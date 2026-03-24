@@ -38,10 +38,7 @@ export class ElectedOfficeController {
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
       id: record.id,
-      electedDate: toDateOnlyString(record.electedDate),
       swornInDate: toDateOnlyString(record.swornInDate),
-      termStartDate: toDateOnlyString(record.termStartDate),
-      termEndDate: toDateOnlyString(record.termEndDate),
     }
   }
 
@@ -119,12 +116,7 @@ export class ElectedOfficeController {
       throw new ForbiddenException('Not allowed to access this elected office')
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
-      electedDate: body.electedDate,
       swornInDate: body.swornInDate,
-      termStartDate: body.termStartDate,
-      termEndDate: body.termEndDate,
-      termLengthDays: body.termLengthDays,
-      isActive: body.isActive,
     }
     const updated = await this.electedOfficeService.update({
       where: { id },

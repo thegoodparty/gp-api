@@ -54,8 +54,6 @@ async function createElectedOffice(params: {
   const response = await request.post('/v1/elected-office', {
     headers: AUTH_HEADER(authToken),
     data: {
-      isActive: true,
-      electedDate: '2024-11-05',
       swornInDate: '2025-01-01',
     },
   })

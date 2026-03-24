@@ -65,7 +65,7 @@ export class UseElectedOfficeGuard implements CanActivate {
       }
     } else {
       electedOffice = await this.electedOfficeService.findFirst({
-        where: { userId, isActive: true },
+        where: { userId },
         include,
       })
     }

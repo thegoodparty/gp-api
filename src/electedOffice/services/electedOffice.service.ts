@@ -13,12 +13,7 @@ import { v7 as uuidv7 } from 'uuid'
 import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
-  electedDate?: Date | null
   swornInDate?: Date | null
-  termStartDate?: Date | null
-  termEndDate?: Date | null
-  termLengthDays?: number | null
-  isActive?: boolean
   userId: number
   campaignId: number
   ballotreadyPositionId?: string | null
@@ -36,32 +31,13 @@ export class ElectedOfficeService extends createPrismaBase(
   constructor(private readonly organizationsService: OrganizationsService) {
     super()
   }
-  // This is for validating that there is only one active elected office per user
-  // prisma at the time of writing does not support partial unique indexes, so we have to do this manually
-  //    eg. Unique UserId with where: { isActive: true } is not supported.
-  //        If we did it without value check, then there could only be one inactive elected office
-  private async validateActiveElectedOffice(
-    userId: number,
-    excludeId?: string,
-  ) {
-    const activeCount = await this.model.count({
-      where: {
-        userId,
-        isActive: true,
-        ...(excludeId && { id: { not: excludeId } }),
-      },
-    })
-
-    if (activeCount > 0) {
-      throw new ConflictException('User already has an active elected office')
-    }
-  }
 
   async create(args: CreateElectedOfficeArgs) {
-    // if isActive is not false, then we need to validate that the user does not
-    // already have an active elected office
-    if (args.isActive !== false) {
-      await this.validateActiveElectedOffice(args.userId)
+    const existing = await this.model.findFirst({
+      where: { userId: args.userId },
+    })
+    if (existing) {
+      throw new ConflictException('User already has an active elected office')
     }
 
     // If the campaign already has an organization, copy its resolved fields
@@ -102,12 +78,7 @@ export class ElectedOfficeService extends createPrismaBase(
       return await tx.electedOffice.create({
         data: {
           id,
-          electedDate: args.electedDate,
           swornInDate: args.swornInDate,
-          termStartDate: args.termStartDate,
-          termEndDate: args.termEndDate,
-          termLengthDays: args.termLengthDays,
-          isActive: args.isActive,
           userId: args.userId,
           campaignId: args.campaignId,
           organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
@@ -117,19 +88,6 @@ export class ElectedOfficeService extends createPrismaBase(
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {
-    const data = args.data as Prisma.ElectedOfficeUpdateInput
-
-    if (data.isActive === true) {
-      const existing = await this.model.findUnique({
-        where: args.where,
-        select: { userId: true },
-      })
-
-      if (existing) {
-        await this.validateActiveElectedOffice(existing.userId, args.where.id)
-      }
-    }
-
     return this.model.update(args)
   }
 
@@ -139,7 +97,7 @@ export class ElectedOfficeService extends createPrismaBase(
 
   getCurrentElectedOffice(userId: number) {
     return this.model.findFirst({
-      where: { userId, isActive: true },
+      where: { userId },
     })
   }
 
