@@ -1,4 +1,5 @@
 import { CampaignWith } from '@/campaigns/campaigns.types'
+import { OrgDistrict } from '@/organizations/organizations.types'
 import { IS_PROD } from '@/shared/util/appEnvironment.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
@@ -16,13 +17,14 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
     this.logger.setContext(VoterFileDownloadAccessService.name)
   }
 
-  canDownload(campaign?: CampaignWith<'pathToVictory'>) {
+  canDownload(
+    campaign?: CampaignWith<'pathToVictory'>,
+    district?: OrgDistrict | null,
+  ) {
     if (!campaign) return false
 
     const ballotLevel = campaign.details?.ballotLevel
-    const hasElectionData =
-      campaign.pathToVictory?.data?.electionType &&
-      campaign.pathToVictory?.data?.electionLocation
+    const hasElectionData = district?.l2Type && district?.l2Name
 
     const canDownload = Boolean(
       // Local races (CITY, TOWNSHIP, etc.) - not required, can fall back to whole state
@@ -31,7 +33,7 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
         (ballotLevel &&
           (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
           campaign.canDownloadFederal) ||
-        // FEDERAL/STATE races with election data from PathToVictory SQS job
+        // FEDERAL/STATE races with district data from Organization
         hasElectionData,
     )
 
@@ -48,8 +50,11 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
   async downloadAccessAlert(
     campaign: CampaignWith<'pathToVictory'>,
     user: User,
+    district?: OrgDistrict | null,
   ) {
-    const canDownload = !campaign ? false : await this.canDownload(campaign)
+    const canDownload = !campaign
+      ? false
+      : await this.canDownload(campaign, district)
     if (!canDownload) {
       // alert Jared and Rob.
       const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`

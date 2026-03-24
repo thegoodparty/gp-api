@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { Readable } from 'stream'
 import { CampaignWith } from '../../../campaigns/campaigns.types'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { OrgDistrict } from '../../../organizations/organizations.types'
 import {
   CHANNELS,
   CustomFilter,
@@ -32,6 +33,7 @@ export class P2pPhoneListUploadService {
   async uploadPhoneList(
     campaign: CampaignWith<'pathToVictory'>,
     request: P2pPhoneListRequestSchema,
+    district: OrgDistrict | null,
   ): Promise<{ token: string; listName: string }> {
     const { name: listName, ...filterData } = request
 
@@ -49,7 +51,11 @@ export class P2pPhoneListUploadService {
 
     let csvBuffer: Buffer
     try {
-      csvBuffer = await this.generatePhoneListCsvStream(campaign, filters)
+      csvBuffer = await this.generatePhoneListCsvStream(
+        campaign,
+        district,
+        filters,
+      )
     } catch (error) {
       this.logger.error(
         { error },
@@ -92,6 +98,7 @@ export class P2pPhoneListUploadService {
 
   private async generatePhoneListCsvStream(
     campaign: CampaignWith<'pathToVictory'>,
+    district: OrgDistrict | null,
     filters: CustomFilter[],
   ): Promise<Buffer> {
     const customFilters = {
@@ -104,6 +111,7 @@ export class P2pPhoneListUploadService {
       this.logger,
       VoterFileType.sms,
       campaign,
+      district,
       customFilters,
       true, // count only
       false,
@@ -138,6 +146,7 @@ export class P2pPhoneListUploadService {
       this.logger,
       VoterFileType.sms,
       campaign,
+      district,
       customFilters,
       false, // not count only
       withFixColumns,

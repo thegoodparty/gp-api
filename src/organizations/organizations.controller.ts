@@ -20,13 +20,14 @@ import {
 } from './schemas/organization.schema'
 import { Roles } from '@/authentication/decorators/Roles.decorator'
 import { pick } from 'es-toolkit'
+import { OrgDistrict } from './organizations.types'
 
 type APIOrganization = {
   slug: string
   name: string | null
   positionName: string | null
   position: null | { id: string; brPositionId: string }
-  district: null | { id: string; l2Type: string; l2Name: string }
+  district: null | OrgDistrict
   electedOfficeId: string | null
   campaignId: number | null
 }

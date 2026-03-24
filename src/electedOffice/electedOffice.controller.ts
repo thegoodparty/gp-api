@@ -14,11 +14,13 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { Prisma, User } from '@prisma/client'
+import { ElectedOffice, Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { toDateOnlyString } from 'src/shared/util/date.util'
+import { ReqElectedOffice } from './decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from './decorators/UseElectedOffice.decorator'
 import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
   CreateElectedOfficeDto,
@@ -51,15 +53,10 @@ export class ElectedOfficeController {
     return this.electedOfficeService.listElectedOffices(query)
   }
 
+  @UseElectedOffice()
   @Get('current')
-  async getCurrent(@ReqUser() user: User) {
-    const record = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!record) {
-      throw new NotFoundException('No active elected office found')
-    }
-    return this.toApi(record)
+  async getCurrent(@ReqElectedOffice() electedOffice: ElectedOffice) {
+    return this.toApi(electedOffice)
   }
 
   @UseGuards(UserOrM2MGuard)

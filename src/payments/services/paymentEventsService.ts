@@ -19,6 +19,7 @@ import { EmailService } from '../../email/email.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -40,6 +41,7 @@ export class PaymentEventsService {
     private readonly emailService: EmailService,
     private readonly crm: CrmCampaignsService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly organizationsService: OrganizationsService,
     private readonly stripeService: StripeService,
     private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => PurchaseService))
@@ -138,7 +140,18 @@ export class PaymentEventsService {
 
     await Promise.allSettled([
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
-      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
+      (async () => {
+        const district = campaign.organizationSlug
+          ? await this.organizationsService.getDistrictForOrgSlug(
+              campaign.organizationSlug,
+            )
+          : null
+        await this.voterFileDownloadAccess.downloadAccessAlert(
+          campaign,
+          user,
+          district,
+        )
+      })(),
     ])
   }
 
@@ -268,7 +281,18 @@ export class PaymentEventsService {
     // Non-critical: Send notifications - log failures but don't fail webhook
     const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
-      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
+      (async () => {
+        const district = campaign.organizationSlug
+          ? await this.organizationsService.getDistrictForOrgSlug(
+              campaign.organizationSlug,
+            )
+          : null
+        await this.voterFileDownloadAccess.downloadAccessAlert(
+          campaign,
+          user,
+          district,
+        )
+      })(),
     ])
 
     // Log any notification failures

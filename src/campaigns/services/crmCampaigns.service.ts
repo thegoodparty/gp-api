@@ -18,6 +18,7 @@ import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/
 import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
+import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
@@ -31,7 +32,6 @@ import {
 } from 'src/elections/types/pathToVictory.types'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
-import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
@@ -229,7 +229,8 @@ export class CrmCampaignsService {
       ballotLevel,
       state,
       pledged,
-      district,
+      campaignCommittee: _campaignCommittee,
+      district: candidateDistrict,
       city,
       runForOffice,
       electionDate,
@@ -239,10 +240,18 @@ export class CrmCampaignsService {
       isProUpdatedAt,
     } = campaignDetails || {}
 
-    const canDownloadVoterFile = this.voterFile.canDownload({
-      ...campaign,
-      pathToVictory,
-    })
+    const district = campaign.organizationSlug
+      ? await this.organizations.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      : null
+    const canDownloadVoterFile = this.voterFile.canDownload(
+      {
+        ...campaign,
+        pathToVictory,
+      },
+      district,
+    )
 
     const lastPortalVisit = formatDateForCRM(user.metaData?.lastVisited)
     const sessionCount = user.metaData?.sessionCount
@@ -304,7 +313,7 @@ export class CrmCampaignsService {
       ecanvasser_contacts_count: ecanvasserCount,
       ecanvasser_houses_count: ecanvasserHousesCount,
       // candidate details
-      candidate_district: district,
+      candidate_district: candidateDistrict,
       candidate_email: user?.email,
       candidate_name: name,
       name: name,

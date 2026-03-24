@@ -2,6 +2,7 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+import { OrgDistrict } from 'src/organizations/organizations.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { WrapperType } from 'src/shared/types/utility.types'
@@ -42,6 +43,7 @@ export class VoterFileService {
       selectedColumns,
       limit,
     }: GetVoterFileSchema,
+    district: OrgDistrict | null,
   ) {
     // Resolve type once at the beginning
     const resolvedType: VoterFileType =
@@ -58,12 +60,13 @@ export class VoterFileService {
               (type as VoterFileType)
 
     if (countOnly) {
-      return this.getVoterCount(resolvedType, campaign, customFilters)
+      return this.getVoterCount(resolvedType, campaign, district, customFilters)
     }
 
     return this.getVoterCsv(
       resolvedType,
       campaign,
+      district,
       customFilters,
       selectedColumns,
       limit,
@@ -73,6 +76,7 @@ export class VoterFileService {
   private async getVoterCount(
     resolvedType: VoterFileType,
     campaign: CampaignWith<'pathToVictory'>,
+    district: OrgDistrict | null,
     customFilters?: GetVoterFileSchema['customFilters'],
   ): Promise<number> {
     // Try regular count first
@@ -80,6 +84,7 @@ export class VoterFileService {
       this.logger,
       resolvedType,
       campaign,
+      district,
       customFilters,
       true,
       false,
@@ -95,6 +100,7 @@ export class VoterFileService {
         this.logger,
         resolvedType,
         campaign,
+        district,
         customFilters,
         true,
         true,
@@ -112,6 +118,7 @@ export class VoterFileService {
   private async getVoterCsv(
     resolvedType: VoterFileType,
     campaign: CampaignWith<'pathToVictory'>,
+    district: OrgDistrict | null,
     customFilters?: GetVoterFileSchema['customFilters'],
     selectedColumns?: GetVoterFileSchema['selectedColumns'],
     limit?: GetVoterFileSchema['limit'],
@@ -121,6 +128,7 @@ export class VoterFileService {
       this.logger,
       resolvedType,
       campaign,
+      district,
       customFilters,
       true,
       false,
@@ -138,6 +146,7 @@ export class VoterFileService {
       this.logger,
       resolvedType,
       campaign,
+      district,
       customFilters,
       false,
       withFixColumns,
