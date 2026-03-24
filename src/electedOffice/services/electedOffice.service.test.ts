@@ -70,7 +70,6 @@ describe('ElectedOfficeService', () => {
 
     service = new ElectedOfficeService({
       resolveOrgData: mockResolveOrgData,
-      findUnique: vi.fn().mockResolvedValue(null),
     } as unknown as OrganizationsService)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
@@ -250,6 +249,35 @@ describe('ElectedOfficeService', () => {
           L2DistrictName: 'District 1',
         }),
       )
+    })
+
+    it('uses orgData directly when provided, skipping campaign org lookup and resolveOrgData', async () => {
+      const createArgs: CreateElectedOfficeArgs = {
+        electedDate: new Date('2024-01-01'),
+        isActive: true,
+        userId: 1,
+        campaignId: 1,
+        orgData: {
+          positionId: 'org-header-position-id',
+          customPositionName: 'City Council',
+          overrideDistrictId: 'org-header-district-id',
+        },
+      }
+
+      mockModel.count.mockResolvedValue(0)
+
+      await service.create(createArgs)
+
+      expect(mockResolveOrgData).not.toHaveBeenCalled()
+      expect(mockOrgCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          slug: expect.stringMatching(/^eo-/),
+          ownerId: 1,
+          positionId: 'org-header-position-id',
+          customPositionName: 'City Council',
+          overrideDistrictId: 'org-header-district-id',
+        }),
+      })
     })
 
     it('links elected office to organization via matching slug', async () => {

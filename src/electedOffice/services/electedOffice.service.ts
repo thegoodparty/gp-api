@@ -21,12 +21,21 @@ export type CreateElectedOfficeArgs = {
   isActive?: boolean
   userId: number
   campaignId: number
+  // LEGACY: Remove these 6 fields when org migration is complete.
+  //         They are only used by resolveOrgData fallback (no org exists yet).
+  //         Once org header is always present, orgData will always be provided by the caller.
   ballotreadyPositionId?: string | null
   office?: string
   otherOffice?: string
   state?: string
   L2DistrictType?: string
   L2DistrictName?: string
+  // When provided, used directly for the new EO org instead of looking up the campaign org
+  orgData?: {
+    positionId: string | null
+    customPositionName: string | null
+    overrideDistrictId: string | null
+  }
 }
 
 @Injectable()
@@ -64,29 +73,10 @@ export class ElectedOfficeService extends createPrismaBase(
       await this.validateActiveElectedOffice(args.userId)
     }
 
-    // If the campaign already has an organization, copy its resolved fields
-    // instead of re-resolving from the election API.
-    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(
-      args.campaignId,
-    )
-    const campaignOrg = await this.organizationsService.findUnique({
-      where: { slug: campaignOrgSlug },
-    })
-
-    const orgData = campaignOrg
-      ? {
-          positionId: campaignOrg.positionId,
-          customPositionName: campaignOrg.customPositionName,
-          overrideDistrictId: campaignOrg.overrideDistrictId,
-        }
-      : await this.organizationsService.resolveOrgData({
-          ballotReadyPositionId: args.ballotreadyPositionId,
-          office: args.office,
-          otherOffice: args.otherOffice,
-          state: args.state,
-          L2DistrictType: args.L2DistrictType,
-          L2DistrictName: args.L2DistrictName,
-        })
+    // Resolve org data for the new elected office organization:
+    // 1. Explicit orgData from caller (org header path or campaign org)
+    // 2. Resolve from election API as fallback (no org exists yet)
+    const orgData = await this.resolveOrgDataForCreate(args)
 
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
@@ -116,6 +106,25 @@ export class ElectedOfficeService extends createPrismaBase(
     })
   }
 
+  // LEGACY: When org migration is complete, orgData will always be provided.
+  //         Remove this method and the OrganizationsService dependency.
+  //         Inline `args.orgData` directly in create().
+  private async resolveOrgDataForCreate(args: CreateElectedOfficeArgs) {
+    if (args.orgData) {
+      return args.orgData
+    }
+
+    // LEGACY: Fallback for callers that don't have an org yet — resolve from election API
+    return this.organizationsService.resolveOrgData({
+      ballotReadyPositionId: args.ballotreadyPositionId,
+      office: args.office,
+      otherOffice: args.otherOffice,
+      state: args.state,
+      L2DistrictType: args.L2DistrictType,
+      L2DistrictName: args.L2DistrictName,
+    })
+  }
+
   async update(args: Prisma.ElectedOfficeUpdateArgs) {
     const data = args.data as Prisma.ElectedOfficeUpdateInput
 
@@ -137,6 +146,8 @@ export class ElectedOfficeService extends createPrismaBase(
     return this.model.delete(args)
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Callers should use findFirst({ where: { organizationSlug } }) instead.
   getCurrentElectedOffice(userId: number) {
     return this.model.findFirst({
       where: { userId, isActive: true },

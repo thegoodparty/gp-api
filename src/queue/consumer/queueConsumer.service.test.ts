@@ -119,7 +119,12 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     markPollComplete: ReturnType<typeof vi.fn>
     model: { count: ReturnType<typeof vi.fn> }
   }
-  let electedOfficeService: { findUnique: ReturnType<typeof vi.fn> }
+  let electedOfficeService: {
+    findUnique: ReturnType<typeof vi.fn>
+    client: {
+      electedOffice: { findUnique: ReturnType<typeof vi.fn> }
+    }
+  }
   let campaignsService: { findUnique: ReturnType<typeof vi.fn> }
   let contactsService: { findContacts: ReturnType<typeof vi.fn> }
   let pollIssuesService: {
@@ -161,6 +166,21 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       findUnique: vi
         .fn()
         .mockResolvedValue({ id: electedOfficeId, campaignId }),
+      client: {
+        electedOffice: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: electedOfficeId,
+            campaignId,
+            organizationSlug: 'eo-office-1',
+            organization: {
+              slug: 'eo-office-1',
+              positionId: 'position-uuid',
+              customPositionName: null,
+              overrideDistrictId: 'district-uuid',
+            },
+          }),
+        },
+      },
     }
     campaignsService = {
       findUnique: vi.fn().mockResolvedValue({
@@ -934,7 +954,12 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       pollIndividualMessage: { findMany: ReturnType<typeof vi.fn> }
     }
   }
-  let electedOfficeService: { findUnique: ReturnType<typeof vi.fn> }
+  let electedOfficeService: {
+    findUnique: ReturnType<typeof vi.fn>
+    client: {
+      electedOffice: { findUnique: ReturnType<typeof vi.fn> }
+    }
+  }
   let campaignsService: { findUnique: ReturnType<typeof vi.fn> }
   let contactsService: { sampleContacts: ReturnType<typeof vi.fn> }
   let s3Service: {
@@ -985,6 +1010,21 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       findUnique: vi
         .fn()
         .mockResolvedValue({ id: electedOfficeId, campaignId }),
+      client: {
+        electedOffice: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: electedOfficeId,
+            campaignId,
+            organizationSlug: 'eo-office-1',
+            organization: {
+              slug: 'eo-office-1',
+              positionId: 'position-uuid',
+              customPositionName: null,
+              overrideDistrictId: 'district-uuid',
+            },
+          }),
+        },
+      },
     }
     campaignsService = {
       findUnique: vi.fn().mockResolvedValue({
@@ -1098,13 +1138,14 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       select: { personId: true },
     })
 
-    // Verify sampleContacts receives correct size and excludeIds
+    // Verify sampleContacts receives correct size, excludeIds, and organization
     expect(contactsService.sampleContacts).toHaveBeenCalledWith(
       {
         size: 1000 - existingRecords.length,
         excludeIds: ['person-existing-1', 'person-existing-2'],
       },
       expect.anything(),
+      expect.objectContaining({ slug: 'eo-office-1' }),
     )
   })
 })

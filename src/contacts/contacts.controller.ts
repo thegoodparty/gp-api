@@ -15,6 +15,9 @@ import {
 import { ContactsService } from './services/contacts.service'
 
 @Controller('contacts')
+// LEGACY: Remove @UseCampaign and @ReqCampaign from all endpoints when org migration is complete.
+//         @UseOrganization becomes required (remove continueIfNotFound).
+//         campaign parameter removed from all service calls.
 @UseCampaign()
 @UseOrganization({ continueIfNotFound: true })
 @UsePipes(ZodValidationPipe)
@@ -22,7 +25,7 @@ export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
-  listContacts(
+  async listContacts(
     @Query() filterDto: ListContactsDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @ReqOrganization() organization: Organization | undefined,
@@ -48,7 +51,7 @@ export class ContactsController {
   }
 
   @Get('stats')
-  getContactsStats(
+  async getContactsStats(
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @ReqOrganization() organization: Organization | undefined,
   ) {
@@ -56,7 +59,7 @@ export class ContactsController {
   }
 
   @Get(':id')
-  getContact(
+  async getContact(
     @Param() params: GetPersonParamsDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @ReqOrganization() organization: Organization | undefined,
