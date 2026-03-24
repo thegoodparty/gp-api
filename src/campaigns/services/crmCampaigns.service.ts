@@ -18,6 +18,7 @@ import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/
 import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
+import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
@@ -44,6 +45,7 @@ export class CrmCampaignsService {
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => CrmUsersService))
     private readonly crmUsers: WrapperType<CrmUsersService>,
+    private readonly organizations: OrganizationsService,
     private readonly aiChat: AiChatService,
     @Inject(forwardRef(() => PathToVictoryService))
     private readonly pathToVictory: WrapperType<PathToVictoryService>,
@@ -224,29 +226,32 @@ export class CrmCampaignsService {
     const {
       zip,
       party,
-      office,
       ballotLevel,
-      level: _level,
       state,
       pledged,
       campaignCommittee: _campaignCommittee,
-      otherOffice,
-      district,
+      district: candidateDistrict,
       city,
-      website: _website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt: _subscriptionCanceledAt,
     } = campaignDetails || {}
 
-    const canDownloadVoterFile = this.voterFile.canDownload({
-      ...campaign,
-      pathToVictory,
-    })
+    const district = campaign.organizationSlug
+      ? await this.organizations.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      : null
+    const canDownloadVoterFile = this.voterFile.canDownload(
+      {
+        ...campaign,
+        pathToVictory,
+      },
+      district,
+    )
 
     const lastPortalVisit = formatDateForCRM(user.metaData?.lastVisited)
     const sessionCount = user.metaData?.sessionCount
@@ -258,7 +263,11 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const resolvedOffice = office === 'Other' ? otherOffice : office
+    const positionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
@@ -304,11 +313,11 @@ export class CrmCampaignsService {
       ecanvasser_contacts_count: ecanvasserCount,
       ecanvasser_houses_count: ecanvasserHousesCount,
       // candidate details
-      candidate_district: district,
+      candidate_district: candidateDistrict,
       candidate_email: user?.email,
       candidate_name: name,
       name: name,
-      candidate_office: resolvedOffice,
+      candidate_office: positionName ?? undefined,
       office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,

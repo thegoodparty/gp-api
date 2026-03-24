@@ -8,9 +8,16 @@ import { AiChatController } from './chat/aiChat.controller'
 import { AiChatService } from './chat/aiChat.service'
 import { AiService } from '../../ai/ai.service'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { OrganizationsModule } from '@/organizations/organizations.module'
 
 @Module({
-  imports: [ContentModule, AiModule, QueueProducerModule, SlackModule],
+  imports: [
+    ContentModule,
+    AiModule,
+    QueueProducerModule,
+    SlackModule,
+    OrganizationsModule,
+  ],
   controllers: [AiContentController, AiChatController],
   providers: [AiContentService, AiChatService, AiService],
   exports: [AiContentService, AiChatService],

@@ -38,6 +38,7 @@ import {
   POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
   sendTevynAPIPollMessage,
 } from 'src/polls/utils/polls.utils'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -66,6 +67,7 @@ import {
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
+import { OrgDistrict } from '@/organizations/organizations.types'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -108,6 +110,7 @@ export class QueueConsumerService {
     private readonly contactsService: ContactsService,
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
+    private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -636,7 +639,7 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
     const { electedOfficeId } = poll
-    const { userId: campaignUserId, pathToVictory } = campaign
+    const { userId: campaignUserId } = campaign
 
     if (!electedOfficeId) {
       throw new InternalServerErrorException(
@@ -822,6 +825,20 @@ export class QueueConsumerService {
       },
     })
 
+    let district: OrgDistrict | null = null
+    if (campaign.organizationSlug) {
+      try {
+        district = await this.organizationsService.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      } catch (e) {
+        this.logger.warn(
+          { e },
+          'Failed to fetch district for analytics, defaulting to null',
+        )
+      }
+    }
+
     await Promise.all([
       this.analytics.identify(campaignUserId, { pollcount: pollCount }),
       this.analytics.track(
@@ -830,7 +847,7 @@ export class QueueConsumerService {
         {
           pollId,
           path: `/dashboard/polls/${pollId}`,
-          constituencyName: pathToVictory?.data.electionLocation,
+          constituencyName: district?.l2Name,
           'issue 1': issues?.at(0)?.theme || null,
           'issue 2': issues?.at(1)?.theme || null,
           'issue 3': issues?.at(2)?.theme || null,
