@@ -55,12 +55,7 @@ describe('ElectedOfficeController', () => {
 
     it('resolves elected office via x-organization-slug header', async () => {
       const created = await createElectedOffice({
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
-        termLengthDays: 730,
-        isActive: true,
       })
       expect(created.status).toBe(201)
 
@@ -72,10 +67,7 @@ describe('ElectedOfficeController', () => {
       expect(result.status).toBe(200)
       expect(result.data).toEqual({
         id: created.data.id,
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
       })
     })
 
@@ -107,9 +99,7 @@ describe('ElectedOfficeController', () => {
         data: {
           userId: otherUser.id,
           campaignId: campaign.id,
-          isActive: true,
           organizationSlug: otherOrg.slug,
-          electedDate: new Date('2024-01-01'),
         },
       })
 
