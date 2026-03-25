@@ -1,11 +1,11 @@
-import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
-import { SlackService } from '@/vendors/slack/services/slack.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PinoLogger } from 'nestjs-pino'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
+import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('VoterFileDownloadAccessService - canDownload', () => {
   let service: VoterFileDownloadAccessService
@@ -132,81 +132,73 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
     })
   })
 
-  describe('FEDERAL/STATE races - with electionType/electionLocation (SQS job completed)', () => {
-    it('should return true for FEDERAL with electionType and electionLocation', () => {
+  describe('FEDERAL/STATE races - with district from Organization', () => {
+    it('should return true for FEDERAL with district', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            electionType: 'US House',
-            electionLocation: 'CA-12',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-1',
+          l2Type: 'US House',
+          l2Name: 'CA-12',
+        }),
+      ).toBe(true)
     })
 
-    it('should return true for STATE with electionType and electionLocation', () => {
+    it('should return true for STATE with district', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.STATE },
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            electionType: 'State Senate',
-            electionLocation: 'CA-15',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-2',
+          l2Type: 'State Senate',
+          l2Name: 'CA-15',
+        }),
+      ).toBe(true)
     })
 
-    it('should return false for FEDERAL with only electionType (missing electionLocation)', () => {
+    it('should return false for FEDERAL with only l2Type (missing l2Name)', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            electionType: 'US House',
-            // missing electionLocation
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(false)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-1',
+          l2Type: 'US House',
+          l2Name: '',
+        }),
+      ).toBe(false)
       expect(mockLogger.info).toHaveBeenCalledWith(
         { id: campaign.id },
         'Campaign is not eligible for download.',
       )
     })
 
-    it('should return false for STATE with only electionLocation (missing electionType)', () => {
+    it('should return false for STATE with no district', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.STATE },
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            // missing electionType
-            electionLocation: 'CA-15',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(false)
+      expect(service.canDownload(campaign, null)).toBe(false)
     })
 
-    it('should return false for FEDERAL without data or flag', () => {
+    it('should return false for FEDERAL without district or flag', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: { data: {} },
       })
       expect(service.canDownload(campaign)).toBe(false)
     })
 
-    it('should return false for STATE without data or flag', () => {
+    it('should return false for STATE without district or flag', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.STATE },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(false)
     })
@@ -226,28 +218,26 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       )
     })
 
-    it('should return true when ballotLevel is missing but electionType/electionLocation exist', () => {
-      // This tests the fallback behavior - allows download if election data exists
+    it('should return true when ballotLevel is missing but district exists', () => {
       const campaign = createMockCampaign({
-        details: {}, // No ballotLevel
+        details: {},
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            electionType: 'US House',
-            electionLocation: 'CA-12',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-1',
+          l2Type: 'US House',
+          l2Name: 'CA-12',
+        }),
+      ).toBe(true)
     })
 
-    it('should return false when ballotLevel is missing and no election data', () => {
+    it('should return false when ballotLevel is missing and no district', () => {
       const campaign = createMockCampaign({
-        details: {}, // No ballotLevel
+        details: {},
         canDownloadFederal: false,
-        pathToVictory: null,
       })
-      expect(service.canDownload(campaign)).toBe(false)
+      expect(service.canDownload(campaign, null)).toBe(false)
     })
   })
 
@@ -284,49 +274,45 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
   })
 
   describe('Business logic validation - priority order', () => {
-    it('should prioritize local race check over election data check', () => {
-      // Even if a local race has election data, it should return true from first condition
+    it('should prioritize local race check over district check', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
-        pathToVictory: {
-          data: {
-            electionType: 'City Council',
-            electionLocation: 'District 1',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-3',
+          l2Type: 'City Council',
+          l2Name: 'District 1',
+        }),
+      ).toBe(true)
     })
 
-    it('should prioritize canDownloadFederal flag over election data for FEDERAL', () => {
-      // Flag should work even without election data
+    it('should prioritize canDownloadFederal flag over district for FEDERAL', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: true,
-        pathToVictory: null,
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(service.canDownload(campaign, null)).toBe(true)
     })
 
-    it('should allow election data as fallback for FEDERAL without flag', () => {
+    it('should allow district as fallback for FEDERAL without flag', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: {
-          data: {
-            electionType: 'US House',
-            electionLocation: 'CA-12',
-          },
-        },
       })
-      expect(service.canDownload(campaign)).toBe(true)
+      expect(
+        service.canDownload(campaign, {
+          id: 'dist-1',
+          l2Type: 'US House',
+          l2Name: 'CA-12',
+        }),
+      ).toBe(true)
     })
 
     it('should return false when all conditions fail', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: { data: {} },
       })
       expect(service.canDownload(campaign)).toBe(false)
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -398,7 +384,7 @@ function createMockCampaign(
 
   return {
     id: overrides.id ?? 1,
-    organizationSlug: null,
+    organizationSlug: `campaign-${overrides.id ?? 1}`,
     slug: overrides.slug ?? 'test-campaign',
     details: overrides.details ?? {},
     canDownloadFederal: overrides.canDownloadFederal ?? false,

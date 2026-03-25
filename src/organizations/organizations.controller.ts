@@ -20,13 +20,14 @@ import {
 } from './schemas/organization.schema'
 import { Roles } from '@/authentication/decorators/Roles.decorator'
 import { pick } from 'es-toolkit'
+import { OrgDistrict } from './organizations.types'
 
 type APIOrganization = {
   slug: string
   name: string | null
   positionName: string | null
-  position: null | { id: string; brPositionId: string }
-  district: null | { id: string; l2Type: string; l2Name: string }
+  position: null | { id: string; state: string; brPositionId: string }
+  district: null | OrgDistrict
   electedOfficeId: string | null
   campaignId: number | null
 }
@@ -43,7 +44,11 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   }
 
   result.position = org.position
-    ? { id: org.position.id, brPositionId: org.position.brPositionId }
+    ? {
+        id: org.position.id,
+        state: org.position.state,
+        brPositionId: org.position.brPositionId,
+      }
     : null
   result.district = org.district
     ? {

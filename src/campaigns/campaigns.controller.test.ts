@@ -7,7 +7,13 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, PathToVictory, User, UserRole } from '@prisma/client'
+import {
+  Campaign,
+  Organization,
+  PathToVictory,
+  User,
+  UserRole,
+} from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -21,6 +27,7 @@ import { CampaignsController } from './campaigns.controller'
 import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 
 const CREATED_AT = '2025-01-01'
 
@@ -442,9 +449,21 @@ describe('CampaignsController', () => {
   })
 
   describe('findMine', () => {
-    it('returns the campaign directly', async () => {
-      const result = await controller.findMine(mockCampaign)
-      expect(result).toBe(mockCampaign)
+    it('returns the campaign with positionName', async () => {
+      const campaignWithRelations: CampaignWith<
+        'organization' | 'pathToVictory'
+      > = {
+        ...mockCampaign,
+        pathToVictory: null as PathToVictory | null,
+        organization: {} as Organization,
+      }
+
+      const result = await controller.findMine(campaignWithRelations)
+
+      expect(result).toEqual({
+        ...campaignWithRelations,
+        positionName: 'Mayor',
+      })
     })
   })
 
@@ -668,7 +687,7 @@ describe('CampaignsController', () => {
       })
     })
 
-    it('calls analytics.identify with detail traits on slug override', async () => {
+    it('calls analytics.identify with detail trait(s) on slug override', async () => {
       const campaignWithUserId: Campaign = { ...mockOtherCampaign, userId: 5 }
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         campaignWithUserId,

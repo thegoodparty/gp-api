@@ -1,18 +1,18 @@
-import { BadGatewayException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { BadGatewayException } from '@nestjs/common'
+import { FastifyReply } from 'fastify'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { CampaignWith } from '../../campaigns/campaigns.types'
 import { P2pController } from './p2p.controller'
 import { PhoneListState } from './peerly.types'
-import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
-import { CampaignWith } from '../../campaigns/campaigns.types'
-import { FastifyReply } from 'fastify'
+import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 
 const mockCampaign: CampaignWith<'pathToVictory'> = {
   id: 1,
   userId: 1,
   slug: 'test-campaign',
-  organizationSlug: null,
+  organizationSlug: 'campaign-1',
   isActive: true,
   isPro: false,
   isDemo: false,
@@ -54,6 +54,9 @@ describe('P2pController', () => {
   let mockP2pPhoneListUploadService: {
     uploadPhoneList: ReturnType<typeof vi.fn>
   }
+  let mockOrganizationsService: {
+    getDistrictForOrgSlug: ReturnType<typeof vi.fn>
+  }
   let mockRes: FastifyReply
 
   beforeEach(() => {
@@ -64,10 +67,14 @@ describe('P2pController', () => {
     mockP2pPhoneListUploadService = {
       uploadPhoneList: vi.fn(),
     }
+    mockOrganizationsService = {
+      getDistrictForOrgSlug: vi.fn().mockResolvedValue(null),
+    }
     mockRes = createMockReply()
     controller = new P2pController(
       mockPeerlyPhoneListService as unknown as PeerlyPhoneListService,
       mockP2pPhoneListUploadService as unknown as P2pPhoneListUploadService,
+      mockOrganizationsService as never,
       createMockLogger(),
     )
   })

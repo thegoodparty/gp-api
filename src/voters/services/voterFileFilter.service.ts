@@ -8,8 +8,8 @@ export class VoterFileFilterService extends createPrismaBase(
   MODELS.VoterFileFilter,
 ) {
   async create(
-    campaignId: number,
-    organizationSlug: string | null,
+    campaignId: number | undefined,
+    organizationSlug: string,
     data: Omit<
       Prisma.VoterFileFilterCreateInput,
       'campaign' | 'outreach' | 'organization'
@@ -40,6 +40,13 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
+  findByOrganizationSlug(slug: string): Promise<VoterFileFilter[]> {
+    return this.model.findMany({
+      where: { organizationSlug: slug },
+      orderBy: { name: 'asc' },
+    })
+  }
+
   findByCampaignId(campaignId: number): Promise<VoterFileFilter[]> {
     return this.model.findMany({
       where: { campaignId },
@@ -56,6 +63,26 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
+  findByIdAndOrganizationSlug(
+    id: number,
+    organizationSlug: string,
+  ): Promise<VoterFileFilter | null> {
+    return this.findFirst({
+      where: { id, organizationSlug },
+    })
+  }
+
+  updateByIdAndOrganizationSlug(
+    id: number,
+    organizationSlug: string,
+    data: UpdateVoterFileFilterSchema,
+  ): Promise<VoterFileFilter> {
+    return this.model.update({
+      where: { id, organizationSlug },
+      data,
+    })
+  }
+
   updateByIdAndCampaignId(
     id: number,
     campaignId: number,
@@ -64,6 +91,15 @@ export class VoterFileFilterService extends createPrismaBase(
     return this.model.update({
       where: { id, campaignId },
       data,
+    })
+  }
+
+  deleteByIdAndOrganizationSlug(
+    id: number,
+    organizationSlug: string,
+  ): Promise<VoterFileFilter> {
+    return this.model.delete({
+      where: { id, organizationSlug },
     })
   }
 

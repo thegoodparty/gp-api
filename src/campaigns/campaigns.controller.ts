@@ -55,6 +55,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -163,8 +164,18 @@ export class CampaignsController {
 
   @Get('mine')
   @UseCampaign({ include: { pathToVictory: true, organization: true } })
-  async findMine(@ReqCampaign() campaign: Campaign) {
-    return campaign
+  async findMine(
+    @ReqCampaign()
+    campaign: CampaignWith<'pathToVictory' | 'organization'>,
+  ) {
+    const { organization: org } = campaign
+
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: org?.customPositionName,
+      positionId: org?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @UseGuards(M2MOnly)

@@ -1,12 +1,12 @@
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
 import { Readable } from 'stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignWith } from '../../../campaigns/campaigns.types'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import { P2P_CSV_COLUMN_MAPPINGS } from '../utils/audienceMapping.util'
 import { P2pPhoneListUploadService } from './p2pPhoneListUpload.service'
-import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 
 vi.mock('../../../voters/voterFile/util/voterFile.util', () => ({
   typeToQuery: vi.fn().mockReturnValue('SELECT 1'),
@@ -16,7 +16,7 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   id: 1,
   userId: 1,
   slug: 'jane-doe',
-  organizationSlug: null,
+  organizationSlug: 'campaign-1',
   isActive: true,
   isPro: false,
   isDemo: false,
@@ -51,6 +51,11 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   },
 }
 
+const mockDistrict = {
+  id: 'dist-1',
+  l2Type: 'City_Portland',
+  l2Name: 'PORTLAND',
+}
 const mockRequest: P2pPhoneListRequestSchema = { name: 'My List' }
 const mockRequestShort: P2pPhoneListRequestSchema = { name: 'List' }
 
@@ -95,7 +100,7 @@ describe('P2pPhoneListUploadService', () => {
       mockTcrCompliance.fetchByCampaignId.mockResolvedValue(null)
 
       await expect(
-        service.uploadPhoneList(mockCampaign, mockRequest),
+        service.uploadPhoneList(mockCampaign, mockRequest, mockDistrict),
       ).rejects.toThrow(BadRequestException)
     })
 
@@ -105,18 +110,22 @@ describe('P2pPhoneListUploadService', () => {
       })
 
       await expect(
-        service.uploadPhoneList(mockCampaign, mockRequest),
+        service.uploadPhoneList(mockCampaign, mockRequest, mockDistrict),
       ).rejects.toThrow(BadRequestException)
     })
 
     it('returns token and listName on success', async () => {
-      const result = await service.uploadPhoneList(mockCampaign, mockRequest)
+      const result = await service.uploadPhoneList(
+        mockCampaign,
+        mockRequest,
+        mockDistrict,
+      )
 
       expect(result).toEqual({ token: 'token-abc', listName: 'My List' })
     })
 
     it('uploads with the correct peerlyIdentityId', async () => {
-      await service.uploadPhoneList(mockCampaign, mockRequest)
+      await service.uploadPhoneList(mockCampaign, mockRequest, mockDistrict)
 
       expect(mockPeerlyPhoneList.uploadPhoneList).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -131,23 +140,31 @@ describe('P2pPhoneListUploadService', () => {
     it('calls typeToQuery twice: first with fixColumns=false, second with fixColumns=false when count > 0', async () => {
       mockVoterDb.query.mockResolvedValue({ rows: [{ count: '42' }] })
 
-      await service.uploadPhoneList(mockCampaign, mockRequestShort)
+      await service.uploadPhoneList(
+        mockCampaign,
+        mockRequestShort,
+        mockDistrict,
+      )
 
       const calls = vi.mocked(voterFileUtil.typeToQuery).mock.calls
       expect(calls).toHaveLength(2)
-      expect(calls[0][5]).toBe(false) // count query: fixColumns=false
-      expect(calls[1][5]).toBe(false) // CSV query: fixColumns=false (count > 0)
+      expect(calls[0][6]).toBe(false) // count query: fixColumns=false
+      expect(calls[1][6]).toBe(false) // CSV query: fixColumns=false (count > 0)
     })
 
     it('calls typeToQuery twice: second with fixColumns=true when count is 0', async () => {
       mockVoterDb.query.mockResolvedValue({ rows: [{ count: '0' }] })
 
-      await service.uploadPhoneList(mockCampaign, mockRequestShort)
+      await service.uploadPhoneList(
+        mockCampaign,
+        mockRequestShort,
+        mockDistrict,
+      )
 
       const calls = vi.mocked(voterFileUtil.typeToQuery).mock.calls
       expect(calls).toHaveLength(2)
-      expect(calls[0][5]).toBe(false) // count query: always fixColumns=false
-      expect(calls[1][5]).toBe(true) // CSV query: fixColumns=true (count was 0)
+      expect(calls[0][6]).toBe(false) // count query: always fixColumns=false
+      expect(calls[1][6]).toBe(true) // CSV query: fixColumns=true (count was 0)
     })
 
     it('calls typeToQuery twice: second with fixColumns=true when count query fails with 42703', async () => {
@@ -157,12 +174,16 @@ describe('P2pPhoneListUploadService', () => {
       )
       mockVoterDb.query.mockRejectedValue(columnNotFoundError)
 
-      await service.uploadPhoneList(mockCampaign, mockRequestShort)
+      await service.uploadPhoneList(
+        mockCampaign,
+        mockRequestShort,
+        mockDistrict,
+      )
 
       const calls = vi.mocked(voterFileUtil.typeToQuery).mock.calls
       expect(calls).toHaveLength(2)
-      expect(calls[0][5]).toBe(false) // count query: always fixColumns=false
-      expect(calls[1][5]).toBe(true) // CSV query: fixColumns=true (column not found)
+      expect(calls[0][6]).toBe(false) // count query: always fixColumns=false
+      expect(calls[1][6]).toBe(true) // CSV query: fixColumns=true (column not found)
     })
 
     it('rethrows count query errors that are not column-not-found', async () => {
@@ -172,16 +193,20 @@ describe('P2pPhoneListUploadService', () => {
       mockVoterDb.query.mockRejectedValue(dbError)
 
       await expect(
-        service.uploadPhoneList(mockCampaign, mockRequestShort),
+        service.uploadPhoneList(mockCampaign, mockRequestShort, mockDistrict),
       ).rejects.toThrow(BadRequestException)
     })
 
     it('passes P2P_CSV_COLUMN_MAPPINGS on the second typeToQuery call', async () => {
-      await service.uploadPhoneList(mockCampaign, mockRequestShort)
+      await service.uploadPhoneList(
+        mockCampaign,
+        mockRequestShort,
+        mockDistrict,
+      )
 
       const calls = vi.mocked(voterFileUtil.typeToQuery).mock.calls
       expect(calls).toHaveLength(2)
-      expect(calls[1][6]).toBe(P2P_CSV_COLUMN_MAPPINGS)
+      expect(calls[1][7]).toBe(P2P_CSV_COLUMN_MAPPINGS)
     })
   })
 })

@@ -321,7 +321,6 @@ describe('GET /v1/organizations', () => {
         organizationSlug: 'eo-abc-123',
         userId: service.user.id,
         campaignId: campaign.id,
-        electedDate: new Date('2025-11-05'),
         swornInDate: new Date('2026-01-15'),
       },
     })

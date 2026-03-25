@@ -1,6 +1,6 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException } from '@nestjs/common'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import {
   beforeEach,
   describe,
@@ -29,6 +29,7 @@ describe('ElectedOfficeService', () => {
     findUnique: ReturnType<typeof vi.fn>
     findFirst: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
   }
 
   beforeEach(() => {
@@ -66,11 +67,11 @@ describe('ElectedOfficeService', () => {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       count: vi.fn(),
+      findMany: vi.fn(),
     }
 
     service = new ElectedOfficeService({
       resolveOrgData: mockResolveOrgData,
-      findUnique: vi.fn().mockResolvedValue(null),
     } as unknown as OrganizationsService)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
@@ -84,16 +85,14 @@ describe('ElectedOfficeService', () => {
   })
 
   describe('create', () => {
-    it('throws ConflictException when creating active office and user already has one', async () => {
+    it('throws ConflictException when user already has an elected office', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
         userId: 1,
         campaignId: 1,
       }
 
-      mockModel.count.mockResolvedValue(1)
+      mockModel.findFirst.mockResolvedValue({ id: 'existing', userId: 1 })
 
       await expect(service.create(createArgs)).rejects.toThrow(
         ConflictException,
@@ -102,38 +101,8 @@ describe('ElectedOfficeService', () => {
         'User already has an active elected office',
       )
 
-      expect(mockModel.count).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          isActive: true,
-        },
-      })
-      expect(mockOrgCreate).not.toHaveBeenCalled()
-      expect(mockEoCreate).not.toHaveBeenCalled()
-    })
-
-    it('throws ConflictException when creating office with isActive not specified and user already has one', async () => {
-      const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
-        userId: 1,
-        campaignId: 1,
-      }
-
-      mockModel.count.mockResolvedValue(1)
-
-      await expect(service.create(createArgs)).rejects.toThrow(
-        ConflictException,
-      )
-      await expect(service.create(createArgs)).rejects.toThrow(
-        'User already has an active elected office',
-      )
-
-      expect(mockModel.count).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          isActive: true,
-        },
+      expect(mockModel.findFirst).toHaveBeenCalledWith({
+        where: { userId: 1 },
       })
       expect(mockOrgCreate).not.toHaveBeenCalled()
       expect(mockEoCreate).not.toHaveBeenCalled()
@@ -142,13 +111,11 @@ describe('ElectedOfficeService', () => {
     it('creates organization with resolved org data and elected office in transaction', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
         userId: 1,
         campaignId: 1,
       }
 
-      mockModel.count.mockResolvedValue(0)
+      mockModel.findFirst.mockResolvedValue(null)
 
       await service.create(createArgs)
 
@@ -171,8 +138,6 @@ describe('ElectedOfficeService', () => {
       })
       expect(mockEoCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          electedDate: new Date('2024-01-01'),
-          isActive: true,
           userId: 1,
           campaignId: 1,
           organizationSlug: expect.stringMatching(/^eo-/),
@@ -189,13 +154,11 @@ describe('ElectedOfficeService', () => {
 
       const createArgs: CreateElectedOfficeArgs = {
         ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
         userId: 1,
         campaignId: 1,
       }
 
-      mockModel.count.mockResolvedValue(0)
+      mockModel.findFirst.mockResolvedValue(null)
 
       await service.create(createArgs)
 
@@ -211,27 +174,9 @@ describe('ElectedOfficeService', () => {
       })
     })
 
-    it('skips active validation when isActive is false', async () => {
-      const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
-        isActive: false,
-        userId: 1,
-        campaignId: 1,
-      }
-
-      await service.create(createArgs)
-
-      expect(mockModel.count).not.toHaveBeenCalled()
-      expect(mockResolveOrgData).toHaveBeenCalled()
-      expect(mockOrgCreate).toHaveBeenCalled()
-      expect(mockEoCreate).toHaveBeenCalled()
-    })
-
     it('passes district data to resolveOrgData', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
         userId: 1,
         campaignId: 1,
         state: 'CA',
@@ -239,7 +184,7 @@ describe('ElectedOfficeService', () => {
         L2DistrictName: 'District 1',
       }
 
-      mockModel.count.mockResolvedValue(0)
+      mockModel.findFirst.mockResolvedValue(null)
 
       await service.create(createArgs)
 
@@ -252,15 +197,41 @@ describe('ElectedOfficeService', () => {
       )
     })
 
+    it('uses orgData directly when provided, skipping campaign org lookup and resolveOrgData', async () => {
+      const createArgs: CreateElectedOfficeArgs = {
+        userId: 1,
+        campaignId: 1,
+        orgData: {
+          positionId: 'org-header-position-id',
+          customPositionName: 'City Council',
+          overrideDistrictId: 'org-header-district-id',
+        },
+      }
+
+      mockModel.count.mockResolvedValue(0)
+
+      await service.create(createArgs)
+
+      expect(mockResolveOrgData).not.toHaveBeenCalled()
+      expect(mockOrgCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          slug: expect.stringMatching(/^eo-/),
+          ownerId: 1,
+          positionId: 'org-header-position-id',
+          customPositionName: 'City Council',
+          overrideDistrictId: 'org-header-district-id',
+        }),
+      })
+    })
+
     it('links elected office to organization via matching slug', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         ballotreadyPositionId: BR_POSITION_ID,
-        electedDate: new Date('2024-01-01'),
         userId: 1,
         campaignId: 1,
       }
 
-      mockModel.count.mockResolvedValue(0)
+      mockModel.findFirst.mockResolvedValue(null)
 
       await service.create(createArgs)
 
@@ -272,190 +243,37 @@ describe('ElectedOfficeService', () => {
   })
 
   describe('update', () => {
-    it('throws ConflictException when updating to active and user already has another active office', async () => {
-      const updateArgs: Prisma.ElectedOfficeUpdateArgs = {
-        where: { id: 'office-1' },
-        data: {
-          isActive: true,
-        },
-      }
-
-      mockModel.findUnique.mockResolvedValue({ userId: 1 })
-      mockModel.count.mockResolvedValue(1)
-
-      await expect(service.update(updateArgs)).rejects.toThrow(
-        ConflictException,
-      )
-      await expect(service.update(updateArgs)).rejects.toThrow(
-        'User already has an active elected office',
-      )
-
-      expect(mockModel.findUnique).toHaveBeenCalledWith({
-        where: { id: 'office-1' },
-        select: { userId: true },
-      })
-      expect(mockModel.count).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          isActive: true,
-          id: { not: 'office-1' },
-        },
-      })
-      expect(mockModel.update).not.toHaveBeenCalled()
-    })
-    it('updates elected office when isActive is not changed to true', async () => {
+    it('delegates to model.update', async () => {
       const mockElectedOffice = {
         id: 'office-1',
         userId: 1,
         campaignId: 1,
-        isActive: false,
-        electedDate: new Date('2024-01-01'),
         swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
 
-      const updateArgs: Prisma.ElectedOfficeUpdateArgs = {
+      const updateArgs = {
         where: { id: 'office-1' },
-        data: {
-          electedDate: new Date('2024-02-01'),
-        },
+        data: { swornInDate: new Date('2024-01-15') },
       }
 
       mockModel.update.mockResolvedValue(mockElectedOffice)
 
       const result = await service.update(updateArgs)
 
-      expect(mockModel.findUnique).not.toHaveBeenCalled()
-      expect(mockModel.count).not.toHaveBeenCalled()
-      expect(mockModel.update).toHaveBeenCalledWith(updateArgs)
-      expect(result).toEqual(mockElectedOffice)
-    })
-
-    it('updates elected office to inactive without validation', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: false,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      const updateArgs: Prisma.ElectedOfficeUpdateArgs = {
-        where: { id: 'office-1' },
-        data: {
-          isActive: false,
-        },
-      }
-
-      mockModel.update.mockResolvedValue(mockElectedOffice)
-
-      const result = await service.update(updateArgs)
-
-      expect(mockModel.findUnique).not.toHaveBeenCalled()
-      expect(mockModel.count).not.toHaveBeenCalled()
-      expect(mockModel.update).toHaveBeenCalledWith(updateArgs)
-      expect(result).toEqual(mockElectedOffice)
-    })
-
-    it('updates elected office to active when user has no other active office', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      const updateArgs: Prisma.ElectedOfficeUpdateArgs = {
-        where: { id: 'office-1' },
-        data: {
-          isActive: true,
-        },
-      }
-
-      mockModel.findUnique.mockResolvedValue({ userId: 1 })
-      mockModel.count.mockResolvedValue(0)
-      mockModel.update.mockResolvedValue(mockElectedOffice)
-
-      const result = await service.update(updateArgs)
-
-      expect(mockModel.findUnique).toHaveBeenCalledWith({
-        where: { id: 'office-1' },
-        select: { userId: true },
-      })
-      expect(mockModel.count).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          isActive: true,
-          id: { not: 'office-1' },
-        },
-      })
-      expect(mockModel.update).toHaveBeenCalledWith(updateArgs)
-      expect(result).toEqual(mockElectedOffice)
-    })
-
-    it('skips validation when existing office is not found', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      const updateArgs: Prisma.ElectedOfficeUpdateArgs = {
-        where: { id: 'office-1' },
-        data: {
-          isActive: true,
-        },
-      }
-
-      mockModel.findUnique.mockResolvedValue(null)
-      mockModel.update.mockResolvedValue(mockElectedOffice)
-
-      const result = await service.update(updateArgs)
-
-      expect(mockModel.findUnique).toHaveBeenCalled()
-      expect(mockModel.count).not.toHaveBeenCalled()
       expect(mockModel.update).toHaveBeenCalledWith(updateArgs)
       expect(result).toEqual(mockElectedOffice)
     })
   })
 
   describe('getCurrentElectedOffice', () => {
-    it('returns active elected office for user and filters out inactive elected offices', async () => {
+    it('returns elected office for user', async () => {
       const mockElectedOffice = {
         id: 'office-1',
         userId: 1,
         campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
         swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -465,7 +283,7 @@ describe('ElectedOfficeService', () => {
       const result = await service.getCurrentElectedOffice(1)
 
       expect(mockModel.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1, isActive: true },
+        where: { userId: 1 },
       })
       expect(result).toEqual(mockElectedOffice)
     })

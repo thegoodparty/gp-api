@@ -1,26 +1,19 @@
+import { StatsResponse } from '@/contacts/contacts.types'
+import { ContactsService } from '@/contacts/services/contacts.service'
 import { useTestService } from '@/test-service'
 import { Poll } from '@prisma/client'
+import { v7 as uuidv7 } from 'uuid'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
-import { ContactsService } from '@/contacts/services/contacts.service'
-import { StatsResponse } from '@/contacts/contacts.types'
 
 const service = useTestService()
 
 const getStats = vi.fn(ContactsService.prototype.getDistrictStats)
 
 beforeEach(async () => {
-  const campaign = await service.prisma.campaign.create({
-    data: {
-      userId: service.user.id,
-      slug: 'test-campaign',
-      details: {
-        state: 'WY',
-      },
-    },
-  })
+  const campaignId = 8888
+  const organizationSlug = `campaign-${campaignId}`
 
-  const organizationSlug = `campaign-${campaign.id}`
   await service.prisma.organization.create({
     data: {
       slug: organizationSlug,
@@ -29,9 +22,16 @@ beforeEach(async () => {
     },
   })
 
-  await service.prisma.campaign.update({
-    where: { id: campaign.id },
-    data: { organizationSlug },
+  const campaign = await service.prisma.campaign.create({
+    data: {
+      id: campaignId,
+      organizationSlug,
+      userId: service.user.id,
+      slug: 'test-campaign',
+      details: {
+        state: 'WY',
+      },
+    },
   })
 
   await service.prisma.pathToVictory.create({
@@ -44,11 +44,17 @@ beforeEach(async () => {
     },
   })
 
+  const electedOfficeId = uuidv7()
+  const eoOrgSlug = `eo-${electedOfficeId}`
+  await service.prisma.organization.create({
+    data: { slug: eoOrgSlug, ownerId: service.user.id },
+  })
   await service.prisma.electedOffice.create({
     data: {
+      id: electedOfficeId,
       userId: service.user.id,
       campaignId: campaign.id,
-      isActive: true,
+      organizationSlug: eoOrgSlug,
     },
   })
 
