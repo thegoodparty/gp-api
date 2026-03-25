@@ -43,7 +43,6 @@ describe('UseElectedOffice guard (integration)', () => {
       data: {
         userId: service.user.id,
         campaignId: campaign.id,
-        isActive: true,
         organizationSlug: org.slug,
       },
     })
@@ -52,7 +51,7 @@ describe('UseElectedOffice guard (integration)', () => {
   }
 
   describe('legacy fallback (no header)', () => {
-    it('resolves elected office by userId + isActive', async () => {
+    it('resolves elected office by userId', async () => {
       await createElectedOfficeWithOrg()
       const result = await service.client.get('/v1/polls/has-polls')
 

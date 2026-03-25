@@ -632,12 +632,12 @@ export class QueueConsumerService {
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
     const { pollId, totalResponses, responsesLocation, issues } = event.data
     this.logger.info(`Handling poll analysis complete event for poll ${pollId}`)
-    const data = await this.getPollAndCampaign(pollId)
+    const data = await this.getPollAndOrganization(pollId)
     if (!data) {
       this.logger.info('Poll not found, ignoring event')
       return
     }
-    const { poll, campaign } = data
+    const { poll, organization, campaign } = data
     const { electedOfficeId } = poll
     const { userId: campaignUserId } = campaign
 
@@ -666,6 +666,7 @@ export class QueueConsumerService {
     const constituency = await this.contactsService.findContacts(
       { segment: 'all', resultsPerPage: 5, page: 1 },
       campaign,
+      organization,
     )
 
     let highConfidence = false
@@ -912,12 +913,12 @@ export class QueueConsumerService {
     sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
     isExpansion: boolean
   }) {
-    const data = await this.getPollAndCampaign(params.pollId)
+    const data = await this.getPollAndOrganization(params.pollId)
     if (!data) {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
       return
     }
-    const { poll, campaign } = data
+    const { poll, organization, campaign } = data
 
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
@@ -958,6 +959,7 @@ export class QueueConsumerService {
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
+        organization,
       )
       if (sample.length === 0) {
         throw new Error(`No contacts returned in sample for poll ${poll.id}`)
@@ -1025,7 +1027,7 @@ export class QueueConsumerService {
     return true
   }
 
-  private async getPollAndCampaign(pollId: string) {
+  private async getPollAndOrganization(pollId: string) {
     const poll = await this.pollsService.findUnique({
       where: { id: pollId },
     })
@@ -1039,12 +1041,20 @@ export class QueueConsumerService {
       return
     }
 
-    const office = await this.electedOfficeService.findUnique({
-      where: { id: poll.electedOfficeId },
-    })
+    const office =
+      await this.electedOfficeService.client.electedOffice.findUnique({
+        where: { id: poll.electedOfficeId },
+        include: { organization: true },
+      })
 
     if (!office) {
       this.logger.info('Elected office not found, ignoring event')
+      return
+    }
+
+    const organization = office.organization
+    if (!organization) {
+      this.logger.info('Elected office has no organization, ignoring event')
       return
     }
 
@@ -1057,7 +1067,7 @@ export class QueueConsumerService {
       this.logger.info('No campaign found, ignoring event')
       return
     }
-    return { poll, office, campaign }
+    return { poll, office, organization, campaign }
   }
 
   async findMappedPersonIdsForCellPhones(params: {

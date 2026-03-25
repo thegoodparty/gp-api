@@ -9,7 +9,7 @@ export class VoterFileFilterService extends createPrismaBase(
 ) {
   async create(
     campaignId: number,
-    organizationSlug: string | null,
+    organizationSlug: string,
     data: Omit<
       Prisma.VoterFileFilterCreateInput,
       'campaign' | 'outreach' | 'organization'
@@ -53,6 +53,15 @@ export class VoterFileFilterService extends createPrismaBase(
   ): Promise<VoterFileFilter | null> {
     return this.findFirst({
       where: { id, campaignId },
+    })
+  }
+
+  findByIdAndOrganizationSlug(
+    id: number,
+    organizationSlug: string,
+  ): Promise<VoterFileFilter | null> {
+    return this.findFirst({
+      where: { id, organizationSlug },
     })
   }
 

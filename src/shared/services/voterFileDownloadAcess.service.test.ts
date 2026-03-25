@@ -1,11 +1,11 @@
-import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
-import { SlackService } from '@/vendors/slack/services/slack.service'
-import { Test, TestingModule } from '@nestjs/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PinoLogger } from 'nestjs-pino'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
+import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('VoterFileDownloadAccessService - canDownload', () => {
   let service: VoterFileDownloadAccessService
@@ -384,7 +384,7 @@ function createMockCampaign(
 
   return {
     id: overrides.id ?? 1,
-    organizationSlug: null,
+    organizationSlug: `campaign-${overrides.id ?? 1}`,
     slug: overrides.slug ?? 'test-campaign',
     details: overrides.details ?? {},
     canDownloadFederal: overrides.canDownloadFederal ?? false,

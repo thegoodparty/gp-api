@@ -33,6 +33,7 @@ describe('ContactsService', () => {
     }
     let mockVoterFileFilterService: {
       findByIdAndCampaignId: ReturnType<typeof vi.fn>
+      findByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     }
     let mockElectionsService: {
       cleanDistrictName: ReturnType<typeof vi.fn>
@@ -63,6 +64,7 @@ describe('ContactsService', () => {
       }
       mockVoterFileFilterService = {
         findByIdAndCampaignId: vi.fn().mockResolvedValue(null),
+        findByIdAndOrganizationSlug: vi.fn().mockResolvedValue(null),
       }
       mockElectionsService = {
         cleanDistrictName: vi.fn((name: string) => name),
@@ -191,6 +193,7 @@ describe('ContactsService', () => {
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
           where: { organizationSlug: org.slug },
         })
+        // Does NOT fall through to userId — org header represents the user's chosen context
         expect(
           mockElectedOfficeService.getCurrentElectedOffice,
         ).not.toHaveBeenCalled()
@@ -307,6 +310,7 @@ describe('ContactsService', () => {
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
           where: { organizationSlug: org.slug },
         })
+        // Does NOT fall through to userId — org header represents the user's chosen context
         expect(
           mockElectedOfficeService.getCurrentElectedOffice,
         ).not.toHaveBeenCalled()
@@ -412,12 +416,12 @@ describe('ContactsService', () => {
         const org = makeOrganization({ positionId: 'position-uuid' })
         mockElectionsService.getPositionById.mockResolvedValue({
           id: 'position-uuid',
+          state: 'WY',
           district: null,
         })
         const statewideCampaign = {
           ...baseCampaign,
           canDownloadFederal: true,
-          details: { state: 'WY', ballotLevel: 'STATE' },
         } as unknown as CampaignWithPathToVictory
 
         mockHttpService.post.mockReturnValue(
@@ -446,40 +450,31 @@ describe('ContactsService', () => {
         expect(callBody.districtId).toBeUndefined()
       })
 
-      it('falls back to state-only when org has no district and campaign is approved for statewide', async () => {
-        const org = makeOrganization()
-        const statewideCampaign = {
-          ...baseCampaign,
-          canDownloadFederal: true,
-          details: { state: 'WY', ballotLevel: 'STATE' },
-        } as unknown as CampaignWithPathToVictory
+      it('throws when position has no district and campaign is not approved for statewide', async () => {
+        const org = makeOrganization({ positionId: 'position-uuid' })
+        mockElectionsService.getPositionById.mockResolvedValue({
+          id: 'position-uuid',
+          state: 'WY',
+          district: null,
+        })
 
-        mockHttpService.post.mockReturnValue(
-          of({ data: { people: [], pagination: {} } }),
+        await expect(
+          service.findContacts(
+            {
+              resultsPerPage: 10,
+              page: 1,
+              search: undefined,
+              segment: 'all',
+            },
+            baseCampaign,
+            org,
+          ),
+        ).rejects.toThrow(
+          'Statewide or federal contacts require admin approval',
         )
-
-        await service.findContacts(
-          { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          statewideCampaign,
-          org,
-        )
-
-        expect(mockHttpService.post).toHaveBeenCalledWith(
-          expect.stringContaining('/v1/people'),
-          expect.objectContaining({
-            state: 'WY',
-          }),
-          expect.any(Object),
-        )
-        // Should not include districtId
-        const callBody = mockHttpService.post.mock.calls[0][1] as Record<
-          string,
-          unknown
-        >
-        expect(callBody.districtId).toBeUndefined()
       })
 
-      it('throws when org has no district and campaign is not approved for statewide', async () => {
+      it('throws when org has no positionId and no overrideDistrictId', async () => {
         const org = makeOrganization()
 
         await expect(
@@ -493,7 +488,9 @@ describe('ContactsService', () => {
             baseCampaign,
             org,
           ),
-        ).rejects.toThrow(BadRequestException)
+        ).rejects.toThrow(
+          'Organization does not have sufficient data to resolve district',
+        )
       })
 
       it('uses legacy campaign path when organization is undefined', async () => {
