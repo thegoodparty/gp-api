@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
+import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { Observable, Subscriber } from 'rxjs'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
@@ -27,7 +28,9 @@ export class CampaignTasksService extends createPrismaBase(
     super()
   }
 
-  async enqueueGenerateTasks(campaign: Campaign): Promise<{ accepted: true }> {
+  async enqueueGenerateTasks(
+    campaign: CampaignWithPathToVictory,
+  ): Promise<{ accepted: true }> {
     try {
       await this.queueProducerService.sendMessage(
         {
@@ -104,7 +107,7 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateTasks(campaign: Campaign) {
+  async generateTasks(campaign: CampaignWithPathToVictory) {
     try {
       await this.generateDefaultTasks(campaign)
       const generatedTasks =
@@ -120,7 +123,9 @@ export class CampaignTasksService extends createPrismaBase(
     }
   }
 
-  generateTasksStream(campaign: Campaign): Observable<MessageEvent> {
+  generateTasksStream(
+    campaign: CampaignWithPathToVictory,
+  ): Observable<MessageEvent> {
     return new Observable((subscriber: Subscriber<MessageEvent>) => {
       this.runGenerationStream(campaign, subscriber).catch((error) => {
         subscriber.next({
@@ -132,7 +137,7 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private async runGenerationStream(
-    campaign: Campaign,
+    campaign: CampaignWithPathToVictory,
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
     await this.generateDefaultTasks(campaign)

@@ -13,22 +13,22 @@ import {
 import { Observable } from 'rxjs'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
+import { CampaignWithPathToVictory } from '../campaigns.types'
 
 @Controller('campaigns/tasks')
-@UseCampaign()
+@UseCampaign({ include: { pathToVictory: true } })
 export class CampaignTasksController {
   constructor(private readonly tasksService: CampaignTasksService) {}
 
   @Get()
-  listCampaignTasks(@ReqCampaign() campaign: Campaign) {
+  listCampaignTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
     return this.tasksService.listCampaignTasks(campaign)
   }
 
   @Put('complete/:id')
   async completeTask(
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Param('id') id: string,
   ) {
     return this.tasksService.completeTask(campaign, id)
@@ -36,7 +36,7 @@ export class CampaignTasksController {
 
   @Delete('complete/:id')
   async unCompleteTask(
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Param('id') id: string,
   ) {
     return this.tasksService.unCompleteTask(campaign, id)
@@ -44,13 +44,13 @@ export class CampaignTasksController {
 
   @Post('generate')
   @HttpCode(HttpStatus.ACCEPTED)
-  enqueueGenerateTasks(@ReqCampaign() campaign: Campaign) {
+  enqueueGenerateTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
     return this.tasksService.enqueueGenerateTasks(campaign)
   }
 
   @Sse('generate/stream')
   generateTasksStream(
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
   ): Observable<MessageEvent> {
     return this.tasksService.generateTasksStream(campaign)
   }

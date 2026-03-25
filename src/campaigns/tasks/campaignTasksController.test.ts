@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTasksController } from './campaignTasksController'
 import { CampaignTasksService } from './services/campaignTasks.service'
-import { Campaign, CampaignTaskType } from '@prisma/client'
+import { CampaignTaskType } from '@prisma/client'
+import { CampaignWithPathToVictory } from '../campaigns.types'
 
-const makeCampaign = (): Campaign =>
+const makeCampaign = (): CampaignWithPathToVictory =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -16,7 +17,8 @@ const makeCampaign = (): Campaign =>
     details: {},
     aiContent: {},
     vendorTsData: {},
-  }) as Campaign
+    pathToVictory: null,
+  }) as CampaignWithPathToVictory
 
 const makeDbTask = (overrides = {}) => ({
   id: 'task-1',
