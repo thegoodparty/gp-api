@@ -588,5 +588,131 @@ describe('ContactsService', () => {
         )
       })
     })
+
+    describe('org-only path (no campaign)', () => {
+      it('findContacts succeeds with org and no campaign', async () => {
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await service.findContacts(
+          { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
+          undefined,
+          org,
+        )
+
+        expect(mockHttpService.post).toHaveBeenCalledWith(
+          expect.stringContaining('/v1/people'),
+          expect.objectContaining({
+            districtId: 'override-district-uuid',
+          }),
+          expect.any(Object),
+        )
+      })
+
+      it('findContacts search succeeds with org + EO access and no campaign', async () => {
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+        mockElectedOfficeService.findFirst.mockResolvedValue({
+          id: 'office-1',
+          organizationSlug: org.slug,
+        })
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            undefined,
+            org,
+          ),
+        ).resolves.toBeDefined()
+      })
+
+      it('findContacts search throws with org + no EO access and no campaign', async () => {
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+        mockElectedOfficeService.findFirst.mockResolvedValue(null)
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            undefined,
+            org,
+          ),
+        ).rejects.toThrow('Search is only available for pro campaigns')
+      })
+
+      it('downloadContacts succeeds with org + EO access and no campaign', async () => {
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+        mockElectedOfficeService.findFirst.mockResolvedValue({
+          id: 'office-1',
+          organizationSlug: org.slug,
+        })
+
+        const mockStream = {
+          pipe: vi.fn(),
+          on: vi.fn((event: string, cb: () => void) => {
+            if (event === 'end') setImmediate(cb)
+          }),
+        }
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const res = { raw: {} } as never
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, undefined, res, org),
+        ).resolves.toBeUndefined()
+      })
+
+      it('throws when neither campaign nor organization is provided', async () => {
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
+            undefined,
+            undefined,
+          ),
+        ).rejects.toThrow('Campaign or organization is required')
+      })
+
+      it('getDistrictStats throws when neither campaign nor organization is provided', async () => {
+        await expect(
+          service.getDistrictStats(undefined, undefined),
+        ).rejects.toThrow('Campaign or organization is required')
+      })
+
+      it('statewide org with no campaign throws (canDownloadFederal defaults to false)', async () => {
+        const org = makeOrganization({ positionId: 'position-uuid' })
+        mockElectionsService.getPositionById.mockResolvedValue({
+          id: 'position-uuid',
+          state: 'WY',
+          district: null,
+        })
+
+        await expect(
+          service.findContacts(
+            {
+              resultsPerPage: 10,
+              page: 1,
+              search: undefined,
+              segment: 'all',
+            },
+            undefined,
+            org,
+          ),
+        ).rejects.toThrow(
+          'Statewide or federal contacts require admin approval',
+        )
+      })
+    })
   })
 })
