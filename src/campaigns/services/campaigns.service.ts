@@ -97,7 +97,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       where: { campaignId },
       select: { organizationSlug: true },
     })
-    if (!eo?.organizationSlug) return
+    if (!eo) return
 
     await tx.organization.update({
       where: { slug: eo.organizationSlug },

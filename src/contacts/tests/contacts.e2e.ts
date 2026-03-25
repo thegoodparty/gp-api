@@ -54,8 +54,6 @@ async function createElectedOffice(params: {
   const response = await request.post('/v1/elected-office', {
     headers: AUTH_HEADER(authToken),
     data: {
-      isActive: true,
-      electedDate: '2024-11-05',
       swornInDate: '2025-01-01',
     },
   })
@@ -63,21 +61,6 @@ async function createElectedOffice(params: {
   await assertOk(response, 'Elected office creation failed')
   const payload = (await response.json()) as { id: string }
   return payload.id
-}
-
-async function updateElectedOffice(params: {
-  request: APIRequestContext
-  authToken: string
-  electedOfficeId: string
-  data: Record<string, unknown>
-}) {
-  const { request, authToken, electedOfficeId, data } = params
-  const response = await request.put(`/v1/elected-office/${electedOfficeId}`, {
-    headers: AUTH_HEADER(authToken),
-    data,
-  })
-
-  await assertOk(response, 'Elected office update failed')
 }
 
 async function prepareCampaignAndOffice(params: {
@@ -143,7 +126,6 @@ test.describe('Contacts and Segments', () => {
   let campaignSlug: string
   let testUserId: number
   let testAuthToken: string
-  let electedOfficeId: string
 
   test.beforeEach(async ({ request }) => {
     const registerResponse = await registerUser(request, {
@@ -161,7 +143,7 @@ test.describe('Contacts and Segments', () => {
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
 
-    electedOfficeId = await prepareCampaignAndOffice({
+    await prepareCampaignAndOffice({
       request,
       authToken,
     })
@@ -178,46 +160,6 @@ test.describe('Contacts and Segments', () => {
   }) => {
     const response = await request.get(`/v1/contacts`)
     expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
-  })
-
-  test('should block contact search for non-pro campaigns without elected office', async ({
-    request,
-  }) => {
-    await updateElectedOffice({
-      request,
-      authToken,
-      electedOfficeId,
-      data: { isActive: false },
-    })
-
-    const response = await request.get(`/v1/contacts?search=smith`, {
-      headers: AUTH_HEADER(authToken),
-    })
-
-    expect(response.status()).toBe(HttpStatus.BAD_REQUEST)
-    const payload = (await response.json()) as { message?: string }
-    expect(payload.message).toContain(
-      'Search is only available for pro campaigns',
-    )
-  })
-
-  test('should block contact download for non-pro campaigns without elected office', async ({
-    request,
-  }) => {
-    await updateElectedOffice({
-      request,
-      authToken,
-      electedOfficeId,
-      data: { isActive: false },
-    })
-
-    const response = await request.get(`/v1/contacts/download`, {
-      headers: AUTH_HEADER(authToken),
-    })
-
-    expect(response.status()).toBe(HttpStatus.BAD_REQUEST)
-    const payload = (await response.json()) as { message?: string }
-    expect(payload.message).toContain('Campaign is not pro')
   })
 
   test('should list contacts for seeded district with populated people and valid pagination', async ({

@@ -12,12 +12,7 @@ const mockEO: ElectedOffice = {
   organizationSlug: 'campaign-100',
   userId: 1,
   campaignId: 100,
-  isActive: true,
-  electedDate: null,
   swornInDate: null,
-  termStartDate: null,
-  termEndDate: null,
-  termLengthDays: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -162,7 +157,7 @@ describe('UseElectedOfficeGuard', () => {
     })
   })
 
-  describe('step 2: legacy fallback (userId + isActive)', () => {
+  describe('step 2: legacy fallback (userId)', () => {
     it('resolves EO by userId when no header', async () => {
       mockMetadata()
       vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
@@ -173,7 +168,7 @@ describe('UseElectedOfficeGuard', () => {
       expect(result).toBe(true)
       expect(mockOrgFindFirst).not.toHaveBeenCalled()
       expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1, isActive: true },
+        where: { userId: 1 },
         include: undefined,
       })
       const req = ctx.switchToHttp().getRequest() as {

@@ -15,16 +15,19 @@ import {
 import { ContactsService } from './services/contacts.service'
 
 @Controller('contacts')
-@UseCampaign()
+// LEGACY: Remove @UseCampaign and @ReqCampaign from all endpoints when org migration is complete.
+//         @UseOrganization becomes required (remove continueIfNotFound).
+//         campaign parameter removed from all service calls.
+@UseCampaign({ continueIfNotFound: true })
 @UseOrganization({ continueIfNotFound: true })
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
-  listContacts(
+  async listContacts(
     @Query() filterDto: ListContactsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
     @ReqOrganization() organization: Organization | undefined,
   ) {
     return this.contactsService.findContacts(filterDto, campaign, organization)
@@ -33,7 +36,7 @@ export class ContactsController {
   @Get('download')
   async downloadContacts(
     @Query() dto: DownloadContactsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
     @ReqOrganization() organization: Organization | undefined,
     @Res() res: FastifyReply,
   ) {
@@ -49,16 +52,16 @@ export class ContactsController {
 
   @Get('stats')
   getContactsStats(
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
     @ReqOrganization() organization: Organization | undefined,
   ) {
     return this.contactsService.getDistrictStats(campaign, organization)
   }
 
   @Get(':id')
-  getContact(
+  async getContact(
     @Param() params: GetPersonParamsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
     @ReqOrganization() organization: Organization | undefined,
   ) {
     return this.contactsService.findPerson(params.id, campaign, organization)

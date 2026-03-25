@@ -15,7 +15,13 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOffice, Poll, PollIssue, User } from '@prisma/client'
+import {
+  ElectedOffice,
+  Organization,
+  Poll,
+  PollIssue,
+  User,
+} from '@prisma/client'
 import { orderBy } from 'lodash'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
@@ -23,6 +29,8 @@ import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
+import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
@@ -127,14 +135,20 @@ export class PollsController {
     return { hasPolls: userHasPolls }
   }
 
+  // LEGACY: When org migration is complete:
+  //         - Remove @UseCampaign and @ReqCampaign (campaign param)
+  //         - @UseOrganization becomes required (remove continueIfNotFound)
+  //         - organization becomes non-optional, campaign no longer passed to getDistrictStats
   @Post('initial-poll')
   @UseElectedOffice()
-  @UseCampaign()
+  @UseCampaign({ continueIfNotFound: true })
+  @UseOrganization({ continueIfNotFound: true })
   async createInitialPoll(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
+    @ReqOrganization() organization: Organization | undefined,
   ) {
     electedOffice = await this.electedOfficeService.update({
       where: { id: electedOffice.id },
@@ -145,7 +159,7 @@ export class PollsController {
 
     const [userHasPolls, districtStats] = await Promise.all([
       this.pollsService.hasPolls(electedOffice.id),
-      this.contactService.getDistrictStats(campaign),
+      this.contactService.getDistrictStats(campaign, organization),
     ])
     if (userHasPolls) {
       throw new ConflictException(
