@@ -1,7 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { PinoLogger } from 'nestjs-pino'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { User, Campaign } from '@prisma/client'
+import { Test, TestingModule } from '@nestjs/testing'
+import { Campaign, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import Stripe from 'stripe'
 import {
   beforeEach,
@@ -11,13 +12,12 @@ import {
   vi,
   type MockedFunction,
 } from 'vitest'
-import { PurchaseService } from './purchase.service'
-import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import {
-  PurchaseType,
-  PurchaseHandler,
   CheckoutSessionPostPurchaseHandler,
+  PurchaseHandler,
+  PurchaseType,
 } from '../purchase.types'
+import { PurchaseService } from './purchase.service'
 
 // Helper to create mock Stripe Response objects
 const mockStripeLastResponse = {
@@ -92,7 +92,7 @@ describe('PurchaseService', () => {
 
   const mockCampaign: Campaign = {
     id: 111,
-    organizationSlug: null,
+    organizationSlug: 'campaign-111',
     slug: 'test-campaign',
     createdAt: new Date(),
     updatedAt: new Date(),

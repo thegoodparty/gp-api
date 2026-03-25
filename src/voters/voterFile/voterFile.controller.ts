@@ -158,12 +158,15 @@ export class VoterFileController {
     if (!campaign.isPro && !electedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
+    if (!campaign.organizationSlug) {
+      throw new BadRequestException('Campaign has no organization')
+    }
     const campaignFilter = await this.voterFileFilterService.create(
       campaign.id,
       campaign.organizationSlug,
       voterFileFilter,
     )
-    if (electedOffice) {
+    if (electedOffice?.organizationSlug) {
       await this.voterFileFilterService.create(
         campaign.id,
         electedOffice.organizationSlug,
