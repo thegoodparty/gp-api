@@ -278,10 +278,4 @@ export class CampaignTasksService extends createPrismaBase(
       orderBy: { week: 'desc' },
     })
   }
-
-  async clearTasks(campaignId: number): Promise<void> {
-    await this.model.deleteMany({
-      where: { campaignId },
-    })
-  }
 }

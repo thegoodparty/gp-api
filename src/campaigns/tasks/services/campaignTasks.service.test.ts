@@ -24,7 +24,6 @@ const mockModel = {
   findMany: vi.fn(),
   findFirst: vi.fn(),
   update: vi.fn(),
-  deleteMany: vi.fn(),
   createMany: vi.fn(),
 }
 
@@ -511,18 +510,6 @@ describe('CampaignTasksService', () => {
             isDefaultTask: false,
           }),
         ],
-      })
-    })
-  })
-
-  describe('clearTasks', () => {
-    it('deletes all tasks for a campaign', async () => {
-      mockModel.deleteMany.mockResolvedValue({ count: 5 })
-
-      await service.clearTasks(1)
-
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
-        where: { campaignId: 1 },
       })
     })
   })
