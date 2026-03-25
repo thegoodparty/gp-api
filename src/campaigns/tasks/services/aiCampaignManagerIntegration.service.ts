@@ -158,10 +158,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     value: string | number | undefined,
     defaultValue: number,
   ): number {
-    if (typeof value === 'number') return value
+    if (typeof value === 'number') return value >= 0 ? value : defaultValue
     if (typeof value === 'string') {
       const parsed = parseFloat(value)
-      return isNaN(parsed) ? defaultValue : parsed
+      return !isNaN(parsed) && parsed >= 0 ? parsed : defaultValue
     }
     return defaultValue
   }
