@@ -199,8 +199,6 @@ describe('ElectedOfficeService', () => {
 
     it('uses orgData directly when provided, skipping campaign org lookup and resolveOrgData', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
         userId: 1,
         campaignId: 1,
         orgData: {
