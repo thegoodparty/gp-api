@@ -171,7 +171,7 @@ describe('PurchaseService', () => {
             pricePerContact: 3.5,
           },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert
@@ -204,6 +204,7 @@ describe('PurchaseService', () => {
             type: PurchaseType.TEXT,
             metadata: {},
           },
+          metadata: {},
         }),
       ).rejects.toThrow('No handler found for purchase type: TEXT')
     })
@@ -230,6 +231,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.POLL,
           metadata: { pollId: 123 },
         },
+        metadata: {},
       })
 
       // Assert: Should use default product name
@@ -267,7 +269,7 @@ describe('PurchaseService', () => {
             campaignId: 111,
           },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert: Should NOT call Stripe
@@ -305,6 +307,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.TEXT,
           metadata: { contactCount: 200, pricePerContact: 3.5 },
         },
+        metadata: {},
       })
 
       // Assert: Session ID must start with free_ prefix
@@ -326,6 +329,7 @@ describe('PurchaseService', () => {
             type: 'INVALID_TYPE' as PurchaseType,
             metadata: {},
           },
+          metadata: {},
         }),
       ).rejects.toThrow('Invalid purchase type: INVALID_TYPE')
     })
@@ -352,7 +356,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.TEXT,
           metadata: { contactCount: 100 },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert: Should return synthetic response without calling handler

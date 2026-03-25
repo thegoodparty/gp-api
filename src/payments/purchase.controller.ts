@@ -1,7 +1,7 @@
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, Organization, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -13,6 +13,8 @@ import {
   CreateCheckoutSessionDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
+import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
+import { ReqOrganization } from '@/organizations/decorators/ReqOrganization.decorator'
 
 @Controller('payments/purchase')
 export class PurchaseController {
@@ -58,17 +60,29 @@ export class PurchaseController {
    * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
    */
   @Post('create-checkout-session')
-  @UseCampaign()
+  @UseCampaign({ continueIfNotFound: true })
+  @UseOrganization({ continueIfNotFound: true })
   async createCheckoutSession(
     @ReqUser() user: User,
     @Body() dto: CreateCheckoutSessionDto<unknown>,
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: Campaign | undefined,
+    @ReqOrganization() organization: Organization | undefined,
   ) {
+    if (!campaign && !organization) {
+      throw new BadRequestException({
+        message: 'Campaign or organization is required',
+        errorCode: 'CAMPAIGN_OR_ORGANIZATION_REQUIRED',
+      })
+    }
+
     try {
       const result = await this.purchaseService.createCheckoutSession({
         user,
         dto,
-        campaign,
+        metadata: {
+          campaignId: campaign?.id,
+          organizationSlug: organization?.slug,
+        },
       })
       return result
     } catch (error) {
