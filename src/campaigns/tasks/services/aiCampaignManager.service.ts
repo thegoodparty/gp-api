@@ -71,6 +71,9 @@ export class AiCampaignManagerService {
       }
     }
     const requestData = params.toString()
+    this.logger.debug(
+      `Starting campaign plan generation: url=${url} body=${requestData}`,
+    )
     try {
       const response = await lastValueFrom(
         this.httpService.post<CampaignPlanSession>(url, requestData, {
@@ -79,7 +82,13 @@ export class AiCampaignManagerService {
       )
       return response.data
     } catch (error) {
-      this.logger.error('Failed to start campaign plan generation', error)
+      const axiosError = error as {
+        response?: { status?: number; data?: unknown }
+        message?: string
+      }
+      this.logger.error(
+        `Failed to start campaign plan generation: status=${axiosError.response?.status} body=${JSON.stringify(axiosError.response?.data)} message=${axiosError.message}`,
+      )
       throw new BadGatewayException('Failed to start campaign plan generation')
     }
   }
