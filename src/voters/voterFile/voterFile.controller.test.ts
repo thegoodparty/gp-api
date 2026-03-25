@@ -335,9 +335,9 @@ describe('VoterFileController', () => {
     it('lists filters by campaign when no organization', async () => {
       const result = controller.listVoterFileFilters(baseCampaign, undefined)
 
-      expect(
-        mockVoterFileFilterService.findByCampaignId,
-      ).toHaveBeenCalledWith(baseCampaign.id)
+      expect(mockVoterFileFilterService.findByCampaignId).toHaveBeenCalledWith(
+        baseCampaign.id,
+      )
       await expect(result).resolves.toEqual([mockFilter])
     })
 
@@ -360,9 +360,7 @@ describe('VoterFileController', () => {
       expect(
         mockVoterFileFilterService.findByOrganizationSlug,
       ).toHaveBeenCalledWith(org.slug)
-      expect(
-        mockVoterFileFilterService.findByCampaignId,
-      ).not.toHaveBeenCalled()
+      expect(mockVoterFileFilterService.findByCampaignId).not.toHaveBeenCalled()
     })
 
     it('throws when neither campaign nor organization is provided', () => {
