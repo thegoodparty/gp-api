@@ -26,7 +26,7 @@ type APIOrganization = {
   slug: string
   name: string | null
   positionName: string | null
-  position: null | { id: string; brPositionId: string }
+  position: null | { id: string; state: string; brPositionId: string }
   district: null | OrgDistrict
   electedOfficeId: string | null
   campaignId: number | null
@@ -44,7 +44,11 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   }
 
   result.position = org.position
-    ? { id: org.position.id, brPositionId: org.position.brPositionId }
+    ? {
+        id: org.position.id,
+        state: org.position.state,
+        brPositionId: org.position.brPositionId,
+      }
     : null
   result.district = org.district
     ? {
