@@ -678,7 +678,7 @@ describe('CampaignsController', () => {
       })
     })
 
-    it('calls analytics.identify with detail traits on slug override', async () => {
+    it('calls analytics.identify with detail trait(s) on slug override', async () => {
       const campaignWithUserId: Campaign = { ...mockOtherCampaign, userId: 5 }
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         campaignWithUserId,
