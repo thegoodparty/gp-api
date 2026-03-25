@@ -13,6 +13,7 @@ import {
   CampaignPlanResponse,
 } from '../aiCampaignManager.types'
 import { sleep } from 'src/shared/util/sleep.util'
+import { isAxiosError } from 'axios'
 
 export {
   StartCampaignPlanRequest,
@@ -74,6 +75,9 @@ export class AiCampaignManagerService {
       }
     }
     const requestData = params.toString()
+    this.logger.debug(
+      `Starting campaign plan generation: url=${url} body=${requestData}`,
+    )
     try {
       const response = await lastValueFrom(
         this.httpService.post<CampaignPlanSession>(url, requestData, {
@@ -82,7 +86,15 @@ export class AiCampaignManagerService {
       )
       return response.data
     } catch (error) {
-      this.logger.error('Failed to start campaign plan generation', error)
+      if (isAxiosError(error)) {
+        this.logger.error(
+          `Failed to start campaign plan generation: status=${error.response?.status} body=${JSON.stringify(error.response?.data)} message=${error.message}`,
+        )
+      } else {
+        this.logger.error(
+          `Failed to start campaign plan generation: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
       throw new BadGatewayException('Failed to start campaign plan generation')
     }
   }
