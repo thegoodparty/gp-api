@@ -306,14 +306,27 @@ export class VoterFileController {
     @ReqOrganization() organization: Organization | undefined,
   ) {
     if (organization) {
+      const electedOffice = await this.electedOfficeService.findFirst({
+        where: { organizationSlug: organization.slug },
+      })
+      if (!(campaign?.isPro ?? false) && !electedOffice) {
+        throw new BadRequestException('Campaign is not pro')
+      }
       await this.voterFileFilterService.deleteByIdAndOrganizationSlug(
         id,
         organization.slug,
       )
       return
     }
+
     if (!campaign) {
       throw new BadRequestException('Campaign or organization is required')
+    }
+
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
+      throw new BadRequestException('Campaign is not pro')
     }
     await this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
   }
