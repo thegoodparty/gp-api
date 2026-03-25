@@ -70,6 +70,7 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
   const electedOffice = electedOfficeFactory({
     userId: user.id,
     campaignId: campaign.id,
+    organizationSlug: campaign.organizationSlug,
   })
   const createdElectedOffice = await prisma.electedOffice.create({
     data: electedOffice,

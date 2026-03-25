@@ -7,5 +7,6 @@ export const electedOfficeFactory = generateFactory<ElectedOffice>(() => {
     swornInDate: faker.date.past(),
     userId: faker.number.int({ min: 1, max: 1000 }),
     campaignId: faker.number.int({ min: 1, max: 1000 }),
+    organizationSlug: `org-${faker.string.nanoid(8)}`,
   }
 })

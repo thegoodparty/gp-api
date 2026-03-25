@@ -302,7 +302,7 @@ export function createService({
       enableExecuteCommand: true,
       waitForSteadyState: true,
     },
-    { dependsOn },
+    { dependsOn, customTimeouts: { create: '5m', update: '5m' } },
   )
 
   new aws.route53.Record('dnsARecord', {
