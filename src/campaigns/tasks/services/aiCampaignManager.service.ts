@@ -25,16 +25,19 @@ export {
 
 const VALID_SESSION_ID_PATTERN = /^[\w-]+$/
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function isProgressStreamData(value: unknown): value is ProgressStreamData {
-  if (typeof value !== 'object' || value === null) return false
-  const obj = value as Record<string, unknown>
+  if (!isRecord(value)) return false
   return (
-    typeof obj.progress === 'number' &&
-    typeof obj.status === 'string' &&
-    (obj.status === 'processing' ||
-      obj.status === 'completed' ||
-      obj.status === 'failed') &&
-    typeof obj.message === 'string'
+    typeof value.progress === 'number' &&
+    typeof value.status === 'string' &&
+    (value.status === 'processing' ||
+      value.status === 'completed' ||
+      value.status === 'failed') &&
+    typeof value.message === 'string'
   )
 }
 
