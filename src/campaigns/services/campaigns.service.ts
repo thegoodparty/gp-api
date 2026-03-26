@@ -15,6 +15,7 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { RaceTargetMetrics } from 'src/elections/types/elections.types'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -68,6 +69,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly stripeService: StripeService,
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
+    private readonly organizations: OrganizationsService,
     private readonly slack: SlackService,
     @Inject(FEATURE_FLAG_CHECKER)
     private readonly featureFlags: FeatureFlagChecker,
@@ -910,5 +912,34 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         placeId: string
       },
     })
+  }
+
+  async fetchLiveRaceTargetMetrics(
+    campaign: Campaign,
+  ): Promise<RaceTargetMetrics | null> {
+    const org = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+
+    if (!org?.positionId || !campaign.details?.electionDate) {
+      return null
+    }
+
+    const result = await this.elections
+      .getPositionMatchedRaceTargetDetails({
+        positionId: org.positionId,
+        electionDate: campaign.details.electionDate,
+        includeTurnout: true,
+        campaignId: campaign.id,
+        officeName: undefined,
+      })
+      .catch(() => null)
+
+    if (!result || result.projectedTurnout <= 0) return null
+
+    const { projectedTurnout, winNumber, voterContactGoal } = result
+    return { projectedTurnout, winNumber, voterContactGoal }
   }
 }

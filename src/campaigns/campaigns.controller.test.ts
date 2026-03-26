@@ -193,7 +193,7 @@ describe('CampaignsController', () => {
 
     const electionsServiceMock: Partial<ElectionsService> = {
       buildRaceTargetDetails: vi.fn(),
-      getBallotReadyMatchedRaceTargetDetails: vi.fn(),
+      getPositionMatchedRaceTargetDetails: vi.fn(),
       getDistrictId: vi.fn().mockResolvedValue(null),
     }
     electionsService = electionsServiceMock as ElectionsService
@@ -1183,7 +1183,7 @@ describe('CampaignsController', () => {
     it('falls back to silver flow when raceTargetDetails is null', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1209,7 +1209,7 @@ describe('CampaignsController', () => {
     it('updates with complete status when hasTurnout', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1241,7 +1241,7 @@ describe('CampaignsController', () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(noTurnout)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1258,7 +1258,7 @@ describe('CampaignsController', () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(noTurnout)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1272,7 +1272,7 @@ describe('CampaignsController', () => {
     it('does not enqueue when hasTurnout', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1286,7 +1286,7 @@ describe('CampaignsController', () => {
     it('passes includeTurnout: true and officeName to elections service', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1295,7 +1295,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith({
         campaignId: mockCampaign.id,
         ballotreadyPositionId: 'br-pos-1',
@@ -1315,7 +1315,7 @@ describe('CampaignsController', () => {
       })
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1324,7 +1324,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           officeName: undefined,
@@ -1340,7 +1340,7 @@ describe('CampaignsController', () => {
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(raceDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1365,7 +1365,7 @@ describe('CampaignsController', () => {
       })
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: false }))
     })
 
@@ -1375,7 +1375,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: true }))
     })
 
@@ -1407,7 +1407,7 @@ describe('CampaignsController', () => {
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,

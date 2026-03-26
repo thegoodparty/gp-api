@@ -77,8 +77,8 @@ describe('ElectionsService', () => {
     vi.clearAllMocks()
   })
 
-  describe('getBallotReadyMatchedRaceTargetDetails', () => {
-    const defaultParams = {
+  describe('getPositionMatchedRaceTargetDetails', () => {
+    const brIdParams = {
       ballotreadyPositionId: 'br-pos-1',
       electionDate: '2024-11-05',
       includeTurnout: true,
@@ -86,30 +86,59 @@ describe('ElectionsService', () => {
       officeName: 'City Council',
     }
 
-    it('returns calculated metrics when district and turnout are present', async () => {
+    const gpIdParams = {
+      positionId: 'pos-1',
+      electionDate: '2024-11-05',
+      includeTurnout: true,
+      campaignId: 456,
+      officeName: undefined,
+    }
+
+    it('returns calculated metrics when district and turnout are present (BR ID)', async () => {
       mockHttpGet.mockReturnValue(of({ data: makePosition(1000), status: 200 }))
 
-      const result =
-        await service.getBallotReadyMatchedRaceTargetDetails(defaultParams)
+      const { district, projectedTurnout, winNumber, voterContactGoal } =
+        await service.getPositionMatchedRaceTargetDetails(brIdParams)
 
-      expect(result.district?.L2DistrictType).toBe('State_House')
-      expect(result.district?.L2DistrictName).toBe('STATE HOUSE 005')
-      expect(result.projectedTurnout).toBe(1000)
-      expect(result.winNumber).toBe(501)
-      expect(result.voterContactGoal).toBe(2505)
+      expect(district?.L2DistrictType).toBe('State_House')
+      expect(district?.L2DistrictName).toBe('STATE HOUSE 005')
+      expect(projectedTurnout).toBe(1000)
+      expect(winNumber).toBe(501)
+      expect(voterContactGoal).toBe(2505)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('positions/by-ballotready-id/br-pos-1'),
+        expect.anything(),
+      )
+    })
+
+    it('returns calculated metrics when district and turnout are present (GP ID)', async () => {
+      mockHttpGet.mockReturnValue(of({ data: makePosition(1000), status: 200 }))
+
+      const { district, projectedTurnout, winNumber, voterContactGoal } =
+        await service.getPositionMatchedRaceTargetDetails(gpIdParams)
+
+      expect(district?.L2DistrictType).toBe('State_House')
+      expect(district?.L2DistrictName).toBe('STATE HOUSE 005')
+      expect(projectedTurnout).toBe(1000)
+      expect(winNumber).toBe(501)
+      expect(voterContactGoal).toBe(2505)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('positions/pos-1'),
+        expect.anything(),
+      )
     })
 
     it('returns district with sentinel values when turnout is null', async () => {
       mockHttpGet.mockReturnValue(of({ data: makePosition(null), status: 200 }))
 
-      const result =
-        await service.getBallotReadyMatchedRaceTargetDetails(defaultParams)
+      const { district, winNumber, voterContactGoal, projectedTurnout } =
+        await service.getPositionMatchedRaceTargetDetails(brIdParams)
 
-      expect(result.district?.L2DistrictType).toBe('State_House')
-      expect(result.district?.L2DistrictName).toBe('STATE HOUSE 005')
-      expect(result.winNumber).toBe(-1)
-      expect(result.voterContactGoal).toBe(-1)
-      expect(result.projectedTurnout).toBe(-1)
+      expect(district?.L2DistrictType).toBe('State_House')
+      expect(district?.L2DistrictName).toBe('STATE HOUSE 005')
+      expect(winNumber).toBe(-1)
+      expect(voterContactGoal).toBe(-1)
+      expect(projectedTurnout).toBe(-1)
     })
 
     it('throws NotFoundException when API returns position without district', async () => {
@@ -123,7 +152,7 @@ describe('ElectionsService', () => {
       mockHttpGet.mockReturnValue(of({ data: positionNoDistrict, status: 200 }))
 
       await expect(
-        service.getBallotReadyMatchedRaceTargetDetails(defaultParams),
+        service.getPositionMatchedRaceTargetDetails(brIdParams),
       ).rejects.toThrow(
         new NotFoundException(
           'No position and/or associated district was found',
@@ -135,7 +164,7 @@ describe('ElectionsService', () => {
       mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
 
       await expect(
-        service.getBallotReadyMatchedRaceTargetDetails(defaultParams),
+        service.getPositionMatchedRaceTargetDetails(brIdParams),
       ).rejects.toThrow(
         new NotFoundException(
           'No position and/or associated district was found',

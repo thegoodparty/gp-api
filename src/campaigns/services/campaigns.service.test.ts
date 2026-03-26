@@ -1,4 +1,5 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { UsersService } from '@/users/services/users.service'
@@ -9,7 +10,7 @@ import { SlackService } from '@/vendors/slack/services/slack.service'
 import { StripeService } from '@/vendors/stripe/services/stripe.service'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Prisma, PrismaClient, User } from '@prisma/client'
+import { Campaign, Prisma, PrismaClient, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import {
@@ -114,6 +115,7 @@ const buildOrgSyncModule = async (overrides?: {
         provide: ElectionsService,
         useValue: { getPositionByBallotReadyId: mockGetPosition },
       },
+      { provide: OrganizationsService, useValue: {} },
       { provide: SlackService, useValue: {} },
       {
         provide: FEATURE_FLAG_CHECKER,
@@ -626,6 +628,10 @@ describe('CampaignsService - redeemFreeTexts', () => {
           useValue: {},
         },
         {
+          provide: OrganizationsService,
+          useValue: {},
+        },
+        {
           provide: SlackService,
           useValue: {},
         },
@@ -988,5 +994,147 @@ describe('CampaignsService - redeemFreeTexts', () => {
       // Analytics should not be called if transaction fails
       expect(mockAnalytics.track).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
+  const mockOrganizations: Partial<OrganizationsService> = {
+    findUnique: vi.fn(),
+  }
+
+  const mockElections: Partial<ElectionsService> = {
+    getPositionMatchedRaceTargetDetails: vi.fn(),
+  }
+
+  let service: CampaignsService
+
+  beforeEach(() => {
+    service = new CampaignsService(
+      {} as UsersService,
+      {} as CrmCampaignsService,
+      {} as AnalyticsService,
+      {} as CampaignPlanVersionsService,
+      {} as StripeService,
+      {} as GooglePlacesService,
+      mockElections as ElectionsService,
+      mockOrganizations as OrganizationsService,
+      {} as SlackService,
+      { isFeatureEnabled: vi.fn() },
+    )
+  })
+
+  const baseCampaign = {
+    id: 1,
+    organizationSlug: 'org-1',
+    details: { electionDate: '2026-11-03' },
+  } as unknown as Campaign
+
+  it('should return live metrics from election-api', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: 'pos-123',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    vi.mocked(
+      mockElections.getPositionMatchedRaceTargetDetails!,
+    ).mockResolvedValue({
+      district: {
+        id: 'd-1',
+        L2DistrictType: 'State_Senate',
+        L2DistrictName: 'STATE SENATE 001',
+        projectedTurnout: null,
+      },
+      projectedTurnout: 10000,
+      winNumber: 5001,
+      voterContactGoal: 25005,
+    })
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toEqual({
+      projectedTurnout: 10000,
+      winNumber: 5001,
+      voterContactGoal: 25005,
+    })
+    expect(
+      mockElections.getPositionMatchedRaceTargetDetails,
+    ).toHaveBeenCalledWith({
+      positionId: 'pos-123',
+      electionDate: '2026-11-03',
+      includeTurnout: true,
+      campaignId: 1,
+      officeName: undefined,
+    })
+  })
+
+  it('should return null when campaign has no organizationSlug', async () => {
+    const campaign = {
+      ...baseCampaign,
+      organizationSlug: null,
+    } as unknown as Campaign
+
+    const result = await service.fetchLiveRaceTargetMetrics(campaign)
+
+    expect(result).toBeNull()
+  })
+
+  it('should return null when organization has no positionId', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: null,
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toBeNull()
+  })
+
+  it('should return null when campaign has no electionDate', async () => {
+    const campaign = {
+      ...baseCampaign,
+      details: {},
+    } as unknown as Campaign
+
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: 'pos-123',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    const result = await service.fetchLiveRaceTargetMetrics(campaign)
+
+    expect(result).toBeNull()
+  })
+
+  it('should return null when election-api call fails', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: 'pos-123',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+    vi.mocked(
+      mockElections.getPositionMatchedRaceTargetDetails!,
+    ).mockRejectedValue(new Error('election-api down'))
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toBeNull()
+  })
+
+  it('should return null when turnout is sentinel -1', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: 'pos-123',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+    vi.mocked(
+      mockElections.getPositionMatchedRaceTargetDetails!,
+    ).mockResolvedValue({
+      district: {
+        id: 'd-1',
+        L2DistrictType: 'State_Senate',
+        L2DistrictName: 'STATE SENATE 001',
+        projectedTurnout: null,
+      },
+      projectedTurnout: -1,
+      winNumber: -1,
+      voterContactGoal: -1,
+    })
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toBeNull()
   })
 })

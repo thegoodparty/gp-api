@@ -170,7 +170,7 @@ export class ElectionsService {
         includeTurnout: boolean
         electionDate?: string
       }
-    >(`positions/${positionId}`, {
+    >(`${ElectionApiRoutes.positions.findById.path}/${positionId}`, {
       includeDistrict: options?.includeDistrict ?? false,
       includeTurnout: options?.includeTurnout ?? false,
       electionDate: options?.electionDate,
@@ -202,24 +202,33 @@ export class ElectionsService {
     })
     return districts?.[0]?.id ?? null
   }
-
   // Gold flow: match a district via BallotReady position ID.
   // Returns district data even when projected turnout is unavailable,
   // using sentinel values (-1) so callers can distinguish partial matches.
-  async getBallotReadyMatchedRaceTargetDetails(params: {
-    ballotreadyPositionId: string
-    electionDate?: string
-    includeTurnout: boolean
-    campaignId: number
-    officeName: string | undefined
-  }) {
+  async getPositionMatchedRaceTargetDetails(
+    params: {
+      electionDate?: string
+      includeTurnout: boolean
+      campaignId: number
+      officeName: string | undefined
+    } & (
+      | { ballotreadyPositionId: string; positionId?: never }
+      | { positionId: string; ballotreadyPositionId?: never }
+    ),
+  ) {
     const {
       ballotreadyPositionId,
+      positionId,
       electionDate,
       includeTurnout,
       campaignId,
       officeName,
     } = params
+
+    const path = ballotreadyPositionId
+      ? `${ElectionApiRoutes.positions.findByBrId.path}/${ballotreadyPositionId}`
+      : `${ElectionApiRoutes.positions.findById.path}/${positionId}`
+
     let positionWithDistrict: PositionWithOptionalDistrict | null = null
     try {
       positionWithDistrict = await this.electionApiGet<
@@ -229,24 +238,23 @@ export class ElectionsService {
           includeDistrict: boolean
           includeTurnout: boolean
         }
-      >(
-        ElectionApiRoutes.positions.findByBrId.path +
-          `/${ballotreadyPositionId}`,
-        {
-          electionDate: electionDate ?? undefined,
-          includeDistrict: true,
-          includeTurnout,
-        },
-      )
-      if (!positionWithDistrict || !positionWithDistrict?.district) {
+      >(path, {
+        electionDate: electionDate ?? undefined,
+        includeDistrict: true,
+        includeTurnout,
+      })
+
+      const { district } = positionWithDistrict ?? {}
+      if (!positionWithDistrict || !district) {
         throw new NotFoundException(
           'No position and/or associated district was found',
         )
       }
 
-      const turnoutValue =
-        positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
+      const turnoutValue = district.projectedTurnout?.projectedTurnout
       const hasTurnout = includeTurnout && !!turnoutValue
+      const { L2DistrictType: districtType, L2DistrictName: districtName } =
+        district
 
       this.logger.info({
         event: 'DistrictMatch',
@@ -255,13 +263,14 @@ export class ElectionsService {
         electionDate,
         campaignId,
         ballotreadyPositionId,
+        positionId,
         officeName,
-        districtType: positionWithDistrict?.district?.L2DistrictType,
-        districtName: positionWithDistrict?.district?.L2DistrictName,
+        districtType,
+        districtName,
         projectedTurnout: turnoutValue,
       })
       return {
-        district: positionWithDistrict?.district,
+        district,
         ...(hasTurnout
           ? this.calculateRaceTargetMetrics(turnoutValue)
           : {
@@ -272,6 +281,7 @@ export class ElectionsService {
             }),
       }
     } catch (error) {
+      const { district } = positionWithDistrict ?? {}
       this.logger.info({
         event: 'DistrictMatch',
         matchType: 'gold',
@@ -281,15 +291,20 @@ export class ElectionsService {
         electionDate,
         campaignId,
         ballotreadyPositionId,
+        positionId,
         officeName,
-        districtType: positionWithDistrict?.district?.L2DistrictType,
-        districtName: positionWithDistrict?.district?.L2DistrictName,
-        projectedTurnout:
-          positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+        districtType: district?.L2DistrictType,
+        districtName: district?.L2DistrictName,
+        projectedTurnout: district?.projectedTurnout?.projectedTurnout,
       })
       const message = this.buildSlackErrorMessage(
-        'Election API error: getBallotReadyMatchedRaceTargetDetails',
-        { ballotreadyPositionId, electionDate, campaignId },
+        'Election API error: getPositionMatchedRaceTargetDetails',
+        {
+          ballotreadyPositionId,
+          positionId,
+          electionDate,
+          campaignId,
+        },
         error,
       )
       await this.slack.formattedMessage({

@@ -428,7 +428,7 @@ export class CampaignsController {
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
-      .getBallotReadyMatchedRaceTargetDetails({
+      .getPositionMatchedRaceTargetDetails({
         campaignId: campaign.id,
         ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
@@ -501,7 +501,7 @@ export class CampaignsController {
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
-      .getBallotReadyMatchedRaceTargetDetails({
+      .getPositionMatchedRaceTargetDetails({
         campaignId: campaign.id,
         ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
