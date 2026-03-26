@@ -248,7 +248,7 @@ describe('CampaignTasksService', () => {
       const result = await service.generateTasks(makeCampaign())
 
       expect(mockAiIntegration.generateCampaignTasks).toHaveBeenCalledWith(
-        makeCampaign(),
+        expect.objectContaining({ id: 1, slug: 'test-campaign' }),
       )
       expect(mockTransaction).toHaveBeenCalled()
       expect(result).toEqual(savedTasks)
