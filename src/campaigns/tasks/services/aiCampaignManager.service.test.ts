@@ -27,7 +27,6 @@ const makeRequest = (
   election_date: '2025-11-04',
   office_and_jurisdiction: 'City Council in California',
   race_type: 'Nonpartisan',
-  seats_available: 1,
   number_of_opponents: 1,
   win_number: 500,
   total_likely_voters: 1800,
