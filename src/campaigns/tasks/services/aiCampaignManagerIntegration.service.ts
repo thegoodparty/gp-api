@@ -392,8 +392,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       general: CampaignTaskType.education,
     }
 
-    const isFlowTypeKey = (key: string): key is FlowTypeKey => key in flowTypeMap
-    return isFlowTypeKey(category) ? flowTypeMap[category] : CampaignTaskType.education
+    const isFlowTypeKey = (key: string): key is FlowTypeKey =>
+      key in flowTypeMap
+    return isFlowTypeKey(category)
+      ? flowTypeMap[category]
+      : CampaignTaskType.education
   }
 
   private calculateWeekFromDate(
