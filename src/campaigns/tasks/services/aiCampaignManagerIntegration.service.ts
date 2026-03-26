@@ -142,7 +142,6 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,
       race_type: this.determineRaceType(details),
-      incumbent_status: this.determineIncumbentStatus(details),
       seats_available: 1,
       number_of_opponents: this.extractNumberOfOpponents(details),
       win_number: winNumber,
@@ -173,12 +172,6 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         : 'Partisan'
     }
     return 'Nonpartisan'
-  }
-
-  private determineIncumbentStatus(
-    _details: PrismaJson.CampaignDetails,
-  ): string {
-    return 'N/A'
   }
 
   private extractNumberOfOpponents(
@@ -452,7 +445,6 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       election_date: request.election_date,
       office_and_jurisdiction: request.office_and_jurisdiction,
       race_type: request.race_type,
-      incumbent_status: request.incumbent_status,
       seats_available: request.seats_available,
       number_of_opponents: request.number_of_opponents,
       win_number: request.win_number,

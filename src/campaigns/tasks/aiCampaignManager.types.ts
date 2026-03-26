@@ -3,7 +3,6 @@ export interface StartCampaignPlanRequest {
   election_date: string
   office_and_jurisdiction: string
   race_type: string
-  incumbent_status: string
   seats_available: number
   number_of_opponents: number
   win_number: number
