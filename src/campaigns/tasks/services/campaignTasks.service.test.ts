@@ -18,6 +18,7 @@ vi.mock('src/shared/util/sleep.util', () => ({
 const mockTxModel = {
   deleteMany: vi.fn(),
   createMany: vi.fn(),
+  count: vi.fn(),
 }
 
 const mockModel = {
@@ -29,7 +30,10 @@ const mockModel = {
 
 const mockTransaction = vi.fn(
   async (callback: (tx: unknown) => Promise<unknown>) => {
-    return callback({ campaignTask: mockTxModel })
+    return callback({
+      campaignTask: mockTxModel,
+      $executeRaw: vi.fn(),
+    })
   },
 )
 
@@ -233,9 +237,8 @@ describe('CampaignTasksService', () => {
       ]
       const savedTasks = [makeDbTask()]
 
-      mockModel.findMany
-        .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })])
-        .mockResolvedValueOnce(savedTasks)
+      mockTxModel.count.mockResolvedValueOnce(1)
+      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
       vi.mocked(mockAiIntegration.generateCampaignTasks!).mockResolvedValue(
@@ -245,7 +248,7 @@ describe('CampaignTasksService', () => {
       const result = await service.generateTasks(makeCampaign())
 
       expect(mockAiIntegration.generateCampaignTasks).toHaveBeenCalledWith(
-        makeCampaign(),
+        expect.objectContaining({ id: 1, slug: 'test-campaign' }),
       )
       expect(mockTransaction).toHaveBeenCalled()
       expect(result).toEqual(savedTasks)
@@ -254,9 +257,8 @@ describe('CampaignTasksService', () => {
     it('falls back to empty tasks on AI failure', async () => {
       const savedTasks = [makeDbTask({ isDefaultTask: true })]
 
-      mockModel.findMany
-        .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })])
-        .mockResolvedValueOnce(savedTasks)
+      mockTxModel.count.mockResolvedValueOnce(1)
+      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 0 })
       vi.mocked(mockAiIntegration.generateCampaignTasks!).mockRejectedValue(
@@ -287,9 +289,8 @@ describe('CampaignTasksService', () => {
       ]
       const savedTasks = [makeDbTask({ id: 'saved-1' })]
 
-      mockModel.findMany
-        .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })])
-        .mockResolvedValueOnce(savedTasks)
+      mockTxModel.count.mockResolvedValueOnce(1)
+      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
       vi.mocked(mockAiIntegration.startOrGetCached!).mockResolvedValue({
@@ -328,9 +329,8 @@ describe('CampaignTasksService', () => {
         },
       ]
 
-      mockModel.findMany
-        .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })])
-        .mockResolvedValueOnce(savedTasks)
+      mockTxModel.count.mockResolvedValueOnce(1)
+      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
       vi.mocked(mockAiIntegration.startOrGetCached!).mockResolvedValue({
@@ -382,9 +382,8 @@ describe('CampaignTasksService', () => {
     it('handles error during stream and falls back to empty tasks', async () => {
       const savedTasks = [makeDbTask({ isDefaultTask: true })]
 
-      mockModel.findMany
-        .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })])
-        .mockResolvedValueOnce(savedTasks)
+      mockTxModel.count.mockResolvedValueOnce(1)
+      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 0 })
       vi.mocked(mockAiIntegration.startOrGetCached!).mockRejectedValue(
@@ -406,17 +405,17 @@ describe('CampaignTasksService', () => {
 
   describe('generateDefaultTasks', () => {
     it('skips if defaults already exist', async () => {
-      mockModel.findMany.mockResolvedValue([
-        makeDbTask({ isDefaultTask: true }),
-      ])
+      mockTxModel.count.mockResolvedValueOnce(1)
 
       await service.generateDefaultTasks(makeCampaign())
 
-      expect(mockTransaction).not.toHaveBeenCalled()
+      expect(mockTransaction).toHaveBeenCalled()
+      expect(mockTxModel.deleteMany).not.toHaveBeenCalled()
+      expect(mockTxModel.createMany).not.toHaveBeenCalled()
     })
 
     it('creates default tasks if none exist', async () => {
-      mockModel.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
 
