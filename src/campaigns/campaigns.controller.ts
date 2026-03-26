@@ -1,5 +1,4 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { SetDistrictOutputSchema } from '@goodparty_org/contracts'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
@@ -8,6 +7,7 @@ import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.sche
 import {
   ListCampaignsPaginationSchema,
   ReadCampaignOutputSchema,
+  SetDistrictOutputSchema,
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
@@ -321,33 +321,6 @@ export class CampaignsController {
     )
   }
 
-  @UseGuards(M2MOnly)
-  @Put(':id/district')
-  @ResponseSchema(SetDistrictOutputSchema)
-  async setDistrictM2M(
-    @Param() { id }: IdParamSchema,
-    @Body()
-    {
-      L2DistrictType: l2DistrictType,
-      L2DistrictName: l2DistrictName,
-    }: SetDistrictM2MDTO,
-  ) {
-    const campaign = await this.campaigns.findUniqueOrThrow({
-      where: { id },
-    })
-
-    this.logger.debug(
-      {
-        campaignId: id,
-        L2DistrictType: l2DistrictType,
-        L2DistrictName: l2DistrictName,
-      },
-      'M2M: Updating campaign with district',
-    )
-
-    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
-  }
-
   @Post('launch')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
@@ -451,6 +424,33 @@ export class CampaignsController {
       },
       overrideDistrictId,
     })
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id/district')
+  @ResponseSchema(SetDistrictOutputSchema)
+  async setDistrictM2M(
+    @Param() { id }: IdParamSchema,
+    @Body()
+    {
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictM2MDTO,
+  ) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+
+    this.logger.debug(
+      {
+        campaignId: id,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
+      },
+      'M2M: Updating campaign with district',
+    )
+
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
   }
 
   @Put('mine/race-target-details')
