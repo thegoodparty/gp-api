@@ -1,4 +1,5 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { SetDistrictOutputSchema } from '@goodparty_org/contracts'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
@@ -48,6 +49,7 @@ import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   CreateCampaignSchema,
   SetDistrictDTO,
+  SetDistrictM2MDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -56,9 +58,9 @@ import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
-) {}
+) { }
 
-class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
+class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) { }
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -291,6 +293,33 @@ export class CampaignsController {
     )
   }
 
+  @UseGuards(M2MOnly)
+  @Put(':id/district')
+  @ResponseSchema(SetDistrictOutputSchema)
+  async setDistrictM2M(
+    @Param() { id }: IdParamSchema,
+    @Body()
+    {
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictM2MDTO,
+  ) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+
+    this.logger.debug(
+      {
+        campaignId: id,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
+      },
+      'M2M: Updating campaign with district',
+    )
+
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
+  }
+
   @Post('launch')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
@@ -311,6 +340,7 @@ export class CampaignsController {
 
   @Put('mine/district')
   @UseCampaign()
+  @ResponseSchema(SetDistrictOutputSchema)
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
@@ -326,7 +356,6 @@ export class CampaignsController {
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin or Sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
@@ -344,6 +373,14 @@ export class CampaignsController {
       'Updating campaign with district',
     )
 
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
+  }
+
+  private async applyDistrictUpdate(
+    campaign: Campaign,
+    l2DistrictType: string,
+    l2DistrictName: string,
+  ) {
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
       L2DistrictType: l2DistrictType,
       L2DistrictName: l2DistrictName,
@@ -375,13 +412,12 @@ export class CampaignsController {
         districtManuallySet: true,
         ...(!hasTurnout
           ? {
-              projectedTurnout: -1,
-              winNumber: -1,
-              voterContactGoal: -1,
-              p2vStatus: P2VStatus.districtMatched,
-            }
+            projectedTurnout: -1,
+            winNumber: -1,
+            voterContactGoal: -1,
+            p2vStatus: P2VStatus.districtMatched,
+          }
           : {}),
-        // Reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -394,13 +430,13 @@ export class CampaignsController {
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
     const campaignOrg = campaign.organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
+        where: { slug: campaign.organizationSlug },
+      })
       : null
     const ballotreadyPositionId = campaignOrg?.positionId
       ? await this.organizations.resolveBallotReadyPositionId(
-          campaignOrg.positionId,
-        )
+        campaignOrg.positionId,
+      )
       : null
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
@@ -476,13 +512,13 @@ export class CampaignsController {
     })
     const campaignOrg = campaign.organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
+        where: { slug: campaign.organizationSlug },
+      })
       : null
     const ballotreadyPositionId = campaignOrg?.positionId
       ? await this.organizations.resolveBallotReadyPositionId(
-          campaignOrg.positionId,
-        )
+        campaignOrg.positionId,
+      )
       : null
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {

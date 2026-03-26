@@ -1084,6 +1084,113 @@ describe('CampaignsController', () => {
     })
   })
 
+  describe('setDistrictM2M', () => {
+    const districtBody = {
+      L2DistrictType: 'State Senate',
+      L2DistrictName: 'District 5',
+    }
+
+    it('throws when campaign is not found', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockRejectedValue(
+        new NotFoundException('Campaign not found'),
+      )
+
+      await expect(
+        controller.setDistrictM2M({ id: 999 }, districtBody),
+      ).rejects.toThrow(NotFoundException)
+
+      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 999 },
+      })
+    })
+
+    it('calls applyDistrictUpdate with the resolved campaign and district values', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
+        projectedTurnout: 5000,
+        winNumber: 2500,
+        voterContactGoal: 3000,
+      })
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.setDistrictM2M({ id: mockCampaign.id }, districtBody)
+
+      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: mockCampaign.id },
+      })
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            electionType: 'State Senate',
+            electionLocation: 'District 5',
+            projectedTurnout: 5000,
+            districtManuallySet: true,
+          }),
+        }),
+      )
+    })
+
+    it('works without user context (M2M auth)', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        null,
+      )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      const result = await controller.setDistrictM2M(
+        { id: mockCampaign.id },
+        districtBody,
+      )
+
+      expect(result).toBeDefined()
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            electionType: 'State Senate',
+            electionLocation: 'District 5',
+            p2vStatus: P2VStatus.districtMatched,
+            districtManuallySet: true,
+          }),
+        }),
+      )
+    })
+
+    it('uses sentinel values when buildRaceTargetDetails returns null', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        null,
+      )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.setDistrictM2M({ id: mockCampaign.id }, districtBody)
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            projectedTurnout: -1,
+            winNumber: -1,
+            voterContactGoal: -1,
+          }),
+        }),
+      )
+    })
+  })
+
   describe('updateRaceTargetDetails', () => {
     it('throws BadRequestException when no positionId', async () => {
       const campaign: Campaign = {
