@@ -1,9 +1,9 @@
-import { Campaign, CampaignTier } from '@prisma/client'
 import {
   BallotReadyPositionLevel,
   CampaignLaunchStatus,
   OnboardingStep,
 } from '@goodparty_org/contracts'
+import { Campaign, CampaignTier } from '@prisma/client'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 import { generateFactory } from './generate'
 
@@ -18,6 +18,7 @@ export function resetCampaignCounter() {
 export const campaignFactory = generateFactory<Campaign>((args) => {
   // skip incrementing when id is provided so slug stays consistent with the given id
   const id = 'id' in args ? (args.id as number) : campaignCounter++
+  const organizationSlug = `campaign-${id}`
   // NOTE: generationStatus can't go in the object literal below — TS errors on the
   // `& Record<string, AiContentData>` intersection. Use bracket notation instead.
   const aiContent: Campaign['aiContent'] = {
@@ -39,7 +40,7 @@ export const campaignFactory = generateFactory<Campaign>((args) => {
     id,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
-    organizationSlug: null,
+    organizationSlug: organizationSlug,
     slug: `test-campaign-${id}`,
     isActive: true,
     isVerified: false,
@@ -71,7 +72,6 @@ export const campaignFactory = generateFactory<Campaign>((args) => {
     },
     aiContent,
     vendorTsData: {},
-    completedTaskIds: [],
     canDownloadFederal: false,
     hasFreeTextsOffer: false,
     freeTextsOfferRedeemedAt: null,

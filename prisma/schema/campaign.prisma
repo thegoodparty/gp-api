@@ -6,8 +6,8 @@ enum CampaignTier {
 
 model Campaign {
   id                    Int                     @id @default(autoincrement())
-  organizationSlug      String?                 @unique @map("organization_slug")
-  organization          Organization?           @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+  organizationSlug      String                  @unique @map("organization_slug")
+  organization          Organization            @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
@@ -21,32 +21,34 @@ model Campaign {
   formattedAddress      String?                 @map("formatted_address")
   placeId               String?                 @map("place_id")
   /// [CampaignData]
-  data                  Json                    @default("{}") @db.JsonB
+  data                     Json                    @default("{}") @db.JsonB
   /// [CampaignDetails]
-  details               Json                    @default("{}") @db.JsonB
+  details                  Json                    @default("{}") @db.JsonB
   /// [CampaignAiContent]
-  aiContent             Json                    @default("{}") @map("ai_content") @db.JsonB
-  vendorTsData          Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
-  pathToVictory         PathToVictory?
-  campaignUpdateHistory CampaignUpdateHistory[]
-  user                  User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId                Int                     @map("user_id")
-  canDownloadFederal    Boolean                 @default(false) @map("can_download_federal")
-  topIssues             TopIssue[]
-  campaignPositions     CampaignPosition[]
-  campaignPlanVersion   CampaignPlanVersion?
-  aiChats               AiChat[]
-  ecanvasser            Ecanvasser?
-  completedTaskIds      String[]                @default([]) @map("completed_task_ids")
-  hasFreeTextsOffer     Boolean                 @default(false) @map("has_free_texts_offer")
-  freeTextsOfferRedeemedAt DateTime?            @map("free_texts_offer_redeemed_at")
-  ScheduledMessage      ScheduledMessage[]
-  tcrCompliance         TcrCompliance?
-  voterFileFilters      VoterFileFilter[]
-  website               Website?
-  outreach              Outreach[]
-  communityIssue        CommunityIssue[]
-  electedOffices        ElectedOffice[]
+  aiContent                Json                    @default("{}") @map("ai_content") @db.JsonB
+  vendorTsData             Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
+  pathToVictory            PathToVictory?
+  campaignUpdateHistory    CampaignUpdateHistory[]
+  user                     User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                   Int                     @map("user_id")
+  canDownloadFederal       Boolean                 @default(false) @map("can_download_federal")
+  topIssues                TopIssue[]
+  campaignPositions        CampaignPosition[]
+  campaignPlanVersion      CampaignPlanVersion?
+  aiChats                  AiChat[]
+  ecanvasser               Ecanvasser?
+  completedTaskIds         String[]                @default([]) @map("completed_task_ids")
+  hasFreeTextsOffer        Boolean                 @default(false) @map("has_free_texts_offer")
+  freeTextsOfferRedeemedAt DateTime?               @map("free_texts_offer_redeemed_at")
+  ScheduledMessage         ScheduledMessage[]
+  tcrCompliance            TcrCompliance?
+  voterFileFilters         VoterFileFilter[]
+  website                  Website?
+  outreach                 Outreach[]
+  communityIssue           CommunityIssue[]
+  campaignTasks            CampaignTask[]
+  campaignPlan             CampaignPlan?
+  electedOffices           ElectedOffice[]
 
   @@index([slug])
   @@map("campaign")

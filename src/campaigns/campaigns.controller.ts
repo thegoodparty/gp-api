@@ -10,6 +10,7 @@ import {
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -33,6 +34,8 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -52,6 +55,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -73,6 +77,7 @@ export class CampaignsController {
     private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
+    private readonly queueProducerService: QueueProducerService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -159,8 +164,18 @@ export class CampaignsController {
 
   @Get('mine')
   @UseCampaign({ include: { pathToVictory: true, organization: true } })
-  async findMine(@ReqCampaign() campaign: Campaign) {
-    return campaign
+  async findMine(
+    @ReqCampaign()
+    campaign: CampaignWith<'pathToVictory' | 'organization'>,
+  ) {
+    const { organization: org } = campaign
+
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: org?.customPositionName,
+      positionId: org?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @UseGuards(M2MOnly)
@@ -464,6 +479,23 @@ export class CampaignsController {
         officeContextFingerprint: null,
       },
     })
+
+    const taskGenerationMessage: QueueMessage = {
+      type: QueueType.GENERATE_TASKS,
+      data: {
+        campaignId: campaign.id,
+      },
+    }
+
+    try {
+      await this.queueProducerService.sendMessage(
+        taskGenerationMessage,
+        MessageGroup.default,
+        { throwOnError: true },
+      )
+    } catch {
+      throw new BadGatewayException('Failed to queue task generation')
+    }
 
     return result
   }

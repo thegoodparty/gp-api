@@ -1,7 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { PinoLogger } from 'nestjs-pino'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { User, Campaign } from '@prisma/client'
+import { Test, TestingModule } from '@nestjs/testing'
+import { Campaign, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import Stripe from 'stripe'
 import {
   beforeEach,
@@ -11,13 +12,12 @@ import {
   vi,
   type MockedFunction,
 } from 'vitest'
-import { PurchaseService } from './purchase.service'
-import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import {
-  PurchaseType,
-  PurchaseHandler,
   CheckoutSessionPostPurchaseHandler,
+  PurchaseHandler,
+  PurchaseType,
 } from '../purchase.types'
+import { PurchaseService } from './purchase.service'
 
 // Helper to create mock Stripe Response objects
 const mockStripeLastResponse = {
@@ -91,7 +91,7 @@ describe('PurchaseService', () => {
 
   const mockCampaign: Campaign = {
     id: 111,
-    organizationSlug: null,
+    organizationSlug: 'campaign-111',
     slug: 'test-campaign',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -170,7 +170,7 @@ describe('PurchaseService', () => {
             pricePerContact: 3.5,
           },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert
@@ -203,6 +203,7 @@ describe('PurchaseService', () => {
             type: PurchaseType.TEXT,
             metadata: {},
           },
+          metadata: {},
         }),
       ).rejects.toThrow('No handler found for purchase type: TEXT')
     })
@@ -229,6 +230,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.POLL,
           metadata: { pollId: 123 },
         },
+        metadata: {},
       })
 
       // Assert: Should use default product name
@@ -266,7 +268,7 @@ describe('PurchaseService', () => {
             campaignId: 111,
           },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert: Should NOT call Stripe
@@ -304,6 +306,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.TEXT,
           metadata: { contactCount: 200, pricePerContact: 3.5 },
         },
+        metadata: {},
       })
 
       // Assert: Session ID must start with free_ prefix
@@ -325,6 +328,7 @@ describe('PurchaseService', () => {
             type: 'INVALID_TYPE' as PurchaseType,
             metadata: {},
           },
+          metadata: {},
         }),
       ).rejects.toThrow('Invalid purchase type: INVALID_TYPE')
     })
@@ -351,7 +355,7 @@ describe('PurchaseService', () => {
           type: PurchaseType.TEXT,
           metadata: { contactCount: 100 },
         },
-        campaign: mockCampaign,
+        metadata: { campaignId: mockCampaign.id },
       })
 
       // Assert: Should return synthetic response without calling handler

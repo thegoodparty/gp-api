@@ -141,13 +141,13 @@ export class PollsController {
   //         - organization becomes non-optional, campaign no longer passed to getDistrictStats
   @Post('initial-poll')
   @UseElectedOffice()
-  @UseCampaign()
+  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization({ continueIfNotFound: true })
   async createInitialPoll(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
     @ReqOrganization() organization: Organization | undefined,
   ) {
     electedOffice = await this.electedOfficeService.update({

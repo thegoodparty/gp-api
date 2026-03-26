@@ -65,11 +65,14 @@ export class PurchaseService {
   async createCheckoutSession({
     user,
     dto,
-    campaign,
+    metadata,
   }: {
     user: User
     dto: CreateCheckoutSessionDto<unknown>
-    campaign?: Campaign
+    metadata: {
+      campaignId?: number
+      organizationSlug?: string
+    }
   }): Promise<{
     id: string
     clientSecret: string
@@ -78,7 +81,7 @@ export class PurchaseService {
     this.logger.info({
       user: user.id,
       dto,
-      campaign,
+      metadata,
       msg: 'Attempting checkout session creation for user',
     })
 
@@ -100,7 +103,7 @@ export class PurchaseService {
       // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...(dto.metadata as Record<string, unknown>),
-      ...(campaign?.id ? { campaignId: campaign?.id } : {}),
+      ...metadata,
     })
 
     if (existingPayment) {
@@ -116,7 +119,7 @@ export class PurchaseService {
       // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...(dto.metadata as Record<string, unknown>),
-      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+      ...metadata,
     }
 
     const amount = await handler.calculateAmount(mergedMetadata)
@@ -163,7 +166,7 @@ export class PurchaseService {
         // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(dto.metadata as Record<string, unknown>),
-        ...(campaign?.id ? { campaignId: campaign.id } : {}),
+        ...metadata,
       },
     }
 

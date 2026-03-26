@@ -19,7 +19,12 @@ export type FriendlyOrganization = {
   slug: string
   hasDistrictOverride: boolean
   customPositionName: string | null
-  position: { id: string; name: string; brPositionId: string } | null
+  position: {
+    id: string
+    name: string
+    state: string
+    brPositionId: string
+  } | null
   district: OrgDistrict | null
   campaign: Campaign | null
   electedOffice: ElectedOffice | null
@@ -343,6 +348,7 @@ export class OrganizationsService extends createPrismaBase(
         ? {
             id: position.id,
             name: position.name,
+            state: position.state,
             brPositionId: position.brPositionId,
           }
         : null,
