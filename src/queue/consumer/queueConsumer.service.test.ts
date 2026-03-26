@@ -3,6 +3,7 @@ import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
+import { CampaignTasksService } from '@/campaigns/tasks/services/campaignTasks.service'
 import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
@@ -232,6 +233,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       {} as never,
       analytics as unknown as AnalyticsService,
       campaignsService as never,
+      {} as never,
       {} as never,
       {} as never,
       pollsService as unknown as PollsService,
@@ -802,6 +804,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
             },
           },
           { provide: CampaignsService, useValue: mockCampaigns },
+          { provide: CampaignTasksService, useValue: {} },
           { provide: CampaignTcrComplianceService, useValue: {} },
           { provide: DomainsService, useValue: {} },
           { provide: PollsService, useValue: {} },
@@ -1073,6 +1076,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       {} as never,
       campaignsService as never,
+      {} as never,
       {} as never,
       {} as never,
       pollsService as never,
