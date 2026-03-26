@@ -1121,10 +1121,23 @@ export class QueueConsumerService {
         `Successfully generated tasks for campaign ${message.campaignId}`,
       )
     } catch (error) {
-      this.logger.error(
-        { error, campaignId: message.campaignId },
-        `Failed to generate tasks for campaign ${message.campaignId}`,
-      )
+      if (isAxiosError(error)) {
+        this.logger.error(
+          {
+            campaignId: message.campaignId,
+            status: error.response?.status,
+            body: JSON.stringify(error.response?.data),
+            message: error.message,
+          },
+          `Failed to generate tasks for campaign ${message.campaignId}`,
+        )
+      } else {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        this.logger.error(
+          { error: errorMsg, campaignId: message.campaignId },
+          `Failed to generate tasks for campaign ${message.campaignId}`,
+        )
+      }
       throw error
     }
   }

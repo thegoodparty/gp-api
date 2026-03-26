@@ -109,7 +109,15 @@ export class AiCampaignManagerService {
       )
       return response.data
     } catch (error) {
-      this.logger.error('Failed to download campaign plan JSON', error)
+      if (isAxiosError(error)) {
+        this.logger.error(
+          `Failed to download campaign plan JSON: status=${error.response?.status} body=${JSON.stringify(error.response?.data)} message=${error.message}`,
+        )
+      } else {
+        this.logger.error(
+          `Failed to download campaign plan JSON: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
       throw new BadGatewayException('Failed to download campaign plan JSON')
     }
   }
@@ -143,7 +151,15 @@ export class AiCampaignManagerService {
 
       return progressData
     } catch (error: unknown) {
-      this.logger.error('Failed to get progress stream', error)
+      if (isAxiosError(error)) {
+        this.logger.error(
+          `Failed to get progress stream: status=${error.response?.status} body=${JSON.stringify(error.response?.data)} message=${error.message}`,
+        )
+      } else {
+        this.logger.error(
+          `Failed to get progress stream: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
       throw new BadGatewayException('Failed to get progress stream')
     }
   }
