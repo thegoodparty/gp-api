@@ -62,9 +62,9 @@ import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
-) { }
+) {}
 
-class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) { }
+class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -440,11 +440,11 @@ export class CampaignsController {
         districtManuallySet: true,
         ...(!hasTurnout
           ? {
-            projectedTurnout: -1,
-            winNumber: -1,
-            voterContactGoal: -1,
-            p2vStatus: P2VStatus.districtMatched,
-          }
+              projectedTurnout: -1,
+              winNumber: -1,
+              voterContactGoal: -1,
+              p2vStatus: P2VStatus.districtMatched,
+            }
           : {}),
         p2vAttempts: 0,
         officeContextFingerprint: null,
