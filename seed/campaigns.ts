@@ -12,6 +12,7 @@ import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.fact
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
+import { ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
@@ -137,6 +138,14 @@ async function handleUserCreation(
           userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
       },
     })
+    if (user.firstName && user.lastName && userData.password) {
+      await ensureClerkUser(prisma, user.id, {
+        email: user.email,
+        password: userData.password,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      })
+    }
   }
   return user
 }

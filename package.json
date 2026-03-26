@@ -22,6 +22,7 @@
     "test:watch": "npx vitest",
     "migrate:dev": "npx prisma migrate dev",
     "migrate:deploy": "npx prisma migrate deploy",
+    "migrate:clean": "tsx scripts/migrate-clean.ts",
     "migrate:reset": "npx prisma migrate reset --force",
     "seed": "npx prisma db seed",
     "seed:all": "npx prisma db seed -- --type all",

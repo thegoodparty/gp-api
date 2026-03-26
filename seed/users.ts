@@ -27,9 +27,10 @@ export const ADMIN_USER = {
   },
 }
 
+const SALES_PASSWORD = 'iDoTalkAboutFightClub1'
 const SALES_USER = {
   email: 'sales@fightclub.org',
-  password: hashPasswordSync('iDoTalkAboutFightClub1'),
+  password: hashPasswordSync(SALES_PASSWORD),
   hasPassword: true,
   roles: [UserRole.sales],
 }
@@ -44,26 +45,34 @@ const CANDIDATE_USER = {
   roles: [UserRole.candidate],
 }
 
+const SERVE_PASSWORD = 'serveFightClubGreatAgain123'
 export const SERVE_USER = {
   email: 'serve@fightclub.org',
-  password: hashPasswordSync('serveFightClubGreatAgain123'),
+  password: hashPasswordSync(SERVE_PASSWORD),
   hasPassword: true,
   roles: [UserRole.candidate],
 }
 
+const VISITOR_PASSWORD = 'tellMeAllAboutFightClub123'
 const USER_W_NO_CAMPAIGN = {
   email: 'visitor@fightclub.org',
-  password: hashPasswordSync('tellMeAllAboutFightClub123'),
+  password: hashPasswordSync(VISITOR_PASSWORD),
   hasPassword: true,
 }
-interface ClerkSeedUser {
+
+const FIXED_PLAINTEXT_PASSWORDS: Record<string, string> = {
+  [SALES_USER.email]: SALES_PASSWORD,
+  [SERVE_USER.email]: SERVE_PASSWORD,
+  [USER_W_NO_CAMPAIGN.email]: VISITOR_PASSWORD,
+}
+export interface ClerkSeedUser {
   email: string
   password: string
   firstName: string
   lastName: string
 }
 
-const ensureClerkUser = async (
+export const ensureClerkUser = async (
   prisma: PrismaClient,
   localUserId: number,
   userData: ClerkSeedUser,
@@ -187,9 +196,15 @@ export default async function seedUsers(prisma: PrismaClient) {
   })
 
   const fakeUsers = new Array(NUM_USERS)
+  const plaintextPasswords = new Map<string, string>()
 
   for (let i = 0; i < NUM_USERS; i++) {
-    fakeUsers[i] = userFactory(FIXED_USERS[i])
+    const generated = userFactory(FIXED_USERS[i])
+    fakeUsers[i] = generated
+    plaintextPasswords.set(
+      generated.email,
+      FIXED_PLAINTEXT_PASSWORDS[generated.email] ?? generated.password,
+    )
   }
 
   const createdUsers = await prisma.user.createManyAndReturn({
@@ -200,6 +215,18 @@ export default async function seedUsers(prisma: PrismaClient) {
   console.log(
     `Created ${createdUsers.length} users (skipped ${fakeUsers.length - createdUsers.length} duplicates)`,
   )
+
+  for (const user of createdUsers) {
+    const plainPassword = plaintextPasswords.get(user.email)
+    if (plainPassword && user.firstName && user.lastName) {
+      await ensureClerkUser(prisma, user.id, {
+        email: user.email,
+        password: plainPassword,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      })
+    }
+  }
 
   const upsertedIds = new Set([adminUser.id, candidateUser.id])
   const allUsers = [
