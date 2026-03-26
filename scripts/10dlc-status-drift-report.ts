@@ -49,6 +49,7 @@ const EXCLUDED_CAMPAIGN_IDS = [151557, 20, 962, 27835, 117404, 3078, 98823]
 const SQL = `
   SELECT
     u.email,
+    u.id                      AS user_id,
     c.id                      AS campaign_id,
     c.slug                    AS campaign_slug,
     c.data->>'hubspotId'      AS hubspot_id,
@@ -137,6 +138,7 @@ type MismatchType =
 
 interface DbRow {
   email: string
+  user_id: number
   campaign_id: number
   campaign_slug: string
   hubspot_id: string | null
@@ -152,6 +154,7 @@ interface DbRow {
 
 interface ReportRow {
   email: string
+  userId: number
   campaignId: number
   hubspotId: string
   mergedTo: string
@@ -502,6 +505,7 @@ async function main() {
 
     return {
       email,
+      userId: row.user_id,
       campaignId: row.campaign_id,
       hubspotId: hubspotId ?? '',
       mergedTo,
@@ -574,6 +578,7 @@ async function main() {
   // --- CSV export (full data lives here — no need to dump all rows to stdout) ---
   const headers: (keyof ReportRow)[] = [
     'email',
+    'userId',
     'campaignId',
     'hubspotId',
     'mergedTo',
