@@ -102,5 +102,6 @@ export const GLOBAL_ALERTS: Alert[] = [
       'A Serve-related background SQS job has failed in the last 5 minutes.',
       'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
     ].join('\n\n'),
+    notify: 'serve-bugs',
   },
 ]
