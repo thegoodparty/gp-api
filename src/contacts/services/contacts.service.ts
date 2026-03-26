@@ -136,7 +136,7 @@ export class ContactsService {
 
   private async withOrgDistrictResolution<Result>(
     org: Organization,
-    campaign: CampaignWithPathToVictory,
+    campaign: CampaignWithPathToVictory | undefined,
     fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
   ): Promise<Result> {
     const { districtId, state } = await this.resolveDistrictInfoFromOrg(org)
@@ -152,9 +152,8 @@ export class ContactsService {
         'Organization does not have sufficient data to resolve district',
       )
     }
-    const canDownloadFederal = Boolean(
-      (campaign as { canDownloadFederal?: boolean }).canDownloadFederal,
-    )
+    // LEGACY: Replace with org-based approval when org migration is complete.
+    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
     if (!canDownloadFederal) {
       throw new BadRequestException(
         'Statewide or federal contacts require admin approval',
@@ -167,16 +166,16 @@ export class ContactsService {
   //         organization becomes required, remove legacy branch.
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
-    campaign: CampaignWithPathToVictory,
+    campaign: CampaignWithPathToVictory | undefined,
     organization?: Organization,
   ) {
     if (search) {
       const hasElectedOffice = await this.hasElectedOfficeAccess(
-        campaign.userId,
+        campaign?.userId ?? 0, // userId unused on org path (checks organizationSlug)
         organization,
       )
       // LEGACY: Remove campaign.isPro check when org migration is complete.
-      if (!campaign.isPro && !hasElectedOffice) {
+      if (!(campaign?.isPro ?? false) && !hasElectedOffice) {
         throw new BadRequestException(
           'Search is only available for pro campaigns',
         )
@@ -230,6 +229,9 @@ export class ContactsService {
     }
 
     // LEGACY: Remove when org migration is complete.
+    if (!campaign) {
+      throw new BadRequestException('Campaign or organization is required')
+    }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
       fetchPeople(params, filters),
@@ -285,7 +287,7 @@ export class ContactsService {
   //         organization becomes required, remove withFallbackDistrictName branch.
   async findPerson(
     id: string,
-    campaign: CampaignWithPathToVictory,
+    campaign: CampaignWithPathToVictory | undefined,
     organization?: Organization,
   ): Promise<PersonOutput> {
     const fetchPerson = async (districtParams: {
@@ -329,6 +331,10 @@ export class ContactsService {
       return this.withOrgDistrictResolution(organization, campaign, fetchPerson)
     }
 
+    // LEGACY: Remove when org migration is complete.
+    if (!campaign) {
+      throw new BadRequestException('Campaign or organization is required')
+    }
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
@@ -346,16 +352,16 @@ export class ContactsService {
   //         organization becomes required, remove legacy branch.
   async downloadContacts(
     { segment }: DownloadContactsDTO,
-    campaign: CampaignWithPathToVictory,
+    campaign: CampaignWithPathToVictory | undefined,
     res: FastifyReply,
     organization?: Organization,
   ) {
     const hasElectedOffice = await this.hasElectedOfficeAccess(
-      campaign.userId,
+      campaign?.userId ?? 0, // userId unused on org path (checks organizationSlug)
       organization,
     )
     // LEGACY: Remove campaign.isPro check when org migration is complete.
-    if (!campaign.isPro && !hasElectedOffice) {
+    if (!(campaign?.isPro ?? false) && !hasElectedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
 
@@ -409,6 +415,9 @@ export class ContactsService {
     }
 
     // LEGACY: Remove when org migration is complete.
+    if (!campaign) {
+      throw new BadRequestException('Campaign or organization is required')
+    }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
       downloadPeople(params, filters),
@@ -418,7 +427,7 @@ export class ContactsService {
   // LEGACY: Remove campaign param when org migration is complete.
   //         organization becomes required, remove withFallbackDistrictName branch.
   async getDistrictStats(
-    campaign: CampaignWithPathToVictory,
+    campaign: CampaignWithPathToVictory | undefined,
     organization?: Organization,
   ) {
     const fetchStats = async (districtParams: {
@@ -446,6 +455,10 @@ export class ContactsService {
       return this.withOrgDistrictResolution(organization, campaign, fetchStats)
     }
 
+    // LEGACY: Remove when org migration is complete.
+    if (!campaign) {
+      throw new BadRequestException('Campaign or organization is required')
+    }
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
@@ -519,11 +532,7 @@ export class ContactsService {
     const ballotLevel = (
       campaign.details as { ballotLevel?: BallotReadyPositionLevel } | null
     )?.ballotLevel
-    const canDownloadFederal = (
-      campaign as {
-        canDownloadFederal?: boolean
-      }
-    ).canDownloadFederal
+    const canDownloadFederal = campaign.canDownloadFederal
     return (
       (ballotLevel === BallotReadyPositionLevel.FEDERAL ||
         ballotLevel === BallotReadyPositionLevel.STATE) &&

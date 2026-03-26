@@ -26,6 +26,7 @@ import { CampaignsController } from './campaigns.controller'
 import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 
 const CREATED_AT = '2025-01-01'
 
@@ -443,10 +444,12 @@ describe('CampaignsController', () => {
 
   describe('findMine', () => {
     it('returns the campaign with positionName', async () => {
-      const campaignWithRelations = {
+      const campaignWithRelations: CampaignWith<
+        'organization' | 'pathToVictory'
+      > = {
         ...mockCampaign,
         pathToVictory: null as PathToVictory | null,
-        organization: null as Organization | null,
+        organization: {} as Organization,
       }
 
       const result = await controller.findMine(campaignWithRelations)
