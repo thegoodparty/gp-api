@@ -121,9 +121,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const district = details.district ? ` - ${details.district}` : ''
     const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
-    const pathData = pathToVictory?.data as
-      | PrismaJson.PathToVictoryData
-      | undefined
+    const pathData = pathToVictory?.data
     const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
     const totalRegisteredVoters = this.extractNumberValue(
       pathData?.totalRegisteredVoters,
@@ -269,11 +267,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   private extractBudgetFromData(
     data: PrismaJson.CampaignData,
   ): number | undefined {
-    if (
-      data.reportedVoterGoals &&
-      typeof data.reportedVoterGoals === 'object'
-    ) {
-      const goals = data.reportedVoterGoals as Record<string, unknown>
+    const goals = data.reportedVoterGoals
+    if (goals && 'budget' in goals) {
       const budget = goals.budget
       if (typeof budget === 'number') return budget
       if (typeof budget === 'string') {
@@ -374,7 +369,18 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private mapFlowTypeToValidEnum(category: string): CampaignTaskType {
-    const flowTypeMap: Record<string, CampaignTaskType> = {
+    type FlowTypeKey =
+      | 'text'
+      | 'robocall'
+      | 'doorKnocking'
+      | 'phoneBanking'
+      | 'socialMedia'
+      | 'events'
+      | 'education'
+      | 'compliance'
+      | 'general'
+
+    const flowTypeMap: Record<FlowTypeKey, CampaignTaskType> = {
       text: CampaignTaskType.text,
       robocall: CampaignTaskType.robocall,
       doorKnocking: CampaignTaskType.doorKnocking,
@@ -386,7 +392,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       general: CampaignTaskType.education,
     }
 
-    return flowTypeMap[category] || CampaignTaskType.education
+    const isFlowTypeKey = (key: string): key is FlowTypeKey => key in flowTypeMap
+    return isFlowTypeKey(category) ? flowTypeMap[category] : CampaignTaskType.education
   }
 
   private calculateWeekFromDate(
@@ -456,17 +463,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private generateCampaignInfoHash(
-    campaignInfo: Record<string, string | number | boolean | null | undefined>,
+    campaignInfo: StartCampaignPlanRequest & { campaign_plan_version: number },
   ): string {
-    const sortedInfo = Object.keys(campaignInfo)
-      .sort()
-      .reduce(
-        (result, key) => {
-          result[key] = campaignInfo[key]
-          return result
-        },
-        {} as Record<string, string | number | boolean | null | undefined>,
-      )
+    const sortedInfo = Object.fromEntries(
+      Object.entries(campaignInfo).sort(([a], [b]) => a.localeCompare(b)),
+    )
 
     const hashString = JSON.stringify(sortedInfo)
     return createHash('sha256').update(hashString).digest('hex')

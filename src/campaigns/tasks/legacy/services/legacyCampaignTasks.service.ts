@@ -21,9 +21,7 @@ export class LegacyCampaignTasksService {
     if (!currentDate) {
       return this.getListOfTasks()
     }
-    const { electionDate: electionDateStr } = details as {
-      electionDate?: string
-    }
+    const electionDateStr = details.electionDate
     const electionDate =
       endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
 
