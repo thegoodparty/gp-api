@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { ReadCampaignOutputSchema } from './ReadCampaignOutput.schema'
-import type { ReadCampaignOutput } from './Campaign.schema'
 
 /**
  * TODO: The PathToVictory sub-schema here duplicates the shape defined in
@@ -20,12 +19,4 @@ export const SetDistrictOutputSchema = ReadCampaignOutputSchema.extend({
   pathToVictory: PathToVictorySchema.nullish(),
 })
 
-export type SetDistrictOutput = ReadCampaignOutput & {
-  pathToVictory: {
-    id: number
-    createdAt: Date
-    updatedAt: Date
-    campaignId: number
-    data: Record<string, unknown>
-  } | null
-}
+export type SetDistrictOutput = z.infer<typeof SetDistrictOutputSchema>
