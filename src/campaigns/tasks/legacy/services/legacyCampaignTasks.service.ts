@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { parse, differenceInWeeks } from 'date-fns'
-import { DateFormats } from '../../shared/util/date.util'
-import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
-import { CampaignsService } from '../services/campaigns.service'
+import { DateFormats } from '@/shared/util/date.util'
+import { STATIC_CAMPAIGN_TASKS } from '../fixtures/legacyCampaignTasks.consts'
+import { CampaignsService } from '../../../services/campaigns.service'
 
 const MAX_WEEK_NUMBER = 9
 
 @Injectable()
-export class CampaignTasksService {
+export class LegacyCampaignTasksService {
   private readonly fullTasksList = STATIC_CAMPAIGN_TASKS
 
   constructor(private readonly campaigns: CampaignsService) {}
@@ -21,7 +21,7 @@ export class CampaignTasksService {
     if (!currentDate) {
       return this.getListOfTasks()
     }
-    const { electionDate: electionDateStr } = details
+    const electionDateStr = details.electionDate
     const electionDate =
       endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
 

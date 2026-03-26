@@ -22,6 +22,7 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { CampaignsController } from './campaigns.controller'
 import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -78,7 +79,7 @@ const campaignDefaults = {
   aiContent: {},
   vendorTsData: {},
   canDownloadFederal: false,
-  completedTaskIds: [] as string[],
+  completedTaskIds: [],
   hasFreeTextsOffer: false,
   freeTextsOfferRedeemedAt: null,
 }
@@ -217,6 +218,10 @@ describe('CampaignsController', () => {
     }
     analyticsService = analyticsServiceMock as AnalyticsService
 
+    const queueProducerServiceMock: Partial<QueueProducerService> = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    }
+
     controller = new CampaignsController(
       campaignsService,
       planVersionsService,
@@ -226,6 +231,7 @@ describe('CampaignsController', () => {
       electionsService,
       organizationsService,
       analyticsService,
+      queueProducerServiceMock as QueueProducerService,
       createMockLogger(),
     )
   })

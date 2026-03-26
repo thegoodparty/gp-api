@@ -1,4 +1,4 @@
-import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { CampaignTask, CampaignTaskType } from '../../campaignTasks.types'
 
 const tasksWeek6: CampaignTask[] = [
   {

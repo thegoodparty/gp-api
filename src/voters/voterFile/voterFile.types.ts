@@ -55,6 +55,7 @@ export const TASK_TO_TYPE_MAP: {
   // These maybe won't be used?, putting here for completeness
   [CampaignTaskType.events]: VoterFileType.full,
   [CampaignTaskType.education]: VoterFileType.full,
+  [CampaignTaskType.compliance]: VoterFileType.full,
 }
 
 // TODO: store this in DB table? (currently in campaign.data)
