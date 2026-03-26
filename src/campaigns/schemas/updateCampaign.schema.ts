@@ -112,3 +112,10 @@ export class SetDistrictDTO extends createZodDto(
     L2DistrictName: z.string(),
   }),
 ) {}
+
+export class SetDistrictM2MDTO extends createZodDto(
+  z.object({
+    L2DistrictType: z.string(),
+    L2DistrictName: z.string(),
+  }),
+) {}
