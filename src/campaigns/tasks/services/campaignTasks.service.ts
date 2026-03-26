@@ -127,9 +127,13 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: CampaignWithPathToVictory,
   ): Observable<MessageEvent> {
     return new Observable((subscriber: Subscriber<MessageEvent>) => {
-      this.runGenerationStream(campaign, subscriber).catch((error) => {
+      this.runGenerationStream(campaign, subscriber).catch((error: Error) => {
+        this.logger.error(
+          { error, campaignId: campaign.id },
+          'Task generation stream failed',
+        )
         subscriber.next({
-          data: { type: 'error', message: String(error) },
+          data: { type: 'error', message: 'Task generation failed' },
         })
         subscriber.complete()
       })
