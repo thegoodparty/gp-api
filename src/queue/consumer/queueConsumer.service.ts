@@ -24,6 +24,7 @@ import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
 import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
@@ -53,6 +54,7 @@ import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
+  GenerateTasksMessage,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -101,6 +103,7 @@ export class QueueConsumerService {
     private readonly pathToVictoryService: PathToVictoryService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
+    private readonly campaignTasksService: CampaignTasksService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly domainsService: DomainsService,
     private readonly pollsService: PollsService,
@@ -266,6 +269,12 @@ export class QueueConsumerService {
         this.logger.info('received pathToVictory message')
         return await this.withLegacyErrorSwallowing(message, async () => {
           await this.handlePathToVictoryMessage(queueMessage.data)
+          return true
+        })
+      case QueueType.GENERATE_TASKS:
+        this.logger.info('received generateTasks message')
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          await this.handleGenerateTasksMessage(queueMessage.data)
           return true
         })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
@@ -1095,6 +1104,42 @@ export class QueueConsumerService {
       cellPhonesToPeopleIds.set(normalizePhoneNumber(personCellPhone), personId)
     }
     return cellPhonesToPeopleIds
+  }
+
+  private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
+    try {
+      this.logger.info(`Generating tasks for campaign ${message.campaignId}`)
+
+      const campaign = await this.campaignsService.findUniqueOrThrow({
+        where: { id: message.campaignId },
+        include: { pathToVictory: true },
+      })
+
+      await this.campaignTasksService.generateTasks(campaign)
+
+      this.logger.info(
+        `Successfully generated tasks for campaign ${message.campaignId}`,
+      )
+    } catch (error) {
+      if (isAxiosError(error)) {
+        this.logger.error(
+          {
+            campaignId: message.campaignId,
+            status: error.response?.status,
+            body: JSON.stringify(error.response?.data),
+            message: error.message,
+          },
+          `Failed to generate tasks for campaign ${message.campaignId}`,
+        )
+      } else {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        this.logger.error(
+          { error: errorMsg, campaignId: message.campaignId },
+          `Failed to generate tasks for campaign ${message.campaignId}`,
+        )
+      }
+      throw error
+    }
   }
 }
 

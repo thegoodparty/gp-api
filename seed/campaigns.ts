@@ -92,12 +92,21 @@ async function createCampaignAndUser(
   updateHistory: CampaignUpdateHistory[]
 }> {
   const user = await handleUserCreation(prisma, existingUsers)
+  const campaignData = campaignFactory({
+    userId: user.id,
+    slug: buildSlug(getUserFullName(user)),
+    ...(fixedData || {}),
+  })
+
+  await prisma.organization.create({
+    data: {
+      slug: campaignData.organizationSlug,
+      ownerId: user.id,
+    },
+  })
+
   const campaign: Campaign = await prisma.campaign.create({
-    data: campaignFactory({
-      userId: user.id,
-      slug: buildSlug(getUserFullName(user)),
-      ...(fixedData || {}),
-    }),
+    data: campaignData,
   })
 
   // create a campaign plan version

@@ -7,9 +7,11 @@ import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.sche
 import {
   ListCampaignsPaginationSchema,
   ReadCampaignOutputSchema,
+  SetDistrictOutputSchema,
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -33,6 +35,8 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -48,10 +52,12 @@ import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   CreateCampaignSchema,
   SetDistrictDTO,
+  SetDistrictM2MDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -73,6 +79,7 @@ export class CampaignsController {
     private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
+    private readonly queueProducerService: QueueProducerService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -159,8 +166,18 @@ export class CampaignsController {
 
   @Get('mine')
   @UseCampaign({ include: { pathToVictory: true, organization: true } })
-  async findMine(@ReqCampaign() campaign: Campaign) {
-    return campaign
+  async findMine(
+    @ReqCampaign()
+    campaign: CampaignWith<'pathToVictory' | 'organization'>,
+  ) {
+    const { organization: org } = campaign
+
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: org?.customPositionName,
+      positionId: org?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @UseGuards(M2MOnly)
@@ -324,6 +341,7 @@ export class CampaignsController {
 
   @Put('mine/district')
   @UseCampaign()
+  @ResponseSchema(SetDistrictOutputSchema)
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
@@ -339,7 +357,6 @@ export class CampaignsController {
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin or Sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
@@ -357,6 +374,14 @@ export class CampaignsController {
       'Updating campaign with district',
     )
 
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
+  }
+
+  private async applyDistrictUpdate(
+    campaign: Campaign,
+    l2DistrictType: string,
+    l2DistrictName: string,
+  ) {
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
       L2DistrictType: l2DistrictType,
       L2DistrictName: l2DistrictName,
@@ -394,12 +419,38 @@ export class CampaignsController {
               p2vStatus: P2VStatus.districtMatched,
             }
           : {}),
-        // Reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
       overrideDistrictId,
     })
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id/district')
+  @ResponseSchema(SetDistrictOutputSchema)
+  async setDistrictM2M(
+    @Param() { id }: IdParamSchema,
+    @Body()
+    {
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictM2MDTO,
+  ) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+
+    this.logger.debug(
+      {
+        campaignId: id,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
+      },
+      'M2M: Updating campaign with district',
+    )
+
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
   }
 
   @Put('mine/race-target-details')
@@ -464,6 +515,23 @@ export class CampaignsController {
         officeContextFingerprint: null,
       },
     })
+
+    const taskGenerationMessage: QueueMessage = {
+      type: QueueType.GENERATE_TASKS,
+      data: {
+        campaignId: campaign.id,
+      },
+    }
+
+    try {
+      await this.queueProducerService.sendMessage(
+        taskGenerationMessage,
+        MessageGroup.default,
+        { throwOnError: true },
+      )
+    } catch {
+      throw new BadGatewayException('Failed to queue task generation')
+    }
 
     return result
   }

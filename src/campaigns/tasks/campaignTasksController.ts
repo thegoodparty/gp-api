@@ -2,43 +2,56 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
+  MessageEvent,
   Param,
-  ParseDatePipe,
+  Post,
   Put,
-  Query,
+  Sse,
 } from '@nestjs/common'
-import { CampaignTasksService } from './campaignTasksService'
+import { Observable } from 'rxjs'
+import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
+import { CampaignWithPathToVictory } from '../campaigns.types'
 
 @Controller('campaigns/tasks')
-@UseCampaign()
+@UseCampaign({ include: { pathToVictory: true } })
 export class CampaignTasksController {
   constructor(private readonly tasksService: CampaignTasksService) {}
 
   @Get()
-  listCampaignTasks(
-    @ReqCampaign() campaign: Campaign,
-    @Query('date', new ParseDatePipe({ optional: true })) date?: Date,
-    @Query('endDate', new ParseDatePipe({ optional: true })) endDate?: Date,
-  ) {
-    return this.tasksService.listCampaignTasks(campaign, date, endDate)
+  listCampaignTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    return this.tasksService.listCampaignTasks(campaign)
   }
 
-  @Put('complete/:taskId')
+  @Put('complete/:id')
   async completeTask(
-    @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.completeTask(campaign, taskId)
+    return this.tasksService.completeTask(campaign, id)
   }
 
-  @Delete('complete/:taskId')
+  @Delete('complete/:id')
   async unCompleteTask(
-    @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.unCompleteTask(campaign, taskId)
+    return this.tasksService.unCompleteTask(campaign, id)
+  }
+
+  @Post('generate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  enqueueGenerateTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    return this.tasksService.enqueueGenerateTasks(campaign)
+  }
+
+  @Sse('generate/stream')
+  generateTasksStream(
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ): Observable<MessageEvent> {
+    return this.tasksService.generateTasksStream(campaign)
   }
 }

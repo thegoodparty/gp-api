@@ -383,12 +383,6 @@ export interface PeerlyJob {
   integrations: string[]
 }
 
-export interface PeerlyAgent {
-  id: string
-  display_email: string
-  status?: string
-}
-
 export interface PeerlyJobTemplate {
   is_default: boolean
   title: string
@@ -412,7 +406,6 @@ export interface PeerlyJobTemplate {
 }
 
 export interface CreateJobParams {
-  crmCompanyId: string
   name: string
   templates: PeerlyJobTemplate[]
   didState: string

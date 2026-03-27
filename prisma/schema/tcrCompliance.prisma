@@ -22,23 +22,23 @@ enum CommitteeType {
 }
 
 model TcrCompliance {
-  id                    String                     @id @default(cuid())
-  ein                   String
-  postalAddress         String
-  committeeName         String                     @map("committee_name")
-  websiteDomain         String                     @map("website_domain")
-  filingUrl             String                     @map("filing_url")
-  phone                 String
-  email                 String
-  officeLevel           OfficeLevel                @map("office_level")
-  fecCommitteeId        String?                    @map("fec_committee_id")
-  committeeType         CommitteeType              @default(CANDIDATE) @map("committee_type")
-  status                TcrComplianceStatus?       @default(submitted)
-  tdlcNumber            String?                    @map("tdlc_number")
-  createdAt             DateTime                   @default(now()) @map("created_at")
-  updatedAt             DateTime                   @updatedAt @map("updated_at")
-  campaign              Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId            Int                        @unique @map("campaign_id")
+  id             String               @id @default(cuid())
+  ein            String
+  postalAddress  String
+  committeeName  String               @map("committee_name")
+  websiteDomain  String               @map("website_domain")
+  filingUrl      String               @map("filing_url")
+  phone          String
+  email          String
+  officeLevel    OfficeLevel          @map("office_level")
+  fecCommitteeId String?              @map("fec_committee_id")
+  committeeType  CommitteeType        @default(CANDIDATE) @map("committee_type")
+  status         TcrComplianceStatus? @default(submitted)
+  tdlcNumber     String?              @map("tdlc_number")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId     Int                  @unique @map("campaign_id")
 
   peerlyIdentityId              String? @unique @map("peerly_identity_id")
   peerlyRegistrationLink        String? @map("peerly_registration_link")

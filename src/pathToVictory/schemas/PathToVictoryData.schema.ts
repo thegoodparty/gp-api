@@ -40,5 +40,5 @@ export const PathToVictoryDataSchema = z.object({
   source: z.nativeEnum(P2VSource).optional(),
   districtId: z.string().optional(),
   districtManuallySet: z.boolean().optional(),
-  officeContextFingerprint: z.string().optional(),
+  officeContextFingerprint: z.string().nullable().optional(),
 })

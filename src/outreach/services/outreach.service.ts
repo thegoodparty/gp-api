@@ -77,7 +77,6 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
 
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
-        crmCompanyId: campaign.data?.hubspotId,
         listId: phoneListId,
         imageInfo: {
           fileStream: p2pImage.stream,
