@@ -299,7 +299,11 @@ describe('ElectionsService', () => {
     it('returns metrics when election-api returns valid turnout via districtId', async () => {
       mockHttpGet.mockReturnValue(
         of({
-          data: { projectedTurnout: 5000, L2DistrictType: 'City', L2DistrictName: 'Ward 1' },
+          data: {
+            projectedTurnout: 5000,
+            L2DistrictType: 'City',
+            L2DistrictName: 'Ward 1',
+          },
           status: 200,
         }),
       )
