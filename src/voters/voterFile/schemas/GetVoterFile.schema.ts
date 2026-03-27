@@ -11,9 +11,11 @@ import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { parseJsonString } from 'src/shared/util/zod.util'
 import { OutreachType } from '@prisma/client'
 
-const LOWER_CASE_TYPE_MAP = {
+const LOWER_CASE_TYPE_MAP: Record<string, VoterFileType> = {
   doorknocking: VoterFileType.doorKnocking,
   directmail: VoterFileType.directMail,
+  digitalads: VoterFileType.digitalAds,
+  telemarketing: VoterFileType.telemarketing,
 }
 
 const SelectedColumnSchema = z.object({
