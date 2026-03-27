@@ -58,6 +58,12 @@ Key mappings:
 - **Firehose Event V2** - Sends all Track events as `pe21589597_segment___all_track` custom events
 - The `Name` property contains the event name that workflows match against
 
+## HubSpot Data Flow: Contact → Company
+
+Segment identifies users by email, so events land on the **contact** record first. HubSpot workflows then copy the `10 DLC Compliance Status` from the contact to its associated **company**.
+
+A company can have multiple contacts, but the expectation is a 1:1 relationship between a contact and a company. The `10 DLC Compliance Status` on the **company** is what downstream HubSpot automations (e.g. compliance reminder emails) key off of. The drift report (`scripts/10dlc-status-drift-report.ts`) checks the status on the company record for this reason.
+
 ## HubSpot Workflow Configuration
 
 Workflows trigger on:
@@ -67,5 +73,5 @@ AND Name is equal to any of: [event name]
 ```
 
 Actions:
-1. Set `10 DLC Compliance Status` on associated companies
-2. Set `10 DLC Compliance Status` on contact
+1. Set `10 DLC Compliance Status` on the contact
+2. Copy `10 DLC Compliance Status` to the associated company
