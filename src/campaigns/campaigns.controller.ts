@@ -7,6 +7,7 @@ import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.sche
 import {
   ListCampaignsPaginationSchema,
   ReadCampaignOutputSchema,
+  SetDistrictOutputSchema,
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
@@ -51,6 +52,7 @@ import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   CreateCampaignSchema,
   SetDistrictDTO,
+  SetDistrictM2MDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -339,6 +341,7 @@ export class CampaignsController {
 
   @Put('mine/district')
   @UseCampaign()
+  @ResponseSchema(SetDistrictOutputSchema)
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
@@ -354,7 +357,6 @@ export class CampaignsController {
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin or Sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
@@ -372,6 +374,14 @@ export class CampaignsController {
       'Updating campaign with district',
     )
 
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
+  }
+
+  private async applyDistrictUpdate(
+    campaign: Campaign,
+    l2DistrictType: string,
+    l2DistrictName: string,
+  ) {
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
       L2DistrictType: l2DistrictType,
       L2DistrictName: l2DistrictName,
@@ -409,12 +419,38 @@ export class CampaignsController {
               p2vStatus: P2VStatus.districtMatched,
             }
           : {}),
-        // Reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
       overrideDistrictId,
     })
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id/district')
+  @ResponseSchema(SetDistrictOutputSchema)
+  async setDistrictM2M(
+    @Param() { id }: IdParamSchema,
+    @Body()
+    {
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictM2MDTO,
+  ) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+
+    this.logger.debug(
+      {
+        campaignId: id,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
+      },
+      'M2M: Updating campaign with district',
+    )
+
+    return this.applyDistrictUpdate(campaign, l2DistrictType, l2DistrictName)
   }
 
   @Put('mine/race-target-details')
