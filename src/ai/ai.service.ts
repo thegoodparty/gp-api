@@ -556,6 +556,7 @@ export class AiService {
           await this.campaignsService.fetchLiveRaceTargetMetrics(campaign)
         const projectedTurnout = liveMetrics?.projectedTurnout ?? storedTurnout
         const winNumber = liveMetrics?.winNumber ?? storedWinNumber
+        const voterContactGoal = liveMetrics?.voterContactGoal ?? voteGoal
 
         replaceArr.push(
           {
@@ -624,7 +625,7 @@ export class AiService {
           },
           {
             find: 'voteGoal',
-            replace: voteGoal,
+            replace: voterContactGoal,
           },
           {
             find: 'voterProjection',
