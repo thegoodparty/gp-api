@@ -140,8 +140,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,
       race_type: this.determineRaceType(details),
-      incumbent_status: 'N/A',
-      seats_available: pathData?.viability?.seats || 1,
+      incumbent_status: pathData?.viability?.isIncumbent
+        ? 'Incumbent'
+        : 'Challenger',
+      seats_available: pathData?.viability?.seats ?? 1,
       number_of_opponents: this.extractNumberOfOpponents(details),
       win_number: winNumber,
       total_likely_voters: Math.floor(projectedTurnout),

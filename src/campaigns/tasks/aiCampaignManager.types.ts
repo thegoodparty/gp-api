@@ -6,7 +6,7 @@ export interface StartCampaignPlanRequest {
   number_of_opponents: number
   seats_available: number
   win_number: number
-  incumbent_status: string
+  incumbent_status: 'Incumbent' | 'Challenger' | 'Open Seat' | 'N/A'
   total_likely_voters: number
   available_cell_phones: number
   available_landlines: number
