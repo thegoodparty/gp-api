@@ -93,7 +93,14 @@ export class AiContentService {
     if (!campaignWithRelations) {
       throw new NotFoundException(`Campaign not found: ${campaign.id}`)
     }
-    prompt = await this.aiService.promptReplace(prompt, campaignWithRelations)
+    const liveMetrics = await this.campaignsService.fetchLiveRaceTargetMetrics(
+      campaignWithRelations,
+    )
+    prompt = await this.aiService.promptReplace(
+      prompt,
+      campaignWithRelations,
+      liveMetrics,
+    )
     if (!prompt || prompt === '') {
       await this.slack.errorMessage({
         message: 'empty prompt replace',

@@ -16,8 +16,8 @@ import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 import { SlackChannel } from '../vendors/slack/slackService.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { PinoLogger } from 'nestjs-pino'
-import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { RaceTargetMetrics } from '@/elections/types/elections.types'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -73,8 +73,6 @@ export class AiService {
     private slack: SlackService,
     @Inject(forwardRef(() => OrganizationsService))
     private readonly organizations: OrganizationsService,
-    @Inject(forwardRef(() => CampaignsService))
-    private readonly campaignsService: CampaignsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiService.name)
@@ -418,7 +416,11 @@ export class AiService {
     return
   }
   /** function to replace placeholder tokens in ai content prompt */
-  async promptReplace(prompt: string, campaign: PromptReplaceCampaign) {
+  async promptReplace(
+    prompt: string,
+    campaign: PromptReplaceCampaign,
+    liveMetrics?: RaceTargetMetrics | null,
+  ) {
     try {
       let newPrompt = prompt
 
@@ -552,8 +554,6 @@ export class AiService {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
 
-        const liveMetrics =
-          await this.campaignsService.fetchLiveRaceTargetMetrics(campaign)
         const projectedTurnout = liveMetrics?.projectedTurnout ?? storedTurnout
         const winNumber = liveMetrics?.winNumber ?? storedWinNumber
         const voterContactGoal = liveMetrics?.voterContactGoal ?? voteGoal
