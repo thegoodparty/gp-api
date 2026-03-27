@@ -1004,6 +1004,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
 
   const mockElections: Partial<ElectionsService> = {
     getPositionMatchedRaceTargetDetails: vi.fn(),
+    buildRaceTargetDetails: vi.fn(),
   }
 
   let service: CampaignsService
@@ -1077,9 +1078,10 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     expect(result).toBeNull()
   })
 
-  it('should return null when organization has no positionId', async () => {
+  it('should return null when organization has no positionId and no overrideDistrictId', async () => {
     vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
       positionId: null,
+      overrideDistrictId: null,
     } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
@@ -1132,6 +1134,70 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       winNumber: -1,
       voterContactGoal: -1,
     })
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toBeNull()
+  })
+
+  it('should use overrideDistrictId when present', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: 'pos-123',
+      overrideDistrictId: 'override-district-uuid',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    vi.mocked(mockElections.buildRaceTargetDetails!).mockResolvedValue({
+      projectedTurnout: 6000,
+      winNumber: 3001,
+      voterContactGoal: 15005,
+    })
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toEqual({
+      projectedTurnout: 6000,
+      winNumber: 3001,
+      voterContactGoal: 15005,
+    })
+    expect(mockElections.buildRaceTargetDetails).toHaveBeenCalledWith({
+      districtId: 'override-district-uuid',
+      electionDate: '2026-11-03',
+    })
+    expect(
+      mockElections.getPositionMatchedRaceTargetDetails,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('should use overrideDistrictId even without positionId', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: null,
+      overrideDistrictId: 'override-district-uuid',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    vi.mocked(mockElections.buildRaceTargetDetails!).mockResolvedValue({
+      projectedTurnout: 4000,
+      winNumber: 2001,
+      voterContactGoal: 10005,
+    })
+
+    const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
+
+    expect(result).toEqual({
+      projectedTurnout: 4000,
+      winNumber: 2001,
+      voterContactGoal: 10005,
+    })
+  })
+
+  it('should return null when overrideDistrictId lookup fails', async () => {
+    vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+      positionId: null,
+      overrideDistrictId: 'bad-district-uuid',
+    } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+
+    vi.mocked(mockElections.buildRaceTargetDetails!).mockRejectedValue(
+      new Error('election-api down'),
+    )
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
 

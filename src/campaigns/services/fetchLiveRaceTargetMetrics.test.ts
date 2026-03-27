@@ -55,7 +55,7 @@ describe('CampaignsService.fetchLiveRaceTargetMetrics (election-api integration)
     expect(metrics!.voterContactGoal).toBeGreaterThan(metrics!.winNumber)
   })
 
-  it('returns null when org has no positionId', async () => {
+  it('returns null when org has no positionId and no overrideDistrictId', async () => {
     const org = await service.prisma.organization.create({
       data: {
         slug: 'no-position-org',
@@ -68,6 +68,36 @@ describe('CampaignsService.fetchLiveRaceTargetMetrics (election-api integration)
       data: {
         userId: service.user.id,
         slug: 'no-position-campaign',
+        organizationSlug: org.slug,
+        details: { electionDate: KNOWN_ELECTION_DATE },
+      },
+    })
+
+    const campaignsService = service.app.get(CampaignsService)
+    const fullCampaign = await service.prisma.campaign.findUniqueOrThrow({
+      where: { id: campaign.id },
+    })
+
+    const metrics =
+      await campaignsService.fetchLiveRaceTargetMetrics(fullCampaign)
+
+    expect(metrics).toBeNull()
+  })
+
+  it('returns null when org has overrideDistrictId but no matching turnout', async () => {
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'override-no-turnout-org',
+        ownerId: service.user.id,
+        positionId: null,
+        overrideDistrictId: 'nonexistent-district-uuid',
+      },
+    })
+
+    const campaign = await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'override-no-turnout-campaign',
         organizationSlug: org.slug,
         details: { electionDate: KNOWN_ELECTION_DATE },
       },

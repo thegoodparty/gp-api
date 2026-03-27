@@ -319,14 +319,17 @@ export class ElectionsService {
   async buildRaceTargetDetails(
     data: BuildRaceTargetDetailsInput,
   ): Promise<PrismaJson.PathToVictoryData | null> {
-    const query = {
-      ...data,
-      L2DistrictName: this.cleanDistrictName(data.L2DistrictName),
-    }
+    const query =
+      'districtId' in data
+        ? data
+        : {
+            ...data,
+            L2DistrictName: this.cleanDistrictName(data.L2DistrictName),
+          }
     try {
       const projectedTurnout = await this.electionApiGet<
         ProjectedTurnout,
-        BuildRaceTargetDetailsInput
+        typeof query
       >(ElectionApiRoutes.projectedTurnout.find.path, query)
 
       if (!projectedTurnout) {
@@ -342,24 +345,22 @@ export class ElectionsService {
         p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
       }
     } catch (error) {
-      const {
-        state,
-        L2DistrictType,
-        L2DistrictName,
-        electionCode,
-        electionDate,
-        electionYear,
-      } = data
+      const context: Record<string, string | number | undefined> =
+        'districtId' in data
+          ? { districtId: data.districtId }
+          : {
+              state: data.state,
+              L2DistrictType: data.L2DistrictType,
+              L2DistrictName: data.L2DistrictName,
+            }
+      if ('electionDate' in data) context.electionDate = data.electionDate
+      if ('electionCode' in data) {
+        context.electionCode = data.electionCode
+        context.electionYear = data.electionYear
+      }
       const message = this.buildSlackErrorMessage(
         'Election API error: buildRaceTargetDetails',
-        {
-          state,
-          L2DistrictType,
-          L2DistrictName,
-          electionCode,
-          electionDate,
-          electionYear,
-        },
+        context,
         error,
       )
       await this.slack.formattedMessage({

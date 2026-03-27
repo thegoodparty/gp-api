@@ -167,6 +167,7 @@ describe('CampaignsController', () => {
       createForUser: vi.fn(),
       updateJsonFields: vi.fn(),
       launch: vi.fn(),
+      fetchLiveRaceTargetMetrics: vi.fn().mockResolvedValue(null),
     }
     campaignsService = campaignsServiceMock as CampaignsService
 
@@ -459,6 +460,34 @@ describe('CampaignsController', () => {
         positionName: 'Mayor',
       })
     })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithRelations: CampaignWith<
+        'organization' | 'pathToVictory'
+      > = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: {} as Organization,
+      }
+
+      const result = await controller.findMine(campaignWithRelations)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
+    })
   })
 
   describe('getUserCampaignStatus', () => {
@@ -585,6 +614,33 @@ describe('CampaignsController', () => {
       await expect(controller.findBySlug('nonexistent')).rejects.toThrow(
         NotFoundException,
       )
+    })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 5000,
+        winNumber: 2501,
+        voterContactGoal: 12505,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+
+      const result = await controller.findBySlug(mockCampaign.slug)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
     })
   })
 

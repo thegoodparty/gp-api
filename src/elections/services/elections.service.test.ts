@@ -295,6 +295,81 @@ describe('ElectionsService', () => {
     })
   })
 
+  describe('buildRaceTargetDetails with districtId', () => {
+    it('returns metrics when election-api returns valid turnout via districtId', async () => {
+      mockHttpGet.mockReturnValue(
+        of({
+          data: { projectedTurnout: 5000, L2DistrictType: 'City', L2DistrictName: 'Ward 1' },
+          status: 200,
+        }),
+      )
+
+      const result = await service.buildRaceTargetDetails({
+        districtId: 'district-uuid',
+        electionDate: '2024-11-05',
+      })
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          projectedTurnout: 5000,
+          winNumber: 2501,
+          voterContactGoal: 12505,
+        }),
+      )
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('projectedTurnout'),
+        expect.objectContaining({
+          params: { districtId: 'district-uuid', electionDate: '2024-11-05' },
+        }),
+      )
+    })
+
+    it('returns null when election-api returns null via districtId', async () => {
+      mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
+
+      const result = await service.buildRaceTargetDetails({
+        districtId: 'district-uuid',
+        electionDate: '2024-11-05',
+      })
+
+      expect(result).toBeNull()
+    })
+
+    it('returns null when election-api throws via districtId', async () => {
+      mockHttpGet.mockImplementation(() => {
+        throw new Error('Network error')
+      })
+
+      const result = await service.buildRaceTargetDetails({
+        districtId: 'district-uuid',
+        electionDate: '2024-11-05',
+      })
+
+      expect(result).toBeNull()
+    })
+
+    it('does not apply cleanDistrictName when using districtId', async () => {
+      mockHttpGet.mockReturnValue(
+        of({
+          data: { projectedTurnout: 3000 },
+          status: 200,
+        }),
+      )
+
+      await service.buildRaceTargetDetails({
+        districtId: 'district-uuid',
+        electionDate: '2024-11-05',
+      })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('projectedTurnout'),
+        expect.objectContaining({
+          params: { districtId: 'district-uuid', electionDate: '2024-11-05' },
+        }),
+      )
+    })
+  })
+
   describe('cleanDistrictName', () => {
     it('returns original name when no ## separator', () => {
       expect(service.cleanDistrictName('Los Angeles')).toBe('Los Angeles')

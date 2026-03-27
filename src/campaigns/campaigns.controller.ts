@@ -52,7 +52,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
-import { CampaignWith } from './campaigns.types'
+import { CampaignWith, CampaignWithPathToVictory } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -166,12 +166,15 @@ export class CampaignsController {
   ) {
     const { organization: org } = campaign
 
-    const { positionName } = await this.organizations.resolvePositionContext({
-      customPositionName: org?.customPositionName,
-      positionId: org?.positionId,
-    })
+    const [{ positionName }, enriched] = await Promise.all([
+      this.organizations.resolvePositionContext({
+        customPositionName: org?.customPositionName,
+        positionId: org?.positionId,
+      }),
+      this.withLiveMetrics(campaign),
+    ])
 
-    return { ...campaign, positionName }
+    return { ...enriched, positionName }
   }
 
   @UseGuards(M2MOnly)
@@ -216,12 +219,15 @@ export class CampaignsController {
 
     if (!campaign) throw new NotFoundException()
 
-    const { positionName } = await this.organizations.resolvePositionContext({
-      customPositionName: campaign.organization?.customPositionName,
-      positionId: campaign.organization?.positionId,
-    })
+    const [{ positionName }, enriched] = await Promise.all([
+      this.organizations.resolvePositionContext({
+        customPositionName: campaign.organization?.customPositionName,
+        positionId: campaign.organization?.positionId,
+      }),
+      this.withLiveMetrics(campaign),
+    ])
 
-    return { ...campaign, positionName }
+    return { ...enriched, positionName }
   }
 
   @Post()
@@ -279,7 +285,9 @@ export class CampaignsController {
 
     this.logger.debug({ campaign, ...{ slug, body } }, 'Updating campaign')
 
-    return this.campaigns.updateJsonFields(campaign.id, body)
+    const updated = await this.campaigns.updateJsonFields(campaign.id, body)
+    if (!updated) throw new NotFoundException('Campaign not found after update')
+    return this.withLiveMetrics(updated)
   }
 
   @UseGuards(M2MOnly)
@@ -391,7 +399,7 @@ export class CampaignsController {
         L2DistrictName: l2DistrictName,
       })
 
-    return this.campaigns.updateJsonFields(campaign.id, {
+    const updated = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         ...(raceTargetDetails || {}),
         electionType: l2DistrictType,
@@ -411,6 +419,8 @@ export class CampaignsController {
       },
       overrideDistrictId,
     })
+    if (!updated) throw new NotFoundException('Campaign not found after update')
+    return this.withLiveMetrics(updated)
   }
 
   @Put('mine/race-target-details')
@@ -470,13 +480,13 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
-        // Always reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
     })
+    if (!result) throw new NotFoundException('Campaign not found after update')
 
-    return result
+    return this.withLiveMetrics(result)
   }
 
   @Put('admin/:slug/race-target-details')
@@ -533,9 +543,6 @@ export class CampaignsController {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
-        // Always write turnout values: real data when available, sentinel -1
-        // when district matched but no turnout. This ensures stale turnout
-        // from a previous district is cleared.
         winNumber,
         voterContactGoal,
         projectedTurnout,
@@ -543,13 +550,32 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
-        // Always reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
     })
+    if (!result) throw new NotFoundException('Campaign not found after update')
 
-    return result
+    return this.withLiveMetrics(result)
+  }
+
+  private async withLiveMetrics(
+    campaign: CampaignWithPathToVictory,
+  ): Promise<CampaignWithPathToVictory> {
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+    if (!liveMetrics) return campaign
+
+    const p2v = campaign.pathToVictory
+    if (!p2v) return campaign
+
+    return {
+      ...campaign,
+      pathToVictory: {
+        ...p2v,
+        data: { ...(p2v.data ?? {}), ...liveMetrics },
+      },
+    }
   }
 
   private async resolveRaceTargetPositionContext(campaign: Campaign) {
