@@ -16,7 +16,7 @@ import { userFactory } from './factories/user.factory'
 import { ClerkSeedUser, ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
 import { CLERK_CONCURRENCY } from './util/clerkRetry.util'
-const NUM_GENERATED_CAMPAIGNS = 100
+const NUM_GENERATED_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
   fixedCampaigns as Partial<Campaign>[]

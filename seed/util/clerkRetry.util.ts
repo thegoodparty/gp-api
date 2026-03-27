@@ -5,9 +5,7 @@ type ClerkRateLimitError = Error & {
   retryAfter: number
 }
 
-const isClerk429 = (
-  error: unknown,
-): error is ClerkRateLimitError =>
+const isClerk429 = (error: unknown): error is ClerkRateLimitError =>
   typeof error === 'object' &&
   error !== null &&
   'status' in error &&
@@ -15,9 +13,7 @@ const isClerk429 = (
 
 export const CLERK_CONCURRENCY = 3
 
-export const clerkRetry = <T>(
-  fn: () => Promise<T>,
-): Promise<T> =>
+export const clerkRetry = <T>(fn: () => Promise<T>): Promise<T> =>
   retry(
     async (bail) => {
       try {
@@ -28,16 +24,10 @@ export const clerkRetry = <T>(
           console.log(
             `  [CLERK] Rate limited — waiting ${waitMs / 1_000}s before retry…`,
           )
-          await new Promise((resolve) =>
-            setTimeout(resolve, waitMs),
-          )
+          await new Promise((resolve) => setTimeout(resolve, waitMs))
           throw error
         }
-        bail(
-          error instanceof Error
-            ? error
-            : new Error(String(error)),
-        )
+        bail(error instanceof Error ? error : new Error(String(error)))
         return undefined as never
       }
     },
