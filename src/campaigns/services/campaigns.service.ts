@@ -917,7 +917,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async fetchLiveRaceTargetMetrics(
     campaign: Campaign,
   ): Promise<RaceTargetMetrics | null> {
-    if (!campaign.details?.electionDate) return null
+    const { electionDate } = campaign.details ?? {}
+    if (!electionDate) return null
 
     const org = campaign.organizationSlug
       ? await this.organizations.findUnique({
@@ -931,23 +932,24 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       const result = await this.elections
         .buildRaceTargetDetails({
           districtId: org.overrideDistrictId,
-          electionDate: campaign.details.electionDate,
+          electionDate,
         })
         .catch(() => null)
 
-      if (!result?.projectedTurnout || result.projectedTurnout <= 0) return null
+      const { projectedTurnout, winNumber, voterContactGoal } = result ?? {}
+      if (!projectedTurnout || projectedTurnout <= 0) return null
 
       return {
-        projectedTurnout: result.projectedTurnout,
-        winNumber: result.winNumber ?? 0,
-        voterContactGoal: result.voterContactGoal ?? 0,
+        projectedTurnout,
+        winNumber: winNumber ?? 0,
+        voterContactGoal: voterContactGoal ?? 0,
       }
     }
 
     const result = await this.elections
       .getPositionMatchedRaceTargetDetails({
         positionId: org.positionId!,
-        electionDate: campaign.details.electionDate,
+        electionDate,
         includeTurnout: true,
         campaignId: campaign.id,
         officeName: undefined,

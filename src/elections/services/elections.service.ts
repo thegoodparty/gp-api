@@ -336,11 +336,17 @@ export class ElectionsService {
         throw new NotFoundException('No projectedTurnout found')
       }
 
+      const {
+        projectedTurnout: turnout,
+        L2DistrictType,
+        L2DistrictName,
+      } = projectedTurnout
+
       return {
-        ...this.calculateRaceTargetMetrics(projectedTurnout.projectedTurnout),
+        ...this.calculateRaceTargetMetrics(turnout),
         source: P2VSource.ElectionApi,
-        electionType: projectedTurnout.L2DistrictType,
-        electionLocation: projectedTurnout.L2DistrictName,
+        electionType: L2DistrictType,
+        electionLocation: L2DistrictName,
         p2vStatus: P2VStatus.complete,
         p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
       }
