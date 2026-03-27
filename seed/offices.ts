@@ -73,8 +73,10 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
     organizationSlug: campaign.organizationSlug,
   })
 
-  await prisma.organization.create({
-    data: {
+  await prisma.organization.upsert({
+    where: { slug: electedOffice.organizationSlug },
+    update: {},
+    create: {
       slug: electedOffice.organizationSlug,
       ownerId: user.id,
     },
