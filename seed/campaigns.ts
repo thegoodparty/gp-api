@@ -15,8 +15,7 @@ import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
 import { ClerkSeedUser, ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
-
-const CLERK_CONCURRENCY = 10
+import { CLERK_CONCURRENCY } from './util/clerkRetry.util'
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =

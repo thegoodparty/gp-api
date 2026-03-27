@@ -3,8 +3,7 @@ import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
 import { userFactory } from './factories/user.factory'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
-
-const CLERK_CONCURRENCY = 10
+import { clerkRetry, CLERK_CONCURRENCY } from './util/clerkRetry.util'
 
 const NUM_USERS = 20
 
@@ -91,15 +90,17 @@ export const ensureClerkUser = async (
   const clerk = createClerkClient({ secretKey })
 
   try {
-    const clerkUser = await clerk.users.createUser({
-      emailAddress: [userData.email],
-      password: userData.password,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      skipPasswordChecks: true,
-      skipLegalChecks: true,
-      externalId: String(localUserId),
-    })
+    const clerkUser = await clerkRetry(() =>
+      clerk.users.createUser({
+        emailAddress: [userData.email],
+        password: userData.password,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        skipPasswordChecks: true,
+        skipLegalChecks: true,
+        externalId: String(localUserId),
+      }),
+    )
 
     await prisma.user.update({
       where: { id: localUserId },
@@ -120,9 +121,11 @@ export const ensureClerkUser = async (
       clerkErrors[0]?.code === 'form_identifier_exists'
 
     if (isDuplicate) {
-      const existing = await clerk.users.getUserList({
-        emailAddress: [email],
-      })
+      const existing = await clerkRetry(() =>
+        clerk.users.getUserList({
+          emailAddress: [email],
+        }),
+      )
 
       if (existing.data.length > 0) {
         const clerkUser = existing.data[0]

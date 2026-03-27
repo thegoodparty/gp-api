@@ -2,8 +2,10 @@ import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
 import { FIXED_EMAILS } from '../seed/users'
-
-const CLERK_CONCURRENCY = 10
+import {
+  clerkRetry,
+  CLERK_CONCURRENCY,
+} from '../seed/util/clerkRetry.util'
 
 const prisma = new PrismaClient()
 
@@ -42,7 +44,7 @@ const main = async () => {
     clerkIds,
     async (id) => {
       try {
-        await clerk.users.deleteUser(id)
+        await clerkRetry(() => clerk.users.deleteUser(id))
         deleted++
       } catch (err) {
         const message =

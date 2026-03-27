@@ -1,9 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
+import {
+  clerkRetry,
+  CLERK_CONCURRENCY,
+} from '../seed/util/clerkRetry.util'
 
 const BATCH_SIZE = 100
-const CLERK_CONCURRENCY = 10
 
 const { CLERK_SECRET_KEY } = process.env
 
@@ -20,10 +23,12 @@ const fetchAllClerkUsers = async () => {
   let offset = 0
 
   while (true) {
-    const batch = await clerk.users.getUserList({
-      limit: BATCH_SIZE,
-      offset,
-    })
+    const batch = await clerkRetry(() =>
+      clerk.users.getUserList({
+        limit: BATCH_SIZE,
+        offset,
+      }),
+    )
 
     if (batch.data.length === 0) break
 
@@ -43,7 +48,7 @@ const deleteClerkUsers = async (userIds: string[]) => {
     userIds,
     async (id) => {
       try {
-        await clerk.users.deleteUser(id)
+        await clerkRetry(() => clerk.users.deleteUser(id))
         deleted++
       } catch (err) {
         const message =
