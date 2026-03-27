@@ -19,5 +19,8 @@ export const ElectionApiRoutes = {
     findByBrId: {
       path: 'positions/by-ballotready-id',
     },
+    findById: {
+      path: 'positions',
+    },
   },
 }

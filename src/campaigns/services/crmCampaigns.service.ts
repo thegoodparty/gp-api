@@ -204,11 +204,16 @@ export class CrmCampaignsService {
 
     const {
       p2vStatus,
-      winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
       viability: { score } = {},
     } = p2vData || {}
+
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+    const winNumber = liveMetrics?.winNumber ?? p2vData?.winNumber
+    const voterContactGoal =
+      liveMetrics?.voterContactGoal ?? p2vData?.voterContactGoal
 
     const {
       lastStepDate,
@@ -367,9 +372,7 @@ export class CrmCampaignsService {
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,
-      votegoal: p2vData?.voterContactGoal
-        ? Number(p2vData?.voterContactGoal)
-        : undefined,
+      votegoal: voterContactGoal ? Number(voterContactGoal) : undefined,
       win_number: winNumber ? Number(winNumber) : undefined,
     }
 

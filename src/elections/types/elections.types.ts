@@ -103,6 +103,10 @@ interface DistrictInfo {
   L2DistrictName: string
 }
 
+interface DistrictIdInfo {
+  districtId: string
+}
+
 interface ByDate {
   electionDate: string
   electionYear?: never
@@ -115,7 +119,7 @@ interface ByYearAndCode {
   electionCode: string
 }
 
-export type BuildRaceTargetDetailsInput = DistrictInfo &
+export type BuildRaceTargetDetailsInput = (DistrictInfo | DistrictIdInfo) &
   (ByDate | ByYearAndCode)
 
 export type District = {
