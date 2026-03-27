@@ -8,7 +8,9 @@ import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegrat
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { defaultTasks } from '../fixtures/defaultTasks'
+import { getDefaultTasks } from '../fixtures/defaultTasks'
+
+const defaultTasks = getDefaultTasks('general')
 import { CampaignTask } from '../campaignTasks.types'
 
 vi.mock('src/shared/util/sleep.util', () => ({

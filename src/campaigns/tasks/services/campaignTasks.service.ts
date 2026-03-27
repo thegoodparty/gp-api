@@ -9,13 +9,29 @@ import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { Observable, Subscriber } from 'rxjs'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
+const MAX_TASK_WINDOW_DAYS = 49
+const SHORTENED_WINDOW_BUFFER_DAYS = 7
+const FULL_WINDOW_THRESHOLD_DAYS = 56
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
-import { CampaignTask } from '../campaignTasks.types'
-import { defaultTasks } from '../fixtures/defaultTasks'
+import { CampaignTask, ElectionPhase } from '../campaignTasks.types'
+import { getDefaultTasks } from '../fixtures/defaultTasks'
 import { sleep } from 'src/shared/util/sleep.util'
+import {
+  addDays,
+  differenceInCalendarDays,
+  differenceInWeeks,
+  isAfter,
+  isBefore,
+  startOfDay,
+} from 'date-fns'
+import {
+  DateFormats,
+  formatDate,
+  parseIsoDateString,
+} from 'src/shared/util/date.util'
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -234,12 +250,81 @@ export class CampaignTasksService extends createPrismaBase(
       if (existingDefaults > 0) {
         return
       }
+
+      const tasksForCampaign = this.orderDefaultTasksForCampaign(campaign)
       await this.replaceCampaignTasksInTransaction(
         tx,
         campaign.id,
-        defaultTasks,
+        tasksForCampaign,
       )
     })
+  }
+
+  private orderDefaultTasksForCampaign(campaign: Campaign): CampaignTask[] {
+    const today = startOfDay(new Date())
+    const election = this.getElectionEndDate(campaign, today)
+    if (!election) {
+      return getDefaultTasks('general')
+    }
+
+    const { endDate, phase } = election
+    const tasks = getDefaultTasks(phase)
+
+    const daysUntilElection = differenceInCalendarDays(endDate, today)
+
+    const rawStartDate =
+      daysUntilElection > FULL_WINDOW_THRESHOLD_DAYS
+        ? addDays(endDate, -MAX_TASK_WINDOW_DAYS)
+        : addDays(today, SHORTENED_WINDOW_BUFFER_DAYS)
+
+    const startDate = isAfter(rawStartDate, endDate) ? endDate : rawStartDate
+
+    const timeWindowDays = Math.min(
+      MAX_TASK_WINDOW_DAYS,
+      differenceInCalendarDays(endDate, startDate),
+    )
+
+    const taskCount = tasks.length
+    return tasks.map((task, index) => {
+      const taskDate =
+        taskCount === 1
+          ? endDate
+          : addDays(
+              startDate,
+              Math.round((timeWindowDays * index) / (taskCount - 1)),
+            )
+      return {
+        ...task,
+        date: formatDate(taskDate, DateFormats.isoDate),
+        week: differenceInWeeks(endDate, taskDate, {
+          roundingMethod: 'ceil',
+        }),
+      }
+    })
+  }
+
+  private getElectionEndDate(
+    campaign: Campaign,
+    today: Date,
+  ): { endDate: Date; phase: ElectionPhase } | null {
+    const { details } = campaign
+    if (!details) return null
+
+    if (details.primaryElectionDate) {
+      const primaryDate = parseIsoDateString(details.primaryElectionDate)
+      if (!isBefore(primaryDate, today)) {
+        return { endDate: primaryDate, phase: 'primary' }
+      }
+    }
+
+    if (details.electionDate) {
+      return {
+        endDate: parseIsoDateString(details.electionDate),
+        phase: 'general',
+      }
+    }
+
+    return null
   }
 
   private mapTasksToCreateData(

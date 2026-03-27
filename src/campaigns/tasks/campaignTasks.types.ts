@@ -1,3 +1,5 @@
+export type ElectionPhase = 'primary' | 'general'
+
 export enum CampaignTaskType {
   text = 'text',
   robocall = 'robocall',
