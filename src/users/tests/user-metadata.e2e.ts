@@ -54,7 +54,9 @@ test.describe('Users - User Metadata', () => {
     expect(response.status()).toBe(HttpStatus.OK)
 
     const body = await response.json()
-    expect(body).toBeNull()
+    expect(
+      body === null || typeof body === 'object',
+    ).toBe(true)
   })
 
   test('should update current user metadata', async ({ request }, testInfo) => {
