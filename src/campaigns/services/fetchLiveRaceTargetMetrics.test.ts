@@ -144,10 +144,18 @@ describe('CampaignsService.fetchLiveRaceTargetMetrics (election-api integration)
   })
 
   it('returns null when campaign has no organization', async () => {
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'dummy-org-for-no-org-test',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'no-org-campaign',
+        organizationSlug: org.slug,
         details: { electionDate: KNOWN_ELECTION_DATE },
       },
     })
@@ -157,8 +165,11 @@ describe('CampaignsService.fetchLiveRaceTargetMetrics (election-api integration)
       where: { id: campaign.id },
     })
 
-    const metrics =
-      await campaignsService.fetchLiveRaceTargetMetrics(fullCampaign)
+    const metrics = await campaignsService.fetchLiveRaceTargetMetrics({
+      ...fullCampaign,
+      // This test intentionally simulates a campaign with no org
+      organizationSlug: null as unknown as string,
+    })
 
     expect(metrics).toBeNull()
   })
