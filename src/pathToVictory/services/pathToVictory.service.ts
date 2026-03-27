@@ -28,6 +28,7 @@ import {
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 const SpecialOfficePhrase = {
   AtLarge: 'At Large',
@@ -89,6 +90,7 @@ export class PathToVictoryService extends createPrismaBase(
     private analytics: WrapperType<AnalyticsService>,
     private elections: ElectionsService,
     private organizationsService: OrganizationsService,
+    private clerkEnricher: ClerkUserEnricherService,
   ) {
     super()
   }
@@ -548,6 +550,10 @@ export class PathToVictoryService extends createPrismaBase(
           message: `no campaign found for slug ${slug}`,
         })
         return
+      }
+
+      if (campaign.user) {
+        campaign.user = await this.clerkEnricher.enrichUser(campaign.user)
       }
 
       let p2v = campaign.pathToVictory

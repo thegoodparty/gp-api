@@ -10,7 +10,9 @@ import { WebsiteContactsService } from '../services/websiteContacts.service'
 import { FilesService } from 'src/files/files.service'
 import { WebsiteViewsService } from '../services/websiteViews.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import {
   createMockUser,
   createMockCampaign,
@@ -53,6 +55,10 @@ describe('WebsitesController', () => {
         { provide: WebsiteViewsService, useValue: {} },
         { provide: CampaignsService, useValue: {} },
         { provide: AnalyticsService, useValue: mockAnalytics },
+        {
+          provide: ClerkUserEnricherService,
+          useValue: createMockClerkEnricher(),
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
         WebsitesController,
       ],

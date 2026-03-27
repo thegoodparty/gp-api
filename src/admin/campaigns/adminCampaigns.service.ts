@@ -18,6 +18,7 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PinoLogger } from 'nestjs-pino'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -31,6 +32,7 @@ export class AdminCampaignsService {
     private readonly auth: AuthenticationService,
     private readonly analytics: AnalyticsService,
     private readonly organizations: OrganizationsService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AdminCampaignsService.name)
@@ -220,6 +222,8 @@ export class AdminCampaignsService {
     if (!user) {
       throw new BadRequestException('Campaign has no user')
     }
+
+    campaign.user = await this.clerkEnricher.enrichUser(user)
 
     await this.adminP2V.completeP2V(user.id, pathToVictory)
 

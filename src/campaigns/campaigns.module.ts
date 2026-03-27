@@ -1,4 +1,5 @@
 import { OrganizationsModule } from '@/organizations/organizations.module'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { ElectionsModule } from 'src/elections/elections.module'
@@ -43,6 +44,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     HttpModule,
     EmailModule,
     CampaignsAiModule,
+    ClerkModule,
     CrmModule,
     ElectionsModule,
     OrganizationsModule,

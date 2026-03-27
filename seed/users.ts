@@ -1,7 +1,10 @@
 import { Prisma, PrismaClient, User, UserRole } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
+import pmap from 'p-map'
 import { userFactory } from './factories/user.factory'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
+
+const CLERK_CONCURRENCY = 10
 
 const NUM_USERS = 20
 
@@ -135,7 +138,17 @@ export const ensureClerkUser = async (
   }
 }
 
-// define some user objects here for non random seeds
+const HOMER_EMAIL = 'HomerSimpson@gmail.com'
+
+export const FIXED_EMAILS = new Set([
+  ADMIN_EMAIL,
+  CANDIDATE_EMAIL,
+  SALES_USER.email,
+  SERVE_USER.email,
+  USER_W_NO_CAMPAIGN.email,
+  HOMER_EMAIL,
+])
+
 const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
   SALES_USER,
@@ -145,15 +158,12 @@ const FIXED_USERS: Partial<User>[] = [
   {
     firstName: 'Homer',
     lastName: 'Simpson',
-    email: 'HomerSimpson@gmail.com',
+    email: HOMER_EMAIL,
     hasPassword: false,
   },
 ]
 
 export default async function seedUsers(prisma: PrismaClient) {
-  // Upsert key users so credentials stay in sync across repeated seeding.
-  // These must be captured separately because createManyAndReturn with
-  // skipDuplicates silently excludes already-existing rows from its result.
   const adminUser = await prisma.user.upsert({
     where: { email: ADMIN_USER.email },
     update: {
@@ -216,17 +226,19 @@ export default async function seedUsers(prisma: PrismaClient) {
     `Created ${createdUsers.length} users (skipped ${fakeUsers.length - createdUsers.length} duplicates)`,
   )
 
-  for (const user of createdUsers) {
-    const plainPassword = plaintextPasswords.get(user.email)
-    if (plainPassword && user.firstName && user.lastName) {
-      await ensureClerkUser(prisma, user.id, {
+  await pmap(
+    createdUsers.filter(
+      (u) => plaintextPasswords.get(u.email) && u.firstName && u.lastName,
+    ),
+    (user) =>
+      ensureClerkUser(prisma, user.id, {
         email: user.email,
-        password: plainPassword,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      })
-    }
-  }
+        password: plaintextPasswords.get(user.email)!,
+        firstName: user.firstName!,
+        lastName: user.lastName!,
+      }),
+    { concurrency: CLERK_CONCURRENCY },
+  )
 
   const upsertedIds = new Set([adminUser.id, candidateUser.id])
   const allUsers = [

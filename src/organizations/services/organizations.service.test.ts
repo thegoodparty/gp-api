@@ -1,4 +1,5 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrganizationsService } from './organizations.service'
 
@@ -15,12 +16,15 @@ describe('OrganizationsService', () => {
     mockGetDistrictId = vi.fn().mockResolvedValue(null)
     mockCleanDistrictName = vi.fn((name: string) => name)
 
-    service = new OrganizationsService({
-      getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
-      getPositionById: mockGetPositionById,
-      getDistrictId: mockGetDistrictId,
-      cleanDistrictName: mockCleanDistrictName,
-    } as unknown as ElectionsService)
+    service = new OrganizationsService(
+      {
+        getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
+        getPositionById: mockGetPositionById,
+        getDistrictId: mockGetDistrictId,
+        cleanDistrictName: mockCleanDistrictName,
+      } as unknown as ElectionsService,
+      createMockClerkEnricher(),
+    )
     ;(
       service as unknown as { logger: { error: ReturnType<typeof vi.fn> } }
     ).logger = { error: vi.fn() }

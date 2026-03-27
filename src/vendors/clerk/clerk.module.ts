@@ -3,6 +3,7 @@ import { AUTH_PROVIDER_TOKEN } from '@/authentication/interfaces/auth-provider.i
 import { ClerkClientProvider } from '@/vendors/clerk/providers/clerk-client.provider'
 import { ClerkAuthService } from '@/vendors/clerk/services/clerk-auth.service'
 import { ClerkEventsHandlerService } from '@/vendors/clerk/services/clerk-events-handler.service'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import { ClerkEventsHandlerController } from '@/vendors/clerk/webhooks/clerk-events-handler.controller'
 
 @Module({
@@ -13,8 +14,13 @@ import { ClerkEventsHandlerController } from '@/vendors/clerk/webhooks/clerk-eve
       useClass: ClerkAuthService,
     },
     ClerkEventsHandlerService,
+    ClerkUserEnricherService,
   ],
-  exports: [AUTH_PROVIDER_TOKEN, ClerkEventsHandlerService],
+  exports: [
+    AUTH_PROVIDER_TOKEN,
+    ClerkEventsHandlerService,
+    ClerkUserEnricherService,
+  ],
   controllers: [ClerkEventsHandlerController],
 })
 export class ClerkModule {}

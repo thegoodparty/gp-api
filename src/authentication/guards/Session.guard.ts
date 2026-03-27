@@ -16,6 +16,7 @@ import { IncomingRequest } from '@/authentication/authentication.types'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
 import { UsersService } from '@/users/services/users.service'
 import { SessionsService } from '@/users/services/sessions.service'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -24,6 +25,7 @@ export class SessionGuard implements CanActivate {
     private authProvider: AuthProvider,
     private usersService: UsersService,
     private sessions: SessionsService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
     private readonly reflector: Reflector,
   ) {
@@ -85,10 +87,23 @@ export class SessionGuard implements CanActivate {
   }
 
   private async resolveUser(externalUserId: string): Promise<User | null> {
-    const existing = await this.usersService.findUser({
-      clerkId: externalUserId,
-    })
-    if (existing) return existing
+    const [rawUser, clerkFields] = await Promise.all([
+      this.usersService.model.findUnique({
+        where: { clerkId: externalUserId },
+      }),
+      this.clerkEnricher.fetchClerkFields(externalUserId),
+    ])
+
+    if (rawUser) {
+      return clerkFields
+        ? {
+            ...rawUser,
+            email: clerkFields.email,
+            firstName: clerkFields.firstName,
+            lastName: clerkFields.lastName,
+          }
+        : rawUser
+    }
 
     try {
       const providerUser = await this.authProvider.getUser(externalUserId)

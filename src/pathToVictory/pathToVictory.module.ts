@@ -1,3 +1,4 @@
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { Module } from '@nestjs/common'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { SegmentModule } from 'src/vendors/segment/segment.module'
@@ -16,6 +17,7 @@ import { PathToVictoryService } from './services/pathToVictory.service'
   imports: [
     PrismaModule,
     AiModule,
+    ClerkModule,
     ElectionsModule,
     OrganizationsModule,
     VotersModule,

@@ -1,4 +1,5 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignStatus } from '@goodparty_org/contracts'
 import {
@@ -233,6 +234,7 @@ describe('CampaignsController', () => {
       organizationsService,
       analyticsService,
       queueProducerServiceMock as QueueProducerService,
+      createMockClerkEnricher(),
       createMockLogger(),
     )
   })
@@ -403,6 +405,7 @@ describe('CampaignsController', () => {
           include: {
             user: {
               select: {
+                clerkId: true,
                 firstName: true,
                 lastName: true,
                 phone: true,

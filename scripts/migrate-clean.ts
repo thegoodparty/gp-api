@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
+import pmap from 'p-map'
 
 const BATCH_SIZE = 100
+const CLERK_CONCURRENCY = 10
 
 const { CLERK_SECRET_KEY } = process.env
 
@@ -37,15 +39,22 @@ const fetchAllClerkUsers = async () => {
 const deleteClerkUsers = async (userIds: string[]) => {
   let deleted = 0
 
-  for (const id of userIds) {
-    try {
-      await clerk.users.deleteUser(id)
-      deleted++
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error(`  Failed to delete Clerk user ${id}: ${message}`)
-    }
-  }
+  await pmap(
+    userIds,
+    async (id) => {
+      try {
+        await clerk.users.deleteUser(id)
+        deleted++
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : String(err)
+        console.error(
+          `  Failed to delete Clerk user ${id}: ${message}`,
+        )
+      }
+    },
+    { concurrency: CLERK_CONCURRENCY },
+  )
 
   return deleted
 }
@@ -58,7 +67,9 @@ const main = async () => {
   if (clerkUserIds.length > 0) {
     console.log('Deleting Clerk users...')
     const deleted = await deleteClerkUsers(clerkUserIds)
-    console.log(`Deleted ${deleted}/${clerkUserIds.length} Clerk user(s)`)
+    console.log(
+      `Deleted ${deleted}/${clerkUserIds.length} Clerk user(s)`,
+    )
   }
 
   console.log('Deleting all local DB users...')

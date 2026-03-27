@@ -38,6 +38,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -54,6 +55,7 @@ export class DomainsService
     private readonly forwardEmailService: ForwardEmailService,
     private queueService: QueueProducerService,
     private readonly analytics: AnalyticsService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
   ) {
     super()
   }
@@ -84,8 +86,10 @@ export class DomainsService
 
     for (const { id: domainId, website } of domains) {
       const { campaign } = website
-      const { user } = campaign
-      const { email: forwardingEmailAddress } = user!
+      const enrichedUser = campaign.user
+        ? await this.clerkEnricher.enrichUser(campaign.user)
+        : campaign.user
+      const { email: forwardingEmailAddress } = enrichedUser!
       const messageData = {
         domainId,
         forwardingEmailAddress,

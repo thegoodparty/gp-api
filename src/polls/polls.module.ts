@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { LlmModule } from 'src/llm/llm.module'
@@ -20,6 +21,7 @@ import { OrganizationsModule } from '@/organizations/organizations.module'
 
 @Module({
   imports: [
+    ClerkModule,
     ElectedOfficeModule,
     PaymentsModule,
     QueueProducerModule,

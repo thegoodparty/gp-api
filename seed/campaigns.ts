@@ -5,6 +5,7 @@ import {
   PrismaClient,
   User,
 } from '@prisma/client'
+import pmap from 'p-map'
 import { buildSlug } from '../src/shared/util/slug.util'
 import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
@@ -12,8 +13,10 @@ import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.fact
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
-import { ensureClerkUser } from './users'
+import { ClerkSeedUser, ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
+
+const CLERK_CONCURRENCY = 10
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
@@ -37,6 +40,11 @@ type FakeP2V = {
   data: PrismaJson.PathToVictoryData
 }
 
+type PendingClerkSync = {
+  localUserId: number
+  userData: ClerkSeedUser
+}
+
 export default async function seedCampaigns(
   prisma: PrismaClient,
   existingUsers: User[],
@@ -44,28 +52,33 @@ export default async function seedCampaigns(
   const fakeP2Vs: FakeP2V[] = []
   const fakeUpdateHistory: CampaignUpdateHistory[] = []
   const campaignIds: number[] = []
+  const pendingClerkSyncs: PendingClerkSync[] = []
 
   const loopLength = Math.max(FIXED_CAMPAIGNS.length, NUM_GENERATED_CAMPAIGNS)
 
   for (let i = 0; i < loopLength; i++) {
     if (i < FIXED_CAMPAIGNS.length) {
-      const { campaignId, p2V, updateHistory } = await createCampaignAndUser(
+      const result = await createCampaignAndUser(
         existingUsers,
         prisma,
+        pendingClerkSyncs,
         FIXED_CAMPAIGNS[i],
       )
 
-      campaignIds.push(campaignId)
-      fakeP2Vs.push(p2V)
-      fakeUpdateHistory.push(...updateHistory)
+      campaignIds.push(result.campaignId)
+      fakeP2Vs.push(result.p2V)
+      fakeUpdateHistory.push(...result.updateHistory)
     }
     if (i < NUM_GENERATED_CAMPAIGNS) {
-      const creationData = await createCampaignAndUser(existingUsers, prisma)
-      const { campaignId, p2V, updateHistory } = creationData
+      const result = await createCampaignAndUser(
+        existingUsers,
+        prisma,
+        pendingClerkSyncs,
+      )
 
-      campaignIds.push(campaignId)
-      fakeP2Vs.push(p2V)
-      fakeUpdateHistory.push(...updateHistory)
+      campaignIds.push(result.campaignId)
+      fakeP2Vs.push(result.p2V)
+      fakeUpdateHistory.push(...result.updateHistory)
     }
   }
 
@@ -78,6 +91,15 @@ export default async function seedCampaigns(
     skipDuplicates: true,
   })
 
+  if (pendingClerkSyncs.length > 0) {
+    await pmap(
+      pendingClerkSyncs,
+      ({ localUserId, userData }) =>
+        ensureClerkUser(prisma, localUserId, userData),
+      { concurrency: CLERK_CONCURRENCY },
+    )
+  }
+
   console.log(`Created ${campaignIds.length} campaigns`)
 
   return campaignIds
@@ -86,13 +108,18 @@ export default async function seedCampaigns(
 async function createCampaignAndUser(
   existingUsers: User[],
   prisma: PrismaClient,
+  pendingClerkSyncs: PendingClerkSync[],
   fixedData?: Partial<Campaign>,
 ): Promise<{
   campaignId: number
   p2V: FakeP2V
   updateHistory: CampaignUpdateHistory[]
 }> {
-  const user = await handleUserCreation(prisma, existingUsers)
+  const user = await handleUserCreation(
+    prisma,
+    existingUsers,
+    pendingClerkSyncs,
+  )
   const campaignData = campaignFactory({
     userId: user.id,
     slug: buildSlug(getUserFullName(user)),
@@ -127,6 +154,7 @@ async function createCampaignAndUser(
 async function handleUserCreation(
   prisma: PrismaClient,
   existingUsers: User[],
+  pendingClerkSyncs: PendingClerkSync[],
 ): Promise<User> {
   let user = existingUsers.shift()
   if (!user) {
@@ -139,11 +167,14 @@ async function handleUserCreation(
       },
     })
     if (user.firstName && user.lastName && userData.password) {
-      await ensureClerkUser(prisma, user.id, {
-        email: user.email,
-        password: userData.password,
-        firstName: user.firstName,
-        lastName: user.lastName,
+      pendingClerkSyncs.push({
+        localUserId: user.id,
+        userData: {
+          email: user.email,
+          password: userData.password,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
       })
     }
   }

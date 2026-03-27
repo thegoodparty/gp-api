@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { PurchaseController } from './purchase.controller'
 import { PaymentsController } from './payments.controller'
 import { PaymentEventsService } from './services/paymentEventsService'
@@ -15,6 +16,7 @@ import { SlackModule } from 'src/vendors/slack/slack.module'
   providers: [PaymentEventsService, PaymentsService, PurchaseService],
   controllers: [PurchaseController, PaymentsController],
   imports: [
+    ClerkModule,
     EmailModule,
     forwardRef(() => CampaignsModule),
     OrganizationsModule,

@@ -13,7 +13,9 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DomainsService } from './domains.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import { createMockUser } from '@/shared/test-utils/mockData.util'
 
 const mockUser = createMockUser()
@@ -86,6 +88,10 @@ describe('DomainsService', () => {
         { provide: ForwardEmailService, useValue: {} },
         { provide: QueueProducerService, useValue: {} },
         { provide: AnalyticsService, useValue: mockAnalytics },
+        {
+          provide: ClerkUserEnricherService,
+          useValue: createMockClerkEnricher(),
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
         DomainsService,
       ],

@@ -14,6 +14,7 @@ import {
 import pmap from 'p-map'
 
 import { OrgDistrict } from '../organizations.types'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 export type FriendlyOrganization = {
   slug: string
@@ -34,7 +35,10 @@ export type FriendlyOrganization = {
 export class OrganizationsService extends createPrismaBase(
   MODELS.Organization,
 ) {
-  constructor(private readonly electionsService: ElectionsService) {
+  constructor(
+    private readonly electionsService: ElectionsService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
+  ) {
     super()
   }
 
@@ -136,6 +140,17 @@ export class OrganizationsService extends createPrismaBase(
       // This is important to prevent the query from scanning the whole table.
       take: 25,
     })
+
+    const owners = organizations
+      .map((o) => o.owner)
+      .filter((o): o is NonNullable<typeof o> => o != null)
+    const enrichedOwners = await this.clerkEnricher.enrichUsers(owners)
+    let idx = 0
+    for (const org of organizations) {
+      if (org.owner) {
+        org.owner = enrichedOwners[idx++]
+      }
+    }
 
     return pmap(
       organizations,

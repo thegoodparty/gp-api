@@ -1,3 +1,4 @@
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
@@ -10,6 +11,7 @@ import { ContactsService } from './services/contacts.service'
 
 @Module({
   imports: [
+    ClerkModule,
     HttpModule,
     CampaignsModule,
     VotersModule,

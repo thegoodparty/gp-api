@@ -3,7 +3,9 @@ import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
@@ -166,6 +168,10 @@ describe('PathToVictoryService', () => {
         { provide: AnalyticsService, useValue: mockAnalytics },
         { provide: ElectionsService, useValue: mockElections },
         { provide: OrganizationsService, useValue: mockOrganizations },
+        {
+          provide: ClerkUserEnricherService,
+          useValue: createMockClerkEnricher(),
+        },
       ],
     }).compile()
 

@@ -57,6 +57,7 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -78,6 +79,7 @@ export class CampaignsController {
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
     private readonly queueProducerService: QueueProducerService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -138,7 +140,7 @@ export class CampaignsController {
   //TODO: remove this when we start using the admin portal.
   @Roles(UserRole.admin)
   @Get()
-  findAll(@Query() query: CampaignListSchema) {
+  async findAll(@Query() query: CampaignListSchema) {
     let where: Prisma.CampaignWhereInput = {}
     if (Object.values(query).some((value) => !!value)) {
       where = buildCampaignListFilters(query)
@@ -146,6 +148,7 @@ export class CampaignsController {
     const include = {
       user: {
         select: {
+          clerkId: true,
           firstName: true,
           lastName: true,
           phone: true,
@@ -159,7 +162,21 @@ export class CampaignsController {
         },
       },
     }
-    return this.campaigns.findMany({ where, include })
+    const campaigns = await this.campaigns.findMany({
+      where,
+      include,
+    })
+    const users = campaigns
+      .map((c) => c.user)
+      .filter((u): u is NonNullable<typeof u> => u != null)
+    const enriched = await this.clerkEnricher.enrichUsers(users)
+    let idx = 0
+    for (const campaign of campaigns) {
+      if (campaign.user) {
+        campaign.user = enriched[idx++]
+      }
+    }
+    return campaigns
   }
 
   @Get('mine')
