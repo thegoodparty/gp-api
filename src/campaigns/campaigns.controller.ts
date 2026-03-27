@@ -600,6 +600,9 @@ export class CampaignsController {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
+        // Always write turnout values: real data when available, sentinel -1
+        // when district matched but no turnout. This ensures stale turnout
+        // from a previous district is cleared.
         winNumber,
         voterContactGoal,
         projectedTurnout,
@@ -607,6 +610,7 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
