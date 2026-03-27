@@ -8,7 +8,6 @@ import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pJobService } from './peerlyP2pJob.service'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
-import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 
 describe('PeerlyP2pJobService', () => {
   let service: PeerlyP2pJobService
@@ -21,13 +20,9 @@ describe('PeerlyP2pJobService', () => {
   let mockErrorHandling: {
     handleApiError: ReturnType<typeof vi.fn>
   }
-  let mockCrmCampaigns: {
-    getCrmCompanyOwner: ReturnType<typeof vi.fn>
-  }
 
   const baseJobParams = {
     campaignId: 1,
-    crmCompanyId: 'hub-1',
     listId: 100,
     imageInfo: {
       fileStream: Buffer.from('fake-image'),
@@ -56,9 +51,6 @@ describe('PeerlyP2pJobService', () => {
         throw new BadGatewayException('mock error')
       }),
     }
-    mockCrmCampaigns = {
-      getCrmCompanyOwner: vi.fn().mockResolvedValue(null),
-    }
 
     mockHttpService.post.mockImplementation((path: string) => {
       if (
@@ -82,7 +74,6 @@ describe('PeerlyP2pJobService', () => {
           provide: PeerlyErrorHandlingService,
           useValue: mockErrorHandling,
         },
-        { provide: CrmCampaignsService, useValue: mockCrmCampaigns },
       ],
     }).compile()
 

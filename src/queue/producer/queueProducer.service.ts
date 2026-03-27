@@ -37,6 +37,7 @@ export class QueueProducerService {
   async sendMessage(
     msg: QueueMessage,
     group: MessageGroup | string = MessageGroup.default,
+    options: { throwOnError?: boolean } = {},
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = JSON.stringify(msg)
@@ -56,6 +57,9 @@ export class QueueProducerService {
       await producer.send(message)
     } catch (error) {
       this.logger.error({ error }, 'error queueing message')
+      if (options.throwOnError) {
+        throw error
+      }
     }
   }
 }

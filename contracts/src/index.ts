@@ -157,6 +157,11 @@ export {
 } from './campaigns/ReadCampaignOutput.schema'
 
 export {
+  SetDistrictOutputSchema,
+  type SetDistrictOutput,
+} from './campaigns/SetDistrictOutput.schema'
+
+export {
   CAMPAIGN_SORT_KEYS,
   ListCampaignsPaginationSchema,
   type ListCampaignsPagination,

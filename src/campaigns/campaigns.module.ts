@@ -1,6 +1,7 @@
 import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
+import { HttpModule } from '@nestjs/axios'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { EmailModule } from 'src/email/email.module'
 import { UsersModule } from 'src/users/users.module'
@@ -27,7 +28,11 @@ import {
 } from './services/campaigns.service'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { CampaignTasksController } from './tasks/campaignTasksController'
-import { CampaignTasksService } from './tasks/campaignTasksService'
+import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
+import { LegacyCampaignTasksService } from './tasks/legacy/services/legacyCampaignTasks.service'
+import { CampaignTasksService } from './tasks/services/campaignTasks.service'
+import { AiCampaignManagerService } from './tasks/services/aiCampaignManager.service'
+import { AiCampaignManagerIntegrationService } from './tasks/services/aiCampaignManagerIntegration.service'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
@@ -36,6 +41,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
 @Global()
 @Module({
   imports: [
+    HttpModule,
     EmailModule,
     CampaignsAiModule,
     CrmModule,
@@ -58,6 +64,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignPositionsController,
     CampaignUpdateHistoryController,
     CampaignTasksController,
+    LegacyCampaignTasksController,
     CampaignTcrComplianceController,
   ],
   providers: [
@@ -71,6 +78,9 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
+    LegacyCampaignTasksService,
+    AiCampaignManagerService,
+    AiCampaignManagerIntegrationService,
     CampaignTcrComplianceService,
     ClerkClientProvider,
   ],
@@ -79,6 +89,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTcrComplianceService,
+    CampaignTasksService,
   ],
 })
 export class CampaignsModule {}
