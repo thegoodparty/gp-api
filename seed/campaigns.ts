@@ -126,10 +126,8 @@ async function createCampaignAndUser(
     ...(fixedData || {}),
   })
 
-  await prisma.organization.upsert({
-    where: { slug: campaignData.organizationSlug },
-    update: {},
-    create: {
+  await prisma.organization.create({
+    data: {
       slug: campaignData.organizationSlug,
       ownerId: user.id,
     },

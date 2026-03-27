@@ -103,4 +103,32 @@ export const GLOBAL_ALERTS: Alert[] = [
       'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
     ].join('\n\n'),
   },
+  // ------ Win Warnings ------ //
+  {
+    slug: 'win-peerly-warnings',
+    name: '[Win] Peerly endpoint errors detected',
+    type: 'log',
+    expr: [
+      'sum(count_over_time(',
+      '{service_name="gp-api", deployment_environment_name="$ENV"}',
+      // Excluding: happens when users input an incorrect PIN.
+      '!= "Campaign Verify Verify PIN API request failed"',
+      // Excluding: transient phone list status error, safe to ignore.
+      '!= "There may be an error with the phone list for context"',
+      '| json',
+      '| detected_level = "error"',
+      '| request_endpoint =~ ".*(p2p|tcr-compliance|outreach).*"',
+      '| request_endpoint != "GET /v1/campaigns/tcr-compliance/mine"',
+      // Excluding: HttpExceptionFilter duplicates every error, would double-count.
+      '| context != "HttpExceptionFilter"',
+      '[15m]))',
+    ].join(' '),
+    threshold: 0,
+    for: '1m',
+    message: [
+      'Peerly-related endpoint errors detected in the last 15 minutes.',
+      'Dashboard: https://goodparty.grafana.net/d/peerly-prod/peerly-e28094-prod',
+    ].join('\n\n'),
+    notify: 'win-bugs',
+  },
 ]

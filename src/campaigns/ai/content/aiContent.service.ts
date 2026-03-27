@@ -102,7 +102,14 @@ export class AiContentService {
       )
     }
 
-    prompt = await this.aiService.promptReplace(prompt, campaignWithRelations)
+    const liveMetrics = await this.campaignsService.fetchLiveRaceTargetMetrics(
+      campaignWithRelations,
+    )
+    prompt = await this.aiService.promptReplace(
+      prompt,
+      campaignWithRelations,
+      liveMetrics,
+    )
     if (!prompt || prompt === '') {
       await this.slack.errorMessage({
         message: 'empty prompt replace',

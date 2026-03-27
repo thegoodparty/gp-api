@@ -157,9 +157,12 @@ export class AiContentController {
     const { candidateJson, systemPrompt } =
       await this.content.getChatSystemPrompt(initial)
 
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const candidateContext = await this.ai.promptReplace(
       candidateJson,
       campaign,
+      liveMetrics,
     )
 
     if (!candidateContext || !systemPrompt) {
