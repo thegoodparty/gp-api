@@ -42,6 +42,13 @@ export class CampaignTasksController {
     return this.tasksService.unCompleteTask(campaign, id)
   }
 
+  // TODO: This is a temporary endpoint to delete all tasks for a campaign for testing purposes
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAllTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    await this.tasksService.deleteAllTasks(campaign.id)
+  }
+
   @Post('generate')
   @HttpCode(HttpStatus.ACCEPTED)
   enqueueGenerateTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {

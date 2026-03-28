@@ -263,6 +263,12 @@ export class CampaignTasksService extends createPrismaBase(
     return false
   }
 
+  async deleteAllTasks(campaignId: number) {
+    await this.model.deleteMany({
+      where: { campaignId },
+    })
+  }
+
   async generateDefaultTasks(campaign: Campaign) {
     const today = startOfDay(new Date())
     await this.client.$transaction(async (tx) => {
