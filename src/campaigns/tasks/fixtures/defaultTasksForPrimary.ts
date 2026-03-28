@@ -2,9 +2,9 @@ import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 
 // id mapping to content: https://gp-api.goodparty.org/v1/content/type/aiContentCategories
 
-export const generalDefaultTasks: CampaignTask[] = [
+export const primaryDefaultTasks: CampaignTask[] = [
   {
-    id: 'b2d5f6a7-8c9d-4e0f-1a2b-3c4d5e6f7a8b',
+    id: 'a1c3e5d7-2b4f-6a8c-0d2e-4f6a8c0e2d4b',
     title: 'Introduction Text',
     description: 'Introduce yourself to voters',
     cta: 'Schedule',
@@ -15,7 +15,7 @@ export const generalDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    id: 'e3d5c7a9-4b6f-8a0c-2d4e-6f8a0c2e4d6b',
     title: 'Introduction Robocall',
     description: 'Introduce yourself to voters',
     cta: 'Request',
@@ -27,7 +27,7 @@ export const generalDefaultTasks: CampaignTask[] = [
   },
 
   {
-    id: 'f58b4523-c36d-4a5b-9e5f-88e4d3a7c70c',
+    id: 'd7e9f1a3-6b8c-0d2e-4f6a-8c0e2d4b6f8a',
     title: 'Persuasion Text',
     description: 'Build trust and persuade voters to vote for you',
     cta: 'Schedule',
@@ -38,7 +38,7 @@ export const generalDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'a5f07d6c-8e3d-49e2-b131-92103c2be07e',
+    id: 'c9a1b3d5-8e0f-2a4c-6d8e-0f2a4c6d8e0b',
     title: 'Persuasion Robocall',
     description: 'Build trust and persuade voters to vote for you',
     cta: 'Request',
@@ -50,7 +50,7 @@ export const generalDefaultTasks: CampaignTask[] = [
   },
 
   {
-    id: 'c7e3a1d9-4f6b-8e2c-0a5d-9b3f7e1c4a6d',
+    id: 'b5c7d9e1-0a2f-4b6c-8d0e-2f4a6c8d0e2b',
     title: 'Early Voting Text',
     description: 'Encourage voters to vote early',
     cta: 'Schedule',
@@ -61,9 +61,9 @@ export const generalDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: '5fc21abd-2792-4c09-96f1-de94a28b2b3c',
-    title: 'Election Day Reminder Robocall',
-    description: 'Get out the vote on Election Day',
+    id: 'a7b9c1d3-2e4f-6a8b-0c2d-4e6f8a0b2c4d',
+    title: 'Primary Day Reminder Robocall',
+    description: 'Get out the vote on Primary Day',
     cta: 'Request',
     week: 1,
     flowType: CampaignTaskType.robocall,
@@ -72,11 +72,10 @@ export const generalDefaultTasks: CampaignTask[] = [
     defaultAiTemplateId: '2GMO6bQoQermNhdRmRe1fh',
     isDefaultTask: true,
   },
-
   {
-    id: '41b8b290-7e50-4d5a-8c9f-b8e17b253cde',
-    title: 'Election Day Reminder Text',
-    description: 'Get out the vote on Election Day',
+    id: 'f1e3d5c7-8a0b-2c4d-6e8f-0a2b4c6d8e0f',
+    title: 'Primary Day Reminder Text',
+    description: 'Get out the vote on Primary Day',
     cta: 'Schedule',
     week: 1,
     flowType: CampaignTaskType.text,
