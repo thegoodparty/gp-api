@@ -7,6 +7,8 @@ export interface ClerkUserFields {
   email: string
   firstName: string
   lastName: string
+  name: string
+  avatar: string | null
 }
 
 type Enrichable = {
@@ -14,6 +16,8 @@ type Enrichable = {
   email?: string | null
   firstName?: string | null
   lastName?: string | null
+  name?: string | null
+  avatar?: string | null
 }
 
 @Injectable()
@@ -33,10 +37,15 @@ export class ClerkUserEnricherService {
         clerkUser.primaryEmailAddress?.emailAddress ??
         clerkUser.emailAddresses?.[0]?.emailAddress
 
+      const firstName = clerkUser.firstName ?? ''
+      const lastName = clerkUser.lastName ?? ''
+
       return {
         email: email ?? '',
-        firstName: clerkUser.firstName ?? '',
-        lastName: clerkUser.lastName ?? '',
+        firstName,
+        lastName,
+        name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
+        avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
       }
     } catch (err) {
       this.logger.warn(
@@ -88,10 +97,15 @@ export class ClerkUserEnricherService {
           clerkUser.primaryEmailAddress?.emailAddress ??
           clerkUser.emailAddresses?.[0]?.emailAddress
 
+        const firstName = clerkUser.firstName ?? ''
+        const lastName = clerkUser.lastName ?? ''
+
         result.set(clerkUser.id, {
           email: email ?? '',
-          firstName: clerkUser.firstName ?? '',
-          lastName: clerkUser.lastName ?? '',
+          firstName,
+          lastName,
+          name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
+          avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
         })
       }
     } catch (err) {
@@ -113,6 +127,8 @@ export class ClerkUserEnricherService {
       ...('email' in user ? { email: fields.email } : {}),
       ...('firstName' in user ? { firstName: fields.firstName } : {}),
       ...('lastName' in user ? { lastName: fields.lastName } : {}),
+      ...('name' in user ? { name: fields.name } : {}),
+      ...('avatar' in user ? { avatar: fields.avatar } : {}),
     }
   }
 }

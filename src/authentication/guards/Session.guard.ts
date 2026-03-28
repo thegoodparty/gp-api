@@ -101,6 +101,8 @@ export class SessionGuard implements CanActivate {
             email: clerkFields.email,
             firstName: clerkFields.firstName,
             lastName: clerkFields.lastName,
+            name: clerkFields.name,
+            avatar: clerkFields.avatar,
           }
         : rawUser
     }
