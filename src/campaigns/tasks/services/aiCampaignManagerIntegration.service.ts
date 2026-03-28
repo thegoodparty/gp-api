@@ -133,13 +133,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     )
 
     const additionalContext = this.buildAdditionalRaceContext(campaign)
-    const isIncumbent = pathData?.viability?.isIncumbent
     const incumbentStatus =
-      isIncumbent === true
-        ? 'Elected'
-        : isIncumbent === false
-          ? 'Appointed'
-          : 'N/A'
+      pathData?.viability?.isIncumbent === true ? 'Elected' : 'N/A'
 
     return {
       candidate_name: data.name || `Campaign ${campaign.id}`,
