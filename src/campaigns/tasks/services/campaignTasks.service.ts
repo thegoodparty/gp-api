@@ -343,7 +343,7 @@ export class CampaignTasksService extends createPrismaBase(
     today: Date,
   ): Date | null {
     if (!dateString) return null
-    const date = parseIsoDateString(dateString)
+    const date = startOfDay(parseIsoDateString(dateString))
     return isBefore(date, today) ? null : date
   }
 

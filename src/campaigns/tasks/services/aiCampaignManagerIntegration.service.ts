@@ -133,6 +133,13 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     )
 
     const additionalContext = this.buildAdditionalRaceContext(campaign)
+    const isIncumbent = pathData?.viability?.isIncumbent
+    const incumbentStatus =
+      isIncumbent === true
+        ? 'Elected'
+        : isIncumbent === false
+          ? 'Appointed'
+          : 'N/A'
 
     return {
       candidate_name: data.name || `Campaign ${campaign.id}`,
@@ -140,9 +147,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,
       race_type: this.determineRaceType(details),
-      incumbent_status: pathData?.viability?.isIncumbent
-        ? 'Incumbent'
-        : 'Challenger',
+      incumbent_status: incumbentStatus,
       seats_available: pathData?.viability?.seats ?? 1,
       number_of_opponents: this.extractNumberOfOpponents(details),
       win_number: winNumber,

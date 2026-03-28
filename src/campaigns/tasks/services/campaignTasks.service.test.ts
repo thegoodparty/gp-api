@@ -637,6 +637,37 @@ describe('CampaignTasksService', () => {
       }
     })
 
+    it('produces consistent weeks regardless of server time-of-day', async () => {
+      vi.setSystemTime(new Date('2025-06-01T14:30:00.000Z'))
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const midDayTasks = getCreatedTaskData()
+
+      vi.clearAllMocks()
+      vi.setSystemTime(new Date('2025-06-01T00:00:00.000Z'))
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const midnightTasks = getCreatedTaskData()
+
+      expect(midDayTasks).toHaveLength(midnightTasks.length)
+      midDayTasks.forEach((task, i) => {
+        expect(task.week).toBe(midnightTasks[i].week)
+        expect(task.date!.getTime()).toBe(midnightTasks[i].date!.getTime())
+      })
+    })
+
     it('treats election date equal to today as future', async () => {
       setupForCreation()
 
