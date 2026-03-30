@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BadGatewayException, NotFoundException } from '@nestjs/common'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CampaignTaskType } from '../campaignTasks.types'
@@ -8,8 +8,9 @@ import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegrat
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { defaultTasks } from '../fixtures/defaultTasks'
 import { CampaignTask } from '../campaignTasks.types'
+import { generalDefaultTasks } from '../fixtures/defaultTasks'
+import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
 vi.mock('src/shared/util/sleep.util', () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
@@ -424,11 +425,262 @@ describe('CampaignTasksService', () => {
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.createMany).toHaveBeenCalled()
       const createCall = mockTxModel.createMany.mock.calls[0][0]
-      expect(createCall.data).toHaveLength(defaultTasks.length)
+      expect(createCall.data).toHaveLength(generalDefaultTasks.length)
       expect(createCall.data[0]).toMatchObject({
         campaignId: 1,
-        title: defaultTasks[0].title,
+        title: generalDefaultTasks[0].title,
         isDefaultTask: true,
+      })
+    })
+  })
+
+  describe('generateDefaultTasks - task distribution', () => {
+    const FAKE_TODAY = new Date('2025-06-01T00:00:00.000Z')
+    const FUTURE_GENERAL = '2025-11-04'
+    const FUTURE_PRIMARY = '2025-08-15'
+    const PAST_PRIMARY = '2024-03-01'
+    const PAST_GENERAL = '2024-11-04'
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(FAKE_TODAY)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const setupForCreation = () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+    }
+
+    const getCreatedTaskData = () => {
+      const call = mockTxModel.createMany.mock.calls[0][0] as {
+        data: {
+          title: string
+          date: Date | null
+          week: number
+          isDefaultTask: boolean
+          campaignId: number
+        }[]
+      }
+      return call.data
+    }
+
+    it('uses general tasks without dates when details is empty', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(makeCampaign({ details: {} }))
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks[0].date).toBeNull()
+    })
+
+    it('distributes general tasks when only general date is future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      tasks.forEach((task) => {
+        expect(task.date).toBeInstanceOf(Date)
+        expect(task.isDefaultTask).toBe(true)
+      })
+    })
+
+    it('distributes primary tasks when only primary date is future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { primaryElectionDate: FUTURE_PRIMARY },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(primaryDefaultTasks.length)
+      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
+      tasks.forEach((task) => {
+        expect(task.date).toBeInstanceOf(Date)
+        expect(task.isDefaultTask).toBe(true)
+      })
+    })
+
+    it('distributes both sets when both dates are future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: FUTURE_PRIMARY,
+            electionDate: FUTURE_GENERAL,
+          },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(
+        primaryDefaultTasks.length + generalDefaultTasks.length,
+      )
+      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(tasks[primaryDefaultTasks.length].title).toBe(
+        generalDefaultTasks[0].title,
+      )
+      tasks.forEach((task) => {
+        expect(task.date).toBeInstanceOf(Date)
+        expect(task.isDefaultTask).toBe(true)
+      })
+    })
+
+    it('returns empty when both dates are in the past', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: PAST_PRIMARY,
+            electionDate: PAST_GENERAL,
+          },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(0)
+    })
+
+    it('returns empty when only general date is in the past', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: PAST_GENERAL },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(0)
+    })
+
+    it('distributes only general when primary is past and general is future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: PAST_PRIMARY,
+            electionDate: FUTURE_GENERAL,
+          },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+    })
+
+    it('distributes only primary when general is past and primary is future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: FUTURE_PRIMARY,
+            electionDate: PAST_GENERAL,
+          },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(primaryDefaultTasks.length)
+      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
+    })
+
+    it('assigns dates in chronological order', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      for (let i = 1; i < tasks.length; i++) {
+        expect(tasks[i].date!.getTime()).toBeGreaterThanOrEqual(
+          tasks[i - 1].date!.getTime(),
+        )
+      }
+    })
+
+    it('assigns decreasing weeks for tasks closer to election', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      for (let i = 1; i < tasks.length; i++) {
+        expect(tasks[i].week).toBeLessThanOrEqual(tasks[i - 1].week)
+      }
+    })
+
+    it('produces consistent weeks regardless of server time-of-day', async () => {
+      vi.setSystemTime(new Date('2025-06-01T14:30:00.000Z'))
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const midDayTasks = getCreatedTaskData()
+
+      vi.clearAllMocks()
+      vi.setSystemTime(new Date('2025-06-01T00:00:00.000Z'))
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const midnightTasks = getCreatedTaskData()
+
+      expect(midDayTasks).toHaveLength(midnightTasks.length)
+      midDayTasks.forEach((task, i) => {
+        expect(task.week).toBe(midnightTasks[i].week)
+        expect(task.date!.getTime()).toBe(midnightTasks[i].date!.getTime())
+      })
+    })
+
+    it('treats election date equal to today as future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: '2025-06-01' },
+        }),
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      tasks.forEach((task) => {
+        expect(task.date).toBeInstanceOf(Date)
       })
     })
   })

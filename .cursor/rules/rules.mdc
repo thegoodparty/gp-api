@@ -1153,3 +1153,50 @@ STRICTLY PROHIBITED:
 - Dismissing pre-existing lint errors as "not my problem"
 - Silently ignoring warnings that are configured as errors in the project's lint config
 - Proceeding without running lint/format at all
+
+## Rule 28: Prefer date-fns Over Native Date Manipulation
+
+CRITICAL REQUIREMENT:
+
+- Always use `date-fns` for date creation, comparison, arithmetic, formatting, and parsing
+- Never use raw JavaScript `Date` methods or manual arithmetic for date operations
+
+REQUIRED BEHAVIOR:
+
+- Use `date-fns` functions for all date operations:
+  - **Parsing**: `parseISO`, `parse` — not `new Date(string)` or `Date.parse()`
+  - **Formatting**: `format`, `formatISO` — not `toISOString()`, `toLocaleDateString()`, or template literals with getters
+  - **Arithmetic**: `addDays`, `addWeeks`, `addMonths`, `subDays` — not `setDate(getDate() + n)` or manual millisecond math
+  - **Comparison**: `isBefore`, `isAfter`, `isEqual`, `compareAsc` — not `>`, `<`, or `getTime()` comparisons
+  - **Differences**: `differenceInDays`, `differenceInWeeks`, `differenceInCalendarDays` — not manual subtraction and division
+  - **Start/end of period**: `startOfDay`, `startOfWeek`, `endOfMonth` — not `setHours(0,0,0,0)`
+
+EXAMPLES:
+
+**PREFER:**
+
+```typescript
+import { addDays, isBefore, differenceInCalendarDays, startOfDay, format } from 'date-fns'
+
+const today = startOfDay(new Date())
+const deadline = addDays(today, 30)
+const isOverdue = isBefore(deadline, today)
+const daysLeft = differenceInCalendarDays(deadline, today)
+const formatted = format(deadline, 'yyyy-MM-dd')
+```
+
+**AVOID:**
+
+```typescript
+const today = new Date()
+today.setHours(0, 0, 0, 0)
+const deadline = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+const isOverdue = deadline < today
+const daysLeft = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+const formatted = deadline.toISOString().split('T')[0]
+```
+
+EXCEPTIONS:
+
+- `new Date()` is acceptable for getting the current timestamp when immediately passed to a `date-fns` function
+- `Date` type annotations are always fine — this rule governs operations, not types
