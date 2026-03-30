@@ -8,10 +8,6 @@ export interface VerifiedM2MToken {
   subject: string
 }
 
-export interface AuthUserEventData {
-  externalUserId: string
-}
-
 export interface AuthProvider {
   verifySessionToken(token: string): Promise<VerifiedSession>
   verifyM2MToken(token: string): Promise<VerifiedM2MToken>
@@ -24,5 +20,3 @@ export interface AuthProvider {
 }
 
 export const AUTH_PROVIDER_TOKEN = 'AuthProvider'
-export const AUTH_USER_UPDATED_EVENT = 'auth.user.updated'
-export const AUTH_USER_DELETED_EVENT = 'auth.user.deleted'
