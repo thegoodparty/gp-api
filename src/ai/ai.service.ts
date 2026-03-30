@@ -17,6 +17,7 @@ import { SlackChannel } from '../vendors/slack/slackService.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { PinoLogger } from 'nestjs-pino'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { RaceTargetMetrics } from '@/elections/types/elections.types'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -415,7 +416,11 @@ export class AiService {
     return
   }
   /** function to replace placeholder tokens in ai content prompt */
-  async promptReplace(prompt: string, campaign: PromptReplaceCampaign) {
+  async promptReplace(
+    prompt: string,
+    campaign: PromptReplaceCampaign,
+    liveMetrics?: RaceTargetMetrics | null,
+  ) {
     try {
       let newPrompt = prompt
 
@@ -526,8 +531,8 @@ export class AiService {
 
       if (pathToVictory) {
         const {
-          projectedTurnout,
-          winNumber,
+          projectedTurnout: storedTurnout,
+          winNumber: storedWinNumber,
           republicans,
           democrats,
           indies,
@@ -548,6 +553,11 @@ export class AiService {
           // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
+
+        const projectedTurnout = liveMetrics?.projectedTurnout ?? storedTurnout
+        const winNumber = liveMetrics?.winNumber ?? storedWinNumber
+        const voterContactGoal = liveMetrics?.voterContactGoal ?? voteGoal
+
         replaceArr.push(
           {
             find: 'pathToVictory',
@@ -615,7 +625,7 @@ export class AiService {
           },
           {
             find: 'voteGoal',
-            replace: voteGoal,
+            replace: voterContactGoal,
           },
           {
             find: 'voterProjection',

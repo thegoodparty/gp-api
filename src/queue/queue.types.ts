@@ -6,6 +6,7 @@ export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
   PATH_TO_VICTORY = 'pathToVictory',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
+  GENERATE_TASKS = 'generateTasks',
   DOMAIN_EMAIL_FORWARDING = 'domainEmailForwarding',
   POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
   POLL_CREATION = 'pollCreation',
@@ -29,6 +30,7 @@ export type QueueMessage =
     }
   | { type: QueueType.POLL_CREATION; data: PollCreationEvent['data'] }
   | { type: QueueType.POLL_EXPANSION; data: PollExpansionEvent['data'] }
+  | { type: QueueType.GENERATE_TASKS; data: GenerateTasksMessage }
 
 export type GenerateAiContentMessageData = {
   slug: string
@@ -38,6 +40,10 @@ export type GenerateAiContentMessageData = {
 
 export type TcrComplianceStatusCheckMessage = {
   tcrCompliance: TcrCompliance
+}
+
+export type GenerateTasksMessage = {
+  campaignId: number
 }
 
 export type DomainEmailForwardingMessage = {

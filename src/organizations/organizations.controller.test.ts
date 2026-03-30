@@ -939,7 +939,9 @@ describe('GET /v1/organizations/admin/list', () => {
       },
     })
 
-    const result = await service.client.get('/v1/organizations/admin/list')
+    const result = await service.client.get(
+      '/v1/organizations/admin/list?slug=campaign-300',
+    )
 
     expect(result.status).toBe(200)
     expect(result.data.organizations).toHaveLength(1)
@@ -980,7 +982,9 @@ describe('GET /v1/organizations/admin/list', () => {
       },
     })
 
-    const result = await service.client.get('/v1/organizations/admin/list')
+    const result = await service.client.get(
+      '/v1/organizations/admin/list?slug=campaign-310',
+    )
 
     expect(result.status).toBe(200)
     expect(result.data.organizations[0].extra.campaign).toBeNull()

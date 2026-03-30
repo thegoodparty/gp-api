@@ -36,7 +36,7 @@ declare global {
       source?: P2VSource
       districtId?: string
       districtManuallySet?: boolean
-      officeContextFingerprint?: string
+      officeContextFingerprint?: string | null
     }
   }
 }
