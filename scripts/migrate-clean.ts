@@ -15,6 +15,13 @@ if (!CLERK_SECRET_KEY) {
   process.exit(1)
 }
 
+if (CLERK_SECRET_KEY.startsWith('sk_live_')) {
+  console.error(
+    'ERROR: migrate:clean must NOT run against a live Clerk environment.',
+  )
+  process.exit(1)
+}
+
 const prisma = new PrismaClient()
 const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY })
 

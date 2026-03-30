@@ -29,7 +29,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, Prisma, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -47,7 +47,6 @@ import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
-import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   CreateCampaignSchema,
@@ -58,8 +57,6 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith, CampaignWithPathToVictory } from './campaigns.types'
-import { buildCampaignListFilters } from './util/buildCampaignListFilters'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -81,7 +78,6 @@ export class CampaignsController {
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
     private readonly queueProducerService: QueueProducerService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -137,48 +133,6 @@ export class CampaignsController {
     }
 
     return p2v
-  }
-
-  //TODO: remove this when we start using the admin portal.
-  @Roles(UserRole.admin)
-  @Get()
-  async findAll(@Query() query: CampaignListSchema) {
-    let where: Prisma.CampaignWhereInput = {}
-    if (Object.values(query).some((value) => !!value)) {
-      where = buildCampaignListFilters(query)
-    }
-    const include = {
-      user: {
-        select: {
-          clerkId: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          email: true,
-          metaData: true,
-        },
-      },
-      pathToVictory: {
-        select: {
-          data: true,
-        },
-      },
-    }
-    const campaigns = await this.campaigns.findMany({
-      where,
-      include,
-    })
-    const users = campaigns
-      .map((c) => c.user)
-      .filter((u): u is NonNullable<typeof u> => u != null)
-    const enriched = await this.clerkEnricher.enrichUsers(users)
-    let idx = 0
-    for (const campaign of campaigns) {
-      if (campaign.user) {
-        campaign.user = enriched[idx++]
-      }
-    }
-    return campaigns
   }
 
   @Get('mine')

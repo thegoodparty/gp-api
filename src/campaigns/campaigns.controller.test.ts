@@ -1,5 +1,4 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
-import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignStatus } from '@goodparty_org/contracts'
 import {
@@ -235,7 +234,6 @@ describe('CampaignsController', () => {
       organizationsService,
       analyticsService,
       queueProducerServiceMock as QueueProducerService,
-      createMockClerkEnricher(),
       createMockLogger(),
     )
   })
@@ -373,53 +371,6 @@ describe('CampaignsController', () => {
       await controller.createPathToVictory({}, mockUser, mockTestCampaign)
 
       expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('findAll', () => {
-    it('passes empty where when no filters provided', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({})
-
-      expect(campaignsService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} }),
-      )
-    })
-
-    it('builds where from filters', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({ slug: 'test-slug' })
-
-      const call = vi.mocked(campaignsService.findMany).mock.calls[0]?.[0]
-      expect(call?.where).toHaveProperty('AND')
-    })
-
-    it('includes user and pathToVictory in query', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({})
-
-      expect(campaignsService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: {
-            user: {
-              select: {
-                clerkId: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                email: true,
-                metaData: true,
-              },
-            },
-            pathToVictory: {
-              select: { data: true },
-            },
-          },
-        }),
-      )
     })
   })
 
