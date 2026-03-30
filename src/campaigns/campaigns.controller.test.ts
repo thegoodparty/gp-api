@@ -168,6 +168,7 @@ describe('CampaignsController', () => {
       createForUser: vi.fn(),
       updateJsonFields: vi.fn(),
       launch: vi.fn(),
+      fetchLiveRaceTargetMetrics: vi.fn().mockResolvedValue(null),
     }
     campaignsService = campaignsServiceMock as CampaignsService
 
@@ -195,7 +196,7 @@ describe('CampaignsController', () => {
 
     const electionsServiceMock: Partial<ElectionsService> = {
       buildRaceTargetDetails: vi.fn(),
-      getBallotReadyMatchedRaceTargetDetails: vi.fn(),
+      getPositionMatchedRaceTargetDetails: vi.fn(),
       getDistrictId: vi.fn().mockResolvedValue(null),
     }
     electionsService = electionsServiceMock as ElectionsService
@@ -465,6 +466,34 @@ describe('CampaignsController', () => {
         positionName: 'Mayor',
       })
     })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithRelations: CampaignWith<
+        'organization' | 'pathToVictory'
+      > = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: {} as Organization,
+      }
+
+      const result = await controller.findMine(campaignWithRelations)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
+    })
   })
 
   describe('getUserCampaignStatus', () => {
@@ -591,6 +620,33 @@ describe('CampaignsController', () => {
       await expect(controller.findBySlug('nonexistent')).rejects.toThrow(
         NotFoundException,
       )
+    })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 5000,
+        winNumber: 2501,
+        voterContactGoal: 12505,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+
+      const result = await controller.findBySlug(mockCampaign.slug)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
     })
   })
 
@@ -1299,7 +1355,7 @@ describe('CampaignsController', () => {
     it('falls back to silver flow when raceTargetDetails is null', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1325,7 +1381,7 @@ describe('CampaignsController', () => {
     it('updates with complete status when hasTurnout', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1357,7 +1413,7 @@ describe('CampaignsController', () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(noTurnout)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1374,7 +1430,7 @@ describe('CampaignsController', () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(noTurnout)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1388,7 +1444,7 @@ describe('CampaignsController', () => {
     it('does not enqueue when hasTurnout', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1402,7 +1458,7 @@ describe('CampaignsController', () => {
     it('passes includeTurnout: true and officeName to elections service', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1411,7 +1467,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith({
         campaignId: mockCampaign.id,
         ballotreadyPositionId: 'br-pos-1',
@@ -1431,7 +1487,7 @@ describe('CampaignsController', () => {
       })
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1440,7 +1496,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           officeName: undefined,
@@ -1456,7 +1512,7 @@ describe('CampaignsController', () => {
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(raceDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1481,7 +1537,7 @@ describe('CampaignsController', () => {
       })
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: false }))
     })
 
@@ -1491,7 +1547,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: true }))
     })
 
@@ -1523,7 +1579,7 @@ describe('CampaignsController', () => {
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,

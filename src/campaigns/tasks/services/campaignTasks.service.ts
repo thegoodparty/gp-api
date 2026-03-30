@@ -5,17 +5,35 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
+import {
+  addDays,
+  differenceInCalendarDays,
+  differenceInWeeks,
+  isAfter,
+  isBefore,
+  startOfDay,
+} from 'date-fns'
 import { Observable, Subscriber } from 'rxjs'
-
-const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
-import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
-import { CampaignTask } from '../campaignTasks.types'
-import { defaultTasks } from '../fixtures/defaultTasks'
+import {
+  DateFormats,
+  formatDate,
+  parseIsoDateString,
+} from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
+import { ProgressStreamData } from '../aiCampaignManager.types'
+import { CampaignTask } from '../campaignTasks.types'
+import { generalDefaultTasks } from '../fixtures/defaultTasks'
+import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
+import { CampaignWithPathToVictory } from '../../campaigns.types'
+import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
+
+const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
+const MAX_TASK_WINDOW_DAYS = 49
+const SHORTENED_WINDOW_BUFFER_DAYS = 7
+const FULL_WINDOW_THRESHOLD_DAYS = 56
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -178,33 +196,18 @@ export class CampaignTasksService extends createPrismaBase(
         const progress =
           await this.aiCampaignManagerIntegration.getLatestProgress(sessionId)
 
-        if (progress) {
-          subscriber.next({
-            data: {
-              type: 'progress',
-              progress: progress.progress,
-              message: progress.message,
-            },
-          })
-
-          if (progress.status === 'completed') {
-            const generatedTasks =
-              await this.aiCampaignManagerIntegration.finishGeneration(
-                sessionId,
-                campaign,
-              )
-            const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
-            subscriber.next({
-              data: { type: 'complete', tasks: savedTasks },
-            })
-            subscriber.complete()
-            return
-          }
-
-          if (progress.status === 'failed') {
-            throw new Error('Campaign plan generation failed')
-          }
+        if (!progress) {
+          await sleep(pollIntervalMs)
+          continue
         }
+
+        const done = await this.handleStreamProgress(
+          progress,
+          sessionId,
+          campaign,
+          subscriber,
+        )
+        if (done) return
 
         await sleep(pollIntervalMs)
       }
@@ -225,7 +228,49 @@ export class CampaignTasksService extends createPrismaBase(
     }
   }
 
+  private async handleStreamProgress(
+    progress: ProgressStreamData,
+    sessionId: string,
+    campaign: CampaignWithPathToVictory,
+    subscriber: Subscriber<MessageEvent>,
+  ): Promise<boolean> {
+    subscriber.next({
+      data: {
+        type: 'progress',
+        progress: progress.progress,
+        message: progress.message,
+      },
+    })
+
+    if (progress.status === 'completed') {
+      const generatedTasks =
+        await this.aiCampaignManagerIntegration.finishGeneration(
+          sessionId,
+          campaign,
+        )
+      const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
+      subscriber.next({
+        data: { type: 'complete', tasks: savedTasks },
+      })
+      subscriber.complete()
+      return true
+    }
+
+    if (progress.status === 'failed') {
+      throw new Error('Campaign plan generation failed')
+    }
+
+    return false
+  }
+
+  async deleteAllTasks(campaignId: number) {
+    await this.model.deleteMany({
+      where: { campaignId },
+    })
+  }
+
   async generateDefaultTasks(campaign: Campaign) {
+    const today = startOfDay(new Date())
     await this.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
       const existingDefaults = await tx.campaignTask.count({
@@ -234,11 +279,109 @@ export class CampaignTasksService extends createPrismaBase(
       if (existingDefaults > 0) {
         return
       }
+
+      const tasksForCampaign = this.orderDefaultTasksForCampaign(
+        campaign,
+        today,
+      )
       await this.replaceCampaignTasksInTransaction(
         tx,
         campaign.id,
-        defaultTasks,
+        tasksForCampaign,
       )
+    })
+  }
+
+  private orderDefaultTasksForCampaign(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
+    const { details } = campaign
+    if (!details) return generalDefaultTasks
+
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+
+    if (primaryDate && generalDate) {
+      return [
+        ...this.distributeTasksOverWindow(
+          primaryDefaultTasks,
+          today,
+          primaryDate,
+        ),
+        ...this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          primaryDate,
+          generalDate,
+        ),
+      ]
+    }
+
+    if (primaryDate) {
+      return this.distributeTasksOverWindow(
+        primaryDefaultTasks,
+        today,
+        primaryDate,
+      )
+    }
+
+    if (generalDate) {
+      return this.distributeTasksOverWindow(
+        generalDefaultTasks,
+        today,
+        generalDate,
+      )
+    }
+
+    const hasAnyElectionDate =
+      details.primaryElectionDate || details.electionDate
+    return hasAnyElectionDate ? [] : generalDefaultTasks
+  }
+
+  private hasFutureDate(
+    dateString: string | undefined,
+    today: Date,
+  ): Date | null {
+    if (!dateString) return null
+    const date = startOfDay(parseIsoDateString(dateString))
+    return isBefore(date, today) ? null : date
+  }
+
+  private distributeTasksOverWindow(
+    tasks: CampaignTask[],
+    windowStart: Date,
+    endDate: Date,
+  ): CampaignTask[] {
+    const daysUntilEnd = differenceInCalendarDays(endDate, windowStart)
+
+    const rawStartDate =
+      daysUntilEnd > FULL_WINDOW_THRESHOLD_DAYS
+        ? addDays(endDate, -MAX_TASK_WINDOW_DAYS)
+        : addDays(windowStart, SHORTENED_WINDOW_BUFFER_DAYS)
+
+    const startDate = isAfter(rawStartDate, endDate) ? endDate : rawStartDate
+
+    const timeWindowDays = Math.min(
+      MAX_TASK_WINDOW_DAYS,
+      differenceInCalendarDays(endDate, startDate),
+    )
+
+    const taskCount = tasks.length
+    return tasks.map((task, index) => {
+      const taskDate =
+        taskCount === 1
+          ? endDate
+          : addDays(
+              startDate,
+              Math.round((timeWindowDays * index) / (taskCount - 1)),
+            )
+      return {
+        ...task,
+        date: formatDate(taskDate, DateFormats.isoDate),
+        week: differenceInWeeks(endDate, taskDate, {
+          roundingMethod: 'ceil',
+        }),
+      }
     })
   }
 
