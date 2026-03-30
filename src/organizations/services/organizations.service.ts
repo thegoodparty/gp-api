@@ -57,14 +57,8 @@ export class OrganizationsService extends createPrismaBase(
   async resolvePositionNameByOrganizationSlug(
     organizationSlug: string,
   ): Promise<string | null> {
-    const organization = await this.findUnique({
-      where: { slug: organizationSlug },
-    })
-
-    const { positionName } = await this.resolvePositionContext({
-      customPositionName: organization?.customPositionName,
-      positionId: organization?.positionId,
-    })
+    const { positionName } =
+      await this.resolvePositionContextByOrgSlug(organizationSlug)
     return positionName
   }
 
