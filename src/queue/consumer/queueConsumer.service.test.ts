@@ -1157,3 +1157,67 @@ describe('QueueConsumerService - triggerPollExecution', () => {
     )
   })
 })
+
+describe('QueueConsumerService - message type routing', () => {
+  let service: QueueConsumerService
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        QueueConsumerService,
+        { provide: AiContentService, useValue: {} },
+        { provide: CampaignsService, useValue: {} },
+        { provide: CampaignTasksService, useValue: {} },
+        { provide: CampaignTcrComplianceService, useValue: {} },
+        { provide: ContactsService, useValue: {} },
+        { provide: DomainsService, useValue: {} },
+        { provide: ElectedOfficeService, useValue: {} },
+        { provide: OrganizationsService, useValue: {} },
+        { provide: PathToVictoryService, useValue: {} },
+        { provide: PollIndividualMessageService, useValue: { client: {} } },
+        { provide: PollIssuesService, useValue: {} },
+        { provide: PollsService, useValue: {} },
+        { provide: S3Service, useValue: {} },
+        { provide: SlackService, useValue: {} },
+        { provide: UsersService, useValue: {} },
+        { provide: AnalyticsService, useValue: {} },
+        { provide: PinoLogger, useValue: createMockLogger() },
+      ],
+    }).compile()
+
+    service = module.get(QueueConsumerService)
+  })
+
+  it('acknowledges campaignPlanComplete messages', async () => {
+    const message: Message = {
+      MessageId: 'msg-plan-complete',
+      Body: JSON.stringify({
+        type: QueueType.CAMPAIGN_PLAN_COMPLETE,
+        data: {
+          campaignId: 123,
+          status: 'completed',
+          s3Key: 'results/123/2026-03-30.json',
+          taskCount: 10,
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+  })
+
+  it('acknowledges unknown message types via default branch', async () => {
+    const message: Message = {
+      MessageId: 'msg-unknown',
+      Body: JSON.stringify({
+        type: 'someUnknownFutureType',
+        data: {},
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+  })
+})

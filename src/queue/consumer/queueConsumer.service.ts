@@ -306,6 +306,18 @@ export class QueueConsumerService {
           pollExpansionEvent,
           message.MessageId!,
         )
+      case QueueType.CAMPAIGN_PLAN_COMPLETE:
+        this.logger.info(
+          { data: queueMessage.data, messageId: message.MessageId },
+          'received campaignPlanComplete message',
+        )
+        return true
+      default:
+        this.logger.warn(
+          { messageId: message.MessageId, body: message.Body },
+          'unknown queue message type',
+        )
+        return true
     }
   }
 
