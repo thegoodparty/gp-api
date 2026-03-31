@@ -11,6 +11,7 @@ export enum QueueType {
   POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
   POLL_CREATION = 'pollCreation',
   POLL_EXPANSION = 'pollExpansion',
+  CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
 }
 
 export type QueueMessage =
@@ -31,6 +32,10 @@ export type QueueMessage =
   | { type: QueueType.POLL_CREATION; data: PollCreationEvent['data'] }
   | { type: QueueType.POLL_EXPANSION; data: PollExpansionEvent['data'] }
   | { type: QueueType.GENERATE_TASKS; data: GenerateTasksMessage }
+  | {
+      type: QueueType.CAMPAIGN_PLAN_COMPLETE
+      data: CampaignPlanCompleteMessage
+    }
 
 export type GenerateAiContentMessageData = {
   slug: string
@@ -49,6 +54,15 @@ export type GenerateTasksMessage = {
 export type DomainEmailForwardingMessage = {
   domainId: number
   forwardingEmailAddress: string
+}
+
+export type CampaignPlanCompleteMessage = {
+  campaignId: number
+  status: 'completed' | 'error'
+  s3Key?: string
+  taskCount?: number
+  generationTimestamp?: string
+  error?: string
 }
 
 export const PollAnalysisCompleteEventSchema = z.object({
