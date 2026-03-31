@@ -436,6 +436,8 @@ export class CampaignsController {
           officeContextFingerprint: null,
         },
       })
+      if (!result)
+        throw new NotFoundException('Campaign not found after update')
       return this.withLiveMetrics(result)
     }
 
@@ -521,6 +523,8 @@ export class CampaignsController {
           officeContextFingerprint: null,
         },
       })
+      if (!result)
+        throw new NotFoundException('Campaign not found after update')
       return this.withLiveMetrics(result)
     }
 
