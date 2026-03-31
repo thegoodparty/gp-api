@@ -1221,3 +1221,123 @@ describe('QueueConsumerService - message type routing', () => {
     expect(result).toBe(true)
   })
 })
+
+describe('QueueConsumerService.handleMessageBatch', () => {
+  let service: QueueConsumerService
+
+  const makeSqsMessage = (messageId: string, groupId?: string): Message => ({
+    MessageId: messageId,
+    Body: JSON.stringify({
+      type: QueueType.POLL_CREATION,
+      data: { pollId: messageId },
+    }),
+    Attributes: groupId ? { MessageGroupId: groupId } : undefined,
+  })
+
+  beforeEach(() => {
+    service = Object.create(QueueConsumerService.prototype)
+  })
+
+  it('returns all messages when all succeed', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockResolvedValue(false)
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('b1', 'group-b'),
+      makeSqsMessage('a2', 'group-a'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result).toHaveLength(3)
+    expect(result.map((m) => m.MessageId)).toEqual(
+      expect.arrayContaining(['a1', 'a2', 'b1']),
+    )
+  })
+
+  it('preserves FIFO order within the same group', async () => {
+    const order: string[] = []
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockImplementation(
+      async (msg) => {
+        order.push(msg.MessageId!)
+        return false
+      },
+    )
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('a2', 'group-a'),
+      makeSqsMessage('a3', 'group-a'),
+    ]
+
+    await service.handleMessageBatch(messages)
+
+    expect(order).toEqual(['a1', 'a2', 'a3'])
+  })
+
+  it('stops processing a group after a requeue and excludes remaining messages', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockImplementation(
+      async (msg) => msg.MessageId === 'a2',
+    )
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('a2', 'group-a'),
+      makeSqsMessage('a3', 'group-a'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result.map((m) => m.MessageId)).toEqual(['a1'])
+    expect(service.handleMessageAndMaybeRequeue).toHaveBeenCalledTimes(2)
+  })
+
+  it('continues processing other groups when one group hits a requeue', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockImplementation(
+      async (msg) => msg.MessageId === 'a1',
+    )
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('a2', 'group-a'),
+      makeSqsMessage('b1', 'group-b'),
+      makeSqsMessage('b2', 'group-b'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result.map((m) => m.MessageId)).toEqual(
+      expect.arrayContaining(['b1', 'b2']),
+    )
+    expect(result.map((m) => m.MessageId)).not.toContain('a1')
+    expect(result.map((m) => m.MessageId)).not.toContain('a2')
+  })
+
+  it('returns empty array when all messages need requeue', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockResolvedValue(true)
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('b1', 'group-b'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result).toEqual([])
+  })
+
+  it('treats messages without MessageGroupId as independent', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockImplementation(
+      async (msg) => msg.MessageId === 'no-group-1',
+    )
+
+    const messages = [
+      makeSqsMessage('no-group-1'),
+      makeSqsMessage('no-group-2'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result.map((m) => m.MessageId)).toEqual(['no-group-2'])
+  })
+})

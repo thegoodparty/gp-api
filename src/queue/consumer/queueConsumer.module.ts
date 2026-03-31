@@ -23,6 +23,8 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
         {
           ...queueConfig,
           pollingWaitTimeMs: 1000,
+          batchSize: 10,
+          messageSystemAttributeNames: ['MessageGroupId'],
         },
       ],
     }),

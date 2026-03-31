@@ -125,17 +125,18 @@ export class QueueConsumerService {
     const groups = Object.values(
       groupBy(messages, (m) => m.Attributes?.MessageGroupId ?? randomUUID()),
     )
-    return Promise.all(
+    const results = await Promise.all(
       groups.map(async (group) => {
+        const processed: Message[] = []
         for (const message of group) {
           const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
-          return shouldRequeue
-            ? // Return a rejected promise if requeue is needed without throwing an error
-              Promise.reject('Requeuing message without stopping the process')
-            : true // Return true to delete the message from the queue
+          if (shouldRequeue) break
+          processed.push(message)
         }
+        return processed
       }),
     )
+    return results.flat()
   }
 
   // Function to process message and decide if requeue is necessary
