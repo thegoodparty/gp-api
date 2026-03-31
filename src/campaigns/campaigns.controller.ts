@@ -37,6 +37,8 @@ import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
+import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -46,6 +48,7 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
+import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   CreateCampaignSchema,
   SetDistrictDTO,
@@ -71,6 +74,8 @@ export class CampaignsController {
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
     private readonly slack: SlackService,
+    private readonly p2v: PathToVictoryService,
+    private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
@@ -78,6 +83,58 @@ export class CampaignsController {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
+  }
+
+  // TODO: this is a placeholder, remove once actual implememntation is in place!!!
+  @Post('mine/path-to-victory')
+  @UseCampaign({ continueIfNotFound: true })
+  async createPathToVictory(
+    @Body() { slug }: CreateP2VSchema,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      // if user has Admin or sales role, allow loading campaign by slug param
+      campaign = await this.campaigns.findUniqueOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
+    const name = campaign?.data?.name
+    let p2vStatus = P2VStatus.waiting
+    if (name && name.toLowerCase().includes('test')) {
+      p2vStatus = P2VStatus.complete
+    }
+
+    let p2v = await this.p2v.findUnique({ where: { campaignId: campaign.id } })
+
+    if (!p2v) {
+      p2v = await this.p2v.create({
+        data: {
+          campaignId: campaign.id,
+          data: { p2vStatus },
+        },
+      })
+    } else {
+      await this.p2v.update({
+        where: {
+          id: p2v.id,
+        },
+        data: {
+          data: { ...p2v.data, p2vStatus, p2vAttempts: 0 },
+        },
+      })
+    }
+
+    if (p2vStatus === P2VStatus.waiting) {
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    return p2v
   }
 
   //TODO: remove this when we start using the admin portal.
@@ -418,6 +475,8 @@ export class CampaignsController {
       )
     }
 
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
       .getPositionMatchedRaceTargetDetails({
         campaignId: campaign.id,
@@ -429,16 +488,17 @@ export class CampaignsController {
       .catch(() => null)
 
     if (!raceTargetDetails) {
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
       const result = await this.campaigns.updateJsonFields(campaign.id, {
         pathToVictory: {
-          p2vStatus: P2VStatus.failed,
+          p2vStatus: P2VStatus.waiting,
           p2vAttempts: 0,
           officeContextFingerprint: null,
         },
       })
-      if (!result)
-        throw new NotFoundException('Campaign not found after update')
-      return this.withLiveMetrics(result)
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
 
     const { district, winNumber, voterContactGoal, projectedTurnout } =
@@ -505,6 +565,8 @@ export class CampaignsController {
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
       .getPositionMatchedRaceTargetDetails({
         campaignId: campaign.id,
@@ -516,16 +578,17 @@ export class CampaignsController {
       .catch(() => null)
 
     if (!raceTargetDetails) {
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
       const result = await this.campaigns.updateJsonFields(campaign.id, {
         pathToVictory: {
-          p2vStatus: P2VStatus.failed,
+          p2vStatus: P2VStatus.waiting,
           p2vAttempts: 0,
           officeContextFingerprint: null,
         },
       })
-      if (!result)
-        throw new NotFoundException('Campaign not found after update')
-      return this.withLiveMetrics(result)
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
 
     const { district, winNumber, voterContactGoal, projectedTurnout } =
@@ -547,6 +610,7 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
