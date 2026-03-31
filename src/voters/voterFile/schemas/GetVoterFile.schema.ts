@@ -14,6 +14,8 @@ import { OutreachType } from '@prisma/client'
 const LOWER_CASE_TYPE_MAP = {
   doorknocking: VoterFileType.doorKnocking,
   directmail: VoterFileType.directMail,
+  digitalads: VoterFileType.digitalAds,
+  telemarketing: VoterFileType.telemarketing,
 }
 
 const SelectedColumnSchema = z.object({

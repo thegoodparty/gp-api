@@ -57,15 +57,23 @@ export class OrganizationsService extends createPrismaBase(
   async resolvePositionNameByOrganizationSlug(
     organizationSlug: string,
   ): Promise<string | null> {
+    const { positionName } =
+      await this.resolvePositionContextByOrgSlug(organizationSlug)
+    return positionName
+  }
+
+  async resolvePositionContextByOrgSlug(organizationSlug: string): Promise<{
+    ballotReadyPositionId: string | null
+    positionName: string | null
+  }> {
     const organization = await this.findUnique({
       where: { slug: organizationSlug },
     })
 
-    const { positionName } = await this.resolvePositionContext({
+    return this.resolvePositionContext({
       customPositionName: organization?.customPositionName,
       positionId: organization?.positionId,
     })
-    return positionName
   }
 
   async listOrganizations(userId: number) {
