@@ -70,6 +70,7 @@ import { PollIndividualMessageService } from '@/polls/services/pollIndividualMes
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
+import { randomUUID } from 'node:crypto'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -119,14 +120,22 @@ export class QueueConsumerService {
     this.logger.setContext(QueueConsumerService.name)
   }
 
-  @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
-  async handleMessage(message: Message) {
-    const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
-
-    return shouldRequeue
-      ? // Return a rejected promise if requeue is needed without throwing an error
-        Promise.reject('Requeuing message without stopping the process')
-      : true // Return true to delete the message from the queue
+  @SqsMessageHandler(process.env.SQS_QUEUE || '', true)
+  async handleMessageBatch(messages: Message[]) {
+    const groups = Object.values(
+      groupBy(messages, (m) => m.Attributes?.MessageGroupId ?? randomUUID()),
+    )
+    return Promise.all(
+      groups.map(async (group) => {
+        for (const message of group) {
+          const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
+          return shouldRequeue
+            ? // Return a rejected promise if requeue is needed without throwing an error
+              Promise.reject('Requeuing message without stopping the process')
+            : true // Return true to delete the message from the queue
+        }
+      }),
+    )
   }
 
   // Function to process message and decide if requeue is necessary
