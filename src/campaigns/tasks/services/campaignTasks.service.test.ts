@@ -6,7 +6,7 @@ import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { MessageGroup, QueueType } from 'src/queue/queue.types'
+import { QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
@@ -207,7 +207,7 @@ describe('CampaignTasksService', () => {
           type: QueueType.GENERATE_TASKS,
           data: { campaignId: 1 },
         },
-        MessageGroup.default,
+        'generateTasks-1',
         { throwOnError: true },
       )
       expect(result).toEqual({ accepted: true })

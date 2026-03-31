@@ -16,7 +16,7 @@ import {
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { MessageGroup, QueueType } from 'src/queue/queue.types'
+import { QueueType } from 'src/queue/queue.types'
 import {
   DateFormats,
   formatDate,
@@ -55,7 +55,7 @@ export class CampaignTasksService extends createPrismaBase(
           type: QueueType.GENERATE_TASKS,
           data: { campaignId: campaign.id },
         },
-        MessageGroup.default,
+        `generateTasks-${campaign.id}`,
         { throwOnError: true },
       )
     } catch {

@@ -36,7 +36,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
+import { QueueMessage, QueueType } from 'src/queue/queue.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -476,7 +476,7 @@ export class CampaignsController {
     try {
       await this.queueProducerService.sendMessage(
         taskGenerationMessage,
-        MessageGroup.default,
+        `generateTasks-${campaign.id}`,
         { throwOnError: true },
       )
     } catch {
