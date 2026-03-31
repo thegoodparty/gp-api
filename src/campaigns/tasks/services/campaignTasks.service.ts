@@ -29,6 +29,7 @@ import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
+import { FeaturesService } from '@/features/services/features.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 const MAX_TASK_WINDOW_DAYS = 49
@@ -42,6 +43,7 @@ export class CampaignTasksService extends createPrismaBase(
   constructor(
     private readonly aiCampaignManagerIntegration: AiCampaignManagerIntegrationService,
     private readonly queueProducerService: QueueProducerService,
+    private readonly featuresService: FeaturesService,
   ) {
     super()
   }
@@ -49,6 +51,13 @@ export class CampaignTasksService extends createPrismaBase(
   async enqueueGenerateTasks(
     campaign: CampaignWithPathToVictory,
   ): Promise<{ accepted: true }> {
+    const featureEnabled = await this.featuresService.isFeatureEnabled({
+      user: campaign.userId,
+      feature: 'campaign-tasks',
+    })
+    if (!featureEnabled) {
+      return { accepted: true }
+    }
     try {
       await this.queueProducerService.sendMessage(
         {

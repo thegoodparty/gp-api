@@ -81,6 +81,7 @@ export class CampaignsController {
     private readonly analytics: AnalyticsService,
     private readonly queueProducerService: QueueProducerService,
     private readonly logger: PinoLogger,
+    private readonly featuresService: FeaturesService,
   ) {
     this.logger.setContext(CampaignsController.name)
   }
@@ -526,23 +527,28 @@ export class CampaignsController {
     })
     if (!result) throw new NotFoundException('Campaign not found after update')
 
-    const taskGenerationMessage: QueueMessage = {
-      type: QueueType.GENERATE_TASKS,
-      data: {
-        campaignId: campaign.id,
-      },
-    }
+    const featureEnabled = await this.featuresService.isFeatureEnabled({
+      user: campaign.userId,
+      feature: 'campaign-tasks',
+    })
+    if (featureEnabled) {
+      const taskGenerationMessage: QueueMessage = {
+        type: QueueType.GENERATE_TASKS,
+        data: {
+          campaignId: campaign.id,
+        },
+      }
 
-    try {
-      await this.queueProducerService.sendMessage(
-        taskGenerationMessage,
-        MessageGroup.default,
-        { throwOnError: true },
-      )
-    } catch {
-      throw new BadGatewayException('Failed to queue task generation')
+      try {
+        await this.queueProducerService.sendMessage(
+          taskGenerationMessage,
+          MessageGroup.default,
+          { throwOnError: true },
+        )
+      } catch {
+        throw new BadGatewayException('Failed to queue task generation')
+      }
     }
-
     return this.withLiveMetrics(result)
   }
 
