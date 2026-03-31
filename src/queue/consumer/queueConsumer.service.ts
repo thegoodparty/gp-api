@@ -308,12 +308,14 @@ export class QueueConsumerService {
         )
       case QueueType.CAMPAIGN_PLAN_COMPLETE:
         this.logger.info(
-          `received campaignPlanComplete message: ${JSON.stringify(queueMessage.data)}`,
+          { data: queueMessage.data, messageId: message.MessageId },
+          'received campaignPlanComplete message',
         )
         return true
       default:
         this.logger.warn(
-          `unknown queue message: ${JSON.stringify(queueMessage)}`,
+          { messageId: message.MessageId, body: message.Body },
+          'unknown queue message type',
         )
         return true
     }
