@@ -98,13 +98,6 @@ const mockCampaign: Campaign = {
   },
 }
 
-const mockTestCampaign: Campaign = {
-  ...mockCampaign,
-  id: 101,
-  slug: 'test-candidate',
-  data: { name: 'Test Campaign' },
-}
-
 const mockP2V: PathToVictory = {
   id: 10,
   createdAt: new Date(CREATED_AT),
