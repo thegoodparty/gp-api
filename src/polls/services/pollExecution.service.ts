@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import {
   Campaign,
+  Organization,
   PathToVictory,
   Poll,
-  PollIndividualMessage,
+  PollIndividualMessageSender,
+  Prisma,
 } from '@prisma/client'
 import { format, isBefore } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
@@ -15,6 +17,7 @@ import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { normalizePhoneNumber } from 'src/shared/util/strings.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { sendTevynAPIPollMessage } from '../utils/polls.utils'
 import { PollsService } from './polls.service'
@@ -25,9 +28,10 @@ export type TriggerPollExecutionParams = {
   isExpansion: boolean
 }
 
-type PollWithCampaign = {
+type PollWithOrganization = {
   poll: Poll
   office: { id: string; campaignId: number }
+  organization: Organization
   campaign: Campaign & { pathToVictory: PathToVictory | null }
 }
 
@@ -48,12 +52,12 @@ export class PollExecutionService {
   async triggerPollExecution(
     params: TriggerPollExecutionParams,
   ): Promise<boolean> {
-    const data = await this.getPollAndCampaign(params.pollId)
+    const data = await this.getPollAndOrganization(params.pollId)
     if (!data) {
       this.logger.log(`${params.pollId} Poll not found, ignoring event`)
       return true
     }
-    const { poll, campaign } = data
+    const { poll, organization, campaign } = data
 
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
@@ -87,6 +91,7 @@ export class PollExecutionService {
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
+        organization,
       )
       this.logger.log(
         `${params.pollId} Generated sample of ${sample.length} contacts`,
@@ -97,22 +102,24 @@ export class PollExecutionService {
       })
     }
 
-    const people = await parseCsv<{ id: string }>(csv)
+    const people = await parseCsv<{ id: string; cellPhone?: string }>(csv)
 
     const now = new Date()
     await this.pollsService.client.$transaction(
       async (tx) => {
         for (const person of people) {
-          const message: PollIndividualMessage = {
+          const message: Prisma.PollIndividualMessageUncheckedCreateInput = {
             id: `${poll.id}-${person.id}`,
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
+            personCellPhone: normalizePhoneNumber(person.cellPhone ?? ''),
+            electedOfficeId: poll.electedOfficeId,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
             create: message,
-            update: message,
+            update: { sentAt: now },
           })
         }
       },
@@ -161,7 +168,10 @@ export class PollExecutionService {
       sampleParams: async (poll) => {
         const alreadySent =
           await this.pollsService.client.pollIndividualMessage.findMany({
-            where: { pollId: poll.id },
+            where: {
+              pollId: poll.id,
+              sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+            },
             select: { personId: true },
           })
 
@@ -174,9 +184,9 @@ export class PollExecutionService {
     })
   }
 
-  async getPollAndCampaign(
+  async getPollAndOrganization(
     pollId: string,
-  ): Promise<PollWithCampaign | undefined> {
+  ): Promise<PollWithOrganization | undefined> {
     const poll = await this.pollsService.findUnique({
       where: { id: pollId },
     })
@@ -190,12 +200,20 @@ export class PollExecutionService {
       return
     }
 
-    const office = await this.electedOfficeService.findUnique({
-      where: { id: poll.electedOfficeId },
-    })
+    const office =
+      await this.electedOfficeService.client.electedOffice.findUnique({
+        where: { id: poll.electedOfficeId },
+        include: { organization: true },
+      })
 
     if (!office) {
       this.logger.log('Elected office not found, ignoring event')
+      return
+    }
+
+    const organization = office.organization
+    if (!organization) {
+      this.logger.log('Elected office has no organization, ignoring event')
       return
     }
 
@@ -208,7 +226,7 @@ export class PollExecutionService {
       this.logger.log('No campaign found, ignoring event')
       return
     }
-    return { poll, office, campaign }
+    return { poll, office, organization, campaign }
   }
 
   csvEscape(value: string | number | null | undefined): string {

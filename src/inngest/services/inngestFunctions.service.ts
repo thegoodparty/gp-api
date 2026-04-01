@@ -3,8 +3,9 @@ import { InngestFunction } from 'inngest'
 import { inngest } from '../inngest.client'
 import { PollExecutionService } from 'src/polls/services/pollExecution.service'
 import parseCsv from 'neat-csv'
-import { PollIndividualMessage } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { sendTevynAPIPollMessage } from '@/polls/utils/polls.utils'
+import { normalizePhoneNumber } from '@/shared/util/strings.util'
 import { format, isBefore } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 
@@ -34,12 +35,13 @@ export class InngestFunctionsService {
 
         this.logger.log(`Processing poll creation for pollId: ${pollId}`)
 
-        const data = await this.pollExecutionService.getPollAndCampaign(pollId)
+        const data =
+          await this.pollExecutionService.getPollAndOrganization(pollId)
         if (!data) {
           this.logger.log(`${pollId} Poll not found, ignoring event`)
           return { success: true, pollId }
         }
-        const { poll, campaign } = data
+        const { poll, organization, campaign } = data
 
         const user = await this.pollExecutionService.usersService.findUnique({
           where: { id: campaign.userId },
@@ -77,6 +79,7 @@ export class InngestFunctionsService {
               await this.pollExecutionService.contactsService.sampleContacts(
                 { size: poll.targetAudienceSize },
                 campaign,
+                organization,
               )
             this.logger.log(
               `${pollId} Generated sample of ${sample.length} contacts`,
@@ -96,22 +99,27 @@ export class InngestFunctionsService {
         })
 
         await step.run('parse-csv-and-create-messages', async () => {
-          const people = await parseCsv<{ id: string }>(csv)
+          const people = await parseCsv<{ id: string; cellPhone?: string }>(csv)
 
           const now = new Date()
           await this.pollExecutionService.pollsService.client.$transaction(
             async (tx) => {
               for (const person of people) {
-                const message: PollIndividualMessage = {
-                  id: `${poll.id}-${person.id}`,
-                  pollId: poll.id,
-                  personId: person.id!,
-                  sentAt: now,
-                }
+                const message: Prisma.PollIndividualMessageUncheckedCreateInput =
+                  {
+                    id: `${poll.id}-${person.id}`,
+                    pollId: poll.id,
+                    personId: person.id!,
+                    sentAt: now,
+                    personCellPhone: normalizePhoneNumber(
+                      person.cellPhone ?? '',
+                    ),
+                    electedOfficeId: poll.electedOfficeId,
+                  }
                 await tx.pollIndividualMessage.upsert({
                   where: { id: message.id },
                   create: message,
-                  update: message,
+                  update: { sentAt: now },
                 })
               }
             },
