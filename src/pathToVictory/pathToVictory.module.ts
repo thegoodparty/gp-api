@@ -9,7 +9,6 @@ import { OrganizationsModule } from '../organizations/organizations.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { VotersModule } from '../voters/voters.module'
 import { PathToVictoryController } from './pathToVictory.controller'
-import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { OfficeMatchService } from './services/officeMatch.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
 import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
@@ -29,15 +28,9 @@ import { ClerkClientProvider } from '@/authentication/providers/clerk-client.pro
   providers: [
     PathToVictoryService,
     OfficeMatchService,
-    EnqueuePathToVictoryService,
     BallotReadyService,
     ClerkClientProvider,
   ],
-  exports: [
-    PathToVictoryService,
-    OfficeMatchService,
-    EnqueuePathToVictoryService,
-    BallotReadyService,
-  ],
+  exports: [PathToVictoryService, OfficeMatchService, BallotReadyService],
 })
 export class PathToVictoryModule {}
