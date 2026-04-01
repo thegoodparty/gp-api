@@ -1,10 +1,8 @@
 import { TcrCompliance } from '@prisma/client'
-import type { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import z from 'zod'
 
 export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
-  PATH_TO_VICTORY = 'pathToVictory',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
   GENERATE_TASKS = 'generateTasks',
   DOMAIN_EMAIL_FORWARDING = 'domainEmailForwarding',
@@ -16,7 +14,6 @@ export enum QueueType {
 
 export type QueueMessage =
   | { type: QueueType.GENERATE_AI_CONTENT; data: GenerateAiContentMessageData }
-  | { type: QueueType.PATH_TO_VICTORY; data: PathToVictoryInput }
   | {
       type: QueueType.TCR_COMPLIANCE_STATUS_CHECK
       data: TcrComplianceStatusCheckMessage
