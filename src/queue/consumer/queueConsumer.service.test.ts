@@ -1340,4 +1340,26 @@ describe('QueueConsumerService.handleMessageBatch', () => {
 
     expect(result.map((m) => m.MessageId)).toEqual(['no-group-2'])
   })
+
+  it('does not crash when a group throws an unexpected error', async () => {
+    vi.spyOn(service, 'handleMessageAndMaybeRequeue').mockImplementation(
+      async (msg) => {
+        if (msg.MessageId === 'a1') throw new Error('unexpected crash')
+        return false
+      },
+    )
+
+    const messages = [
+      makeSqsMessage('a1', 'group-a'),
+      makeSqsMessage('b1', 'group-b'),
+      makeSqsMessage('b2', 'group-b'),
+    ]
+
+    const result = await service.handleMessageBatch(messages)
+
+    expect(result.map((m) => m.MessageId)).toEqual(
+      expect.arrayContaining(['b1', 'b2']),
+    )
+    expect(result.map((m) => m.MessageId)).not.toContain('a1')
+  })
 })

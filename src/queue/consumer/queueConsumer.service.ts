@@ -14,7 +14,7 @@ import {
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -125,7 +125,7 @@ export class QueueConsumerService {
     const groups = Object.values(
       groupBy(messages, (m) => m.Attributes?.MessageGroupId ?? randomUUID()),
     )
-    const results = await Promise.all(
+    const results = await Promise.allSettled(
       groups.map(async (group) => {
         const processed: Message[] = []
         for (const message of group) {
@@ -136,7 +136,15 @@ export class QueueConsumerService {
         return processed
       }),
     )
-    return results.flat()
+    return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+  }
+
+  @SqsConsumerEventHandler(process.env.SQS_QUEUE || '', 'error')
+  onError(error: Error, message: Message | Message[] | undefined) {
+    this.logger.error(
+      { error: serializeError(error), message },
+      'SQS consumer error',
+    )
   }
 
   // Function to process message and decide if requeue is necessary
