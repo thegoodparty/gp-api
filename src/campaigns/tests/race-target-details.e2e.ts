@@ -11,11 +11,12 @@ import { updateCampaignWithRetry } from '../../../e2e-tests/utils/request.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 
 test.describe('Campaigns - Race Target Details', () => {
-  const testUsers: Array<{ id: number; token: string }> = []
+  let currentUser: { id: number; token: string } | undefined
 
-  test.afterAll(async ({ request }) => {
-    for (const { id, token } of testUsers) {
-      await deleteUser(request, id, token)
+  test.afterEach(async ({ request }) => {
+    if (currentUser) {
+      await deleteUser(request, currentUser.id, currentUser.token)
+      currentUser = undefined
     }
   })
 
@@ -37,10 +38,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({
+    currentUser = {
       id: registerResponse.user.id,
       token: registerResponse.token,
-    })
+    }
 
     const updateResponse = await updateCampaignWithRetry(
       request,
@@ -77,10 +78,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({
+    currentUser = {
       id: registerResponse.user.id,
       token: registerResponse.token,
-    })
+    }
 
     await updateCampaignWithRetry(request, registerResponse.token, {
       details: {
@@ -141,10 +142,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({
+    currentUser = {
       id: registerResponse.user.id,
       token: registerResponse.token,
-    })
+    }
 
     await updateCampaignWithRetry(request, registerResponse.token, {
       details: {
@@ -186,16 +187,17 @@ test.describe('Campaigns - Race Target Details', () => {
 test.describe('Campaigns - Race Target Details (Admin)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
-  const testUsers: Array<{ id: number; token: string }> = []
+  let currentUser: { id: number; token: string } | undefined
   let testSlug: string
 
   test.beforeAll(() => {
     test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
   })
 
-  test.afterAll(async ({ request }) => {
-    for (const { id, token } of testUsers) {
-      await deleteUser(request, id, token)
+  test.afterEach(async ({ request }) => {
+    if (currentUser) {
+      await deleteUser(request, currentUser.id, currentUser.token)
+      currentUser = undefined
     }
   })
 
@@ -217,10 +219,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({
+    currentUser = {
       id: registerResponse.user.id,
       token: registerResponse.token,
-    })
+    }
     testSlug = registerResponse.campaign.slug
 
     await updateCampaignWithRetry(request, registerResponse.token, {
@@ -275,10 +277,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({
+    currentUser = {
       id: registerResponse.user.id,
       token: registerResponse.token,
-    })
+    }
     testSlug = registerResponse.campaign.slug
 
     await updateCampaignWithRetry(request, registerResponse.token, {
