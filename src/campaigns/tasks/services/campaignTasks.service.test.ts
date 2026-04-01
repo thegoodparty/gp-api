@@ -341,7 +341,7 @@ describe('CampaignTasksService', () => {
         updateHistoryId: null,
       })
       const updatedTask = { ...task, completed: false }
-      mockModel.findFirst.mockResolvedValue(task)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
       mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
 
       const result = await service.unCompleteTask(makeCampaign(), 'task-1')
@@ -354,7 +354,7 @@ describe('CampaignTasksService', () => {
     })
 
     it('throws NotFoundException when task not found', async () => {
-      mockModel.findFirst.mockResolvedValue(null)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(null)
 
       await expect(
         service.unCompleteTask(makeCampaign(), 'missing'),
@@ -363,7 +363,7 @@ describe('CampaignTasksService', () => {
 
     it('returns task as-is when already uncompleted', async () => {
       const task = makeDbTask({ completed: false })
-      mockModel.findFirst.mockResolvedValue(task)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
       mockTxModel.update = vi.fn()
 
       const result = await service.unCompleteTask(makeCampaign(), 'task-1')
@@ -382,7 +382,7 @@ describe('CampaignTasksService', () => {
         completed: false,
         updateHistoryId: null,
       }
-      mockModel.findFirst.mockResolvedValue(task)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
       mockCampaignUpdateHistoryModel.findUniqueOrThrow.mockResolvedValue({
         id: 42,
         type: CampaignUpdateHistoryType.doorKnocking,
@@ -427,7 +427,7 @@ describe('CampaignTasksService', () => {
         completed: true,
         updateHistoryId: 42,
       })
-      mockModel.findFirst.mockResolvedValue(task)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
       mockCampaignUpdateHistoryModel.findUniqueOrThrow.mockResolvedValue({
         id: 42,
         type: CampaignUpdateHistoryType.text,

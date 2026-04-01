@@ -141,24 +141,24 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async unCompleteTask({ id: campaignId }: Campaign, id: string) {
-    const task = await this.model.findFirst({
-      where: { campaignId, id },
-    })
-    if (!task) {
-      throw new NotFoundException(`Task ${id} not found`)
-    }
-    if (!task.completed) {
-      return task
-    }
-
-    const history = task.updateHistoryId
-      ? await this.client.campaignUpdateHistory.findUniqueOrThrow({
-          where: { id: task.updateHistoryId },
-          select: { id: true, type: true, quantity: true },
-        })
-      : null
-
     return this.client.$transaction(async (tx) => {
+      const task = await tx.campaignTask.findFirst({
+        where: { campaignId, id },
+      })
+      if (!task) {
+        throw new NotFoundException(`Task ${id} not found`)
+      }
+      if (!task.completed) {
+        return task
+      }
+
+      const history = task.updateHistoryId
+        ? await tx.campaignUpdateHistory.findUniqueOrThrow({
+            where: { id: task.updateHistoryId },
+            select: { id: true, type: true, quantity: true },
+          })
+        : null
+
       if (history) {
         const campaign = await tx.campaign.findUniqueOrThrow({
           where: { id: campaignId },
