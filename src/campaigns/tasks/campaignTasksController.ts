@@ -10,19 +10,16 @@ import {
   Post,
   Put,
   Sse,
-  UsePipes,
 } from '@nestjs/common'
 import { Observable } from 'rxjs'
-import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { CampaignWithPathToVictory } from '../campaigns.types'
-import { CompleteTaskBodySchema } from './schemas/completeTaskBody.schema'
+import { completeTaskBodySchema } from './schemas/completeTaskBody.schema'
 
 @Controller('campaigns/tasks')
 @UseCampaign({ include: { pathToVictory: true } })
-@UsePipes(ZodValidationPipe)
 export class CampaignTasksController {
   constructor(private readonly tasksService: CampaignTasksService) {}
 
@@ -35,9 +32,13 @@ export class CampaignTasksController {
   async completeTask(
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Param('id') id: string,
-    @Body() body?: CompleteTaskBodySchema,
+    @Body() body?: Record<string, unknown>,
   ) {
-    return this.tasksService.completeTask(campaign, id, body)
+    const voterContact =
+      body && Object.keys(body).length > 0
+        ? completeTaskBodySchema.parse(body)
+        : undefined
+    return this.tasksService.completeTask(campaign, id, voterContact)
   }
 
   @Delete('complete/:id')
