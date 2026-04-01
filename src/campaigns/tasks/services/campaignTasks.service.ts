@@ -28,6 +28,7 @@ import { CampaignTask } from '../campaignTasks.types'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
+import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
@@ -82,46 +83,114 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async completeTask({ id: campaignId }: Campaign, id: string) {
-    const task = await this.model.findFirst({
-      where: {
-        campaignId,
-        id,
-      },
-    })
-    if (!task) {
-      throw new NotFoundException(`Task ${id} not found`)
-    }
+  async completeTask(
+    { id: campaignId, userId }: Campaign,
+    id: string,
+    voterContact?: CompleteTaskBodySchema,
+  ) {
+    return this.client.$transaction(async (tx) => {
+      const task = await tx.campaignTask.findFirst({
+        where: { campaignId, id },
+      })
+      if (!task) {
+        throw new NotFoundException(`Task ${id} not found`)
+      }
+      if (task.completed) {
+        return task
+      }
 
-    return this.model.update({
-      where: {
-        id: task.id,
-      },
-      data: {
-        completed: true,
-      },
+      let updateHistoryId: number | undefined
+
+      if (voterContact) {
+        const history = await tx.campaignUpdateHistory.create({
+          data: {
+            type: voterContact.type,
+            quantity: voterContact.quantity,
+            campaignId,
+            userId,
+          },
+        })
+        updateHistoryId = history.id
+
+        const campaign = await tx.campaign.findUniqueOrThrow({
+          where: { id: campaignId },
+        })
+        const { data } = campaign
+        const reportedVoterGoals = (data.reportedVoterGoals || {}) as Record<
+          string,
+          number
+        >
+        reportedVoterGoals[voterContact.type] =
+          (reportedVoterGoals[voterContact.type] || 0) + voterContact.quantity
+        data.reportedVoterGoals = { ...reportedVoterGoals }
+
+        await tx.campaign.update({
+          where: { id: campaignId },
+          data: { data },
+        })
+      }
+
+      return tx.campaignTask.update({
+        where: { id: task.id },
+        data: {
+          completed: true,
+          ...(updateHistoryId !== undefined && { updateHistoryId }),
+        },
+      })
     })
   }
 
   async unCompleteTask({ id: campaignId }: Campaign, id: string) {
     const task = await this.model.findFirst({
-      where: {
-        campaignId,
-        id,
-      },
+      where: { campaignId, id },
     })
-
     if (!task) {
       throw new NotFoundException(`Task ${id} not found`)
     }
+    if (!task.completed) {
+      return task
+    }
 
-    return this.model.update({
-      where: {
-        id: task.id,
-      },
-      data: {
-        completed: false,
-      },
+    const history = task.updateHistoryId
+      ? await this.client.campaignUpdateHistory.findUniqueOrThrow({
+          where: { id: task.updateHistoryId },
+          select: { id: true, type: true, quantity: true },
+        })
+      : null
+
+    return this.client.$transaction(async (tx) => {
+      if (history) {
+        const campaign = await tx.campaign.findUniqueOrThrow({
+          where: { id: campaignId },
+        })
+        const { data } = campaign
+        const reportedVoterGoals = (data.reportedVoterGoals || {}) as Record<
+          string,
+          number
+        >
+        reportedVoterGoals[history.type] = Math.max(
+          (reportedVoterGoals[history.type] || 0) - history.quantity,
+          0,
+        )
+        data.reportedVoterGoals = { ...reportedVoterGoals }
+
+        await tx.campaign.update({
+          where: { id: campaignId },
+          data: { data },
+        })
+
+        await tx.campaignUpdateHistory.delete({
+          where: { id: history.id },
+        })
+      }
+
+      return tx.campaignTask.update({
+        where: { id: task.id },
+        data: {
+          completed: false,
+          updateHistoryId: null,
+        },
+      })
     })
   }
 
