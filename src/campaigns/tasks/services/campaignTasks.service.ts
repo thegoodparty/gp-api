@@ -32,6 +32,7 @@ import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
+const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
 const MAX_TASK_WINDOW_DAYS = 49
 const SHORTENED_WINDOW_BUFFER_DAYS = 7
 const FULL_WINDOW_THRESHOLD_DAYS = 56
@@ -102,6 +103,7 @@ export class CampaignTasksService extends createPrismaBase(
       let updateHistoryId: number | undefined
 
       if (voterContact) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOTER_GOALS_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
         const history = await tx.campaignUpdateHistory.create({
           data: {
             type: voterContact.type,
@@ -160,6 +162,7 @@ export class CampaignTasksService extends createPrismaBase(
         : null
 
       if (history) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOTER_GOALS_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
         const campaign = await tx.campaign.findUniqueOrThrow({
           where: { id: campaignId },
         })

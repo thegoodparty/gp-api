@@ -43,13 +43,14 @@ const mockCampaignModel = {
   update: vi.fn(),
 }
 
+const mockExecuteRaw = vi.fn()
 const mockTransaction = vi.fn(
   async (callback: (tx: unknown) => Promise<unknown>) => {
     return callback({
       campaignTask: mockTxModel,
       campaignUpdateHistory: mockCampaignUpdateHistoryModel,
       campaign: mockCampaignModel,
-      $executeRaw: vi.fn(),
+      $executeRaw: mockExecuteRaw,
     })
   },
 )
@@ -172,6 +173,7 @@ describe('CampaignTasksService', () => {
 
       const result = await service.completeTask(makeCampaign(), 'task-1')
 
+      expect(mockExecuteRaw).not.toHaveBeenCalled()
       expect(mockTxModel.update).toHaveBeenCalledWith({
         where: { id: 'task-1' },
         data: { completed: true },
@@ -227,6 +229,7 @@ describe('CampaignTasksService', () => {
         quantity: 10,
       })
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockCampaignUpdateHistoryModel.create).toHaveBeenCalledWith({
         data: {
           type: CampaignUpdateHistoryType.doorKnocking,
@@ -346,6 +349,7 @@ describe('CampaignTasksService', () => {
 
       const result = await service.unCompleteTask(makeCampaign(), 'task-1')
 
+      expect(mockExecuteRaw).not.toHaveBeenCalled()
       expect(mockTxModel.update).toHaveBeenCalledWith({
         where: { id: 'task-1' },
         data: { completed: false, updateHistoryId: null },
@@ -402,6 +406,7 @@ describe('CampaignTasksService', () => {
 
       const result = await service.unCompleteTask(makeCampaign(), 'task-1')
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockCampaignModel.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {
