@@ -22,6 +22,7 @@ model CampaignUpdateHistory {
   userId     Int                       @map("user_id")
   type       CampaignUpdateHistoryType
   quantity   Int
+  campaignTask CampaignTask?
 
   @@index([campaignId])
   @@map("campaign_update_history")
