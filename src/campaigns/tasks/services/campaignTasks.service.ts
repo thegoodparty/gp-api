@@ -90,6 +90,10 @@ export class CampaignTasksService extends createPrismaBase(
     voterContact?: CompleteTaskBodySchema,
   ) {
     return this.client.$transaction(async (tx) => {
+      if (voterContact) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOTER_GOALS_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
+      }
+
       const task = await tx.campaignTask.findFirst({
         where: { campaignId, id },
       })
@@ -103,7 +107,6 @@ export class CampaignTasksService extends createPrismaBase(
       let updateHistoryId: number | undefined
 
       if (voterContact) {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOTER_GOALS_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
         const history = await tx.campaignUpdateHistory.create({
           data: {
             type: voterContact.type,
