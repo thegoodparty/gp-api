@@ -2,9 +2,7 @@ import { addBusinessDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { QueueType } from 'src/queue/queue.types'
-import { pollMessageGroup } from '../utils/polls.utils'
+import { TemporalService } from 'src/temporal/services/temporal.service'
 import { APIPollStatus, derivePollStatus } from '../polls.types'
 
 type PollCreateInput = Omit<
@@ -19,7 +17,7 @@ const estimatedCompletionDate = (scheduledDate: Date | string) =>
 
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(private readonly queueProducer: QueueProducerService) {
+  constructor(private readonly temporalService: TemporalService) {
     super()
   }
 
@@ -30,10 +28,9 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
         estimatedCompletionDate: estimatedCompletionDate(input.scheduledDate),
       },
     })
-    await this.queueProducer.sendMessage(
-      { type: QueueType.POLL_CREATION, data: { pollId: poll.id } },
-      pollMessageGroup(poll.id),
-    )
+    if (process.env.NODE_ENV !== 'test') {
+      await this.temporalService.startPollCreation(poll.id)
+    }
 
     return poll
   }
@@ -106,10 +103,9 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
       },
     )
 
-    await this.queueProducer.sendMessage(
-      { type: QueueType.POLL_EXPANSION, data: { pollId: params.pollId } },
-      pollMessageGroup(params.pollId),
-    )
+    if (process.env.NODE_ENV !== 'test') {
+      await this.temporalService.startPollExpansion(params.pollId)
+    }
 
     return result
   }

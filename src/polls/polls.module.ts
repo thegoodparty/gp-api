@@ -5,7 +5,8 @@ import { LlmModule } from 'src/llm/llm.module'
 import { PaymentsModule } from 'src/payments/payments.module'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PurchaseService } from 'src/payments/services/purchase.service'
-import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
+import { forwardRef } from '@nestjs/common'
+import { TemporalModule } from '@/temporal/temporal.module'
 import { UsersModule } from 'src/users/users.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { PollsController } from './polls.controller'
@@ -22,7 +23,7 @@ import { OrganizationsModule } from '@/organizations/organizations.module'
   imports: [
     ElectedOfficeModule,
     PaymentsModule,
-    QueueProducerModule,
+    forwardRef(() => TemporalModule),
     UsersModule,
     CampaignsModule,
     AwsModule,

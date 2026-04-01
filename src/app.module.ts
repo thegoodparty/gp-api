@@ -40,6 +40,7 @@ import { VotersModule } from '@/voters/voters.module'
 import { WebsitesModule } from '@/websites/websites.module'
 import { Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { TemporalModule } from '@/temporal/temporal.module'
 import { ScheduleModule } from '@nestjs/schedule'
 import { loggerModule } from './observability/logging/logger-module'
 
@@ -78,6 +79,7 @@ import { loggerModule } from './observability/logging/logger-module'
     PollsModule,
     ElectedOfficeModule,
     OrganizationsModule,
+    TemporalModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.
