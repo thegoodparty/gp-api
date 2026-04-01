@@ -1,10 +1,3 @@
-import { QueueType } from 'src/queue/queue.types'
-
-export interface PathToVictoryQueueMessage {
-  type: QueueType.PATH_TO_VICTORY
-  data: PathToVictoryInput
-}
-
 export interface PathToVictoryInput {
   slug: string
   campaignId: string

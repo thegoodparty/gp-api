@@ -5,11 +5,8 @@ import { QueueProducerService } from '../../queue/producer/queueProducer.service
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
-import {
-  PathToVictoryInput,
-  PathToVictoryQueueMessage,
-} from '../types/pathToVictory.types'
-import { MessageGroup, QueueType } from '../../queue/queue.types'
+import { PathToVictoryInput } from '../types/pathToVictory.types'
+import { MessageGroup } from '../../queue/queue.types'
 import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
@@ -48,7 +45,9 @@ export class EnqueuePathToVictoryService {
 
       const slug = campaign.slug
       const details = campaign.details as PrismaJson.CampaignDetails
-      let queueMessage: PathToVictoryQueueMessage | undefined
+      let queueMessage:
+        | { type: 'pathToVictory'; data: PathToVictoryInput }
+        | undefined
 
       if (details?.raceId) {
         this.logger.debug(
@@ -73,7 +72,7 @@ export class EnqueuePathToVictoryService {
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
-          type: QueueType.PATH_TO_VICTORY,
+          type: 'pathToVictory',
           // GraphQL race data spread into typed input — BallotReady types fields as any
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           data: {
