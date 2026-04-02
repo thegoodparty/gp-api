@@ -269,12 +269,10 @@ describe('AiCampaignManagerIntegrationService', () => {
         } as PathToVictory,
       })
       mockModel.findUnique.mockResolvedValue(null)
-      vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mockResolvedValue({ session_id: 'session-1' })
-      vi.mocked(
-        mockAiManager.waitForCompletion!,
-      ).mockResolvedValue({
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 'session-1',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
         progress: 100,
         status: 'completed',
         message: 'Done',
@@ -290,13 +288,12 @@ describe('AiCampaignManagerIntegrationService', () => {
       vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(
         makePlanResponse(),
       )
-      mockModel.create.mockResolvedValue({})
+      mockModel.upsert.mockResolvedValue({})
 
       await service.generateCampaignTasks(campaign)
 
-      const request = vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mock.calls[0][0]
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
 
       expect(request.seats_available).toBe(1)
     })
@@ -327,12 +324,10 @@ describe('AiCampaignManagerIntegrationService', () => {
         } as PathToVictory,
       })
       mockModel.findUnique.mockResolvedValue(null)
-      vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mockResolvedValue({ session_id: 'session-1' })
-      vi.mocked(
-        mockAiManager.waitForCompletion!,
-      ).mockResolvedValue({
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 'session-1',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
         progress: 100,
         status: 'completed',
         message: 'Done',
@@ -348,13 +343,12 @@ describe('AiCampaignManagerIntegrationService', () => {
       vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(
         makePlanResponse(),
       )
-      mockModel.create.mockResolvedValue({})
+      mockModel.upsert.mockResolvedValue({})
 
       await service.generateCampaignTasks(campaign)
 
-      const request = vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mock.calls[0][0]
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
 
       expect(request.seats_available).toBe(3)
     })
