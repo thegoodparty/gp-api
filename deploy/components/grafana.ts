@@ -252,7 +252,11 @@ export const createGrafanaResources = async ({
     enabled: true,
     frequency: 60000,
     timeout: 10000,
-    probes: [probes['Atlanta'], probes['NewYork'], probes['SanFrancisco']],
+    probes: [
+      probes['NorthCalifornia'],
+      probes['NorthVirginia'],
+      probes['Ohio'],
+    ],
     labels: {
       environment,
       alert_slug: 'health-check',
