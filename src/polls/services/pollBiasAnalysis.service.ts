@@ -14,6 +14,7 @@ import {
 import {
   BiasAnalysisInputSchema,
   BiasAnalysisResponse,
+  POLL_BIAS_MODELS,
 } from '../types/pollBias.types'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { convertSubstringsToIndices } from '../utils/pollBiasSpan.util'
@@ -57,7 +58,7 @@ export class PollBiasAnalysisService {
               temperature: 0.2,
               maxTokens: 512,
               userId,
-              models: ['Qwen/Qwen3.5-397B-A17B', 'MiniMaxAI/MiniMax-M2.5'],
+              models: POLL_BIAS_MODELS,
             })
           const result = await this.braintrust.traced(
             'poll-bias-analysis',

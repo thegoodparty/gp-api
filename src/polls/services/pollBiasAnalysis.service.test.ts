@@ -5,6 +5,7 @@ import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { PollBiasAnalysisService } from './pollBiasAnalysis.service'
+import { POLL_BIAS_MODELS } from '../types/pollBias.types'
 
 vi.mock('src/llm/services/llm.service')
 vi.mock('src/vendors/braintrust/braintrust.service')
@@ -118,7 +119,7 @@ describe('PollBiasAnalysisService', () => {
         temperature: 0.2,
         maxTokens: 512,
         userId: 'user-123',
-        models: ['Qwen/Qwen3.5-397B-A17B', 'MiniMaxAI/MiniMax-M2.5'],
+        models: POLL_BIAS_MODELS,
       })
     })
 
