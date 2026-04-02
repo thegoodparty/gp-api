@@ -412,7 +412,7 @@ export = async () => {
   })
 
   if (environment !== 'preview') {
-    createGrafanaResources({ environment, domain })
+    await createGrafanaResources({ environment, domain })
   }
 
   return {

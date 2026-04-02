@@ -119,7 +119,7 @@ const setupStack = async (env: string) => {
   run(`pulumi config set imageUri ${imageUri}`)
   run('pulumi config set grafana:url https://goodparty.grafana.net')
   run(
-    'pulumi config set grafana:smUrl https://synthetic-monitoring-api-us-east-0.grafana.net',
+    'pulumi config set grafana:smUrl https://synthetic-monitoring-api-us-east-3.grafana.net',
   )
   if (env === 'preview') {
     run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`)

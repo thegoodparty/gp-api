@@ -21,7 +21,7 @@ const datasourceConfig = {
   metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
 } as const
 
-export const createGrafanaResources = ({
+export const createGrafanaResources = async ({
   environment,
   domain,
 }: GrafanaConfig) => {
@@ -244,7 +244,7 @@ export const createGrafanaResources = ({
     })
   }
 
-  const probes = grafana.syntheticMonitoring.getProbes()
+  const { probes } = await grafana.syntheticmonitoring.getProbes()
 
   new grafana.syntheticmonitoring.Check('health-check', {
     job: `gp-api-${environment}-health`,
@@ -252,14 +252,10 @@ export const createGrafanaResources = ({
     enabled: true,
     frequency: 60000,
     timeout: 10000,
-    probes: [
-      probes.then((p) => p.probes['Atlanta']),
-      probes.then((p) => p.probes['Chicago']),
-      probes.then((p) => p.probes['NewYork']),
-    ],
+    probes: [probes['Atlanta'], probes['NewYork'], probes['SanFrancisco']],
     labels: {
-      service: 'gp-api',
-      env: environment,
+      environment,
+      alert_slug: 'health-check',
     },
     settings: {
       http: {
@@ -269,6 +265,6 @@ export const createGrafanaResources = ({
         failIfNotSsl: true,
       },
     },
-    alertSensitivity: 'medium',
+    alertSensitivity: 'high',
   })
 }
