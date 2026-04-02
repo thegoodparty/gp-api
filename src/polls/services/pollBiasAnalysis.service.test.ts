@@ -118,10 +118,7 @@ describe('PollBiasAnalysisService', () => {
         temperature: 0.2,
         maxTokens: 512,
         userId: 'user-123',
-        models: [
-          'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
-          'Qwen/Qwen3-235B-A22B-fp8-tput',
-        ],
+        models: ['Qwen/Qwen3.5-397B-A17B', 'MiniMaxAI/MiniMax-M2.5'],
       })
     })
 
