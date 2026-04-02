@@ -9,7 +9,6 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { GenerationStatus } from './aiContent.types'
-import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import {
   MessageGroup,
   QueueMessage,
@@ -135,12 +134,10 @@ export class AiContentService {
       createdAt: new Date().valueOf(),
     }
 
-    await this.slack.message(
-      {
-        body: JSON.stringify(aiContent.generationStatus),
-      },
-      SlackChannel.botDev,
-    )
+    await this.slack.aiMessage({
+      message: 'Generation status update',
+      error: aiContent.generationStatus,
+    })
 
     try {
       this.logger.info(aiContent)
@@ -200,14 +197,10 @@ export class AiContentService {
       aiContent.generationStatus?.[key] || {}
 
     if (!aiContent || !prompt) {
-      await this.slack.message(
-        {
-          body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
-            campaign?.id
-          }. message: ${JSON.stringify(message)}`,
-        },
-        SlackChannel.botDev,
-      )
+      await this.slack.errorMessage({
+        message: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${campaign?.id}`,
+        error: message,
+      })
       throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)
     }
 

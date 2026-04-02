@@ -88,7 +88,7 @@ export class AiService {
     if (models.length === 0) {
       await this.slack.message(
         {
-          body: `AI Models are not configured. Please specify AI models.`,
+          text: `AI Models are not configured. Please specify AI models.`,
         },
         SlackChannel.botDev,
       )
@@ -157,51 +157,47 @@ export class AiService {
       }
     })
 
-    let completion: BaseMessage | undefined
+    let completion: BaseMessage
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
     } catch (error) {
-      this.logger.error({ err: error }, 'Error in utils/ai/llmChatCompletion')
-      const errorResponse =
-        error instanceof Error && 'response' in error
-          ? error.response
-          : undefined
-      this.logger.error({ response: errorResponse }, 'error response')
-
+      this.logger.error({ err: error }, 'Error in llmChatCompletion')
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
         error,
       })
+      throw error
     }
 
-    if (completion && completion?.content) {
-      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      let content = completion.content as string
-      if (content.includes('```html')) {
-        content = content.match(/```html([\s\S]*?)```/)![1]
-      }
-      content = content.replace('/n', '<br/><br/>')
+    if (!completion?.content) {
+      const err = new Error(
+        'AI model returned empty content — possible reasoning-only model or token limit exhausted',
+      )
+      this.logger.error(err.message)
+      throw err
+    }
 
-      // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
-      const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
-      const totalTokens =
-        tokenUsage &&
-        typeof tokenUsage === 'object' &&
-        'totalTokens' in tokenUsage &&
-        typeof tokenUsage.totalTokens === 'number'
-          ? tokenUsage.totalTokens
-          : 0
+    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    let content = completion.content as string
+    if (content.includes('```html')) {
+      content = content.match(/```html([\s\S]*?)```/)![1]
+    }
+    content = content.replace('/n', '<br/><br/>')
 
-      return {
-        content,
-        tokens: totalTokens,
-      }
-    } else {
-      return {
-        content: '',
-        tokens: 0,
-      }
+    // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
+    const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
+    const totalTokens =
+      tokenUsage &&
+      typeof tokenUsage === 'object' &&
+      'totalTokens' in tokenUsage &&
+      typeof tokenUsage.totalTokens === 'number'
+        ? tokenUsage.totalTokens
+        : 0
+
+    return {
+      content,
+      tokens: totalTokens,
     }
   }
 
@@ -348,72 +344,59 @@ export class AiService {
     temperature = 0.7,
     topP = 0.1,
   }: GetAssistantCompletionArgs) {
-    try {
-      if (!assistantId || !systemPrompt) {
-        this.logger.info('missing assistantId or systemPrompt')
-        this.logger.info({ assistantId }, 'assistantId')
-        this.logger.info({ systemPrompt }, 'systemPrompt')
-        return
-      }
+    if (!assistantId || !systemPrompt) {
+      throw new Error(
+        `Missing required params: assistantId=${assistantId}, systemPrompt=${!!systemPrompt}`,
+      )
+    }
 
-      if (!threadId) {
-        this.logger.info('missing threadId')
-        return
-      }
+    if (!threadId) {
+      throw new Error('Missing threadId for assistant completion')
+    }
 
-      this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
+    this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
 
-      let messages: AiChatMessage[] = []
+    let messages: AiChatMessage[] = []
+    messages.push({
+      content: systemPrompt + '\n' + candidateContext,
+      role: 'system',
+      createdAt: new Date().valueOf(),
+      id: crypto.randomUUID(),
+    })
+
+    if (existingMessages) {
+      messages.push(...existingMessages)
+    }
+
+    if (messageId) {
+      this.logger.info({ messageId }, 'deleting message')
+      messages = messages.filter((m) => m.id !== messageId)
+    } else {
       messages.push({
-        content: systemPrompt + '\n' + candidateContext,
-        role: 'system',
+        content: message.content,
+        role: 'user',
         createdAt: new Date().valueOf(),
         id: crypto.randomUUID(),
       })
-
-      if (existingMessages) {
-        messages.push(...existingMessages)
-      }
-
-      if (messageId) {
-        this.logger.info({ messageId }, 'deleting message')
-        messages = messages.filter((m) => m.id !== messageId)
-      } else {
-        messages.push({
-          content: message.content,
-          role: 'user',
-          createdAt: new Date().valueOf(),
-          id: crypto.randomUUID(),
-        })
-      }
-
-      this.logger.info({ messages }, 'messages')
-
-      const result = await this.llmChatCompletion(
-        messages,
-        500,
-        temperature,
-        topP,
-      )
-
-      return {
-        content: result?.content,
-        threadId,
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        createdAt: new Date().valueOf(),
-        usage: result?.tokens,
-      }
-    } catch (error) {
-      this.logger.info({ error }, 'error')
-      await this.slack.message(
-        {
-          body: `Error in getAssistantCompletion. Error: ${error}`,
-        },
-        SlackChannel.botDev,
-      )
     }
-    return
+
+    this.logger.info({ messages }, 'messages')
+
+    const result = await this.llmChatCompletion(
+      messages,
+      500,
+      temperature,
+      topP,
+    )
+
+    return {
+      content: result.content,
+      threadId,
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      createdAt: new Date().valueOf(),
+      usage: result.tokens,
+    }
   }
   /** function to replace placeholder tokens in ai content prompt */
   async promptReplace(
