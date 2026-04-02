@@ -6,8 +6,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import {
-  Campaign,
-  PathToVictory,
   Poll,
   PollIndividualMessageSender,
   Prisma,
@@ -29,10 +27,6 @@ import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import {
@@ -43,9 +37,7 @@ import { OrganizationsService } from 'src/organizations/services/organizations.s
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
 import { normalizePhoneNumber } from '../../shared/util/strings.util'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
@@ -100,7 +92,6 @@ export class QueueConsumerService {
   constructor(
     private readonly aiContentService: AiContentService,
     private readonly slackService: SlackService,
-    private readonly pathToVictoryService: PathToVictoryService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly campaignTasksService: CampaignTasksService,
@@ -263,12 +254,6 @@ export class QueueConsumerService {
             )
             throw error
           }
-          return true
-        })
-      case QueueType.PATH_TO_VICTORY:
-        this.logger.info('received pathToVictory message')
-        return await this.withLegacyErrorSwallowing(message, async () => {
-          await this.handlePathToVictoryMessage(queueMessage.data)
           return true
         })
       case QueueType.GENERATE_TASKS:
@@ -475,179 +460,6 @@ export class QueueConsumerService {
       }))
 
     return true
-  }
-
-  private async handlePathToVictoryMessage(
-    message: PathToVictoryInput,
-  ): Promise<boolean> {
-    let p2vSuccess = false
-    let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
-      null
-
-    const {
-      slug,
-      officeName,
-      electionLevel,
-      electionState,
-      subAreaName,
-      subAreaValue,
-      electionDate,
-    } = message
-
-    try {
-      this.logger.debug(
-        `P2V start for slug=${slug}, office="${officeName}", level=${electionLevel}, state=${electionState}, subAreaName=${subAreaName}, subAreaValue=${subAreaValue}, electionDate=${electionDate}`,
-      )
-      const p2vResponse: P2VResponse =
-        await this.pathToVictoryService.handlePathToVictory({
-          ...message,
-        })
-      this.logger.debug(p2vResponse, 'p2vResponse')
-
-      campaign = await this.campaignsService.findUnique({
-        where: { id: Number(message.campaignId) },
-        include: { pathToVictory: true },
-      })
-
-      if (!campaign) {
-        this.logger.error('campaign not found')
-        throw new Error('campaign not found')
-      }
-
-      if (!campaign.pathToVictory) {
-        this.logger.error('pathToVictory not found on campaign')
-        throw new Error('pathToVictory not found on campaign')
-      }
-
-      p2vSuccess = await this.pathToVictoryService.analyzePathToVictoryResponse(
-        {
-          campaign: { ...campaign, pathToVictory: campaign.pathToVictory },
-          pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
-          officeName: p2vResponse.officeName,
-          electionDate: p2vResponse.electionDate,
-          electionTerm: p2vResponse.electionTerm,
-          electionLevel: p2vResponse.electionLevel,
-          electionState: p2vResponse.electionState,
-          electionCounty: p2vResponse.electionCounty || '',
-          electionMunicipality: p2vResponse.electionMunicipality || '',
-          subAreaName: p2vResponse.subAreaName,
-          subAreaValue: p2vResponse.subAreaValue,
-          partisanType: p2vResponse.partisanType,
-          priorElectionDates: p2vResponse.priorElectionDates,
-          positionId: p2vResponse.positionId,
-        },
-      )
-    } catch (e) {
-      this.logger.error(
-        { e },
-        `error in consumer/handlePathToVictoryMessage for slug=${message.slug}, office="${message.officeName}"`,
-      )
-      // Extra structured context for visibility in logs
-      this.logger.error(
-        {
-          slug,
-          officeName,
-          electionLevel,
-          electionState,
-          subAreaName,
-          subAreaValue,
-          electionDate,
-        },
-        'P2V context',
-      )
-      await this.slackService.errorMessage({
-        message: 'error in consumer/handlePathToVictoryMessage',
-        error: {
-          error: e,
-          context: {
-            slug,
-            officeName,
-            electionLevel,
-            electionState,
-            subAreaName,
-            subAreaValue,
-            electionDate,
-          },
-        },
-      })
-    }
-
-    if (p2vSuccess === false && campaign) {
-      this.logger.error(
-        `analyzePathToVictoryResponse returned false; slug=${campaign.slug}`,
-      )
-      const shouldRequeue = await this.handlePathToVictoryFailure(campaign)
-      if (shouldRequeue) {
-        throw new Error('error in consumer/handlePathToVictoryMessage')
-      }
-      // District already matched by gold flow. Don't requeue
-    }
-
-    return true
-  }
-
-  /**
-   * Returns true if the message should be requeued for another attempt,
-   * false if it should be deleted (no more retries needed).
-   */
-  private async handlePathToVictoryFailure(
-    campaign: Campaign,
-  ): Promise<boolean> {
-    const p2v = await this.pathToVictoryService.findUniqueOrThrow({
-      where: { campaignId: campaign.id },
-    })
-
-    let p2vAttempts = 0
-    if (p2v.data.p2vAttempts) {
-      p2vAttempts = p2v.data.p2vAttempts
-    }
-    p2vAttempts += 1
-
-    const existingStatus = p2v.data.p2vStatus
-    const isAlreadyMatched =
-      existingStatus === P2VStatus.districtMatched ||
-      existingStatus === P2VStatus.complete
-    const exhaustedRetries = p2vAttempts >= 3
-    const markAsFailed = exhaustedRetries && !isAlreadyMatched
-
-    if (exhaustedRetries && isAlreadyMatched) {
-      this.logger.info(
-        `P2V silver flow exhausted retries for ${campaign.slug}, but gold flow already set status=${existingStatus}. Keeping existing status.`,
-      )
-    }
-
-    if (markAsFailed) {
-      await this.slackService.message(
-        {
-          body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
-      const blockedStateAttributes = {
-        service: 'gp-api' as const,
-        environment: process.env.NODE_ENV,
-        userId: campaign.userId,
-        campaignId: campaign.id,
-        slug: campaign.slug,
-        feature: 'path_to_victory',
-        rootCause: 'p2v_failed' as const,
-        isBackground: true,
-        p2vAttempts,
-      }
-      recordBlockedStateEvent(blockedStateAttributes)
-    }
-
-    const updateData = {
-      ...p2v.data,
-      p2vAttempts,
-      ...(markAsFailed ? { p2vStatus: P2VStatus.failed } : {}),
-    }
-    await this.pathToVictoryService.update({
-      where: { id: p2v.id },
-      data: { data: updateData },
-    })
-
-    return !exhaustedRetries
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {

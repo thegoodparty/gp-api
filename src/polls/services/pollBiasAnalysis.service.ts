@@ -14,6 +14,7 @@ import {
 import {
   BiasAnalysisInputSchema,
   BiasAnalysisResponse,
+  POLL_BIAS_MODELS,
 } from '../types/pollBias.types'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { convertSubstringsToIndices } from '../utils/pollBiasSpan.util'
@@ -57,10 +58,7 @@ export class PollBiasAnalysisService {
               temperature: 0.2,
               maxTokens: 512,
               userId,
-              models: [
-                'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
-                'Qwen/Qwen3-235B-A22B-fp8-tput',
-              ],
+              models: POLL_BIAS_MODELS,
             })
           const result = await this.braintrust.traced(
             'poll-bias-analysis',
@@ -203,13 +201,16 @@ export class PollBiasAnalysisService {
   }
 
   private isValidationError(error: unknown): boolean {
+    if (error instanceof Error && error.name === 'ZodError') {
+      return true
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error)
 
     return (
+      errorMessage.includes('Model returned invalid JSON') ||
       errorMessage.includes('Failed to parse') ||
-      errorMessage.includes('Invalid response') ||
-      errorMessage.includes('Bias span') ||
-      errorMessage.includes('ZodError')
+      errorMessage.includes('Invalid response')
     )
   }
 }
