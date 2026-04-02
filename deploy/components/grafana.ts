@@ -211,7 +211,10 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           expression: 'B',
           conditions: [
             {
-              evaluator: { type: 'gt', params: [alert.threshold] },
+              evaluator: {
+                type: alert.evaluator ?? 'gt',
+                params: [alert.threshold],
+              },
               operator: { type: 'and' },
               query: { params: ['B'] },
               reducer: { type: 'last', params: [] },

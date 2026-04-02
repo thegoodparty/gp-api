@@ -68,8 +68,9 @@ export const GLOBAL_ALERTS: Alert[] = [
     slug: 'missing-health-check',
     name: 'Missing health check logs',
     type: 'log',
-    expr: 'absent_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Request completed" |= "/v1/health" [2m])',
-    threshold: 0,
+    expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Request completed" |= "/v1/health" [2m]))',
+    threshold: 1,
+    evaluator: 'lt',
     for: '2m',
     message: [
       'No health check requests logged in the last 2 minutes — the service may be down.',
