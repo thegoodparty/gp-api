@@ -5,42 +5,20 @@ import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PathToVictoryService } from './pathToVictory.service'
 
-const mockRecordBlockedStateEvent = vi.fn()
-vi.mock('src/observability/grafana/otel.client', () => ({
-  recordBlockedStateEvent: (...args: unknown[]) =>
-    mockRecordBlockedStateEvent(...args),
-}))
-
 describe('PathToVictoryService', () => {
   let service: PathToVictoryService
   let mockPrisma: {
-    campaign: { findUnique: ReturnType<typeof vi.fn> }
     pathToVictory: {
-      create: ReturnType<typeof vi.fn>
-      update: ReturnType<typeof vi.fn>
-      findUnique: ReturnType<typeof vi.fn>
-      findUniqueOrThrow: ReturnType<typeof vi.fn>
       findMany: ReturnType<typeof vi.fn>
       count: ReturnType<typeof vi.fn>
-    }
-    organization: {
-      update: ReturnType<typeof vi.fn>
     }
   }
 
   beforeEach(async () => {
     mockPrisma = {
-      campaign: { findUnique: vi.fn() },
       pathToVictory: {
-        create: vi.fn(),
-        update: vi.fn(),
-        findUnique: vi.fn(),
-        findUniqueOrThrow: vi.fn(),
         findMany: vi.fn(),
         count: vi.fn(),
-      },
-      organization: {
-        update: vi.fn().mockResolvedValue({}),
       },
     }
 
