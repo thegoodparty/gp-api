@@ -65,19 +65,6 @@ export const GLOBAL_ALERTS: Alert[] = [
     ].join('\n\n'),
   },
   {
-    slug: 'missing-health-check',
-    name: 'Missing health check logs',
-    type: 'log',
-    expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Request completed" |= "/v1/health" [2m])) or vector(0)',
-    threshold: 1,
-    evaluator: 'lt',
-    for: '2m',
-    message: [
-      'No health check requests logged in the last 2 minutes — the service may be down.',
-      'Check the ECS console for task status and recent events. If the task is crashing, click *View in Grafana* to check recent logs for crash output. If the task is running but not logging, investigate network or load balancer connectivity.',
-    ].join('\n\n'),
-  },
-  {
     slug: 'slow-prisma-connections',
     name: 'Slow Prisma connection acquisitions',
     type: 'metric',

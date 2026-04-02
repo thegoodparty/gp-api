@@ -14,6 +14,7 @@ const ssm = new SSM({ region: AWS_REGION })
 
 let PULUMI_CONFIG_PASSPHRASE: string | undefined
 let GRAFANA_AUTH: string | undefined
+let GRAFANA_SM_ACCESS_TOKEN: string | undefined
 
 const getSSMParameter = async (name: string) => {
   const { Parameter } = await ssm.getParameter({
@@ -38,6 +39,7 @@ const run = (cmd: string, opts?: ExecSyncOptions) => {
         AWS_REGION,
         PULUMI_CONFIG_PASSPHRASE,
         GRAFANA_AUTH,
+        GRAFANA_SM_ACCESS_TOKEN,
       },
       ...opts,
     })
@@ -105,6 +107,7 @@ const setupStack = async (env: string) => {
   )
 
   GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
+  GRAFANA_SM_ACCESS_TOKEN = await getSSMParameter('grafana-sm-access-token')
 
   run('pulumi login s3://goodparty-iac-state', {
     // Ignore stdio -- we need the output to be pure JSON for diffs in CI
@@ -115,6 +118,9 @@ const setupStack = async (env: string) => {
   run(`pulumi config set environment ${env}`)
   run(`pulumi config set imageUri ${imageUri}`)
   run('pulumi config set grafana:url https://goodparty.grafana.net')
+  run(
+    'pulumi config set grafana:smUrl https://synthetic-monitoring-api-us-east-0.grafana.net',
+  )
   if (env === 'preview') {
     run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`)
   }

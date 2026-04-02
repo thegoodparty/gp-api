@@ -35,14 +35,10 @@ export type Alert = {
    */
   for: `${number}m`
   /**
-   * The value that `expr` is compared against before the alert starts pending.
+   * The value that `expr` must exceed before the alert starts pending.
    * The unit depends on what your expr returns (e.g. percentage, milliseconds, count).
    */
   threshold: number
-  /**
-   * The comparison operator for the threshold. Defaults to 'gt' (greater than).
-   */
-  evaluator?: 'gt' | 'lt'
   /** A message to include in the Slack notification. */
   message: string
 
