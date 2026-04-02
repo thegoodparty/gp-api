@@ -736,8 +736,10 @@ describe('QueueConsumerService - triggerPollExecution', () => {
   let pollsService: {
     findUnique: ReturnType<typeof vi.fn>
     client: {
-      $transaction: ReturnType<typeof vi.fn>
-      pollIndividualMessage: { findMany: ReturnType<typeof vi.fn> }
+      pollIndividualMessage: {
+        findMany: ReturnType<typeof vi.fn>
+        createMany: ReturnType<typeof vi.fn>
+      }
     }
   }
   let electedOfficeService: {
@@ -754,7 +756,6 @@ describe('QueueConsumerService - triggerPollExecution', () => {
     uploadFile: ReturnType<typeof vi.fn>
   }
   let usersService: { findUnique: ReturnType<typeof vi.fn> }
-  let mockUpsert: ReturnType<typeof vi.fn>
 
   const pollId = 'poll-456'
   const electedOfficeId = 'office-1'
@@ -774,21 +775,13 @@ describe('QueueConsumerService - triggerPollExecution', () => {
 
   beforeEach(() => {
     vi.stubEnv('TEVYN_POLL_CSVS_BUCKET', 'test-csv-bucket')
-    mockUpsert = vi.fn().mockResolvedValue(undefined)
 
     pollsService = {
       findUnique: vi.fn().mockResolvedValue(makePoll()),
       client: {
-        $transaction: vi
-          .fn()
-          .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-            const mockTx = {
-              pollIndividualMessage: { upsert: mockUpsert },
-            }
-            return fn(mockTx)
-          }),
         pollIndividualMessage: {
           findMany: vi.fn().mockResolvedValue([]),
+          createMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
       },
     }
@@ -881,15 +874,21 @@ describe('QueueConsumerService - triggerPollExecution', () => {
 
     await service.processMessage(message)
 
-    expect(mockUpsert).toHaveBeenCalledTimes(2)
-    for (const call of mockUpsert.mock.calls) {
-      const createData = call[0].create
-      expect(createData).toMatchObject({
-        pollId,
-        electedOfficeId,
-      })
-      expect(createData.personCellPhone).toMatch(/^\+1\d{10}$/)
-    }
+    expect(
+      pollsService.client.pollIndividualMessage.createMany,
+    ).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          pollId,
+          electedOfficeId,
+          personCellPhone: expect.stringMatching(/^\+1\d{10}$/),
+        }),
+      ]),
+      skipDuplicates: true,
+    })
+    const { data } =
+      pollsService.client.pollIndividualMessage.createMany.mock.calls[0][0]
+    expect(data).toHaveLength(2)
   })
 
   it('handlePollExpansion only counts ELECTED_OFFICIAL records for alreadySent', async () => {
