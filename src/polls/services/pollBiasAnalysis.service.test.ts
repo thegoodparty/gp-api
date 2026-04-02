@@ -207,7 +207,9 @@ describe('PollBiasAnalysisService', () => {
     it('retries on validation errors', async () => {
       vi.useFakeTimers()
 
-      const validationError = new Error('ZodError: validation failed')
+      const validationError = new Error(
+        'Model returned invalid JSON for test-model',
+      )
       const successResponse = {
         object: {
           bias_spans: [],
@@ -343,13 +345,6 @@ describe('PollBiasAnalysisService', () => {
         }
       })
 
-      const validationErrorMessages = [
-        'Failed to parse JSON',
-        'Invalid response format',
-        'Bias span validation failed',
-        'ZodError: schema validation',
-      ]
-
       const successResponse = {
         object: {
           bias_spans: [],
@@ -360,7 +355,13 @@ describe('PollBiasAnalysisService', () => {
         model: 'model1',
       }
 
-      for (const errorMessage of validationErrorMessages) {
+      const messageErrors = [
+        'Model returned invalid JSON for test-model',
+        'Failed to parse JSON',
+        'Invalid response format',
+      ]
+
+      for (const errorMessage of messageErrors) {
         const error = new Error(errorMessage)
         llmService.jsonCompletion.mockClear()
         llmService.jsonCompletion.mockRejectedValueOnce(error)
@@ -372,6 +373,18 @@ describe('PollBiasAnalysisService', () => {
 
         expect(result.rewritten_text).toBe('Success')
       }
+
+      const zodError = new Error('[{"code":"invalid_type"}]')
+      zodError.name = 'ZodError'
+      llmService.jsonCompletion.mockClear()
+      llmService.jsonCompletion.mockRejectedValueOnce(zodError)
+      llmService.jsonCompletion.mockResolvedValueOnce(successResponse)
+
+      const resultPromise = service.analyzePollText('test')
+      await vi.runAllTimersAsync()
+      const result = await resultPromise
+
+      expect(result.rewritten_text).toBe('Success')
 
       vi.useRealTimers()
     })

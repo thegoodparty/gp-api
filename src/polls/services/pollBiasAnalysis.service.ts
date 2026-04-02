@@ -201,13 +201,16 @@ export class PollBiasAnalysisService {
   }
 
   private isValidationError(error: unknown): boolean {
+    if (error instanceof Error && error.name === 'ZodError') {
+      return true
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error)
 
     return (
+      errorMessage.includes('Model returned invalid JSON') ||
       errorMessage.includes('Failed to parse') ||
-      errorMessage.includes('Invalid response') ||
-      errorMessage.includes('Bias span') ||
-      errorMessage.includes('ZodError')
+      errorMessage.includes('Invalid response')
     )
   }
 }
