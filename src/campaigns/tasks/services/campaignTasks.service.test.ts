@@ -6,6 +6,7 @@ import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { CampaignUpdateHistoryType } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignTask } from '../campaignTasks.types'
@@ -20,6 +21,8 @@ const mockTxModel = {
   deleteMany: vi.fn(),
   createMany: vi.fn(),
   count: vi.fn(),
+  findFirst: vi.fn(),
+  update: vi.fn(),
 }
 
 const mockModel = {
@@ -29,11 +32,25 @@ const mockModel = {
   createMany: vi.fn(),
 }
 
+const mockCampaignUpdateHistoryModel = {
+  create: vi.fn(),
+  delete: vi.fn(),
+  findUniqueOrThrow: vi.fn(),
+}
+
+const mockCampaignModel = {
+  findUniqueOrThrow: vi.fn(),
+  update: vi.fn(),
+}
+
+const mockExecuteRaw = vi.fn()
 const mockTransaction = vi.fn(
   async (callback: (tx: unknown) => Promise<unknown>) => {
     return callback({
       campaignTask: mockTxModel,
-      $executeRaw: vi.fn(),
+      campaignUpdateHistory: mockCampaignUpdateHistoryModel,
+      campaign: mockCampaignModel,
+      $executeRaw: mockExecuteRaw,
     })
   },
 )
@@ -99,6 +116,7 @@ describe('CampaignTasksService', () => {
     Object.defineProperty(service, '_prisma', {
       get: () => ({
         campaignTask: mockModel,
+        campaignUpdateHistory: mockCampaignUpdateHistoryModel,
         $transaction: mockTransaction,
       }),
       configurable: true,
@@ -147,15 +165,16 @@ describe('CampaignTasksService', () => {
   })
 
   describe('completeTask', () => {
-    it('marks task as completed', async () => {
+    it('marks task as completed without voter contact', async () => {
       const task = makeDbTask()
       const updatedTask = { ...task, completed: true }
-      mockModel.findFirst.mockResolvedValue(task)
-      mockModel.update.mockResolvedValue(updatedTask)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
 
       const result = await service.completeTask(makeCampaign(), 'task-1')
 
-      expect(mockModel.update).toHaveBeenCalledWith({
+      expect(mockExecuteRaw).not.toHaveBeenCalled()
+      expect(mockTxModel.update).toHaveBeenCalledWith({
         where: { id: 'task-1' },
         data: { completed: true },
       })
@@ -163,36 +182,289 @@ describe('CampaignTasksService', () => {
     })
 
     it('throws NotFoundException when task not found', async () => {
-      mockModel.findFirst.mockResolvedValue(null)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(null)
 
       await expect(
         service.completeTask(makeCampaign(), 'missing'),
       ).rejects.toThrow(NotFoundException)
     })
+
+    it('returns task as-is when already completed', async () => {
+      const task = makeDbTask({ completed: true })
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn()
+
+      const result = await service.completeTask(makeCampaign(), 'task-1')
+
+      expect(result).toEqual(task)
+      expect(mockTxModel.update).not.toHaveBeenCalled()
+    })
+
+    it('creates update history and increments voter goals when voterContact provided', async () => {
+      const task = makeDbTask({
+        flowType: CampaignUpdateHistoryType.doorKnocking,
+      })
+      const updatedTask = {
+        ...task,
+        completed: true,
+        updateHistoryId: 42,
+      }
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
+      mockCampaignUpdateHistoryModel.create.mockResolvedValue({
+        id: 42,
+      })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: {
+          reportedVoterGoals: {
+            [CampaignUpdateHistoryType.doorKnocking]: 5,
+          },
+        },
+      })
+      mockCampaignModel.update.mockResolvedValue({})
+
+      const result = await service.completeTask(makeCampaign(), 'task-1', {
+        type: CampaignUpdateHistoryType.doorKnocking,
+        quantity: 10,
+      })
+
+      expect(mockExecuteRaw).toHaveBeenCalled()
+      expect(mockCampaignUpdateHistoryModel.create).toHaveBeenCalledWith({
+        data: {
+          type: CampaignUpdateHistoryType.doorKnocking,
+          quantity: 10,
+          campaignId: 1,
+          userId: 123,
+        },
+      })
+      expect(mockCampaignModel.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: {
+            reportedVoterGoals: {
+              [CampaignUpdateHistoryType.doorKnocking]: 15,
+            },
+          },
+        },
+      })
+      expect(mockTxModel.update).toHaveBeenCalledWith({
+        where: { id: 'task-1' },
+        data: { completed: true, updateHistoryId: 42 },
+      })
+      expect(result).toEqual(updatedTask)
+    })
+
+    it('initializes reportedVoterGoals when none exist yet', async () => {
+      const task = makeDbTask({
+        flowType: CampaignUpdateHistoryType.text,
+      })
+      const updatedTask = {
+        ...task,
+        completed: true,
+        updateHistoryId: 99,
+      }
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
+      mockCampaignUpdateHistoryModel.create.mockResolvedValue({
+        id: 99,
+      })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: {},
+      })
+      mockCampaignModel.update.mockResolvedValue({})
+
+      const result = await service.completeTask(makeCampaign(), 'task-1', {
+        type: CampaignUpdateHistoryType.text,
+        quantity: 5,
+      })
+
+      expect(mockCampaignModel.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: {
+            reportedVoterGoals: {
+              [CampaignUpdateHistoryType.text]: 5,
+            },
+          },
+        },
+      })
+      expect(result).toEqual(updatedTask)
+    })
+
+    it('adds new type key when reportedVoterGoals exists but lacks the type', async () => {
+      const task = makeDbTask({
+        flowType: CampaignUpdateHistoryType.phoneBanking,
+      })
+      const updatedTask = {
+        ...task,
+        completed: true,
+        updateHistoryId: 77,
+      }
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
+      mockCampaignUpdateHistoryModel.create.mockResolvedValue({
+        id: 77,
+      })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: {
+          reportedVoterGoals: {
+            [CampaignUpdateHistoryType.doorKnocking]: 10,
+          },
+        },
+      })
+      mockCampaignModel.update.mockResolvedValue({})
+
+      const result = await service.completeTask(makeCampaign(), 'task-1', {
+        type: CampaignUpdateHistoryType.phoneBanking,
+        quantity: 3,
+      })
+
+      expect(mockCampaignModel.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: {
+            reportedVoterGoals: {
+              [CampaignUpdateHistoryType.doorKnocking]: 10,
+              [CampaignUpdateHistoryType.phoneBanking]: 3,
+            },
+          },
+        },
+      })
+      expect(result).toEqual(updatedTask)
+    })
   })
 
   describe('unCompleteTask', () => {
-    it('marks task as uncompleted', async () => {
-      const task = makeDbTask({ completed: true })
+    it('marks task as uncompleted without history', async () => {
+      const task = makeDbTask({
+        completed: true,
+        updateHistoryId: null,
+      })
       const updatedTask = { ...task, completed: false }
-      mockModel.findFirst.mockResolvedValue(task)
-      mockModel.update.mockResolvedValue(updatedTask)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
 
       const result = await service.unCompleteTask(makeCampaign(), 'task-1')
 
-      expect(mockModel.update).toHaveBeenCalledWith({
+      expect(mockExecuteRaw).not.toHaveBeenCalled()
+      expect(mockTxModel.update).toHaveBeenCalledWith({
         where: { id: 'task-1' },
-        data: { completed: false },
+        data: { completed: false, updateHistoryId: null },
       })
       expect(result).toEqual(updatedTask)
     })
 
     it('throws NotFoundException when task not found', async () => {
-      mockModel.findFirst.mockResolvedValue(null)
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(null)
 
       await expect(
         service.unCompleteTask(makeCampaign(), 'missing'),
       ).rejects.toThrow(NotFoundException)
+    })
+
+    it('returns task as-is when already uncompleted', async () => {
+      const task = makeDbTask({ completed: false })
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockTxModel.update = vi.fn()
+
+      const result = await service.unCompleteTask(makeCampaign(), 'task-1')
+
+      expect(result).toEqual(task)
+      expect(mockTxModel.update).not.toHaveBeenCalled()
+    })
+
+    it('deletes history and decrements voter goals when history exists', async () => {
+      const task = makeDbTask({
+        completed: true,
+        updateHistoryId: 42,
+      })
+      const updatedTask = {
+        ...task,
+        completed: false,
+        updateHistoryId: null,
+      }
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockCampaignUpdateHistoryModel.findUniqueOrThrow.mockResolvedValue({
+        id: 42,
+        type: CampaignUpdateHistoryType.doorKnocking,
+        quantity: 10,
+      })
+      mockTxModel.update = vi.fn().mockResolvedValue(updatedTask)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: {
+          reportedVoterGoals: {
+            [CampaignUpdateHistoryType.doorKnocking]: 15,
+          },
+        },
+      })
+      mockCampaignModel.update.mockResolvedValue({})
+      mockCampaignUpdateHistoryModel.delete.mockResolvedValue({})
+
+      const result = await service.unCompleteTask(makeCampaign(), 'task-1')
+
+      expect(mockExecuteRaw).toHaveBeenCalled()
+      expect(mockCampaignModel.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: {
+            reportedVoterGoals: {
+              [CampaignUpdateHistoryType.doorKnocking]: 5,
+            },
+          },
+        },
+      })
+      expect(mockCampaignUpdateHistoryModel.delete).toHaveBeenCalledWith({
+        where: { id: 42 },
+      })
+      expect(mockTxModel.update).toHaveBeenCalledWith({
+        where: { id: 'task-1' },
+        data: { completed: false, updateHistoryId: null },
+      })
+      expect(result).toEqual(updatedTask)
+    })
+
+    it('floors voter goals at 0 when decrementing', async () => {
+      const task = makeDbTask({
+        completed: true,
+        updateHistoryId: 42,
+      })
+      mockTxModel.findFirst = vi.fn().mockResolvedValue(task)
+      mockCampaignUpdateHistoryModel.findUniqueOrThrow.mockResolvedValue({
+        id: 42,
+        type: CampaignUpdateHistoryType.text,
+        quantity: 100,
+      })
+      mockTxModel.update = vi.fn().mockResolvedValue({
+        ...task,
+        completed: false,
+      })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: {
+          reportedVoterGoals: {
+            [CampaignUpdateHistoryType.text]: 5,
+          },
+        },
+      })
+      mockCampaignModel.update.mockResolvedValue({})
+      mockCampaignUpdateHistoryModel.delete.mockResolvedValue({})
+
+      await service.unCompleteTask(makeCampaign(), 'task-1')
+
+      expect(mockCampaignModel.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: {
+            reportedVoterGoals: {
+              [CampaignUpdateHistoryType.text]: 0,
+            },
+          },
+        },
+      })
     })
   })
 

@@ -27,7 +27,7 @@ import {
   FEATURE_FLAG_CHECKER,
 } from './services/campaigns.service'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
-import { CampaignTasksController } from './tasks/campaignTasksController'
+import { CampaignTasksController } from './tasks/campaignTasks.controller'
 import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
 import { LegacyCampaignTasksService } from './tasks/legacy/services/legacyCampaignTasks.service'
 import { CampaignTasksService } from './tasks/services/campaignTasks.service'

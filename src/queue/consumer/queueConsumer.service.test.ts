@@ -8,8 +8,6 @@ import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
-import { P2VStatus } from '@/elections/types/pathToVictory.types'
-import { PathToVictoryService } from '@/pathToVictory/services/pathToVictory.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { PollIssuesService } from '@/polls/services/pollIssues.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -31,27 +29,6 @@ vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
   ...(await importOriginal()),
   sendTevynAPIPollMessage: vi.fn(),
 }))
-
-const mockRecordBlockedStateEvent = vi.fn()
-vi.mock('src/observability/grafana/otel.client', () => ({
-  recordBlockedStateEvent: (...args: unknown[]) =>
-    mockRecordBlockedStateEvent(...args),
-}))
-
-const makeCampaign = (slug = 'test-slug') => ({
-  id: 1,
-  userId: 10,
-  slug,
-})
-
-const makeP2V = (overrides: Record<string, unknown> = {}) => ({
-  id: 100,
-  data: {
-    p2vAttempts: 0,
-    p2vStatus: P2VStatus.waiting,
-    ...overrides,
-  },
-})
 
 const createPollAnalysisCompleteMessage = (data: {
   pollId: string
@@ -228,7 +205,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never,
       {} as never,
       {} as never,
       analytics as unknown as AnalyticsService,
@@ -753,202 +729,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(deleteWhere.id.in).toHaveLength(1)
     expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalled()
   })
-
-  describe('QueueConsumerService - P2V handling', () => {
-    let service: QueueConsumerService
-    let mockP2vService: {
-      handlePathToVictory: ReturnType<typeof vi.fn>
-      analyzePathToVictoryResponse: ReturnType<typeof vi.fn>
-      findUniqueOrThrow: ReturnType<typeof vi.fn>
-      update: ReturnType<typeof vi.fn>
-    }
-    let mockSlack: {
-      message: ReturnType<typeof vi.fn>
-      errorMessage: ReturnType<typeof vi.fn>
-      formattedMessage: ReturnType<typeof vi.fn>
-    }
-    let mockCampaigns: {
-      findUnique: ReturnType<typeof vi.fn>
-      findUniqueOrThrow: ReturnType<typeof vi.fn>
-    }
-
-    beforeEach(async () => {
-      mockP2vService = {
-        handlePathToVictory: vi.fn(),
-        analyzePathToVictoryResponse: vi.fn(),
-        findUniqueOrThrow: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
-      }
-      mockSlack = {
-        message: vi.fn().mockResolvedValue(undefined),
-        errorMessage: vi.fn().mockResolvedValue(undefined),
-        formattedMessage: vi.fn().mockResolvedValue(undefined),
-      }
-      mockCampaigns = {
-        findUnique: vi.fn(),
-        findUniqueOrThrow: vi.fn(),
-      }
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          QueueConsumerService,
-          { provide: PinoLogger, useValue: createMockLogger() },
-          { provide: AiContentService, useValue: {} },
-          { provide: SlackService, useValue: mockSlack },
-          { provide: PathToVictoryService, useValue: mockP2vService },
-          {
-            provide: AnalyticsService,
-            useValue: {
-              track: vi.fn().mockResolvedValue(undefined),
-              identify: vi.fn().mockResolvedValue(undefined),
-            },
-          },
-          { provide: CampaignsService, useValue: mockCampaigns },
-          { provide: CampaignTasksService, useValue: {} },
-          { provide: CampaignTcrComplianceService, useValue: {} },
-          { provide: DomainsService, useValue: {} },
-          { provide: PollsService, useValue: {} },
-          { provide: PollIssuesService, useValue: {} },
-          { provide: PollIndividualMessageService, useValue: {} },
-          { provide: ElectedOfficeService, useValue: {} },
-          { provide: ContactsService, useValue: {} },
-          { provide: S3Service, useValue: {} },
-          { provide: UsersService, useValue: {} },
-          { provide: OrganizationsService, useValue: {} },
-        ],
-      }).compile()
-
-      service = module.get<QueueConsumerService>(QueueConsumerService)
-
-      const mockLogger = createMockLogger()
-      Object.defineProperty(service, 'logger', {
-        get: () => mockLogger,
-        configurable: true,
-      })
-
-      vi.clearAllMocks()
-    })
-
-    describe('handlePathToVictoryFailure', () => {
-      let handleFailure: (
-        campaign: ReturnType<typeof makeCampaign>,
-      ) => Promise<boolean>
-
-      beforeEach(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handleFailure = (service as any).handlePathToVictoryFailure.bind(
-          service,
-        )
-      })
-
-      it('returns true (requeue) and increments p2vAttempts when < 3 attempts', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 1, p2vStatus: P2VStatus.districtMatched }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(true)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(2)
-        // Should NOT mark as failed or send Slack
-        expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
-        expect(mockSlack.message).not.toHaveBeenCalled()
-      })
-
-      it('returns false and marks Failed when exhausted retries and status is Waiting', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.waiting }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(false)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(3)
-        expect(updateData.p2vStatus).toBe(P2VStatus.failed)
-        expect(mockSlack.message).toHaveBeenCalled()
-        expect(mockRecordBlockedStateEvent).toHaveBeenCalled()
-      })
-
-      it('returns false and preserves DistrictMatched when exhausted retries', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.districtMatched }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(false)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(3)
-        // Status preserved — gold's DistrictMatched is NOT overwritten to Failed
-        expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
-        expect(mockSlack.message).not.toHaveBeenCalled()
-        expect(mockRecordBlockedStateEvent).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('handlePathToVictoryMessage (via processMessage)', () => {
-      const makeQueueMessage = () => ({
-        Body: JSON.stringify({
-          type: 'pathToVictory',
-          data: {
-            slug: 'test-slug',
-            campaignId: '1',
-            officeName: 'City Council',
-            electionDate: '2024-11-05',
-            electionTerm: 4,
-            electionLevel: 'local',
-            electionState: 'CA',
-            electionCounty: 'Los Angeles',
-            electionMunicipality: 'Los Angeles',
-            partisanType: 'nonpartisan',
-            priorElectionDates: [],
-          },
-        }),
-      })
-
-      const mockP2VResponse = {
-        slug: 'test-slug',
-        pathToVictoryResponse: {
-          electionType: '',
-          electionLocation: '',
-          district: '',
-          counts: { projectedTurnout: 0, winNumber: 0, voterContactGoal: 0 },
-        },
-        officeName: 'City Council',
-        electionDate: '2024-11-05',
-        electionTerm: 4,
-        electionLevel: 'local',
-        electionState: 'CA',
-        electionCounty: 'Los Angeles',
-        electionMunicipality: 'Los Angeles',
-        partisanType: 'nonpartisan',
-        priorElectionDates: [],
-      }
-
-      it('does not throw when failure handler returns false (already matched)', async () => {
-        mockP2vService.handlePathToVictory.mockResolvedValue(mockP2VResponse)
-        mockCampaigns.findUnique.mockResolvedValue({
-          ...makeCampaign(),
-          pathToVictory: { id: 100, data: {} },
-        })
-        mockP2vService.analyzePathToVictoryResponse.mockResolvedValue(false)
-        // handlePathToVictoryFailure returns false (don't requeue)
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({
-            p2vAttempts: 2,
-            p2vStatus: P2VStatus.districtMatched,
-          }),
-        )
-
-        // withLegacyErrorSwallowing: no throw → returns true (message processed)
-        const result = await service.processMessage(makeQueueMessage() as never)
-
-        expect(result).toBe(true)
-      })
-    })
-  })
 })
 
 describe('QueueConsumerService - triggerPollExecution', () => {
@@ -1074,7 +854,6 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       { client: {} } as never,
       {} as never,
-      {} as never,
       campaignsService as never,
       {} as never,
       {} as never,
@@ -1180,7 +959,6 @@ describe('QueueConsumerService - message type routing', () => {
         { provide: DomainsService, useValue: {} },
         { provide: ElectedOfficeService, useValue: {} },
         { provide: OrganizationsService, useValue: {} },
-        { provide: PathToVictoryService, useValue: {} },
         { provide: PollIndividualMessageService, useValue: { client: {} } },
         { provide: PollIssuesService, useValue: {} },
         { provide: PollsService, useValue: {} },
