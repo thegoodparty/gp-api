@@ -6,7 +6,7 @@
  * a real TOGETHER_AI_KEY to run (e.g. in a nightly or pre-deploy CI job).
  */
 import { describe, expect, it } from 'vitest'
-import { POLL_BIAS_MODELS } from 'src/polls/services/pollBiasAnalysis.service'
+import { POLL_BIAS_MODELS } from 'src/polls/types/pollBias.types'
 
 const TOGETHER_AI_KEY = process.env.TOGETHER_AI_KEY
 const AI_MODELS = process.env.AI_MODELS
