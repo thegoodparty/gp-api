@@ -809,29 +809,23 @@ export class QueueConsumerService {
     const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
     // 2. Create individual poll messages
+    // IDs are deterministic (`pollId-personId`) so re-processing the same CSV
+    // is safe: skipDuplicates silently ignores rows that already exist.
     const now = new Date()
-    await this.pollsService.client.$transaction(
-      async (tx) => {
-        for (const person of people) {
-          const message: Prisma.PollIndividualMessageUncheckedCreateInput = {
-            // It's important that this id be deterministic, so that we can safely re-upsert
-            // a previous CSV.
-            id: `${poll.id}-${person.id}`,
-            pollId: poll.id,
-            personId: person.id!,
-            sentAt: now,
-            personCellPhone: normalizePhoneNumber(person.cellPhone),
-            electedOfficeId: poll.electedOfficeId,
-          }
-          await tx.pollIndividualMessage.upsert({
-            where: { id: message.id },
-            create: message,
-            update: { sentAt: now },
-          })
-        }
-      },
-      { timeout: 10000 },
+    const messages: Prisma.PollIndividualMessageCreateManyInput[] = people.map(
+      (person) => ({
+        id: `${poll.id}-${person.id}`,
+        pollId: poll.id,
+        personId: person.id!,
+        sentAt: now,
+        personCellPhone: normalizePhoneNumber(person.cellPhone),
+        electedOfficeId: poll.electedOfficeId,
+      }),
     )
+    await this.pollsService.client.pollIndividualMessage.createMany({
+      data: messages,
+      skipDuplicates: true,
+    })
 
     this.logger.info(`${params.pollId} Created individual poll messages`)
 
