@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignTasksController } from './campaignTasksController'
+import { CampaignTasksController } from './campaignTasks.controller'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { CampaignTaskType, CampaignUpdateHistoryType } from '@prisma/client'
 import { CampaignWithPathToVictory } from '../campaigns.types'
