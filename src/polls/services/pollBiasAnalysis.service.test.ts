@@ -5,6 +5,7 @@ import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { PollBiasAnalysisService } from './pollBiasAnalysis.service'
+import { POLL_BIAS_MODELS } from '../types/pollBias.types'
 
 vi.mock('src/llm/services/llm.service')
 vi.mock('src/vendors/braintrust/braintrust.service')
@@ -118,10 +119,7 @@ describe('PollBiasAnalysisService', () => {
         temperature: 0.2,
         maxTokens: 512,
         userId: 'user-123',
-        models: [
-          'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
-          'Qwen/Qwen3-235B-A22B-fp8-tput',
-        ],
+        models: POLL_BIAS_MODELS,
       })
     })
 
@@ -209,7 +207,9 @@ describe('PollBiasAnalysisService', () => {
     it('retries on validation errors', async () => {
       vi.useFakeTimers()
 
-      const validationError = new Error('ZodError: validation failed')
+      const validationError = new Error(
+        'Model returned invalid JSON for test-model',
+      )
       const successResponse = {
         object: {
           bias_spans: [],
@@ -345,13 +345,6 @@ describe('PollBiasAnalysisService', () => {
         }
       })
 
-      const validationErrorMessages = [
-        'Failed to parse JSON',
-        'Invalid response format',
-        'Bias span validation failed',
-        'ZodError: schema validation',
-      ]
-
       const successResponse = {
         object: {
           bias_spans: [],
@@ -362,7 +355,13 @@ describe('PollBiasAnalysisService', () => {
         model: 'model1',
       }
 
-      for (const errorMessage of validationErrorMessages) {
+      const messageErrors = [
+        'Model returned invalid JSON for test-model',
+        'Failed to parse JSON',
+        'Invalid response format',
+      ]
+
+      for (const errorMessage of messageErrors) {
         const error = new Error(errorMessage)
         llmService.jsonCompletion.mockClear()
         llmService.jsonCompletion.mockRejectedValueOnce(error)
@@ -374,6 +373,18 @@ describe('PollBiasAnalysisService', () => {
 
         expect(result.rewritten_text).toBe('Success')
       }
+
+      const zodError = new Error('[{"code":"invalid_type"}]')
+      zodError.name = 'ZodError'
+      llmService.jsonCompletion.mockClear()
+      llmService.jsonCompletion.mockRejectedValueOnce(zodError)
+      llmService.jsonCompletion.mockResolvedValueOnce(successResponse)
+
+      const resultPromise = service.analyzePollText('test')
+      await vi.runAllTimersAsync()
+      const result = await resultPromise
+
+      expect(result.rewritten_text).toBe('Success')
 
       vi.useRealTimers()
     })
