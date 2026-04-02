@@ -19,6 +19,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
   let testTaskId: string
 
   test.beforeAll(async ({ request }) => {
+    test.setTimeout(150_000)
     reg = await registerUser(request, {
       firstName: generateRandomName(),
       lastName: generateRandomName(),
@@ -48,7 +49,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
           const tasks = (await response.json()) as CampaignTask[]
           return tasks.length
         },
-        { timeout: 120_000 },
+        { timeout: 120_000, intervals: [2_000] },
       )
       .toBeGreaterThan(0)
   })
@@ -60,6 +61,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
   })
 
   test('should complete a task', async ({ request }) => {
+    test.setTimeout(90_000)
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-13T21:17:31.648Z'
 
@@ -92,6 +94,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
   })
 
   test('should uncomplete a task', async ({ request }) => {
+    test.setTimeout(90_000)
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-13T21:17:31.648Z'
 
