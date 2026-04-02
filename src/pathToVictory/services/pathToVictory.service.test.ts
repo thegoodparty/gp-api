@@ -325,18 +325,11 @@ describe('PathToVictoryService', () => {
 
       expect(writtenData.p2vStatus).toBe('Complete')
       expect(writtenData.source).toBe('GpApi')
-      expect(writtenData.projectedTurnout).toBe(500)
-      expect(writtenData.winNumber).toBe(251)
-      expect(writtenData.voterContactGoal).toBe(1255)
     })
 
-    it('infers DistrictMatched when existing record has district data but status is Waiting', async () => {
+    it('does not infer DistrictMatched when existing status is Waiting (rank too low)', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
-        makeCampaign({
-          p2vStatus: P2VStatus.waiting,
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
-        }),
+        makeCampaign({ p2vStatus: P2VStatus.waiting }),
       )
       mockPrisma.pathToVictory.update.mockResolvedValue({})
 
@@ -348,16 +341,14 @@ describe('PathToVictoryService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             data: expect.objectContaining({
-              p2vStatus: P2VStatus.districtMatched,
+              p2vStatus: P2VStatus.waiting,
             }),
           }),
         }),
       )
     })
 
-    it('keeps electionType/electionLocation when office changed and writes sentinel turnout values', async () => {
-      // Scenario: candidate had complete P2V, switches office, gold flow
-      // matches a district but finds no turnout (sentinel -1 values)
+    it('strips viability and resets p2vAttempts when office changed', async () => {
       const sentinelResponse = {
         counts: {
           projectedTurnout: -1,
@@ -371,12 +362,9 @@ describe('PathToVictoryService', () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({
           p2vStatus: P2VStatus.complete,
-          projectedTurnout: 500,
-          winNumber: 251,
-          voterContactGoal: 1255,
           p2vAttempts: 2,
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
+          viability: 'Viable',
+          averageTurnout: 42,
           officeContextFingerprint: 'old-fingerprint',
         }),
       )
@@ -390,23 +378,13 @@ describe('PathToVictoryService', () => {
       const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
       const writtenData = updateCall.data.data
 
-      // New district data should overwrite old
-      expect(writtenData.electionType).toBe('State_Senate')
-      expect(writtenData.electionLocation).toBe('STATE SENATE 010')
-      // Stale turnout should be replaced with sentinel -1 values,
-      // not left absent — so the record explicitly reflects "no turnout found"
-      expect(writtenData.projectedTurnout).toBe(-1)
-      expect(writtenData.winNumber).toBe(-1)
-      expect(writtenData.voterContactGoal).toBe(-1)
-      // p2vAttempts should be reset to 0 because office changed
       expect(writtenData.p2vAttempts).toBe(0)
-      // New fingerprint should be set
+      expect(writtenData.viability).toBeUndefined()
+      expect(writtenData.averageTurnout).toBe(42)
       expect(writtenData.officeContextFingerprint).toBe('new-fingerprint')
     })
 
-    it('overwrites turnout with sentinel -1 when same office but turnout no longer available', async () => {
-      // Scenario: same office, previously had turnout, now gold flow returns
-      // district match but no turnout (sentinel -1). Should overwrite stale turnout.
+    it('preserves viability when same office fingerprint (no stripping)', async () => {
       const sentinelResponse = {
         counts: {
           projectedTurnout: -1,
@@ -420,11 +398,7 @@ describe('PathToVictoryService', () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({
           p2vStatus: P2VStatus.complete,
-          projectedTurnout: 500,
-          winNumber: 251,
-          voterContactGoal: 1255,
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
+          viability: 'Viable',
           officeContextFingerprint: 'same-fingerprint',
         }),
       )
@@ -438,16 +412,14 @@ describe('PathToVictoryService', () => {
       const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
       const writtenData = updateCall.data.data
 
-      expect(writtenData.projectedTurnout).toBe(-1)
-      expect(writtenData.winNumber).toBe(-1)
-      expect(writtenData.voterContactGoal).toBe(-1)
+      expect(writtenData.viability).toBe('Viable')
     })
 
-    it('does not overwrite district when incoming has empty values', async () => {
+    it('preserves existing data when incoming response has empty values', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
+          p2vStatus: P2VStatus.districtMatched,
+          averageTurnout: 42,
         }),
       )
       mockPrisma.pathToVictory.update.mockResolvedValue({})
@@ -457,30 +429,26 @@ describe('PathToVictoryService', () => {
       const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
       const writtenData = updateCall.data.data
 
-      // Existing district data should remain from baseData spread
-      expect(writtenData.electionType).toBe('State_House')
-      expect(writtenData.electionLocation).toBe('STATE HOUSE 005')
+      expect(writtenData.averageTurnout).toBe(42)
+      expect(writtenData.p2vStatus).toBe(P2VStatus.districtMatched)
     })
 
-    it('does not overwrite turnout when incoming has zero values', async () => {
+    it('written data does not contain legacy turnout or district fields', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
-        makeCampaign({
-          projectedTurnout: 500,
-          winNumber: 251,
-          voterContactGoal: 1255,
-        }),
+        makeCampaign({ p2vStatus: P2VStatus.waiting }),
       )
       mockPrisma.pathToVictory.update.mockResolvedValue({})
 
-      await service.completePathToVictory('test-slug', emptyResponse)
+      await service.completePathToVictory('test-slug', responseWithTurnout)
 
       const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
       const writtenData = updateCall.data.data
 
-      // Existing turnout data should remain from baseData spread
-      expect(writtenData.projectedTurnout).toBe(500)
-      expect(writtenData.winNumber).toBe(251)
-      expect(writtenData.voterContactGoal).toBe(1255)
+      expect(writtenData).not.toHaveProperty('projectedTurnout')
+      expect(writtenData).not.toHaveProperty('winNumber')
+      expect(writtenData).not.toHaveProperty('voterContactGoal')
+      expect(writtenData).not.toHaveProperty('electionType')
+      expect(writtenData).not.toHaveProperty('electionLocation')
     })
 
     it('returns early and sends Slack when no campaign found for slug', async () => {
@@ -564,11 +532,9 @@ describe('PathToVictoryService', () => {
     describe('organization upsert', () => {
       const campaignWithDetails = {
         ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
-        organization: { positionId: 'gp-pos-1' },
+        organization: { positionId: 'gp-pos-1', customPositionName: null },
         details: {
           state: 'CA',
-          office: 'City Council',
-          otherOffice: null,
         },
       }
 
@@ -588,8 +554,7 @@ describe('PathToVictoryService', () => {
         ).toHaveBeenCalledWith('gp-pos-1')
         expect(mockOrganizations.resolveOrgData).toHaveBeenCalledWith({
           ballotReadyPositionId: 'br-pos-1',
-          office: 'City Council',
-          otherOffice: null,
+          customPositionName: null,
           state: 'CA',
           L2DistrictType: 'State_House',
           L2DistrictName: 'STATE HOUSE 005',

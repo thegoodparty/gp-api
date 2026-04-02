@@ -24,7 +24,6 @@ import { ListPathToVictoryPaginationSchema } from '../schemas/ListPathToVictoryP
 import {
   P2VCounts,
   P2VSource,
-  PathToVictoryDataWithLegacy,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
@@ -562,11 +561,8 @@ export class PathToVictoryService extends createPrismaBase(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const p2vData = (p2v.data ||
-        {}) as PathToVictoryDataWithLegacy
+      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
       const existingStatus = p2vData.p2vStatus as P2VStatus | undefined
-      const existingHasDistrict =
-        !!p2vData.electionType && !!p2vData.electionLocation
 
       // --- Determine final p2vStatus with rank protection ---
       // Status can only move up (Failed > Waiting > DistrictMatched > Complete),
@@ -578,6 +574,10 @@ export class PathToVictoryService extends createPrismaBase(
         [P2VStatus.districtMatched]: 2,
         [P2VStatus.complete]: 3,
       }
+
+      const existingHasDistrict =
+        (STATUS_RANK[existingStatus ?? ''] ?? 0) >=
+        (STATUS_RANK[P2VStatus.districtMatched] ?? 0)
       const proposedStatus: P2VStatus =
         options?.p2vStatusOverride ??
         (pathToVictoryResponse?.counts?.projectedTurnout &&
@@ -619,12 +619,9 @@ export class PathToVictoryService extends createPrismaBase(
         )
       }
 
-      let baseData: Partial<PathToVictoryDataWithLegacy>
+      let baseData: Partial<PrismaJson.PathToVictoryData>
       if (hasOfficeChanged) {
         const {
-          projectedTurnout: _pt,
-          winNumber: _wn,
-          voterContactGoal: _vcg,
           viability: _viability,
           p2vAttempts: _attempts,
           p2vCompleteDate: _p2vCompleteDate,
@@ -637,21 +634,14 @@ export class PathToVictoryService extends createPrismaBase(
       }
 
       // --- Selective overwrite logic ---
-      // Only overwrite district/turnout when incoming data is meaningful.
+      // Only overwrite district on Organization when incoming data is meaningful.
       // This prevents a failing silver run from wiping out gold's data.
-      // Turnout: overwrite when non-zero (real data or sentinel -1), or when
-      // office changed (stale turnout already stripped from baseData).
-      // District: overwrite only when incoming has non-empty values.
-      const incomingTurnout = Number(
-        pathToVictoryResponse.counts?.projectedTurnout ?? 0,
-      )
       const incomingHasDistrict =
         !!pathToVictoryResponse.electionType &&
         !!pathToVictoryResponse.electionLocation
       const shouldOverwriteDistrict = incomingHasDistrict
-      const shouldOverwriteTurnout = incomingTurnout !== 0 || hasOfficeChanged
 
-      const p2vUpdateData: Partial<PathToVictoryDataWithLegacy> = {
+      const p2vUpdateData: Partial<PrismaJson.PathToVictoryData> = {
         ...baseData,
         ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
         p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),

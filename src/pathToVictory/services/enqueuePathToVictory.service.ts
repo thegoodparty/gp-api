@@ -6,7 +6,6 @@ import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
 import {
-  PathToVictoryDataWithLegacy,
   PathToVictoryInput,
   PathToVictoryQueueMessage,
 } from '../types/pathToVictory.types'
@@ -99,16 +98,6 @@ export class EnqueuePathToVictoryService {
           await this.sendVictoryIssuesSlackMessage(campaign, user)
         }
         return { message: 'ok' }
-      }
-
-      if (campaign.pathToVictory && queueMessage) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const p2vData = (campaign.pathToVictory.data ||
-          {}) as PathToVictoryDataWithLegacy
-        if (p2vData.electionType && p2vData.electionLocation) {
-          queueMessage.data.electionType = p2vData.electionType
-          queueMessage.data.electionLocation = p2vData.electionLocation
-        }
       }
 
       this.logger.debug(queueMessage, 'queueing Message')

@@ -37,10 +37,7 @@ beforeEach(async () => {
   await service.prisma.pathToVictory.create({
     data: {
       campaignId: campaign.id,
-      data: {
-        electionType: 'City_Ward',
-        electionLocation: 'CHEYENNE CITY WARD 1',
-      } as PrismaJson.PathToVictoryDataWithLegacy,
+      data: {} as PrismaJson.PathToVictoryData,
     },
   })
 

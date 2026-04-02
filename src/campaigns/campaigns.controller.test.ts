@@ -114,7 +114,7 @@ const mockCampaign: Campaign = {
     state: 'CA',
     positionId: 'pos-1',
     otherOffice: 'Mayor',
-  } as PrismaJson.IncomingCampaignDetails,
+  } as unknown as Campaign['details'],
 }
 
 const mockTestCampaign: Campaign = {
@@ -690,7 +690,12 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.createForUser).toHaveBeenCalledWith(
         mockUser,
-        mockCreateBody,
+        { ...mockCreateBody, details: { state: 'CA' } },
+        {
+          positionId: undefined,
+          office: 'Mayor',
+          otherOffice: undefined,
+        },
       )
       expect(result).toEqual(mockCampaign)
     })
@@ -717,6 +722,9 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
         { canDownloadFederal: true },
+        undefined,
+        undefined,
+        undefined,
       )
     })
 
@@ -739,6 +747,9 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockOtherCampaign.id,
         { data: { foo: 'bar' } },
+        undefined,
+        undefined,
+        undefined,
       )
     })
 
@@ -758,6 +769,13 @@ describe('CampaignsController', () => {
       expect(campaignsService.findFirstOrThrow).toHaveBeenCalledWith({
         where: { slug: OVERRIDE_SLUG },
       })
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockOtherCampaign.id,
+        { data: { foo: 'bar' } },
+        undefined,
+        undefined,
+        undefined,
+      )
     })
 
     it('calls analytics.identify with detail trait(s) on slug override', async () => {
@@ -781,6 +799,25 @@ describe('CampaignsController', () => {
           pledged: true,
         },
       })
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockOtherCampaign.id,
+        {
+          details: {
+            city: 'Springfield',
+            electionDate: '2025-11-04',
+            party: 'Independent',
+            pledged: true,
+          },
+        },
+        undefined,
+        undefined,
+        {
+          positionId: undefined,
+          office: 'Mayor',
+          otherOffice: undefined,
+        },
+      )
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
         officeMunicipality: 'Springfield',
@@ -806,6 +843,14 @@ describe('CampaignsController', () => {
         data: { foo: 'bar' },
       })
 
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockOtherCampaign.id,
+        { data: { foo: 'bar' } },
+        undefined,
+        undefined,
+        undefined,
+      )
+
       expect(analyticsService.identify).not.toHaveBeenCalled()
     })
 
@@ -824,6 +869,18 @@ describe('CampaignsController', () => {
         slug: OVERRIDE_SLUG,
         details: { city: 'Springfield' },
       })
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockOtherCampaign.id,
+        { details: { city: 'Springfield' } },
+        undefined,
+        undefined,
+        {
+          positionId: undefined,
+          office: undefined,
+          otherOffice: undefined,
+        },
+      )
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
         officeMunicipality: 'Springfield',
@@ -849,6 +906,9 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
         { data: { currentStep: 'goals' } },
+        undefined,
+        undefined,
+        undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -910,6 +970,7 @@ describe('CampaignsController', () => {
         { data: undefined, details: undefined, aiContent: undefined },
         true,
         { isActive: false, slug: 'new-slug' },
+        undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -924,6 +985,7 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         { data: { name: 'Updated' }, details: undefined, aiContent: undefined },
         true,
+        undefined,
         undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
@@ -944,6 +1006,11 @@ describe('CampaignsController', () => {
         },
         true,
         { isActive: true },
+        {
+          positionId: undefined,
+          office: undefined,
+          otherOffice: undefined,
+        },
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -958,6 +1025,7 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         { data: undefined, details: undefined, aiContent: undefined },
         true,
+        undefined,
         undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
@@ -1032,7 +1100,7 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(NotFoundException)
     })
 
-    it('saves district with sentinel values when buildRaceTargetDetails returns null', async () => {
+    it('sets districtMatched when buildRaceTargetDetails returns null', async () => {
       vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
         null,
       )
@@ -1044,23 +1112,18 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            electionType: 'State Senate',
-            electionLocation: 'District 5',
-            projectedTurnout: -1,
-            winNumber: -1,
-            voterContactGoal: -1,
+        {
+          pathToVictory: {
             p2vStatus: P2VStatus.districtMatched,
-            districtManuallySet: true,
             p2vAttempts: 0,
             officeContextFingerprint: null,
-          }),
-        }),
+          },
+          overrideDistrictId: null,
+        },
       )
     })
 
-    it('uses sentinel -1 values when no turnout', async () => {
+    it('sets districtMatched when projected turnout is zero', async () => {
       vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
         mockRaceTargetResult({
           projectedTurnout: 0,
@@ -1076,21 +1139,18 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            projectedTurnout: -1,
-            winNumber: -1,
-            voterContactGoal: -1,
+        {
+          pathToVictory: {
             p2vStatus: P2VStatus.districtMatched,
-            districtManuallySet: true,
             p2vAttempts: 0,
             officeContextFingerprint: null,
-          }),
-        }),
+          },
+          overrideDistrictId: null,
+        },
       )
     })
 
-    it('passes through turnout values when hasTurnout is true', async () => {
+    it('omits districtMatched status when hasTurnout is true', async () => {
       vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
         mockRaceTargetResult({
           projectedTurnout: 5000,
@@ -1106,16 +1166,13 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            projectedTurnout: 5000,
-            electionType: 'State Senate',
-            electionLocation: 'District 5',
-            districtManuallySet: true,
+        {
+          pathToVictory: {
             p2vAttempts: 0,
             officeContextFingerprint: null,
-          }),
-        }),
+          },
+          overrideDistrictId: null,
+        },
       )
 
       const callArgs = vi.mocked(campaignsService.updateJsonFields).mock
@@ -1125,7 +1182,7 @@ describe('CampaignsController', () => {
       )
     })
 
-    it('sets districtManuallySet to true', async () => {
+    it('writes minimal pathToVictory payload when hasTurnout is true', async () => {
       vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
         mockRaceTargetResult({ projectedTurnout: 5000 }),
       )
@@ -1137,7 +1194,10 @@ describe('CampaignsController', () => {
 
       const callArgs = vi.mocked(campaignsService.updateJsonFields).mock
         .calls[0][1]
-      expect(callArgs.pathToVictory?.districtManuallySet).toBe(true)
+      expect(callArgs.pathToVictory).toEqual({
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
+      })
     })
 
     it('passes overrideDistrictId to updateJsonFields', async () => {
@@ -1277,14 +1337,13 @@ describe('CampaignsController', () => {
       })
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            electionType: 'State Senate',
-            electionLocation: 'District 5',
-            projectedTurnout: 5000,
-            districtManuallySet: true,
-          }),
-        }),
+        {
+          pathToVictory: {
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          },
+          overrideDistrictId: null,
+        },
       )
     })
 
@@ -1307,18 +1366,18 @@ describe('CampaignsController', () => {
       expect(result).toBeDefined()
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            electionType: 'State Senate',
-            electionLocation: 'District 5',
+        {
+          pathToVictory: {
             p2vStatus: P2VStatus.districtMatched,
-            districtManuallySet: true,
-          }),
-        }),
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          },
+          overrideDistrictId: null,
+        },
       )
     })
 
-    it('uses sentinel values when buildRaceTargetDetails returns null', async () => {
+    it('sets districtMatched when buildRaceTargetDetails returns null (M2M)', async () => {
       vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
         mockCampaign,
       )
@@ -1333,13 +1392,14 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
-        expect.objectContaining({
-          pathToVictory: expect.objectContaining({
-            projectedTurnout: -1,
-            winNumber: -1,
-            voterContactGoal: -1,
-          }),
-        }),
+        {
+          pathToVictory: {
+            p2vStatus: P2VStatus.districtMatched,
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          },
+          overrideDistrictId: null,
+        },
       )
     })
   })
@@ -1367,9 +1427,7 @@ describe('CampaignsController', () => {
     it('throws BadRequestException when no electionDate', async () => {
       const campaign: Campaign = {
         ...mockCampaign,
-        details: {
-          positionId: 'pos-1',
-        } as PrismaJson.IncomingCampaignDetails,
+        details: { positionId: 'pos-1' } as unknown as Campaign['details'],
       }
 
       await expect(
@@ -1418,15 +1476,9 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         {
           pathToVictory: expect.objectContaining({
-            districtId: 'd-1',
-            electionType: 'City Council',
-            electionLocation: 'Ward 3',
-            winNumber: 2000,
-            voterContactGoal: 2500,
-            projectedTurnout: 4000,
             source: P2VSource.ElectionApi,
             p2vStatus: P2VStatus.complete,
-            districtManuallySet: false,
+            p2vCompleteDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
             p2vAttempts: 0,
             officeContextFingerprint: null,
           }),
@@ -1635,7 +1687,9 @@ describe('CampaignsController', () => {
       const callArgs = vi.mocked(campaignsService.updateJsonFields).mock
         .calls[0][1]
       expect(callArgs.pathToVictory?.p2vStatus).toBe(P2VStatus.complete)
-      expect(callArgs.pathToVictory?.districtManuallySet).toBe(false)
+      expect(callArgs.pathToVictory?.p2vCompleteDate).toMatch(
+        /^\d{4}-\d{2}-\d{2}$/,
+      )
       expect(callArgs.pathToVictory?.source).toBe(P2VSource.ElectionApi)
     })
 

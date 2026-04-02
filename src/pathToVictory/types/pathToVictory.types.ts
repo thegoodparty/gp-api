@@ -1,26 +1,5 @@
 import { QueueType } from 'src/queue/queue.types'
 
-/**
- * Fields formerly stored on PathToVictoryData, now served live from the
- * election API. May still exist in historical DB rows.
- */
-export type LegacyPathToVictoryFields = {
-  projectedTurnout?: number
-  winNumber?: number
-  voterContactGoal?: number
-  electionType?: string
-  electionLocation?: string
-  districtId?: string
-  districtManuallySet?: boolean
-}
-
-/**
- * PathToVictoryData as it may appear in historical DB rows — includes
- * fields that are no longer actively written but may still exist.
- */
-export type PathToVictoryDataWithLegacy = PrismaJson.PathToVictoryData &
-  LegacyPathToVictoryFields
-
 export interface PathToVictoryQueueMessage {
   type: QueueType.PATH_TO_VICTORY
   data: PathToVictoryInput
@@ -41,8 +20,6 @@ export interface PathToVictoryInput {
   partisanType: string
   priorElectionDates: string[]
   positionId?: string
-  electionType?: string
-  electionLocation?: string
 }
 
 export type P2VCounts = {

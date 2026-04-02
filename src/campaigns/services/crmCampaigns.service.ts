@@ -30,7 +30,6 @@ import {
   P2V_LOCKED_STATUS,
   P2VStatus,
 } from 'src/elections/types/pathToVictory.types'
-import type { PathToVictoryDataWithLegacy } from 'src/pathToVictory/types/pathToVictory.types'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -203,7 +202,7 @@ export class CrmCampaignsService {
     })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const p2vData = (pathToVictory?.data ||
-      {}) as PathToVictoryDataWithLegacy
+      {}) as PrismaJson.PathToVictoryData
 
     const {
       p2vStatus,
@@ -214,9 +213,8 @@ export class CrmCampaignsService {
 
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    const winNumber = liveMetrics?.winNumber ?? p2vData?.winNumber
-    const voterContactGoal =
-      liveMetrics?.voterContactGoal ?? p2vData?.voterContactGoal
+    const winNumber = liveMetrics?.winNumber
+    const voterContactGoal = liveMetrics?.voterContactGoal
 
     const {
       lastStepDate,

@@ -37,10 +37,7 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
     campaignId: 1,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
-    data: {
-      electionType: 'City_Portland',
-      electionLocation: 'PORTLAND',
-    } as PrismaJson.PathToVictoryDataWithLegacy,
+    data: {} as PrismaJson.PathToVictoryData,
   },
 }
 

@@ -1,24 +1,5 @@
 import { Prisma } from '@prisma/client'
 
-/**
- * Fields formerly stored on CampaignDetails, now managed by Organization.
- * Still accepted in incoming API requests (via Zod .passthrough()) for
- * org resolution, and may exist in historical DB rows.
- */
-export type OrgManagedCampaignFields = {
-  positionId?: string | null
-  office?: string | null
-  otherOffice?: string | null
-}
-
-/**
- * CampaignDetails as received in incoming API requests — includes
- * org-managed fields that are consumed for resolution but stripped
- * before persistence.
- */
-export type IncomingCampaignDetails = PrismaJson.CampaignDetails &
-  OrgManagedCampaignFields
-
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
 export type PlanVersion = {

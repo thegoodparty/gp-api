@@ -242,7 +242,12 @@ export class CampaignsController {
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return this.campaigns.createForUser(user, body)
+    const { positionId, office, otherOffice, ...cleanDetails } = body.details
+    return this.campaigns.createForUser(
+      user,
+      { ...body, details: cleanDetails },
+      { positionId, office, otherOffice },
+    )
   }
 
   @Put('mine')
@@ -257,41 +262,50 @@ export class CampaignsController {
         'User does not have permission to download federal data',
       )
     }
+
+    let orgContext:
+      | {
+          positionId?: string | null
+          office?: string | null
+          otherOffice?: string | null
+        }
+      | undefined
+    if (body.details) {
+      const { positionId, office, otherOffice, ...cleanDetails } = body.details
+      orgContext = { positionId, office, otherOffice }
+      body = { ...body, details: cleanDetails }
+    }
+
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin or Sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
 
       if (body?.details) {
-        const { city, office, electionDate, pledged, party } = body.details
+        const { city, electionDate, pledged, party } = body.details
         await this.analytics.identify(campaign.userId, {
-          ...(city && {
-            officeMunicipality: city,
-          }),
-          ...(office && {
-            officeName: office,
-          }),
-          ...(electionDate && {
-            officeElectionDate: electionDate,
-          }),
-          ...(party && {
-            affiliation: party,
-          }),
-          ...(pledged && {
-            pledged,
-          }),
+          ...(city && { officeMunicipality: city }),
+          ...(orgContext?.office && { officeName: orgContext.office }),
+          ...(electionDate && { officeElectionDate: electionDate }),
+          ...(party && { affiliation: party }),
+          ...(pledged && { pledged }),
         })
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     this.logger.debug({ campaign, ...{ slug, body } }, 'Updating campaign')
 
-    const updated = await this.campaigns.updateJsonFields(campaign.id, body)
+    const updated = await this.campaigns.updateJsonFields(
+      campaign.id,
+      body,
+      undefined,
+      undefined,
+      orgContext,
+    )
     if (!updated) throw new NotFoundException('Campaign not found after update')
     return this.withLiveMetrics(updated)
   }
@@ -317,7 +331,29 @@ export class CampaignsController {
       select: { id: true },
     })
 
-    const { data, details, aiContent, ...scalarFields } = body
+    const { data, details: rawDetails, aiContent, ...scalarFields } = body
+
+    let orgContext:
+      | {
+          positionId?: string | null
+          office?: string | null
+          otherOffice?: string | null
+        }
+      | undefined
+    let details = rawDetails
+    if (rawDetails) {
+      const { positionId, office, otherOffice, ...cleanDetails } = rawDetails
+      orgContext = {
+        // Prisma JSON column typed as Record<string, unknown> by Zod
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        positionId: positionId as string | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        office: office as string | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        otherOffice: otherOffice as string | undefined,
+      }
+      details = cleanDetails
+    }
 
     return this.campaigns.updateJsonFields(
       id,
@@ -326,6 +362,7 @@ export class CampaignsController {
       Object.values(scalarFields).some((v) => v !== undefined)
         ? scalarFields
         : undefined,
+      orgContext,
     )
   }
 

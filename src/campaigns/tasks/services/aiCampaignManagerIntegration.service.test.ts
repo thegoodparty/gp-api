@@ -5,13 +5,19 @@ import { Campaign, PathToVictory } from '@prisma/client'
 import {
   CampaignPlanResponse,
   CampaignPlanTask,
+  StartCampaignPlanRequest,
 } from '../aiCampaignManager.types'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 const mockOrganizations: Partial<OrganizationsService> = {
   resolvePositionNameByOrganizationSlug: vi.fn().mockResolvedValue(null),
+}
+
+const mockCampaigns: Partial<CampaignsService> = {
+  fetchLiveRaceTargetMetrics: vi.fn(),
 }
 
 const mockModel = {
@@ -42,6 +48,7 @@ const makeCampaign = (
     data: { name: 'Jane Doe' },
     details: {
       office: 'City Council',
+      normalizedOffice: 'City Council',
       state: 'California',
       electionDate: '2025-11-04',
       partisanType: 'nonpartisan',
@@ -54,10 +61,8 @@ const makeCampaign = (
       createdAt: new Date(),
       updatedAt: new Date(),
       data: {
-        winNumber: 500,
         totalRegisteredVoters: 3000,
-        projectedTurnout: 1800,
-      },
+      } as PrismaJson.PathToVictoryData,
     },
     ...overrides,
   }) as Campaign & { pathToVictory: PathToVictory | null }
@@ -106,9 +111,15 @@ describe('AiCampaignManagerIntegrationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(mockCampaigns.fetchLiveRaceTargetMetrics!).mockResolvedValue({
+      winNumber: 500,
+      projectedTurnout: 1800,
+      voterContactGoal: 350,
+    })
     service = new AiCampaignManagerIntegrationService(
       mockAiManager as AiCampaignManagerService,
       mockOrganizations as OrganizationsService,
+      mockCampaigns as CampaignsService,
     )
     Object.defineProperty(service, '_prisma', {
       get: () => ({ campaignPlan: mockModel }),
@@ -134,16 +145,18 @@ describe('AiCampaignManagerIntegrationService', () => {
       })
 
       // Need to get the actual hash to make the cache hit work
-      // Access private method via prototype
-      const buildRequest = (
+      // Access private method via prototype (buildCampaignPlanRequest is async)
+      const buildRequest = await (
         service as unknown as {
-          buildCampaignPlanRequest: (typeof service)['buildCampaignPlanRequest']
+          buildCampaignPlanRequest: (
+            c: typeof campaign,
+          ) => Promise<StartCampaignPlanRequest>
         }
       ).buildCampaignPlanRequest.call(service, campaign)
       const hash = (
         service as unknown as {
           generateCampaignInfoHashFromRequest: (
-            r: typeof buildRequest,
+            r: StartCampaignPlanRequest,
           ) => string
         }
       ).generateCampaignInfoHashFromRequest.call(service, buildRequest)
@@ -238,6 +251,9 @@ describe('AiCampaignManagerIntegrationService', () => {
 
       await service.generateCampaignTasks(campaign)
 
+      expect(mockCampaigns.fetchLiveRaceTargetMetrics).toHaveBeenCalledWith(
+        campaign,
+      )
       const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
         .calls[0][0]
 
@@ -250,6 +266,9 @@ describe('AiCampaignManagerIntegrationService', () => {
     })
 
     it('uses defaults when campaign data is sparse', async () => {
+      vi.mocked(mockCampaigns.fetchLiveRaceTargetMetrics!).mockResolvedValueOnce(
+        null,
+      )
       const campaign = makeCampaign({
         data: {} as PrismaJson.CampaignData,
         details: {} as PrismaJson.CampaignDetails,

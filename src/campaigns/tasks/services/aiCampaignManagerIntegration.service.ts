@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { createHash } from 'crypto'
 import { AiCampaignManagerService } from './aiCampaignManager.service'
@@ -10,8 +10,9 @@ import {
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
-import type { PathToVictoryDataWithLegacy } from 'src/pathToVictory/types/pathToVictory.types'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 const CAMPAIGN_PLAN_VERSION = Number(process.env.CAMPAIGN_PLAN_VERSION) || 2
 
@@ -40,6 +41,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   constructor(
     private readonly aiCampaignManager: AiCampaignManagerService,
     private readonly organizations: OrganizationsService,
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaigns: WrapperType<CampaignsService>,
   ) {
     super()
   }
@@ -133,15 +136,18 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const pathData = pathToVictory?.data as
-      | PathToVictoryDataWithLegacy
+      | PrismaJson.PathToVictoryData
       | undefined
-    const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
+
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const totalRegisteredVoters = this.extractNumberValue(
       pathData?.totalRegisteredVoters,
       5000,
     )
+    const winNumber = this.extractNumberValue(liveMetrics?.winNumber, 1000)
     const projectedTurnout = this.extractNumberValue(
-      pathData?.projectedTurnout,
+      liveMetrics?.projectedTurnout,
       totalRegisteredVoters * 0.6,
     )
 
