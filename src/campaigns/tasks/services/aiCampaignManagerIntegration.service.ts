@@ -136,10 +136,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const incumbentStatus =
       pathData?.viability?.isIncumbent === true ? 'Elected' : 'N/A'
 
-    let seatsAvailable = pathData?.viability?.seats ?? 1
-    if (!seatsAvailable || seatsAvailable < 1) {
-      seatsAvailable = 1
-    }
+    const seatsAvailable =
+      pathData?.viability?.seats && pathData.viability.seats >= 1
+        ? pathData.viability.seats
+        : 1
 
     return {
       candidate_name: data.name || `Campaign ${campaign.id}`,
