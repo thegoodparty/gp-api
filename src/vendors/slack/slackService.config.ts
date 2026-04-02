@@ -37,4 +37,8 @@ export const SLACK_CHANNEL_IDS = {
     channelId: process.env.SLACK_BOT_TEVYN_API_CHANNEL_ID,
     channelToken: process.env.SLACK_BOT_TEVYN_API_CHANNEL_TOKEN,
   },
+  [SlackChannel.casClickupTasks]: {
+    channelId: process.env.SLACK_CAS_CLICKUP_TASKS_CHANNEL_ID,
+    channelToken: process.env.SLACK_CAS_CLICKUP_TASKS_CHANNEL_TOKEN,
+  },
 }

@@ -24,6 +24,7 @@ import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
 import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
@@ -53,6 +54,7 @@ import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
+  CampaignPlanCompleteMessage,
   DomainEmailForwardingMessage,
   GenerateTasksMessage,
   PollAnalysisCompleteEvent,
@@ -311,7 +313,7 @@ export class QueueConsumerService {
           { data: queueMessage.data, messageId: message.MessageId },
           'received campaignPlanComplete message',
         )
-        return true
+        return await this.handleCampaignPlanComplete(queueMessage.data)
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
@@ -1116,6 +1118,78 @@ export class QueueConsumerService {
       cellPhonesToPeopleIds.set(normalizePhoneNumber(personCellPhone), personId)
     }
     return cellPhonesToPeopleIds
+  }
+
+  private async handleCampaignPlanComplete(
+    message: CampaignPlanCompleteMessage,
+  ) {
+    if (message.status === 'error') {
+      this.logger.error(
+        { campaignId: message.campaignId, error: message.error },
+        'Campaign plan generation failed',
+      )
+      return true
+    }
+
+    const campaign = await this.campaignsService.model.findUniqueOrThrow({
+      where: { id: message.campaignId },
+      include: { user: true, campaignTasks: true },
+    })
+
+    const candidateName =
+      [campaign.user?.firstName, campaign.user?.lastName]
+        .filter((value): value is string => Boolean(value))
+        .join(' ') ||
+      campaign.data.name ||
+      'Unknown'
+
+    const outreachTasks = campaign.campaignTasks.filter(
+      (task) =>
+        !task.isDefaultTask &&
+        (task.flowType === CampaignTaskType.text ||
+          task.flowType === CampaignTaskType.robocall),
+    )
+
+    const taskLines = outreachTasks.map((task) => {
+      const dueDate = task.date
+        ? format(task.date, 'MMM d, yyyy')
+        : 'No date set'
+      return `- ${task.flowType.toUpperCase()}: ${task.title} (Due: ${dueDate})`
+    })
+
+    const { hubspotId } = campaign.data
+
+    const hubspotLink = hubspotId
+      ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
+      : 'N/A'
+
+    const slackBody = [
+      ':white_check_mark: *AI Campaign Plan Created*',
+      `*Candidate:* ${candidateName}`,
+      `*Email:* ${campaign.user?.email ?? 'N/A'}`,
+      `*Phone:* ${campaign.user?.phone ?? 'N/A'}`,
+      `*HubSpot ID:* ${hubspotLink}`,
+      '',
+      `*AI Text & Robocall Campaigns (${outreachTasks.length}):*`,
+      ...(taskLines.length > 0 ? taskLines : ['None']),
+    ].join('\n')
+
+    await this.slackService.message(
+      {
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: slackBody,
+            },
+          },
+        ],
+      },
+      SlackChannel.casClickupTasks,
+    )
+
+    return true
   }
 
   private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
