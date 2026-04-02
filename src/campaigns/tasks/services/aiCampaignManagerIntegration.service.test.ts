@@ -8,6 +8,11 @@ import {
 } from '../aiCampaignManager.types'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
+
+const mockOrganizations: Partial<OrganizationsService> = {
+  resolvePositionNameByOrganizationSlug: vi.fn().mockResolvedValue(null),
+}
 
 const mockModel = {
   findUnique: vi.fn(),
@@ -103,6 +108,7 @@ describe('AiCampaignManagerIntegrationService', () => {
     vi.clearAllMocks()
     service = new AiCampaignManagerIntegrationService(
       mockAiManager as AiCampaignManagerService,
+      mockOrganizations as OrganizationsService,
     )
     Object.defineProperty(service, '_prisma', {
       get: () => ({ campaignPlan: mockModel }),

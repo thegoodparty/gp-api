@@ -114,7 +114,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
       },
       data: {
         details: {
-          otherOffice: ['array'],
+          website: ['array'],
         },
       },
     })
@@ -129,15 +129,25 @@ test.describe('Campaigns - User Campaign Operations', () => {
     expect(body.errors[0].message).toBe('Expected string, received array')
   })
 
-  test('should set campaign office', async ({ request }) => {
+  test('should strip org-managed fields from persisted details', async ({
+    request,
+  }) => {
     const response = await updateCampaignWithRetry(request, reg.token, {
       details: {
         office: 'Other',
         otherOffice: 'State Representative',
+        positionId: '123',
       },
     })
 
     expect(response.status()).toBe(200)
+
+    const campaign = (await response.json()) as {
+      details: Record<string, unknown>
+    }
+    expect(campaign.details).not.toHaveProperty('office')
+    expect(campaign.details).not.toHaveProperty('otherOffice')
+    expect(campaign.details).not.toHaveProperty('positionId')
   })
 
   test('should launch campaign', async ({ request }) => {

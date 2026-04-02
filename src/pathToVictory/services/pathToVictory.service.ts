@@ -24,6 +24,7 @@ import { ListPathToVictoryPaginationSchema } from '../schemas/ListPathToVictoryP
 import {
   P2VCounts,
   P2VSource,
+  PathToVictoryDataWithLegacy,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
@@ -560,7 +561,9 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const p2vData = (p2v.data ||
+        {}) as PathToVictoryDataWithLegacy
       const existingStatus = p2vData.p2vStatus as P2VStatus | undefined
       const existingHasDistrict =
         !!p2vData.electionType && !!p2vData.electionLocation
@@ -616,9 +619,8 @@ export class PathToVictoryService extends createPrismaBase(
         )
       }
 
-      let baseData: Partial<PrismaJson.PathToVictoryData>
+      let baseData: Partial<PathToVictoryDataWithLegacy>
       if (hasOfficeChanged) {
-        // Strip stale fields but keep district and other metadata
         const {
           projectedTurnout: _pt,
           winNumber: _wn,
@@ -629,7 +631,7 @@ export class PathToVictoryService extends createPrismaBase(
           p2vStatus: _p2vStatus,
           ...rest
         } = p2vData
-        baseData = rest as Partial<PrismaJson.PathToVictoryData>
+        baseData = rest
       } else {
         baseData = { ...p2vData }
       }
@@ -649,27 +651,8 @@ export class PathToVictoryService extends createPrismaBase(
       const shouldOverwriteDistrict = incomingHasDistrict
       const shouldOverwriteTurnout = incomingTurnout !== 0 || hasOfficeChanged
 
-      const turnoutFields = shouldOverwriteTurnout
-        ? {
-            projectedTurnout: incomingTurnout,
-            winNumber: Number(pathToVictoryResponse.counts?.winNumber ?? 0),
-            voterContactGoal: Number(
-              pathToVictoryResponse.counts?.voterContactGoal ?? 0,
-            ),
-          }
-        : {}
-      const districtFields = shouldOverwriteDistrict
-        ? {
-            electionType: pathToVictoryResponse.electionType,
-            electionLocation: pathToVictoryResponse.electionLocation,
-          }
-        : {}
-
-      // Merge: existing data ← selective overwrites ← metadata
-      const p2vUpdateData: PrismaJson.PathToVictoryData = {
+      const p2vUpdateData: Partial<PathToVictoryDataWithLegacy> = {
         ...baseData,
-        ...turnoutFields,
-        ...districtFields,
         ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
         p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
         p2vStatus,
@@ -698,8 +681,7 @@ export class PathToVictoryService extends createPrismaBase(
           : null
         const orgData = await this.organizationsService.resolveOrgData({
           ballotReadyPositionId,
-          office: campaign.details?.office,
-          otherOffice: campaign.details?.otherOffice,
+          customPositionName: campaign.organization?.customPositionName ?? null,
           state: campaign.details.state,
           L2DistrictType: pathToVictoryResponse.electionType,
           L2DistrictName: pathToVictoryResponse.electionLocation,

@@ -17,7 +17,7 @@ const mockP2V: PathToVictory = {
     p2vStatus: P2VStatus.waiting,
     electionType: 'State_House',
     electionLocation: 'STATE HOUSE 005',
-  },
+  } as PrismaJson.PathToVictoryDataWithLegacy,
 }
 
 const mockP2V2: PathToVictory = {
@@ -30,7 +30,7 @@ const mockP2V2: PathToVictory = {
     electionType: 'City_Council',
     electionLocation: 'WARD 3',
     projectedTurnout: 500,
-  },
+  } as PrismaJson.PathToVictoryDataWithLegacy,
 }
 
 describe('PathToVictoryController', () => {
@@ -159,16 +159,18 @@ describe('PathToVictoryController', () => {
       vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
         mockP2V,
       )
-      const updatedP2V = {
+      const updatedP2V: PathToVictory = {
         ...mockP2V,
         data: {
           ...(mockP2V.data as object),
           projectedTurnout: 1000,
-        },
+        } as PrismaJson.PathToVictoryDataWithLegacy,
       }
       vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
 
-      const body = { data: { projectedTurnout: 1000 } }
+      const body = {
+        data: { projectedTurnout: 1000 } as PrismaJson.PathToVictoryDataWithLegacy,
+      }
       const result = await controller.update({ id: 10 }, body)
 
       expect(pathToVictoryService.findUniqueOrThrow).toHaveBeenCalledWith({
@@ -193,16 +195,19 @@ describe('PathToVictoryController', () => {
       vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
         mockP2V2,
       )
-      const updatedP2V = {
+      const updatedP2V: PathToVictory = {
         ...mockP2V2,
         data: {
           ...(mockP2V2.data as object),
           winNumber: 300,
-        },
+        } as PrismaJson.PathToVictoryDataWithLegacy,
       }
       vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
 
-      await controller.update({ id: 11 }, { data: { winNumber: 300 } })
+      await controller.update(
+        { id: 11 },
+        { data: { winNumber: 300 } as PrismaJson.PathToVictoryDataWithLegacy },
+      )
 
       expect(pathToVictoryService.update).toHaveBeenCalledWith({
         where: { id: 11 },

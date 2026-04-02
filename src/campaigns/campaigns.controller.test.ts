@@ -16,6 +16,7 @@ import {
 } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { RaceTargetDetailsResult } from 'src/elections/types/elections.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
@@ -28,6 +29,22 @@ import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith } from './campaigns.types'
+
+function mockRaceTargetResult(
+  overrides: Partial<RaceTargetDetailsResult> = {},
+): RaceTargetDetailsResult {
+  return {
+    projectedTurnout: 0,
+    winNumber: 0,
+    voterContactGoal: 0,
+    source: 'test',
+    electionType: 'General',
+    electionLocation: 'Test Location',
+    p2vStatus: 'Complete',
+    p2vCompleteDate: '2025-01-01',
+    ...overrides,
+  }
+}
 
 const CREATED_AT = '2025-01-01'
 
@@ -97,7 +114,7 @@ const mockCampaign: Campaign = {
     state: 'CA',
     positionId: 'pos-1',
     otherOffice: 'Mayor',
-  },
+  } as PrismaJson.IncomingCampaignDetails,
 }
 
 const mockTestCampaign: Campaign = {
@@ -992,9 +1009,9 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         mockOtherCampaign,
       )
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 1000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 1000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockOtherCampaignWithP2V,
       )
@@ -1044,11 +1061,13 @@ describe('CampaignsController', () => {
     })
 
     it('uses sentinel -1 values when no turnout', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 0,
-        winNumber: 0,
-        voterContactGoal: 0,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({
+          projectedTurnout: 0,
+          winNumber: 0,
+          voterContactGoal: 0,
+        }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1072,11 +1091,13 @@ describe('CampaignsController', () => {
     })
 
     it('passes through turnout values when hasTurnout is true', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-        winNumber: 2500,
-        voterContactGoal: 3000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({
+          projectedTurnout: 5000,
+          winNumber: 2500,
+          voterContactGoal: 3000,
+        }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1105,9 +1126,9 @@ describe('CampaignsController', () => {
     })
 
     it('sets districtManuallySet to true', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 5000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1120,9 +1141,9 @@ describe('CampaignsController', () => {
     })
 
     it('passes overrideDistrictId to updateJsonFields', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 5000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1150,9 +1171,9 @@ describe('CampaignsController', () => {
     })
 
     it('passes null overrideDistrictId when resolveOverrideDistrictId returns null', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 5000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1172,9 +1193,9 @@ describe('CampaignsController', () => {
     })
 
     it('fails the request when resolveOverrideDistrictId rejects', async () => {
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 5000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1193,9 +1214,9 @@ describe('CampaignsController', () => {
         ...mockCampaign,
         details: { electionDate: '2025-11-04', state: 'CA' },
       }
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({ projectedTurnout: 5000 }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1238,11 +1259,13 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
         mockCampaign,
       )
-      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
-        projectedTurnout: 5000,
-        winNumber: 2500,
-        voterContactGoal: 3000,
-      })
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        mockRaceTargetResult({
+          projectedTurnout: 5000,
+          winNumber: 2500,
+          voterContactGoal: 3000,
+        }),
+      )
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
@@ -1344,7 +1367,9 @@ describe('CampaignsController', () => {
     it('throws BadRequestException when no electionDate', async () => {
       const campaign: Campaign = {
         ...mockCampaign,
-        details: { positionId: 'pos-1' },
+        details: {
+          positionId: 'pos-1',
+        } as PrismaJson.IncomingCampaignDetails,
       }
 
       await expect(

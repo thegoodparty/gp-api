@@ -47,7 +47,7 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
     data: {
       electionType: 'City_Portland',
       electionLocation: 'PORTLAND',
-    },
+    } as PrismaJson.PathToVictoryDataWithLegacy,
   },
 }
 

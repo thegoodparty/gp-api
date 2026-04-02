@@ -21,11 +21,7 @@ import { CampaignsController } from './campaigns.controller'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
-import { FeaturesService } from 'src/features/services/features.service'
-import {
-  CampaignsService,
-  FEATURE_FLAG_CHECKER,
-} from './services/campaigns.service'
+import { CampaignsService } from './services/campaigns.service'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
@@ -68,10 +64,6 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignTcrComplianceController,
   ],
   providers: [
-    {
-      provide: FEATURE_FLAG_CHECKER,
-      useExisting: FeaturesService,
-    },
     CampaignsService,
     CampaignPlanVersionsService,
     CampaignPositionsService,

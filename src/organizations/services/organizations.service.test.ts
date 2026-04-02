@@ -59,22 +59,15 @@ describe('OrganizationsService', () => {
       expect(result.positionId).toBeNull()
     })
 
-    it('resolves customPositionName from office', async () => {
-      const result = await service.resolveOrgData({ office: 'Mayor' })
+    it('passes through customPositionName', async () => {
+      const result = await service.resolveOrgData({
+        customPositionName: 'Mayor',
+      })
 
       expect(result.customPositionName).toBe('Mayor')
     })
 
-    it('resolves customPositionName from otherOffice when office is Other', async () => {
-      const result = await service.resolveOrgData({
-        office: 'Other',
-        otherOffice: 'Dog Catcher',
-      })
-
-      expect(result.customPositionName).toBe('Dog Catcher')
-    })
-
-    it('returns null customPositionName when no office provided', async () => {
+    it('returns null customPositionName when not provided', async () => {
       const result = await service.resolveOrgData({})
 
       expect(result.customPositionName).toBeNull()
@@ -145,8 +138,7 @@ describe('OrganizationsService', () => {
 
       const result = await service.resolveOrgData({
         ballotReadyPositionId: 'br-pos-1',
-        office: 'Other',
-        otherOffice: 'City Council Member',
+        customPositionName: 'City Council Member',
         state: 'CA',
         L2DistrictType: 'City Council',
         L2DistrictName: 'District 5',

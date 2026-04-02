@@ -303,7 +303,9 @@ describe('GET /v1/organizations', () => {
       data: {
         userId: service.user.id,
         slug: 'test-campaign-multi',
-        details: { positionId: 'br-pos-456' },
+        details: {
+          positionId: 'br-pos-456',
+        } as PrismaJson.IncomingCampaignDetails,
         organizationSlug: 'campaign-10',
       },
     })

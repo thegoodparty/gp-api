@@ -415,17 +415,8 @@ export class CampaignsController {
 
     const updated = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...(raceTargetDetails || {}),
-        electionType: l2DistrictType,
-        electionLocation: l2DistrictName,
-        districtManuallySet: true,
         ...(!hasTurnout
-          ? {
-              projectedTurnout: -1,
-              winNumber: -1,
-              voterContactGoal: -1,
-              p2vStatus: P2VStatus.districtMatched,
-            }
+          ? { p2vStatus: P2VStatus.districtMatched }
           : {}),
         p2vAttempts: 0,
         officeContextFingerprint: null,
@@ -501,25 +492,13 @@ export class CampaignsController {
       return result
     }
 
-    const { district, winNumber, voterContactGoal, projectedTurnout } =
-      raceTargetDetails
-    const { L2DistrictType, L2DistrictName } = district
+    const { projectedTurnout } = raceTargetDetails
     const hasTurnout = projectedTurnout > 0
     const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        districtId: district.id,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
-        // Always write turnout values: real data when available, sentinel -1
-        // when district matched but no turnout. This ensures stale turnout
-        // from a previous district is cleared.
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
-        districtManuallySet: false,
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -591,26 +570,13 @@ export class CampaignsController {
       return result
     }
 
-    const { district, winNumber, voterContactGoal, projectedTurnout } =
-      raceTargetDetails
-    const { L2DistrictType, L2DistrictName } = district
+    const { projectedTurnout } = raceTargetDetails
     const hasTurnout = projectedTurnout > 0
     const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        districtId: district.id,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
-        // Always write turnout values: real data when available, sentinel -1
-        // when district matched but no turnout. This ensures stale turnout
-        // from a previous district is cleared.
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
-        districtManuallySet: false,
-        // Always reset stale silver state when district changes
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },

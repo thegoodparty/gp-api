@@ -30,6 +30,7 @@ import {
   P2V_LOCKED_STATUS,
   P2VStatus,
 } from 'src/elections/types/pathToVictory.types'
+import type { PathToVictoryDataWithLegacy } from 'src/pathToVictory/types/pathToVictory.types'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -200,7 +201,9 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    const p2vData = pathToVictory?.data || {}
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const p2vData = (pathToVictory?.data ||
+      {}) as PathToVictoryDataWithLegacy
 
     const {
       p2vStatus,
@@ -268,10 +271,21 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const positionName = campaign.organizationSlug
-      ? await this.organizations.resolvePositionNameByOrganizationSlug(
-          campaign.organizationSlug,
-        )
+    const org = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const positionName = org
+      ? (
+          await this.organizations.resolvePositionContext({
+            customPositionName: org.customPositionName,
+            positionId: org.positionId,
+          })
+        ).positionName
+      : null
+    const brPositionId = org?.positionId
+      ? await this.organizations.resolveBallotReadyPositionId(org.positionId)
       : null
 
     const longState = usStates.find(
@@ -343,7 +357,7 @@ export class CrmCampaignsService {
       running: runForOffice ? HubSpot.Running.YES : HubSpot.Running.NO,
 
       // election details
-      br_position_id: campaignDetails?.positionId ?? undefined,
+      br_position_id: brPositionId ?? undefined,
       br_race_id: campaignDetails?.raceId ?? undefined,
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?

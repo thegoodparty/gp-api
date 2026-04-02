@@ -6,6 +6,7 @@ import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
 import {
+  PathToVictoryDataWithLegacy,
   PathToVictoryInput,
   PathToVictoryQueueMessage,
 } from '../types/pathToVictory.types'
@@ -101,10 +102,10 @@ export class EnqueuePathToVictoryService {
       }
 
       if (campaign.pathToVictory && queueMessage) {
-        const p2vData = campaign.pathToVictory.data || {}
-        // If electionType and electionLocation are already specified
-        // we can skip those steps and just do the counts
-        if (p2vData?.electionType && p2vData?.electionLocation) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const p2vData = (campaign.pathToVictory.data ||
+          {}) as PathToVictoryDataWithLegacy
+        if (p2vData.electionType && p2vData.electionLocation) {
           queueMessage.data.electionType = p2vData.electionType
           queueMessage.data.electionLocation = p2vData.electionLocation
         }
@@ -134,11 +135,10 @@ export class EnqueuePathToVictoryService {
   }
 
   private async sendVictoryIssuesSlackMessage(campaign: Campaign, user: User) {
-    const { slug, data: details } = campaign
-    const { office, state, city, district } =
-      // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (details as PrismaJson.CampaignDetails) || {}
+    const { slug } = campaign
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const details = (campaign.details ?? {}) as PrismaJson.CampaignDetails
+    const { state, city, district } = details
     const appBase = process.env.WEBAPP_ROOT
 
     const resolvedName = user?.firstName
@@ -152,7 +152,6 @@ ${appBase}
 *We need to manually add their admin Path to victory*
 
 Name: ${resolvedName}
-Office: ${office || 'n/a'}
 State: ${state || 'n/a'}
 City: ${city || 'n/a'}
 District: ${district || 'n/a'}

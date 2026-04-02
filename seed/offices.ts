@@ -39,7 +39,7 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
         state: 'NC',
         party: 'independent',
         office: 'Other',
-      },
+      } as PrismaJson.IncomingCampaignDetails,
       didWin: true,
       isDemo: false,
       isActive: true,
@@ -63,7 +63,7 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
         projectedTurnout: 6282,
         voterContactGoal: 15710,
         districtManuallySet: false,
-      },
+      } as PrismaJson.PathToVictoryDataWithLegacy,
     },
   })
 

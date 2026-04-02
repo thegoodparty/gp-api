@@ -21,11 +21,10 @@ import {
   vi,
   type MockedFunction,
 } from 'vitest'
+import { IncomingCampaignDetails } from '../campaigns.types'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
-
-import { FEATURE_FLAG_CHECKER } from './campaigns.service'
 
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
@@ -117,10 +116,6 @@ const buildOrgSyncModule = async (overrides?: {
       },
       { provide: OrganizationsService, useValue: {} },
       { provide: SlackService, useValue: {} },
-      {
-        provide: FEATURE_FLAG_CHECKER,
-        useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
-      },
       { provide: PinoLogger, useValue: createMockLogger() },
       CampaignsService,
     ],
@@ -211,7 +206,11 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       await service.update({
         where: { id: 10 },
-        data: { details: { positionId: BR_POSITION_ID } },
+        data: {
+          details: {
+            positionId: BR_POSITION_ID,
+          } as IncomingCampaignDetails,
+        },
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
@@ -236,12 +235,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindUnique.mockResolvedValue({
         id: 10,
         userId: 1,
-        details: { positionId: BR_POSITION_ID },
+        details: {
+          positionId: BR_POSITION_ID,
+        } as IncomingCampaignDetails,
       })
 
       await service.update({
         where: { id: 10 },
-        data: { details: { office: 'Mayor' } },
+        data: {
+          details: {
+            office: 'Mayor',
+          } as IncomingCampaignDetails,
+        },
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
@@ -271,7 +276,11 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       await service.update({
         where: { id: 10 },
-        data: { details: { office: 'Mayor' } },
+        data: {
+          details: {
+            office: 'Mayor',
+          } as IncomingCampaignDetails,
+        },
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
@@ -296,12 +305,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindUnique.mockResolvedValue({
         id: 10,
         userId: 1,
-        details: { positionId: BR_POSITION_ID },
+        details: {
+          positionId: BR_POSITION_ID,
+        } as IncomingCampaignDetails,
       })
 
       await service.update({
         where: { id: 10 },
-        data: { details: { positionId: null } },
+        data: {
+          details: {
+            positionId: null,
+          } as IncomingCampaignDetails,
+        },
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
@@ -634,10 +649,6 @@ describe('CampaignsService - redeemFreeTexts', () => {
         {
           provide: SlackService,
           useValue: {},
-        },
-        {
-          provide: FEATURE_FLAG_CHECKER,
-          useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
         },
         // Provide CampaignsService LAST - all dependencies are now available
         { provide: PinoLogger, useValue: createMockLogger() },
@@ -1020,7 +1031,6 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       mockElections as ElectionsService,
       mockOrganizations as OrganizationsService,
       {} as SlackService,
-      { isFeatureEnabled: vi.fn() },
     )
   })
 
@@ -1150,6 +1160,11 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 6000,
       winNumber: 3001,
       voterContactGoal: 15005,
+      source: 'test',
+      electionType: 'test',
+      electionLocation: 'test',
+      p2vStatus: 'Complete',
+      p2vCompleteDate: '2026-01-01',
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
@@ -1178,6 +1193,11 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 4000,
       winNumber: 2001,
       voterContactGoal: 10005,
+      source: 'test',
+      electionType: 'test',
+      electionLocation: 'test',
+      p2vStatus: 'Complete',
+      p2vCompleteDate: '2026-01-01',
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)

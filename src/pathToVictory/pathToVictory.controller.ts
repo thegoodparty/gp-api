@@ -19,6 +19,7 @@ import { ListPathToVictoryPaginationSchema } from './schemas/ListPathToVictoryPa
 import { PathToVictorySchema } from './schemas/PathToVictory.schema'
 import { UpdatePathToVictoryM2MSchema } from './schemas/UpdatePathToVictoryM2M.schema'
 import { PinoLogger } from 'nestjs-pino'
+import type { PathToVictoryDataWithLegacy } from './types/pathToVictory.types'
 
 @Controller('path-to-victory')
 @UseGuards(M2MOnly)
@@ -58,7 +59,18 @@ export class PathToVictoryController {
       where: { id },
     })
 
-    const mergedData = deepMerge((existing.data as object) || {}, body.data)
+    const {
+      projectedTurnout: _pt,
+      winNumber: _wn,
+      voterContactGoal: _vcg,
+      electionType: _et,
+      electionLocation: _el,
+      districtId: _di,
+      districtManuallySet: _dms,
+      ...cleanedData
+    } = body.data as PathToVictoryDataWithLegacy
+
+    const mergedData = deepMerge((existing.data as object) || {}, cleanedData)
 
     const updated = await this.pathToVictoryService.update({
       where: { id },

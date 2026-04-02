@@ -378,7 +378,8 @@ function createMockCampaign(
             createdAt: new Date(),
             updatedAt: new Date(),
             campaignId: overrides.id ?? 1,
-            data: overrides.pathToVictory.data,
+            data: overrides.pathToVictory
+              .data as PrismaJson.PathToVictoryDataWithLegacy,
           }
         : null
 

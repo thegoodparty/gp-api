@@ -598,7 +598,8 @@ export class OrganizationsBackfillService extends createPrismaBase(
   } {
     const { isJsonObject, getString } = OrganizationsBackfillService
     const C = BackfillCategory
-    const details = campaign.details
+    const details =
+      campaign.details as PrismaJson.IncomingCampaignDetails | null
 
     if (!isJsonObject(details)) {
       return {

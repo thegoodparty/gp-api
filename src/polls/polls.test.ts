@@ -40,7 +40,7 @@ beforeEach(async () => {
       data: {
         electionType: 'City_Ward',
         electionLocation: 'CHEYENNE CITY WARD 1',
-      },
+      } as PrismaJson.PathToVictoryDataWithLegacy,
     },
   })
 

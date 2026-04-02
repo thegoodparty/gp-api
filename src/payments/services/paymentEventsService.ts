@@ -419,15 +419,18 @@ export class PaymentEventsService {
   }
 
   async sendProCancellationSlackMessage(user: User, campaign: Campaign) {
-    const { details = {} } = campaign || {}
-    const { office, otherOffice } = details
     const fullName = getUserFullName(user)
+    const positionName = campaign.organizationSlug
+      ? await this.organizationsService.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     await this.slackService.message(
       {
         body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
-        }, running for '${otherOffice || office}' and campaign slug \`${
+        }, running for '${positionName || 'Unknown Office'}' and campaign slug \`${
           campaign.slug
         }\` ended their pro subscription!`,
       },
@@ -446,9 +449,14 @@ export class PaymentEventsService {
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {
     const { details = {}, data = {} } = campaign || {}
-    const { office, otherOffice, state } = details
+    const { state } = details
     const { hubspotId } = data
     const name = `${user.firstName}${user.firstName ? ` ${user.lastName}` : ''}`
+    const positionName = campaign.organizationSlug
+      ? await this.organizationsService.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     await this.slackService.message(
       {
@@ -457,7 +465,7 @@ export class PaymentEventsService {
           Email: ${user.email}
           Campaign slug: ${campaign.slug}
           State: ${state}
-          Office: ${office || otherOffice}
+          Office: ${positionName || 'Unknown Office'}
           Assigned PA: ${
             hubspotId
               ? await this.crm.getCrmCompanyOwnerName(hubspotId)

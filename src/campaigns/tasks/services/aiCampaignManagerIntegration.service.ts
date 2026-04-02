@@ -9,6 +9,8 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
+import type { PathToVictoryDataWithLegacy } from 'src/pathToVictory/types/pathToVictory.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const CAMPAIGN_PLAN_VERSION = Number(process.env.CAMPAIGN_PLAN_VERSION) || 2
@@ -35,14 +37,17 @@ type CampaignWithPathToVictory = Campaign & {
 export class AiCampaignManagerIntegrationService extends createPrismaBase(
   MODELS.CampaignPlan,
 ) {
-  constructor(private readonly aiCampaignManager: AiCampaignManagerService) {
+  constructor(
+    private readonly aiCampaignManager: AiCampaignManagerService,
+    private readonly organizations: OrganizationsService,
+  ) {
     super()
   }
 
   async generateCampaignTasks(
     campaign: CampaignWithPathToVictory,
   ): Promise<CampaignTask[]> {
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
       request,
@@ -76,7 +81,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     | { cached: true; tasks: CampaignTask[] }
     | { cached: false; sessionId: string }
   > {
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
       request,
@@ -106,22 +111,30 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   ): Promise<CampaignTask[]> {
     const campaignPlanJson =
       await this.aiCampaignManager.downloadJson(sessionId)
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     await this.saveCampaignPlan(campaignPlanJson, campaign, request)
     return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
   }
 
-  private buildCampaignPlanRequest(
+  private async buildCampaignPlanRequest(
     campaign: CampaignWithPathToVictory,
-  ): StartCampaignPlanRequest {
+  ): Promise<StartCampaignPlanRequest> {
     const { details, data, pathToVictory } = campaign
 
-    const office = details.office || details.normalizedOffice || 'Local Office'
+    const positionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
+    const office = positionName || details.normalizedOffice || 'Local Office'
     const jurisdiction = details.state || 'Unknown State'
     const district = details.district ? ` - ${details.district}` : ''
     const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
-    const pathData = pathToVictory?.data
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const pathData = pathToVictory?.data as
+      | PathToVictoryDataWithLegacy
+      | undefined
     const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
     const totalRegisteredVoters = this.extractNumberValue(
       pathData?.totalRegisteredVoters,
