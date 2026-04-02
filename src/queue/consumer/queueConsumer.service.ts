@@ -44,7 +44,10 @@ import { OrganizationsService } from 'src/organizations/services/organizations.s
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import {
+  SlackChannel,
+  SlackMessageType,
+} from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
@@ -1178,9 +1181,9 @@ export class QueueConsumerService {
       {
         blocks: [
           {
-            type: 'section',
+            type: SlackMessageType.SECTION,
             text: {
-              type: 'mrkdwn',
+              type: SlackMessageType.MRKDWN,
               text: slackBody,
             },
           },
