@@ -316,7 +316,9 @@ export class QueueConsumerService {
           { data: queueMessage.data, messageId: message.MessageId },
           'received campaignPlanComplete message',
         )
-        return await this.handleCampaignPlanComplete(queueMessage.data)
+        return await this.withLegacyErrorSwallowing(message, () =>
+          this.handleCampaignPlanComplete(queueMessage.data),
+        )
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
