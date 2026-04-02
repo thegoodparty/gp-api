@@ -243,6 +243,116 @@ describe('AiCampaignManagerIntegrationService', () => {
       expect(request.total_likely_voters).toBe(1800)
     })
 
+    it('clamps seats_available to 1 when viability.seats is 0', async () => {
+      const campaign = makeCampaign({
+        pathToVictory: {
+          id: 1,
+          campaignId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          data: {
+            winNumber: 500,
+            totalRegisteredVoters: 3000,
+            projectedTurnout: 1800,
+            viability: {
+              level: 'medium',
+              isPartisan: false,
+              isIncumbent: false,
+              isUncontested: false,
+              candidates: 2,
+              seats: 0,
+              candidatesPerSeat: 2,
+              score: 50,
+              probOfWin: 0.5,
+            },
+          },
+        } as PathToVictory,
+      })
+      mockModel.findUnique.mockResolvedValue(null)
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 'session-1',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
+        progress: 100,
+        status: 'completed',
+        message: 'Done',
+        logs: [],
+        timestamp: new Date().toISOString(),
+        has_pdf: false,
+        has_json: true,
+        download_links: {},
+        expires_at: null,
+        expires_at_formatted: null,
+        files_ready: { pdf: false, json: true, total: 1 },
+      })
+      vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(
+        makePlanResponse(),
+      )
+      mockModel.upsert.mockResolvedValue({})
+
+      await service.generateCampaignTasks(campaign)
+
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
+
+      expect(request.seats_available).toBe(1)
+    })
+
+    it('passes through valid seats value from viability data', async () => {
+      const campaign = makeCampaign({
+        pathToVictory: {
+          id: 1,
+          campaignId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          data: {
+            winNumber: 500,
+            totalRegisteredVoters: 3000,
+            projectedTurnout: 1800,
+            viability: {
+              level: 'medium',
+              isPartisan: false,
+              isIncumbent: false,
+              isUncontested: false,
+              candidates: 5,
+              seats: 3,
+              candidatesPerSeat: 1.67,
+              score: 50,
+              probOfWin: 0.5,
+            },
+          },
+        } as PathToVictory,
+      })
+      mockModel.findUnique.mockResolvedValue(null)
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 'session-1',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
+        progress: 100,
+        status: 'completed',
+        message: 'Done',
+        logs: [],
+        timestamp: new Date().toISOString(),
+        has_pdf: false,
+        has_json: true,
+        download_links: {},
+        expires_at: null,
+        expires_at_formatted: null,
+        files_ready: { pdf: false, json: true, total: 1 },
+      })
+      vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(
+        makePlanResponse(),
+      )
+      mockModel.upsert.mockResolvedValue({})
+
+      await service.generateCampaignTasks(campaign)
+
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
+
+      expect(request.seats_available).toBe(3)
+    })
+
     it('uses defaults when campaign data is sparse', async () => {
       const campaign = makeCampaign({
         data: {} as PrismaJson.CampaignData,
