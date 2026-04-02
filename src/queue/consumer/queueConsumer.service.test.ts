@@ -1327,6 +1327,7 @@ describe('QueueConsumerService - message type routing', () => {
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
+    expect(mockSlackService.message).toHaveBeenCalledOnce()
     const slackText =
       mockSlackService.message.mock.calls[0][0].blocks[0].text.text
     expect(slackText).toContain('John')
