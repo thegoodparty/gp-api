@@ -1,5 +1,11 @@
 # @goodparty_org/contracts
 
+## 0.2.0
+
+### Minor Changes
+
+- Add SetDistrictOutput response schema and type for campaign district update endpoint
+
 ## 0.1.0
 
 ### Minor Changes
