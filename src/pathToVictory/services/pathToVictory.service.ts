@@ -604,9 +604,7 @@ export class PathToVictoryService extends createPrismaBase(
 
       // --- Detect office change via fingerprint ---
       // When the candidate switches offices between silver runs, strip stale
-      // turnout/viability/attempts so old data doesn't persist for the new office.
-      // District data (electionType/electionLocation) is kept — gold may have
-      // already written correct district data for the new office.
+      // viability/attempts so old data doesn't persist for the new office.
       const previousOfficeFingerprint: string | null =
         p2vData.officeContextFingerprint ?? null
       const hasOfficeChanged =
