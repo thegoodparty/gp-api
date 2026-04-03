@@ -42,6 +42,8 @@ function createService(): AiService {
   )
 }
 
+const FALLBACK_CONTENT = 'from fallback'
+
 function userMessage(content: string): AiChatMessage {
   return { role: 'user', content, createdAt: Date.now(), id: 'msg-1' }
 }
@@ -125,13 +127,13 @@ describe('AiService', () => {
       mockLangChainInvoke
         .mockResolvedValueOnce({ content: '', response_metadata: {} })
         .mockResolvedValueOnce({
-          content: 'from fallback',
+          content: FALLBACK_CONTENT,
           response_metadata: { tokenUsage: { totalTokens: 10 } },
         })
 
       const result = await service.llmChatCompletion([userMessage('hi')])
 
-      expect(result.content).toBe('from fallback')
+      expect(result.content).toBe(FALLBACK_CONTENT)
       expect(result.tokens).toBe(10)
     })
 
@@ -139,13 +141,13 @@ describe('AiService', () => {
       mockLangChainInvoke
         .mockRejectedValueOnce(new Error('rate limit'))
         .mockResolvedValueOnce({
-          content: 'from fallback',
+          content: FALLBACK_CONTENT,
           response_metadata: {},
         })
 
       const result = await service.llmChatCompletion([userMessage('hi')])
 
-      expect(result.content).toBe('from fallback')
+      expect(result.content).toBe(FALLBACK_CONTENT)
       expect(mockSlack.errorMessage).toHaveBeenCalledTimes(1)
     })
 

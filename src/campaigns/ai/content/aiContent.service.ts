@@ -29,6 +29,18 @@ export class AiContentService {
     this.logger.setContext(AiContentService.name)
   }
 
+  private static readonly STALE_PROCESSING_MS = 5 * 60 * 1000
+
+  private isStaleProcessing(keyStatus: {
+    createdAt?: number | string
+  }): boolean {
+    const createdAt = Number(keyStatus.createdAt)
+    return (
+      !Number.isNaN(createdAt) &&
+      Date.now() - createdAt > AiContentService.STALE_PROCESSING_MS
+    )
+  }
+
   /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
@@ -40,23 +52,13 @@ export class AiContentService {
       aiContent.generationStatus = {}
     }
 
-    const STALE_PROCESSING_MS = 5 * 60 * 1000
     const keyStatus = aiContent.generationStatus[key]
-    if (
-      !regenerate &&
-      keyStatus?.status === GenerationStatus.processing
-    ) {
-      const createdAt = keyStatus.createdAt as number | undefined
-      const isStale =
-        createdAt && Date.now() - createdAt > STALE_PROCESSING_MS
-      if (!isStale) {
-        return {
-          status: GenerationStatus.processing,
-          key,
-        }
+    if (!regenerate && keyStatus?.status === GenerationStatus.processing) {
+      if (!this.isStaleProcessing(keyStatus)) {
+        return { status: GenerationStatus.processing, key }
       }
       this.logger.warn(
-        { key, createdAt },
+        { key, createdAt: keyStatus.createdAt },
         'Stale processing status detected, re-generating',
       )
     }
