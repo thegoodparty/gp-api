@@ -62,6 +62,7 @@ import { PollIndividualMessageService } from '@/polls/services/pollIndividualMes
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
+import { isTestUser } from '@/users/util/users.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -932,6 +933,15 @@ export class QueueConsumerService {
         where: { id: message.campaignId },
         include: { pathToVictory: true },
       })
+
+      const user = await this.usersService.findUniqueOrThrow({
+        where: { id: campaign.userId },
+      })
+
+      if (isTestUser({ email: user.email })) {
+        this.logger.info(`Skipping task generation for test user ${user.email}`)
+        return
+      }
 
       await this.campaignTasksService.generateTasks(campaign)
 
