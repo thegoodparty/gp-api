@@ -85,13 +85,9 @@ async function prepareCampaignAndOffice(params: {
         source: P2VSource.ElectionApi,
         p2vStatus: P2VStatus.complete,
         winNumber: 3142,
-        districtId: CONTACTS_TEST_DISTRICT.id,
-        electionType: CONTACTS_TEST_DISTRICT.type,
-        electionLocation: CONTACTS_TEST_DISTRICT.name,
         p2vCompleteDate: '2025-09-25',
         projectedTurnout: 6282,
         voterContactGoal: 15710,
-        districtManuallySet: false,
       },
     },
   })
@@ -257,9 +253,6 @@ test.describe('Contacts and Segments', () => {
         pathToVictory: {
           source: P2VSource.ElectionApi,
           p2vStatus: P2VStatus.complete,
-          districtId: 'cfa28085-cf71-6c78-7605-a24b8e2d41ab',
-          electionType: 'State',
-          electionLocation: 'AL',
           p2vCompleteDate: '2025-09-25',
         },
       },

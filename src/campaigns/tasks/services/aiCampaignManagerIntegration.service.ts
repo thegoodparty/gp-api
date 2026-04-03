@@ -134,7 +134,6 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const district = details.district ? ` - ${details.district}` : ''
     const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const pathData = pathToVictory?.data as
       | PrismaJson.PathToVictoryData
       | undefined

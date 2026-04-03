@@ -395,9 +395,7 @@ export class CampaignsController {
 
     const updated = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...(!hasTurnout
-          ? { p2vStatus: P2VStatus.districtMatched }
-          : {}),
+        ...(!hasTurnout ? { p2vStatus: P2VStatus.districtMatched } : {}),
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -551,7 +549,6 @@ export class CampaignsController {
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
-        districtManuallySet: false,
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },

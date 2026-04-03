@@ -195,8 +195,13 @@ describe('CampaignsService - Organization positionId sync', () => {
 
   describe('update', () => {
     it('should delegate to campaign.update inside a transaction and track campaign', async () => {
-      const { service, mockCampaignUpdate, mockTrackCampaign, mockGetPosition, mockOrgUpdate } =
-        await buildOrgSyncModule()
+      const {
+        service,
+        mockCampaignUpdate,
+        mockTrackCampaign,
+        mockGetPosition,
+        mockOrgUpdate,
+      } = await buildOrgSyncModule()
 
       const args = {
         where: { id: 10 } as const,
@@ -245,13 +250,9 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
-      await service.updateJsonFields(
-        10,
-        {},
-        true,
-        undefined,
-        { positionId: BR_POSITION_ID },
-      )
+      await service.updateJsonFields(10, {}, true, undefined, {
+        positionId: BR_POSITION_ID,
+      })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpdate).toHaveBeenCalledWith({
@@ -295,13 +296,9 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
-      await service.updateJsonFields(
-        10,
-        {},
-        true,
-        undefined,
-        { office: 'Mayor' },
-      )
+      await service.updateJsonFields(10, {}, true, undefined, {
+        office: 'Mayor',
+      })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpdate).toHaveBeenCalledWith({
@@ -370,7 +367,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { electionType: 'State Senate' },
+        pathToVictory: { p2vCompleteDate: '2025-01-01' },
         overrideDistrictId: 'district-uuid-123',
       })
 
@@ -387,7 +384,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { electionType: 'State Senate' },
+        pathToVictory: { p2vCompleteDate: '2025-01-01' },
         overrideDistrictId: null,
       })
 
@@ -404,7 +401,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { electionType: 'State Senate' },
+        pathToVictory: { p2vCompleteDate: '2025-01-01' },
       })
 
       expect(mockOrgUpdate).not.toHaveBeenCalled()

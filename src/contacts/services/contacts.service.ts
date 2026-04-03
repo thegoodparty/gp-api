@@ -81,17 +81,11 @@ export class ContactsService {
       if (!alternativeDistrictName || !is404) {
         throw error
       }
-      const result = await fn({
+      return fn({
         state,
         districtType,
         districtName: alternativeDistrictName,
       })
-      await this.campaigns.updateJsonFields(
-        campaign.id,
-        { pathToVictory: { electionLocation: alternativeDistrictName } },
-        false,
-      )
-      return result
     }
   }
 
@@ -569,6 +563,8 @@ export class ContactsService {
   } {
     const state = this.getCampaignState(campaign)
 
+    // LEGACY: These fields still exist in old DB rows until the cleanup migration runs.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const ptv = campaign.pathToVictory?.data as
       | { electionType?: string; electionLocation?: string }
       | undefined

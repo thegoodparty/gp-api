@@ -376,9 +376,9 @@ describe('AiCampaignManagerIntegrationService', () => {
     })
 
     it('uses defaults when campaign data is sparse', async () => {
-      vi.mocked(mockCampaigns.fetchLiveRaceTargetMetrics!).mockResolvedValueOnce(
-        null,
-      )
+      vi.mocked(
+        mockCampaigns.fetchLiveRaceTargetMetrics!,
+      ).mockResolvedValueOnce(null)
       const campaign = makeCampaign({
         data: {} as PrismaJson.CampaignData,
         details: {} as PrismaJson.CampaignDetails,

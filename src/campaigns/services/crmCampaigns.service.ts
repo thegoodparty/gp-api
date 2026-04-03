@@ -200,9 +200,8 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const p2vData = (pathToVictory?.data ||
-      {}) as PrismaJson.PathToVictoryData
+
+    const p2vData = (pathToVictory?.data || {}) as PrismaJson.PathToVictoryData
 
     const {
       p2vStatus,

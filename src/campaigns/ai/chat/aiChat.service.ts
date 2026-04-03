@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ContentService } from 'src/content/services/content.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
@@ -18,6 +19,7 @@ const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   constructor(
     private aiService: AiService,
+    private campaigns: CampaignsService,
     private contentService: ContentService,
     private slack: SlackService,
   ) {
@@ -32,9 +34,12 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt(initial)
 
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const candidateContext = await this.aiService.promptReplace(
       candidateJson,
       campaign,
+      liveMetrics,
     )
 
     const chatMessage: AiChatMessage = {
@@ -130,9 +135,12 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt()
 
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const candidateContext = await this.aiService.promptReplace(
       candidateJson,
       campaign,
+      liveMetrics,
     )
 
     let messageId: string | undefined

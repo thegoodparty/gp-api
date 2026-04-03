@@ -531,8 +531,6 @@ export class AiService {
 
       if (pathToVictory) {
         const {
-          projectedTurnout: storedTurnout,
-          winNumber: storedWinNumber,
           republicans,
           democrats,
           indies,
@@ -552,10 +550,10 @@ export class AiService {
           budgetHigh,
           // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
+        } = pathToVictory.data as Record<string, string | number>
 
-        const projectedTurnout = liveMetrics?.projectedTurnout ?? storedTurnout
-        const winNumber = liveMetrics?.winNumber ?? storedWinNumber
+        const projectedTurnout = liveMetrics?.projectedTurnout
+        const winNumber = liveMetrics?.winNumber
         const voterContactGoal = liveMetrics?.voterContactGoal ?? voteGoal
 
         replaceArr.push(
