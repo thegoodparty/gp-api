@@ -36,7 +36,7 @@ export type SlackMessageBlock = {
 }
 
 export type SlackMessage = {
-  body?: string
+  text?: string
   blocks?: SlackMessageBlock[]
 }
 

@@ -425,7 +425,7 @@ export class PaymentEventsService {
 
     await this.slackService.message(
       {
-        body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
+        text: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
         }, running for '${otherOffice || office}' and campaign slug \`${
           campaign.slug
@@ -438,7 +438,7 @@ export class PaymentEventsService {
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        body: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
+        text: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
@@ -452,23 +452,15 @@ export class PaymentEventsService {
 
     await this.slackService.message(
       {
-        body: `PRO PLAN SIGN UP!!! :gp:
-          Name: ${name}
-          Email: ${user.email}
-          Campaign slug: ${campaign.slug}
-          State: ${state}
-          Office: ${office || otherOffice}
-          Assigned PA: ${
-            hubspotId
-              ? await this.crm.getCrmCompanyOwnerName(hubspotId)
-              : 'None assigned'
-          }
-          ${
-            hubspotId
-              ? `https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}`
-              : 'No CRM company found'
-          }
-        `,
+        text: `PRO PLAN SIGN UP!!! :gp:\nName: ${name}\nEmail: ${user.email}\nCampaign slug: ${campaign.slug}\nState: ${state}\nOffice: ${office || otherOffice}\nAssigned PA: ${
+          hubspotId
+            ? await this.crm.getCrmCompanyOwnerName(hubspotId)
+            : 'None assigned'
+        }\n${
+          hubspotId
+            ? `https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}`
+            : 'No CRM company found'
+        }`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
