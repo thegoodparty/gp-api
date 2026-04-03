@@ -352,4 +352,72 @@ describe('OrganizationsService', () => {
       ).rejects.toThrow('election-api down')
     })
   })
+
+  describe('resolvePositionContextByOrgSlug', () => {
+    let mockFindUnique: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      mockFindUnique = vi.fn().mockResolvedValue(null)
+      service.findUnique = mockFindUnique as typeof service.findUnique
+    })
+
+    it('returns brPositionId and positionName for org with positionId', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'campaign-1',
+        positionId: 'gp-pos-id',
+        customPositionName: null,
+        ownerId: 1,
+        overrideDistrictId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      mockGetPositionById.mockResolvedValue({
+        id: 'gp-pos-id',
+        name: 'Mayor',
+        brPositionId: 'br-pos-42',
+      })
+
+      const result = await service.resolvePositionContextByOrgSlug('campaign-1')
+
+      expect(result).toEqual({
+        ballotReadyPositionId: 'br-pos-42',
+        positionName: 'Mayor',
+      })
+      expect(mockFindUnique).toHaveBeenCalledWith({
+        where: { slug: 'campaign-1' },
+      })
+      expect(mockGetPositionById).toHaveBeenCalledWith('gp-pos-id')
+    })
+
+    it('returns null brPositionId and custom name for org without positionId', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'campaign-2',
+        positionId: null,
+        customPositionName: 'Dog Catcher',
+        ownerId: 1,
+        overrideDistrictId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+
+      const result = await service.resolvePositionContextByOrgSlug('campaign-2')
+
+      expect(result).toEqual({
+        ballotReadyPositionId: null,
+        positionName: 'Dog Catcher',
+      })
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+
+    it('returns nulls when organization is not found', async () => {
+      const result =
+        await service.resolvePositionContextByOrgSlug('nonexistent-slug')
+
+      expect(result).toEqual({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+  })
 })

@@ -217,7 +217,7 @@ export class AiService {
       // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
       this.logger.debug({ model }, 'model')
-      const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
+      const togetherAi = !model.includes('gpt')
       const client = new OpenAI({
         apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
         baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,

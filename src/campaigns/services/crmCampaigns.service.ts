@@ -269,22 +269,11 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const org = campaign.organizationSlug
-      ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
-      : null
-    const positionName = org
-      ? (
-          await this.organizations.resolvePositionContext({
-            customPositionName: org.customPositionName,
-            positionId: org.positionId,
-          })
-        ).positionName
-      : null
-    const brPositionId = org?.positionId
-      ? await this.organizations.resolveBallotReadyPositionId(org.positionId)
-      : null
+    const { positionName, ballotReadyPositionId } = campaign.organizationSlug
+      ? await this.organizations.resolvePositionContextByOrgSlug(
+          campaign.organizationSlug,
+        )
+      : { positionName: null, ballotReadyPositionId: null }
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
@@ -355,7 +344,7 @@ export class CrmCampaignsService {
       running: runForOffice ? HubSpot.Running.YES : HubSpot.Running.NO,
 
       // election details
-      br_position_id: brPositionId ?? undefined,
+      br_position_id: ballotReadyPositionId ?? undefined,
       br_race_id: campaignDetails?.raceId ?? undefined,
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?

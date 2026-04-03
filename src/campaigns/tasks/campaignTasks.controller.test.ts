@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignTasksController } from './campaignTasksController'
+import { CampaignTasksController } from './campaignTasks.controller'
 import { CampaignTasksService } from './services/campaignTasks.service'
-import { CampaignTaskType } from '@prisma/client'
+import { CampaignTaskType, CampaignUpdateHistoryType } from '@prisma/client'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 
 const makeCampaign = (): CampaignWithPathToVictory =>
@@ -35,6 +35,7 @@ const makeDbTask = (overrides = {}) => ({
   deadline: null,
   defaultAiTemplateId: null,
   completed: false,
+  updateHistoryId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,
@@ -72,16 +73,40 @@ describe('CampaignTasksController', () => {
   })
 
   describe('completeTask', () => {
-    it('delegates to service with campaign and task id', async () => {
+    it('delegates to service with campaign, task id, and no body', async () => {
       const campaign = makeCampaign()
       const updatedTask = makeDbTask({ completed: true })
       vi.mocked(mockTasksService.completeTask!).mockResolvedValue(updatedTask)
 
-      const result = await controller.completeTask(campaign, 'task-1')
+      const result = await controller.completeTask(
+        campaign,
+        'task-1',
+        undefined,
+      )
 
       expect(mockTasksService.completeTask).toHaveBeenCalledWith(
         campaign,
         'task-1',
+        undefined,
+      )
+      expect(result).toEqual(updatedTask)
+    })
+
+    it('delegates to service with voter contact body', async () => {
+      const campaign = makeCampaign()
+      const updatedTask = makeDbTask({ completed: true })
+      vi.mocked(mockTasksService.completeTask!).mockResolvedValue(updatedTask)
+      const body = {
+        type: CampaignUpdateHistoryType.doorKnocking,
+        quantity: 10,
+      }
+
+      const result = await controller.completeTask(campaign, 'task-1', body)
+
+      expect(mockTasksService.completeTask).toHaveBeenCalledWith(
+        campaign,
+        'task-1',
+        body,
       )
       expect(result).toEqual(updatedTask)
     })

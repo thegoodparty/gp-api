@@ -27,6 +27,8 @@ model CampaignTask {
   completed           Boolean          @default(false)
   campaign            Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId          Int              @map("campaign_id")
+  updateHistory       CampaignUpdateHistory? @relation(fields: [updateHistoryId], references: [id], onDelete: SetNull)
+  updateHistoryId     Int?                   @unique @map("update_history_id")
 
   @@index([campaignId])
   @@index([campaignId, completed])

@@ -113,7 +113,7 @@ test.describe('Campaigns - Race Target Details', () => {
       expect(data?.source).toBeTruthy()
       expect(data?.p2vStatus).toBeTruthy()
       expect(data?.p2vCompleteDate).toBeTruthy()
-      expect(data?.p2pAttempts).toBe(0)
+      expect(data?.p2vAttempts).toBe(0)
       expect(data?.officeContextFingerprint).toBeNull()
     }
   })
@@ -171,7 +171,7 @@ test.describe('Campaigns - Race Target Details', () => {
 
       const { pathToVictory } = campaign
       expect(pathToVictory).toHaveProperty('data')
-      expect(pathToVictory?.data?.p2pAttempts).toBe(0)
+      expect(pathToVictory?.data?.p2vAttempts).toBe(0)
       expect(pathToVictory?.data?.officeContextFingerprint).toBeNull()
     }
   })
@@ -308,7 +308,7 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       expect(campaign.pathToVictory?.data).toBeTruthy()
       expect(campaign.pathToVictory?.data?.source).toBeTruthy()
       expect(campaign.pathToVictory?.data?.p2vStatus).toBeTruthy()
-      expect(campaign.pathToVictory?.data?.p2pAttempts).toBe(0)
+      expect(campaign.pathToVictory?.data?.p2vAttempts).toBe(0)
       expect(campaign.pathToVictory?.data?.officeContextFingerprint).toBeNull()
     }
   })
