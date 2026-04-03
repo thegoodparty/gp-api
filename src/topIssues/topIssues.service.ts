@@ -26,11 +26,24 @@ export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
       },
     ]
 
-    const completion = await this.ai.llmChatCompletion(messages, 3000, 0.5, 0.1)
+    try {
+      const completion = await this.ai.llmChatCompletion(
+        messages,
+        3000,
+        0.5,
+        0.1,
+      )
 
-    const chatResponse = completion.content
-    const issues = chatResponse.split(',')
-    return issues.map((issue) => issue.trim())
+      const chatResponse = completion.content
+      const issues = chatResponse.split(',')
+      return issues.map((issue) => issue.trim())
+    } catch (error) {
+      this.logger.error(
+        { err: error, zip },
+        'AI completion failed in getByLocation',
+      )
+      return []
+    }
   }
 
   async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {
