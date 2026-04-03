@@ -97,8 +97,10 @@ export class AiService {
       model: modelName,
       ...options,
       maxRetries: 0,
+      timeout: 120_000,
       ...(!isOpenAi && {
         configuration: { baseURL: TOGETHER_AI_BASE_URL },
+        modelKwargs: { reasoning: { enabled: false } },
       }),
     })
   }
@@ -154,41 +156,47 @@ export class AiService {
     }
 
     const options = { maxTokens, temperature, topP }
-    const [primaryName, ...fallbackNames] = PARSED_AI_MODELS
-    const primary = this.buildChatModel(primaryName, options)
-    const fallbacks = fallbackNames.map((m) => this.buildChatModel(m, options))
-
-    const model =
-      fallbacks.length > 0 ? primary.withFallbacks(fallbacks) : primary
-
     const sanitizedMessages = messages.map(AiService.sanitizeMessage)
 
-    let completion: BaseMessage
-    try {
-      completion = await model.invoke(sanitizedMessages)
-    } catch (error) {
-      this.logger.error({ err: error }, 'Error in llmChatCompletion')
-      await this.slack.errorMessage({
-        message: 'Error in AI completion (raw)',
-        error,
-      })
-      throw error
+    for (const modelName of PARSED_AI_MODELS) {
+      const model = this.buildChatModel(modelName, options)
+
+      try {
+        const completion = await model.invoke(sanitizedMessages)
+        const raw = this.extractContent(completion.content)
+
+        if (!raw) {
+          this.logger.warn(
+            { model: modelName },
+            'Model returned empty content, trying next',
+          )
+          continue
+        }
+
+        let content = AiService.stripHtmlFences(raw)
+        content = content.replace(/\n/g, '<br/><br/>')
+
+        return {
+          content,
+          tokens: this.extractTokenCount(completion),
+        }
+      } catch (error) {
+        this.logger.error(
+          { err: error, model: modelName },
+          'Error in llmChatCompletion',
+        )
+        try {
+          await this.slack.errorMessage({
+            message: `Error in AI completion (${modelName})`,
+            error,
+          })
+        } catch {
+          // Slack notification must never prevent model fallback
+        }
+      }
     }
 
-    if (!completion?.content) {
-      throw new Error(
-        'AI model returned empty content — possible reasoning-only model or token limit exhausted',
-      )
-    }
-
-    let content = this.extractContent(completion.content)
-    content = AiService.stripHtmlFences(content)
-    content = content.replace(/\n/g, '<br/><br/>')
-
-    return {
-      content,
-      tokens: this.extractTokenCount(completion),
-    }
+    throw new Error('All AI models failed or returned empty content')
   }
 
   private buildOpenAiClient(model: string): OpenAI {
@@ -222,6 +230,7 @@ export class AiService {
       this.logger.debug({ model }, 'model')
       const client = this.buildOpenAiClient(model)
 
+      const isTogetherAi = !model.includes('gpt')
       try {
         const completion = await client.chat.completions.create(
           {
@@ -231,6 +240,7 @@ export class AiService {
             temperature,
             ...(tool && { tools: [tool] }),
             ...(toolChoice && { tool_choice: toolChoice }),
+            ...(isTogetherAi && { reasoning: { enabled: false } }),
           },
           { timeout },
         )
@@ -249,12 +259,19 @@ export class AiService {
           tokens: completion.usage?.total_tokens ?? 0,
         }
       } catch (error) {
-        this.logger.error({ error }, 'error')
-        await this.slack.formattedMessage({
-          message: `Error in getChatToolCompletion. model: ${model}`,
-          error,
-          channel: SlackChannel.botDev,
-        })
+        this.logger.error(
+          { err: error, model },
+          'Error in getChatToolCompletion',
+        )
+        try {
+          await this.slack.formattedMessage({
+            message: `Error in getChatToolCompletion. model: ${model}`,
+            error,
+            channel: SlackChannel.botDev,
+          })
+        } catch {
+          // Slack notification must never prevent model fallback
+        }
       }
     }
 

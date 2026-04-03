@@ -110,40 +110,53 @@ describe('AiService', () => {
       expect(result.content).toBe('part1 part2')
     })
 
-    it('throws when model returns empty content', async () => {
-      mockLangChainInvoke.mockResolvedValueOnce({
+    it('throws when all models return empty content', async () => {
+      mockLangChainInvoke.mockResolvedValue({
         content: '',
         response_metadata: {},
       })
 
       await expect(
         service.llmChatCompletion([userMessage('hi')]),
-      ).rejects.toThrow('AI model returned empty content')
+      ).rejects.toThrow('All AI models failed or returned empty content')
     })
 
-    it('throws when model returns null content', async () => {
-      mockLangChainInvoke.mockResolvedValueOnce({
-        content: null,
-        response_metadata: {},
-      })
+    it('falls back to next model when primary returns empty content', async () => {
+      mockLangChainInvoke
+        .mockResolvedValueOnce({ content: '', response_metadata: {} })
+        .mockResolvedValueOnce({
+          content: 'from fallback',
+          response_metadata: { tokenUsage: { totalTokens: 10 } },
+        })
+
+      const result = await service.llmChatCompletion([userMessage('hi')])
+
+      expect(result.content).toBe('from fallback')
+      expect(result.tokens).toBe(10)
+    })
+
+    it('falls back to next model when primary throws', async () => {
+      mockLangChainInvoke
+        .mockRejectedValueOnce(new Error('rate limit'))
+        .mockResolvedValueOnce({
+          content: 'from fallback',
+          response_metadata: {},
+        })
+
+      const result = await service.llmChatCompletion([userMessage('hi')])
+
+      expect(result.content).toBe('from fallback')
+      expect(mockSlack.errorMessage).toHaveBeenCalledTimes(1)
+    })
+
+    it('throws when all models fail and sends Slack notifications', async () => {
+      mockLangChainInvoke.mockRejectedValue(new Error('all down'))
 
       await expect(
         service.llmChatCompletion([userMessage('hi')]),
-      ).rejects.toThrow('AI model returned empty content')
-    })
+      ).rejects.toThrow('All AI models failed or returned empty content')
 
-    it('propagates LLM errors and sends Slack notification', async () => {
-      const llmError = new Error('Together AI rate limit')
-      mockLangChainInvoke.mockRejectedValueOnce(llmError)
-
-      await expect(
-        service.llmChatCompletion([userMessage('hi')]),
-      ).rejects.toThrow('Together AI rate limit')
-
-      expect(mockSlack.errorMessage).toHaveBeenCalledWith({
-        message: 'Error in AI completion (raw)',
-        error: llmError,
-      })
+      expect(mockSlack.errorMessage).toHaveBeenCalled()
     })
 
     it('returns 0 tokens when tokenUsage is missing', async () => {
@@ -182,7 +195,7 @@ describe('AiService', () => {
       expect(invokedMessages[0].content).toBe("hello - world 'code'")
     })
 
-    it('uses primary model without fallbacks when only one model is configured', async () => {
+    it('succeeds on first model without trying others', async () => {
       mockLangChainInvoke.mockResolvedValueOnce({
         content: 'ok',
         response_metadata: {},
@@ -190,10 +203,6 @@ describe('AiService', () => {
 
       await service.llmChatCompletion([userMessage('hi')])
 
-      // When there's only one model (or models parsed from env),
-      // withFallbacks should not be called, OR be called with empty array
-      // depending on PARSED_AI_MODELS length. Since the env is set in the
-      // module scope, we verify the invoke was called successfully.
       expect(mockLangChainInvoke).toHaveBeenCalledTimes(1)
     })
   })
@@ -532,10 +541,10 @@ describe('AiService', () => {
     })
 
     it('propagates errors from llmChatCompletion', async () => {
-      mockLangChainInvoke.mockRejectedValueOnce(new Error('LLM unavailable'))
+      mockLangChainInvoke.mockRejectedValue(new Error('LLM unavailable'))
 
       await expect(service.getAssistantCompletion(baseArgs)).rejects.toThrow(
-        'LLM unavailable',
+        'All AI models failed',
       )
     })
   })

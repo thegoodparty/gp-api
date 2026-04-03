@@ -113,7 +113,7 @@ export class SlackService {
     error,
     channel,
   }: FormattedSlackMessageArgs) {
-    let body = `${message}\n\n${error ? JSON.stringify(error) : ''}`
+    let body = `${message}\n\n${error ? JSON.stringify(serializeError(error)) : ''}`
     if (body.length > SlackService.SLACK_BLOCK_TEXT_LIMIT) {
       body =
         body.slice(0, SlackService.SLACK_BLOCK_TEXT_LIMIT - 20) +

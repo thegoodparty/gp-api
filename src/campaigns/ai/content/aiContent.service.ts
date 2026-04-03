@@ -40,16 +40,25 @@ export class AiContentService {
       aiContent.generationStatus = {}
     }
 
+    const STALE_PROCESSING_MS = 5 * 60 * 1000
+    const keyStatus = aiContent.generationStatus[key]
     if (
       !regenerate &&
-      aiContent.generationStatus[key] !== undefined &&
-      aiContent.generationStatus[key].status !== undefined &&
-      aiContent.generationStatus[key].status === GenerationStatus.processing
+      keyStatus?.status === GenerationStatus.processing
     ) {
-      return {
-        status: GenerationStatus.processing,
-        key,
+      const createdAt = keyStatus.createdAt as number | undefined
+      const isStale =
+        createdAt && Date.now() - createdAt > STALE_PROCESSING_MS
+      if (!isStale) {
+        return {
+          status: GenerationStatus.processing,
+          key,
+        }
       }
+      this.logger.warn(
+        { key, createdAt },
+        'Stale processing status detected, re-generating',
+      )
     }
     const existing = aiContent[key]
 
