@@ -27,10 +27,6 @@ export type CreateElectedOfficeArgs = {
 export class ElectedOfficeService extends createPrismaBase(
   MODELS.ElectedOffice,
 ) {
-  constructor() {
-    super()
-  }
-
   async create(args: CreateElectedOfficeArgs) {
     const existing = await this.model.findFirst({
       where: { userId: args.userId },
