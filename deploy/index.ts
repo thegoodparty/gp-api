@@ -353,7 +353,7 @@ export = async () => {
       }),
       WEBAPP_ROOT_URL: `https://${productDomain}`,
       AI_MODELS:
-        'Qwen/Qwen3.5-397B-A17B,MiniMaxAI/MiniMax-M2.5',
+        'Qwen/Qwen3-235B-A22B-Instruct-2507-tput,MiniMaxAI/MiniMax-M2.5',
       LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
