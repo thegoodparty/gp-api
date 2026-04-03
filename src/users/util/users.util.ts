@@ -25,3 +25,6 @@ export function userHasRole(user: User, roleOrRoles: UserRole | UserRole[]) {
 export function isAdmin(user: User) {
   return userHasRole(user, UserRole.admin)
 }
+
+export const isTestUser = (params: { email: string }) =>
+  params.email.endsWith('@test.goodparty.org')
