@@ -200,7 +200,9 @@ describe('PathToVictoryController', () => {
 
       await controller.update(
         { id: 11 },
-        { data: { totalRegisteredVoters: 300 } as PrismaJson.PathToVictoryData },
+        {
+          data: { totalRegisteredVoters: 300 } as PrismaJson.PathToVictoryData,
+        },
       )
 
       expect(pathToVictoryService.update).toHaveBeenCalledWith({
