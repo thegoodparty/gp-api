@@ -84,14 +84,21 @@ export class AiService {
     temperature: number = 1.0,
     topP: number = 0.1,
   ) {
+    if (!AI_MODELS || AI_MODELS.trim() === '') {
+      const err = new Error(
+        'AI_MODELS env var is empty — no models configured for AI completion',
+      )
+      this.logger.error(err.message)
+      await this.slack.errorMessage({
+        message: 'AI Models are not configured. Please specify AI models.',
+        error: err,
+      })
+      throw err
+    }
+
     const models = AI_MODELS.split(',')
       .map((m) => m.trim())
       .filter((m) => m.length > 0)
-    if (models.length === 0) {
-      throw new Error(
-        'AI_MODELS env var is empty — no models configured for AI completion',
-      )
-    }
 
     const aiOptions = {
       maxTokens,
@@ -191,9 +198,7 @@ export class AiService {
 
     if (content.includes('```html')) {
       const match = content.match(/```html([\s\S]*?)```/)
-      if (match) {
-        content = match[1]
-      }
+      content = match?.length ? match[1] : content
     }
     content = content.replace(/\n/g, '<br/><br/>')
 
@@ -381,7 +386,10 @@ export class AiService {
     }
 
     if (messageId) {
-      this.logger.info({ messageId }, 'filtering out old message for regeneration')
+      this.logger.info(
+        { messageId },
+        'filtering out old message for regeneration',
+      )
       messages = messages.filter((m) => m.id !== messageId)
     }
 
