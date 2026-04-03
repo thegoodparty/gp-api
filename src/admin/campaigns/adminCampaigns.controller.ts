@@ -57,7 +57,7 @@ export class AdminCampaignsController {
     //  https://goodparty.atlassian.net/browse/WEB-4324
     await this.slack.message(
       {
-        body: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
+        text: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
       },
       SlackChannel.botDeletions,
     )

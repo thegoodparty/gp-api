@@ -62,55 +62,42 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     this.logger.info({ candidateContext }, 'candidateContext')
     this.logger.info({ systemPrompt }, 'systemPrompt')
 
-    const completion = (await this.aiService.getAssistantCompletion({
+    const completion = await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
       messageId: messageId!,
-    })) as
-      | {
-          content: string
-          threadId: string
-          id: string
-          role: string
-          createdAt: number
-          usage: number
-        }
-      | undefined
+    })
 
     this.logger.info({ completion }, 'completion')
 
-    if (completion && completion?.content) {
-      const chatResponse: AiChatMessage = {
-        role: 'assistant',
-        id: completion.id,
-        content: completion.content,
-        createdAt: completion.createdAt,
-        usage: completion.usage,
-      }
+    const chatResponse: AiChatMessage = {
+      role: 'assistant',
+      id: completion.id,
+      content: completion.content,
+      createdAt: completion.createdAt,
+      usage: completion.usage,
+    }
 
-      if (!campaign.user?.id) {
-        throw new Error('Campaign has no associated user')
-      }
-      await this.model.create({
-        data: {
-          assistant: LLAMA_AI_ASSISTANT,
-          threadId: completion.threadId,
-          userId: campaign.user.id,
-          campaignId: campaign.id,
-          data: {
-            messages: [chatMessage, chatResponse],
-          },
-        },
-      })
-      return {
-        chat: [chatMessage, chatResponse],
+    if (!campaign.user?.id) {
+      throw new Error('Campaign has no associated user')
+    }
+    await this.model.create({
+      data: {
+        assistant: LLAMA_AI_ASSISTANT,
         threadId: completion.threadId,
-      }
-    } else {
-      throw new Error('Failed to create')
+        userId: campaign.user.id,
+        campaignId: campaign.id,
+        data: {
+          messages: [chatMessage, chatResponse],
+        },
+      },
+    })
+    return {
+      chat: [chatMessage, chatResponse],
+      threadId: completion.threadId,
     }
   }
 
@@ -162,7 +149,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       createdAt: new Date().valueOf(),
     }
 
-    const completion = (await this.aiService.getAssistantCompletion({
+    const completion = await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
@@ -170,43 +157,29 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       message: chatMessage,
       messageId: messageId!,
       existingMessages: messages,
-    })) as
-      | {
-          content: string
-          threadId: string
-          id: string
-          role: string
-          createdAt: number
-          usage: number
-        }
-      | undefined
+    })
 
     this.logger.info({ completion }, 'completion')
 
-    let chatResponse: AiChatMessage | undefined
-    if (completion && completion.content) {
-      chatResponse = {
-        role: 'assistant',
-        id: completion.id,
-        content: completion.content,
-        createdAt: completion.createdAt,
-        usage: completion.usage,
-      }
-
-      await this.model.update({
-        where: { id: aiChat.id },
-        data: {
-          data: {
-            ...aiChat.data,
-            messages: [...messages, chatMessage, chatResponse],
-          },
-        },
-      })
-
-      return { message: chatResponse }
-    } else {
-      throw new Error('Failed to update')
+    const chatResponse: AiChatMessage = {
+      role: 'assistant',
+      id: completion.id,
+      content: completion.content,
+      createdAt: completion.createdAt,
+      usage: completion.usage,
     }
+
+    await this.model.update({
+      where: { id: aiChat.id },
+      data: {
+        data: {
+          ...aiChat.data,
+          messages: [...messages, chatMessage, chatResponse],
+        },
+      },
+    })
+
+    return { message: chatResponse }
   }
 
   delete(threadId: string, userId: number) {

@@ -73,9 +73,9 @@ export class SlackService {
       )) as { data: string }
       return data
     } catch (e: unknown) {
-      this.logger.error({
+      this.logger.warn({
         msg: 'Failed to send slack message',
-        slackMessage: message,
+        channel,
         err: serializeError(e),
       })
     }
@@ -106,11 +106,20 @@ export class SlackService {
     })
   }
 
+  private static readonly SLACK_BLOCK_TEXT_LIMIT = 3000
+
   async formattedMessage({
     message,
     error,
     channel,
   }: FormattedSlackMessageArgs) {
+    let body = `${message}\n\n${error ? JSON.stringify(serializeError(error)) : ''}`
+    if (body.length > SlackService.SLACK_BLOCK_TEXT_LIMIT) {
+      body =
+        body.slice(0, SlackService.SLACK_BLOCK_TEXT_LIMIT - 20) +
+        '\n…[truncated]'
+    }
+
     return await this.message(
       {
         blocks: [
@@ -125,7 +134,7 @@ export class SlackService {
             type: SlackMessageType.SECTION,
             text: {
               type: SlackMessageType.MRKDWN,
-              text: `${message}\n\n${error ? JSON.stringify(error) : ''}`,
+              text: body,
             },
           },
         ],
