@@ -65,6 +65,16 @@ export const GLOBAL_ALERTS: Alert[] = [
     ].join('\n\n'),
   },
   {
+    slug: 'health-check-probe-failure',
+    name: 'Health check probe failures',
+    type: 'metric',
+    expr: '1 - (sum(rate(probe_all_success_sum{job="gp-api-$ENV-health"}[5m])) / sum(rate(probe_all_success_count{job="gp-api-$ENV-health"}[5m])))',
+    threshold: 0,
+    for: '2m',
+    message:
+      'Synthetic monitoring probes are failing against the health endpoint — the service may be unreachable externally.',
+  },
+  {
     slug: 'slow-prisma-connections',
     name: 'Slow Prisma connection acquisitions',
     type: 'metric',
@@ -84,8 +94,8 @@ export const GLOBAL_ALERTS: Alert[] = [
     name: '[Serve] Background job failed',
     type: 'log',
     expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Message processing failed" |= "poll" [5m]))',
-    threshold: 1,
-    for: '5m',
+    threshold: 0,
+    for: '0m',
     message: [
       'A Serve-related background SQS job has failed in the last 5 minutes.',
       'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
