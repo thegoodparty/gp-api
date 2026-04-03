@@ -85,12 +85,11 @@ export class AiService {
     topP: number = 0.1,
   ) {
     const models = AI_MODELS.split(',')
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0)
     if (models.length === 0) {
-      await this.slack.message(
-        {
-          text: `AI Models are not configured. Please specify AI models.`,
-        },
-        SlackChannel.botDev,
+      throw new Error(
+        'AI_MODELS env var is empty — no models configured for AI completion',
       )
     }
 
@@ -177,13 +176,26 @@ export class AiService {
       throw err
     }
 
-    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    let content = completion.content as string
+    let content =
+      typeof completion.content === 'string'
+        ? completion.content
+        : Array.isArray(completion.content)
+          ? completion.content
+              .map((part: { type?: string; text?: string }) =>
+                part.type === 'text' && typeof part.text === 'string'
+                  ? part.text
+                  : '',
+              )
+              .join('')
+          : String(completion.content)
+
     if (content.includes('```html')) {
-      content = content.match(/```html([\s\S]*?)```/)![1]
+      const match = content.match(/```html([\s\S]*?)```/)
+      if (match) {
+        content = match[1]
+      }
     }
-    content = content.replace('/n', '<br/><br/>')
+    content = content.replace(/\n/g, '<br/><br/>')
 
     // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
     const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
@@ -284,7 +296,7 @@ export class AiService {
           const match = content.match(/```html([\s\S]*?)```/)
           content = match?.length ? match[1] : content
         }
-        content = content.replace('/n', '<br/><br/>')
+        content = content.replace(/\n/g, '<br/><br/>')
         this.logger.debug({ content }, 'completion success')
         return {
           content,
@@ -369,16 +381,16 @@ export class AiService {
     }
 
     if (messageId) {
-      this.logger.info({ messageId }, 'deleting message')
+      this.logger.info({ messageId }, 'filtering out old message for regeneration')
       messages = messages.filter((m) => m.id !== messageId)
-    } else {
-      messages.push({
-        content: message.content,
-        role: 'user',
-        createdAt: new Date().valueOf(),
-        id: crypto.randomUUID(),
-      })
     }
+
+    messages.push({
+      content: message.content,
+      role: 'user',
+      createdAt: new Date().valueOf(),
+      id: crypto.randomUUID(),
+    })
 
     this.logger.info({ messages }, 'messages')
 
