@@ -26,9 +26,18 @@ if (!TOGETHER_AI_KEY) {
 if (!OPEN_AI_KEY) {
   throw new Error('Please set OPEN_AI_KEY in your .env')
 }
-if (AI_MODELS === undefined || AI_MODELS === null) {
-  throw new Error('Please set AI_MODELS in your .env')
+
+const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1'
+
+const PARSED_AI_MODELS = AI_MODELS.split(',')
+  .map((m) => m.trim())
+  .filter((m) => m.length > 0)
+
+type PromptReplacement = {
+  find: string
+  replace: string | boolean | number | undefined | null
 }
+
 type GetChatToolCompletionArgs = {
   messages?: AiChatMessage[]
   temperature?: number
@@ -78,263 +87,217 @@ export class AiService {
     this.logger.setContext(AiService.name)
   }
 
+  private buildChatModel(
+    modelName: string,
+    options: { maxTokens: number; temperature: number; topP: number },
+  ): BaseChatModel {
+    const isOpenAi = modelName.includes('gpt')
+    return new ChatOpenAI({
+      apiKey: isOpenAi ? OPEN_AI_KEY : TOGETHER_AI_KEY,
+      model: modelName,
+      ...options,
+      maxRetries: 0,
+      timeout: 120_000,
+      ...(!isOpenAi && {
+        configuration: { baseURL: TOGETHER_AI_BASE_URL },
+        modelKwargs: { reasoning: { enabled: false } },
+      }),
+    })
+  }
+
+  private extractContent(raw: BaseMessage['content']): string {
+    if (typeof raw === 'string') return raw
+    if (Array.isArray(raw)) {
+      return raw
+        .map((part: { type?: string; text?: string }) =>
+          part.type === 'text' && typeof part.text === 'string'
+            ? part.text
+            : '',
+        )
+        .join('')
+    }
+    return String(raw)
+  }
+
+  private extractTokenCount(completion: BaseMessage): number {
+    const tokenUsage: unknown = completion.response_metadata?.tokenUsage
+    if (
+      tokenUsage &&
+      typeof tokenUsage === 'object' &&
+      'totalTokens' in tokenUsage &&
+      typeof tokenUsage.totalTokens === 'number'
+    ) {
+      return tokenUsage.totalTokens
+    }
+    return 0
+  }
+
+  private static stripHtmlFences(content: string): string {
+    if (!content.includes('```html')) return content
+    const match = content.match(/```html([\s\S]*?)```/)
+    return match ? match[1] : content
+  }
+
+  private static sanitizeMessage(message: AiChatMessage): AiChatMessage {
+    const content = message.content.replace(/\u2013/g, '-').replace(/`/g, "'")
+    return { ...message, content }
+  }
+
   async llmChatCompletion(
     messages: AiChatMessage[],
     maxTokens: number = 500,
     temperature: number = 1.0,
     topP: number = 0.1,
   ) {
-    const models = AI_MODELS.split(',')
-    if (models.length === 0) {
-      await this.slack.message(
-        {
-          body: `AI Models are not configured. Please specify AI models.`,
-        },
-        SlackChannel.botDev,
+    if (PARSED_AI_MODELS.length === 0) {
+      throw new Error(
+        'AI_MODELS env var is empty — no models configured for AI completion',
       )
     }
 
-    const aiOptions = {
-      maxTokens,
-      temperature,
-      topP,
-      maxRetries: 0,
-    }
+    const options = { maxTokens, temperature, topP }
+    const sanitizedMessages = messages.map(AiService.sanitizeMessage)
 
-    let firstModel: BaseChatModel | undefined
-    let fallbackModel: BaseChatModel | undefined
+    for (const modelName of PARSED_AI_MODELS) {
+      const model = this.buildChatModel(modelName, options)
 
-    for (const model of models) {
-      if (model.includes('gpt')) {
-        if (!firstModel) {
-          firstModel = new ChatOpenAI({
-            apiKey: OPEN_AI_KEY,
-            model,
-            ...aiOptions,
-          })
-        } else {
-          fallbackModel = new ChatOpenAI({
-            apiKey: OPEN_AI_KEY,
-            model,
-            ...aiOptions,
-          })
+      try {
+        const completion = await model.invoke(sanitizedMessages)
+        const raw = this.extractContent(completion.content)
+
+        if (!raw) {
+          this.logger.warn(
+            { model: modelName },
+            'Model returned empty content, trying next',
+          )
+          continue
         }
-      } else {
-        if (!firstModel) {
-          firstModel = new ChatOpenAI({
-            apiKey: TOGETHER_AI_KEY,
-            model,
-            ...aiOptions,
-            configuration: {
-              baseURL: 'https://api.together.xyz/v1',
-            },
+
+        let content = AiService.stripHtmlFences(raw)
+        content = content.replace(/\n/g, '<br/><br/>')
+
+        return {
+          content,
+          tokens: this.extractTokenCount(completion),
+        }
+      } catch (error) {
+        this.logger.error(
+          { err: error, model: modelName },
+          'Error in llmChatCompletion',
+        )
+        try {
+          await this.slack.errorMessage({
+            message: `Error in AI completion (${modelName})`,
+            error,
           })
-        } else {
-          fallbackModel = new ChatOpenAI({
-            apiKey: TOGETHER_AI_KEY,
-            model,
-            ...aiOptions,
-            configuration: {
-              baseURL: 'https://api.together.xyz/v1',
-            },
-          })
+        } catch {
+          // Slack notification must never prevent model fallback
         }
       }
     }
 
-    const modelWithFallback = firstModel!.withFallbacks([fallbackModel!])
+    throw new Error('All AI models failed or returned empty content')
+  }
 
-    const sanitizedMessages = messages.map((message) => {
-      let sanitizedContent = message.content
-      sanitizedContent =
-        sanitizedContent.replace(/\–/g, '-') || sanitizedContent
-      sanitizedContent =
-        sanitizedContent.replace(/\`/g, "'") || sanitizedContent
-
-      return {
-        ...message,
-        ...(sanitizedContent ? { content: sanitizedContent } : {}),
-      }
+  private buildOpenAiClient(model: string): OpenAI {
+    const isOpenAi = model.includes('gpt')
+    return new OpenAI({
+      apiKey: isOpenAi ? OPEN_AI_KEY : TOGETHER_AI_KEY,
+      baseURL: isOpenAi ? undefined : TOGETHER_AI_BASE_URL,
     })
+  }
 
-    let completion: BaseMessage | undefined
-    try {
-      completion = await modelWithFallback.invoke(sanitizedMessages)
-    } catch (error) {
-      this.logger.error({ err: error }, 'Error in utils/ai/llmChatCompletion')
-      const errorResponse =
-        error instanceof Error && 'response' in error
-          ? error.response
-          : undefined
-      this.logger.error({ response: errorResponse }, 'error response')
-
-      await this.slack.errorMessage({
-        message: 'Error in AI completion (raw)',
-        error,
-      })
+  private extractToolContent(
+    message: ChatCompletion.Choice['message'],
+  ): string {
+    const toolCalls = message.tool_calls
+    if (toolCalls?.length) {
+      const args = toolCalls[0]?.function?.arguments
+      if (args) return args
     }
-
-    if (completion && completion?.content) {
-      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      let content = completion.content as string
-      if (content.includes('```html')) {
-        content = content.match(/```html([\s\S]*?)```/)![1]
-      }
-      content = content.replace('/n', '<br/><br/>')
-
-      // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
-      const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
-      const totalTokens =
-        tokenUsage &&
-        typeof tokenUsage === 'object' &&
-        'totalTokens' in tokenUsage &&
-        typeof tokenUsage.totalTokens === 'number'
-          ? tokenUsage.totalTokens
-          : 0
-
-      return {
-        content,
-        tokens: totalTokens,
-      }
-    } else {
-      return {
-        content: '',
-        tokens: 0,
-      }
-    }
+    return message.content || ''
   }
 
   async getChatToolCompletion({
     messages = [],
     temperature = 0.1,
     topP = 0.1,
-    tool = undefined, // list of functions that could be called.
-    timeout = 300000, // timeout request after 5 minutes
+    tool,
+    toolChoice,
+    timeout = 300000,
   }: GetChatToolCompletionArgs) {
-    const models = AI_MODELS.split(',')
-    for (const model of models) {
-      // Lama 3.3 supports native function calling
-      // so we can modify the OpenAI base url to use the together.ai api
+    for (const model of PARSED_AI_MODELS) {
       this.logger.debug({ model }, 'model')
-      const togetherAi = !model.includes('gpt')
-      const client = new OpenAI({
-        apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
-        baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,
-      })
+      const client = this.buildOpenAiClient(model)
 
-      let completion: ChatCompletion
+      const isTogetherAi = !model.includes('gpt')
       try {
-        if (tool) {
-          completion = await client.chat.completions.create(
-            {
-              model,
-              messages,
-              top_p: topP,
-              temperature: temperature,
-              tools: [tool],
-            },
-            {
-              timeout,
-            },
-          )
-        } else {
-          completion = await client.chat.completions.create(
-            {
-              model,
-              messages,
-              top_p: topP,
-              temperature: temperature,
-            },
-            {
-              timeout,
-            },
-          )
-        }
+        const completion = await client.chat.completions.create(
+          {
+            model,
+            messages,
+            top_p: topP,
+            temperature,
+            ...(tool && { tools: [tool] }),
+            ...(toolChoice && { tool_choice: toolChoice }),
+            ...(isTogetherAi && { reasoning: { enabled: false } }),
+          },
+          { timeout },
+        )
 
-        let content = ''
-        if (completion?.choices && completion.choices[0]?.message) {
-          if (completion.choices[0].message?.tool_calls) {
-            // console.log('completion (json)', JSON.stringify(completion, null, 2));
-            const toolCalls = completion.choices[0].message.tool_calls
-            if (toolCalls && toolCalls.length > 0) {
-              content = toolCalls[0]?.function?.arguments || ''
-            }
-            if (content === '') {
-              // we are expecting tool_calls to have a function call response
-              // but we can check if the model returned a response without a function call
-              content = completion.choices[0].message?.content || ''
-            }
-          } else {
-            // console.log('completion (raw)', completion);
-            content = completion.choices[0].message?.content || ''
-          }
-        }
+        const message = completion.choices[0]?.message
+        let content = message ? this.extractToolContent(message) : ''
         content = content.trim()
+        content = this.applyToolResponseFallback(content)
 
-        if (content && content !== '') {
-          if (content.includes('<function=')) {
-            // there is some bug either with openai client, llama3.1 native FC, or together.ai api
-            // where the tool_calls are not being returned in the response
-            // so we can parse the function call from the content
-            const toolResponse = this.parseToolResponse(content)
-            if (toolResponse) {
-              content = toolResponse.arguments
-            }
-          }
-        }
+        content = AiService.stripHtmlFences(content)
+        content = content.replace(/\n/g, '<br/><br/>')
 
-        if (content.includes('```html')) {
-          const match = content.match(/```html([\s\S]*?)```/)
-          content = match?.length ? match[1] : content
-        }
-        content = content.replace('/n', '<br/><br/>')
         this.logger.debug({ content }, 'completion success')
         return {
           content,
-          tokens: completion?.usage?.total_tokens || 0,
+          tokens: completion.usage?.total_tokens ?? 0,
         }
       } catch (error) {
-        this.logger.error({ error }, 'error')
-        await this.slack.formattedMessage({
-          message: `Error in getChatToolCompletion. model: ${model}`,
-          error,
-          channel: SlackChannel.botDev,
-        })
+        this.logger.error(
+          { err: error, model },
+          'Error in getChatToolCompletion',
+        )
+        try {
+          await this.slack.formattedMessage({
+            message: `Error in getChatToolCompletion. model: ${model}`,
+            error,
+            channel: SlackChannel.botDev,
+          })
+        } catch {
+          // Slack notification must never prevent model fallback
+        }
       }
     }
 
-    return {
-      content: '',
-      tokens: 0,
-    }
+    return { content: '', tokens: 0 }
   }
 
-  private parseToolResponse(response: string):
-    | {
-        function: string
-        arguments: string
-      }
-    | undefined {
-    const functionRegex = /<function=(\w+)>(.*?)<\/function>/
-    const match = response.match(functionRegex)
+  private applyToolResponseFallback(content: string): string {
+    if (!content.includes('<function=')) return content
+    const toolResponse = this.parseToolResponse(content)
+    return toolResponse ? toolResponse.arguments : content
+  }
 
-    if (match) {
-      const [functionName, argsString] = match
-      try {
-        // JSON.parse returns unknown — no way to infer parsed shape at compile time
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const args = JSON.parse(argsString) as string
-        return {
-          function: functionName,
-          arguments: args,
-        }
-      } catch (error) {
-        this.logger.error(`Error parsing function arguments: ${error}`)
-        return undefined
-      }
+  private parseToolResponse(
+    response: string,
+  ): { function: string; arguments: string } | undefined {
+    const match = response.match(/<function=(\w+)>(.*?)<\/function>/)
+    if (!match) return undefined
+
+    const [, functionName, argsString] = match
+    try {
+      JSON.parse(argsString) // validate JSON
+      return { function: functionName, arguments: argsString }
+    } catch (error) {
+      this.logger.error(`Error parsing function arguments: ${error}`)
+      return undefined
     }
-    return undefined
   }
 
   async getAssistantCompletion({
@@ -348,423 +311,280 @@ export class AiService {
     temperature = 0.7,
     topP = 0.1,
   }: GetAssistantCompletionArgs) {
-    try {
-      if (!assistantId || !systemPrompt) {
-        this.logger.info('missing assistantId or systemPrompt')
-        this.logger.info({ assistantId }, 'assistantId')
-        this.logger.info({ systemPrompt }, 'systemPrompt')
-        return
-      }
-
-      if (!threadId) {
-        this.logger.info('missing threadId')
-        return
-      }
-
-      this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
-
-      let messages: AiChatMessage[] = []
-      messages.push({
-        content: systemPrompt + '\n' + candidateContext,
-        role: 'system',
-        createdAt: new Date().valueOf(),
-        id: crypto.randomUUID(),
-      })
-
-      if (existingMessages) {
-        messages.push(...existingMessages)
-      }
-
-      if (messageId) {
-        this.logger.info({ messageId }, 'deleting message')
-        messages = messages.filter((m) => m.id !== messageId)
-      } else {
-        messages.push({
-          content: message.content,
-          role: 'user',
-          createdAt: new Date().valueOf(),
-          id: crypto.randomUUID(),
-        })
-      }
-
-      this.logger.info({ messages }, 'messages')
-
-      const result = await this.llmChatCompletion(
-        messages,
-        500,
-        temperature,
-        topP,
-      )
-
-      return {
-        content: result?.content,
-        threadId,
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        createdAt: new Date().valueOf(),
-        usage: result?.tokens,
-      }
-    } catch (error) {
-      this.logger.info({ error }, 'error')
-      await this.slack.message(
-        {
-          body: `Error in getAssistantCompletion. Error: ${error}`,
-        },
-        SlackChannel.botDev,
+    if (!assistantId || !systemPrompt) {
+      throw new Error(
+        `Missing required params: assistantId=${assistantId}, systemPrompt=${!!systemPrompt}`,
       )
     }
-    return
+
+    if (!threadId) {
+      throw new Error('Missing threadId for assistant completion')
+    }
+
+    this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
+
+    let messages: AiChatMessage[] = []
+    messages.push({
+      content: systemPrompt + '\n' + candidateContext,
+      role: 'system',
+      createdAt: new Date().valueOf(),
+      id: crypto.randomUUID(),
+    })
+
+    if (existingMessages) {
+      messages.push(...existingMessages)
+    }
+
+    if (messageId) {
+      this.logger.info(
+        { messageId },
+        'filtering out old message for regeneration',
+      )
+      messages = messages.filter((m) => m.id !== messageId)
+    }
+
+    messages.push({
+      content: message.content,
+      role: 'user',
+      createdAt: new Date().valueOf(),
+      id: crypto.randomUUID(),
+    })
+
+    this.logger.info({ messages }, 'messages')
+
+    const result = await this.llmChatCompletion(
+      messages,
+      500,
+      temperature,
+      topP,
+    )
+
+    return {
+      content: result.content,
+      threadId,
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      createdAt: new Date().valueOf(),
+      usage: result.tokens,
+    }
   }
-  /** function to replace placeholder tokens in ai content prompt */
+  /** Replace placeholder tokens in AI content prompt */
   async promptReplace(
     prompt: string,
     campaign: PromptReplaceCampaign,
     liveMetrics?: RaceTargetMetrics | null,
   ) {
     try {
-      let newPrompt = prompt
-
-      const campaignPositions = campaign.campaignPositions
       if (!campaign.user) {
         throw new Error('Campaign has no associated user')
       }
-      const user = campaign.user
 
-      const name = getUserFullName(user)
-      const details = campaign.details
-
-      const positionsStr = positionsToStr(
-        campaignPositions,
-        details.customIssues,
-      )
-      let party =
-        details.party === 'Other' ? details.otherParty : details?.party
-      if (party === 'Independent') {
-        party = 'Independent / non-partisan'
-      }
-      const positionName = campaign.organizationSlug
-        ? await this.organizations.resolvePositionNameByOrganizationSlug(
-            campaign.organizationSlug,
-          )
-        : null
-
-      const replaceArr: {
-        find: string
-        replace: string | boolean | number | undefined | null
-      }[] = [
-        {
-          find: 'name',
-          replace: name,
-        },
-        {
-          find: 'zip',
-          replace: details.zip,
-        },
-        {
-          find: 'website',
-          replace: details.website,
-        },
-        {
-          find: 'party',
-          replace: party,
-        },
-        {
-          find: 'state',
-          replace: details.state,
-        },
-        {
-          find: 'primaryElectionDate',
-          replace: details.primaryElectionDate,
-        },
-        {
-          find: 'district',
-          replace: details.district,
-        },
-        {
-          find: 'office',
-          replace:
-            positionName && details.district
-              ? `${positionName} in ${details.district}`
-              : positionName || '',
-        },
-        {
-          find: 'positions',
-          replace: positionsStr,
-        },
-        {
-          find: 'pastExperience',
-          replace:
-            typeof details.pastExperience === 'string'
-              ? details.pastExperience
-              : JSON.stringify(details.pastExperience || {}),
-        },
-        {
-          find: 'occupation',
-          replace: details.occupation,
-        },
-        {
-          find: 'funFact',
-          replace: details.funFact,
-        },
-        {
-          find: 'campaignCommittee',
-          replace: details.campaignCommittee || 'unknown',
-        },
+      const replacements: PromptReplacement[] = [
+        ...this.buildCampaignReplacements(campaign),
+        ...(await this.buildOfficeReplacement(campaign)),
+        ...this.buildPathToVictoryReplacements(campaign, liveMetrics),
+        ...this.buildUpdateHistoryReplacement(prompt, campaign),
+        ...this.buildAiContentReplacements(campaign),
       ]
-      const againstStr = againstToStr(details.runningAgainst)
-      replaceArr.push(
-        {
-          find: 'runningAgainst',
-          replace: againstStr,
-        },
-        {
-          find: 'electionDate',
-          replace: details.electionDate,
-        },
-        {
-          find: 'statementName',
-          replace: details.statementName,
-        },
-      )
 
-      const pathToVictory = campaign.pathToVictory
-
-      if (pathToVictory) {
-        const {
-          projectedTurnout: storedTurnout,
-          winNumber: storedWinNumber,
-          republicans,
-          democrats,
-          indies,
-          averageTurnout,
-          allAvailVoters,
-          availVotersTo35,
-          women,
-          men,
-          africanAmerican,
-          white,
-          asian,
-          hispanic,
-          voteGoal,
-          voterProjection,
-          totalRegisteredVoters,
-          budgetLow,
-          budgetHigh,
-          // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
-
-        const projectedTurnout = liveMetrics?.projectedTurnout ?? storedTurnout
-        const winNumber = liveMetrics?.winNumber ?? storedWinNumber
-        const voterContactGoal = liveMetrics?.voterContactGoal ?? voteGoal
-
-        replaceArr.push(
-          {
-            find: 'pathToVictory',
-            replace: JSON.stringify(pathToVictory.data),
-          },
-          {
-            find: 'projectedTurnout',
-            replace: projectedTurnout,
-          },
-          {
-            find: 'totalRegisteredVoters',
-            replace: totalRegisteredVoters,
-          },
-          {
-            find: 'winNumber',
-            replace: winNumber,
-          },
-          {
-            find: 'republicans',
-            replace: republicans,
-          },
-          {
-            find: 'democrats',
-            replace: democrats,
-          },
-          {
-            find: 'indies',
-            replace: indies,
-          },
-          {
-            find: 'averageTurnout',
-            replace: averageTurnout,
-          },
-          {
-            find: 'allAvailVoters',
-            replace: allAvailVoters,
-          },
-          {
-            find: 'availVotersTo35',
-            replace: availVotersTo35,
-          },
-          {
-            find: 'women',
-            replace: women,
-          },
-          {
-            find: 'men',
-            replace: men,
-          },
-          {
-            find: 'africanAmerican',
-            replace: africanAmerican,
-          },
-          {
-            find: 'white',
-            replace: white,
-          },
-          {
-            find: 'asian',
-            replace: asian,
-          },
-          {
-            find: 'hispanic',
-            replace: hispanic,
-          },
-          {
-            find: 'voteGoal',
-            replace: voterContactGoal,
-          },
-          {
-            find: 'voterProjection',
-            replace: voterProjection,
-          },
-          {
-            find: 'budgetLow',
-            replace: budgetLow,
-          },
-          {
-            find: 'budgetHigh',
-            replace: budgetHigh,
-          },
-        )
-      }
-
-      if (newPrompt.includes('[[updateHistory]]')) {
-        const updateHistoryObjects = campaign.campaignUpdateHistory
-
-        const twoWeeksAgo = new Date()
-        const thisWeek = new Date()
-        thisWeek.setDate(thisWeek.getDate() - 7)
-        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-
-        const updateHistory = {
-          allTime: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-          thisWeek: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-          lastWeek: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-        }
-
-        if (updateHistoryObjects) {
-          for (const update of updateHistoryObjects) {
-            updateHistory.allTime[update.type] += update.quantity
-            updateHistory.allTime.total += update.quantity
-            if (update.createdAt > thisWeek) {
-              updateHistory.thisWeek[update.type] += update.quantity
-              updateHistory.thisWeek.total += update.quantity
-            }
-            if (update.createdAt > twoWeeksAgo && update.createdAt < thisWeek) {
-              updateHistory.lastWeek[update.type] += update.quantity
-              updateHistory.lastWeek.total += update.quantity
-            }
-          }
-        }
-        replaceArr.push({
-          find: 'updateHistory',
-          replace: JSON.stringify(updateHistory),
-        })
-      }
-
-      if (campaign.aiContent) {
-        const {
-          aboutMe,
-          communicationStrategy,
-          messageBox,
-          mobilizing,
-          policyPlatform,
-          slogan,
-          why,
-        } = campaign.aiContent
-        replaceArr.push(
-          {
-            find: 'slogan',
-            replace: slogan?.content,
-          },
-          {
-            find: 'why',
-            replace: why?.content,
-          },
-          {
-            find: 'about',
-            replace: aboutMe?.content,
-          },
-          {
-            find: 'myPolicies',
-            replace: policyPlatform?.content,
-          },
-          {
-            find: 'commStart',
-            replace: communicationStrategy?.content,
-          },
-          {
-            find: 'mobilizing',
-            replace: mobilizing?.content,
-          },
-          {
-            find: 'positioning',
-            replace: messageBox?.content,
-          },
-        )
-      }
-
-      replaceArr.forEach((item) => {
+      let result = prompt
+      for (const { find, replace } of replacements) {
         try {
-          newPrompt = replaceAll(
-            newPrompt,
-            item.find,
-            item.replace ? item.replace.toString().trim() : '',
+          result = replaceAll(
+            result,
+            find,
+            replace ? replace.toString().trim() : '',
           )
         } catch (e) {
           this.logger.error({ e }, 'error at prompt replace')
         }
-      })
+      }
 
-      newPrompt += `\n
-
-      `
-
-      return newPrompt
+      return result + '\n\n      '
     } catch (e) {
       this.logger.error({ e }, 'Error in helpers/ai/promptReplace')
       return ''
     }
+  }
+
+  private buildCampaignReplacements(
+    campaign: PromptReplaceCampaign,
+  ): PromptReplacement[] {
+    const user = campaign.user!
+    const details = campaign.details
+    const name = getUserFullName(user)
+    const positionsStr = positionsToStr(
+      campaign.campaignPositions,
+      details.customIssues,
+    )
+
+    let party = details.party === 'Other' ? details.otherParty : details?.party
+    if (party === 'Independent') {
+      party = 'Independent / non-partisan'
+    }
+
+    return [
+      { find: 'name', replace: name },
+      { find: 'zip', replace: details.zip },
+      { find: 'website', replace: details.website },
+      { find: 'party', replace: party },
+      { find: 'state', replace: details.state },
+      { find: 'primaryElectionDate', replace: details.primaryElectionDate },
+      { find: 'district', replace: details.district },
+      { find: 'positions', replace: positionsStr },
+      {
+        find: 'pastExperience',
+        replace:
+          typeof details.pastExperience === 'string'
+            ? details.pastExperience
+            : JSON.stringify(details.pastExperience || {}),
+      },
+      { find: 'occupation', replace: details.occupation },
+      { find: 'funFact', replace: details.funFact },
+      {
+        find: 'campaignCommittee',
+        replace: details.campaignCommittee || 'unknown',
+      },
+      {
+        find: 'runningAgainst',
+        replace: againstToStr(details.runningAgainst),
+      },
+      { find: 'electionDate', replace: details.electionDate },
+      { find: 'statementName', replace: details.statementName },
+    ]
+  }
+
+  private async buildOfficeReplacement(
+    campaign: PromptReplaceCampaign,
+  ): Promise<PromptReplacement[]> {
+    const positionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
+
+    const office =
+      positionName && campaign.details.district
+        ? `${positionName} in ${campaign.details.district}`
+        : positionName || ''
+
+    return [{ find: 'office', replace: office }]
+  }
+
+  private buildPathToVictoryReplacements(
+    campaign: PromptReplaceCampaign,
+    liveMetrics?: RaceTargetMetrics | null,
+  ): PromptReplacement[] {
+    const ptv = campaign.pathToVictory
+    if (!ptv) return []
+
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const data = ptv.data as Record<string, string | number>
+
+    return [
+      { find: 'pathToVictory', replace: JSON.stringify(ptv.data) },
+      {
+        find: 'projectedTurnout',
+        replace: liveMetrics?.projectedTurnout ?? data.projectedTurnout,
+      },
+      { find: 'totalRegisteredVoters', replace: data.totalRegisteredVoters },
+      {
+        find: 'winNumber',
+        replace: liveMetrics?.winNumber ?? data.winNumber,
+      },
+      { find: 'republicans', replace: data.republicans },
+      { find: 'democrats', replace: data.democrats },
+      { find: 'indies', replace: data.indies },
+      { find: 'averageTurnout', replace: data.averageTurnout },
+      { find: 'allAvailVoters', replace: data.allAvailVoters },
+      { find: 'availVotersTo35', replace: data.availVotersTo35 },
+      { find: 'women', replace: data.women },
+      { find: 'men', replace: data.men },
+      { find: 'africanAmerican', replace: data.africanAmerican },
+      { find: 'white', replace: data.white },
+      { find: 'asian', replace: data.asian },
+      { find: 'hispanic', replace: data.hispanic },
+      {
+        find: 'voteGoal',
+        replace: liveMetrics?.voterContactGoal ?? data.voteGoal,
+      },
+      { find: 'voterProjection', replace: data.voterProjection },
+      { find: 'budgetLow', replace: data.budgetLow },
+      { find: 'budgetHigh', replace: data.budgetHigh },
+    ]
+  }
+
+  private buildUpdateHistoryReplacement(
+    prompt: string,
+    campaign: PromptReplaceCampaign,
+  ): PromptReplacement[] {
+    if (!prompt.includes('[[updateHistory]]')) return []
+
+    const updates = campaign.campaignUpdateHistory
+    const thisWeek = new Date()
+    const twoWeeksAgo = new Date()
+    thisWeek.setDate(thisWeek.getDate() - 7)
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+
+    const emptyBucket = () => ({
+      total: 0,
+      doorKnocking: 0,
+      digitalAds: 0,
+      calls: 0,
+      yardSigns: 0,
+      events: 0,
+      text: 0,
+      directMail: 0,
+    })
+
+    const history = {
+      allTime: emptyBucket(),
+      thisWeek: emptyBucket(),
+      lastWeek: emptyBucket(),
+    }
+
+    if (updates) {
+      for (const u of updates) {
+        history.allTime[u.type] += u.quantity
+        history.allTime.total += u.quantity
+
+        if (u.createdAt > thisWeek) {
+          history.thisWeek[u.type] += u.quantity
+          history.thisWeek.total += u.quantity
+        } else if (u.createdAt > twoWeeksAgo) {
+          history.lastWeek[u.type] += u.quantity
+          history.lastWeek.total += u.quantity
+        }
+      }
+    }
+
+    return [{ find: 'updateHistory', replace: JSON.stringify(history) }]
+  }
+
+  private buildAiContentReplacements(
+    campaign: PromptReplaceCampaign,
+  ): PromptReplacement[] {
+    if (!campaign.aiContent) return []
+
+    const {
+      aboutMe,
+      communicationStrategy,
+      messageBox,
+      mobilizing,
+      policyPlatform,
+      slogan,
+      why,
+    } = campaign.aiContent
+
+    return [
+      { find: 'slogan', replace: slogan?.content },
+      { find: 'why', replace: why?.content },
+      { find: 'about', replace: aboutMe?.content },
+      { find: 'myPolicies', replace: policyPlatform?.content },
+      { find: 'commStart', replace: communicationStrategy?.content },
+      { find: 'mobilizing', replace: mobilizing?.content },
+      { find: 'positioning', replace: messageBox?.content },
+    ]
   }
 }
