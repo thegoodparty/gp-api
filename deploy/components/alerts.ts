@@ -69,7 +69,7 @@ export const GLOBAL_ALERTS: Alert[] = [
     name: 'Health check probe failures',
     type: 'metric',
     expr: '1 - (sum(rate(probe_all_success_sum{job="gp-api-$ENV-health"}[5m])) / sum(rate(probe_all_success_count{job="gp-api-$ENV-health"}[5m])))',
-    threshold: 0.2,
+    threshold: 0.1,
     for: '2m',
     message:
       'Synthetic monitoring probes are failing against the health endpoint — the service may be unreachable externally.',
