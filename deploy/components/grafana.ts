@@ -269,6 +269,5 @@ export const createGrafanaResources = async ({
         failIfNotSsl: true,
       },
     },
-    alertSensitivity: 'high',
   })
 }
