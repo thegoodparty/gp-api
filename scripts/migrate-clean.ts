@@ -1,10 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
+import { SingleBar, Presets } from 'cli-progress'
 import pmap from 'p-map'
-import {
-  clerkRetry,
-  CLERK_CONCURRENCY,
-} from '../seed/util/clerkRetry.util'
+import { clerkThrottle } from '../seed/util/clerkThrottle.util'
 
 const BATCH_SIZE = 100
 
@@ -30,7 +28,7 @@ const fetchAllClerkUsers = async () => {
   let offset = 0
 
   while (true) {
-    const batch = await clerkRetry(() =>
+    const batch = await clerkThrottle(() =>
       clerk.users.getUserList({
         limit: BATCH_SIZE,
         offset,
@@ -50,23 +48,34 @@ const fetchAllClerkUsers = async () => {
 
 const deleteClerkUsers = async (userIds: string[]) => {
   let deleted = 0
+  let failed = 0
 
-  await pmap(
-    userIds,
-    async (id) => {
-      try {
-        await clerkRetry(() => clerk.users.deleteUser(id))
-        deleted++
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : String(err)
-        console.error(
-          `  Failed to delete Clerk user ${id}: ${message}`,
-        )
-      }
+  const bar = new SingleBar(
+    {
+      format:
+        'Deleting Clerk users [{bar}] {percentage}% | ' +
+        '{value}/{total} | deleted: {deleted} | ' +
+        'failed: {failed}',
+      hideCursor: true,
     },
-    { concurrency: CLERK_CONCURRENCY },
+    Presets.shades_classic,
   )
+
+  bar.start(userIds.length, 0, { deleted: 0, failed: 0 })
+
+  await pmap(userIds, async (id) => {
+    try {
+      await clerkThrottle(() => clerk.users.deleteUser(id))
+      deleted++
+    } catch (err) {
+      failed++
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`\n  Failed to delete Clerk user ${id}: ${message}`)
+    }
+    bar.increment({ deleted, failed })
+  })
+
+  bar.stop()
 
   return deleted
 }
@@ -79,9 +88,7 @@ const main = async () => {
   if (clerkUserIds.length > 0) {
     console.log('Deleting Clerk users...')
     const deleted = await deleteClerkUsers(clerkUserIds)
-    console.log(
-      `Deleted ${deleted}/${clerkUserIds.length} Clerk user(s)`,
-    )
+    console.log(`Deleted ${deleted}/${clerkUserIds.length} Clerk user(s)`)
   }
 
   console.log('Deleting all local DB users...')

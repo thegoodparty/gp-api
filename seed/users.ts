@@ -3,7 +3,7 @@ import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
 import { userFactory } from './factories/user.factory'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
-import { clerkRetry, CLERK_CONCURRENCY } from './util/clerkRetry.util'
+import { clerkThrottle } from './util/clerkThrottle.util'
 
 const NUM_USERS = 20
 
@@ -90,7 +90,7 @@ export const ensureClerkUser = async (
   const clerk = createClerkClient({ secretKey })
 
   try {
-    const clerkUser = await clerkRetry(() =>
+    const clerkUser = await clerkThrottle(() =>
       clerk.users.createUser({
         emailAddress: [userData.email],
         password: userData.password,
@@ -121,7 +121,7 @@ export const ensureClerkUser = async (
       clerkErrors[0]?.code === 'form_identifier_exists'
 
     if (isDuplicate) {
-      const existing = await clerkRetry(() =>
+      const existing = await clerkThrottle(() =>
         clerk.users.getUserList({
           emailAddress: [email],
         }),
@@ -240,7 +240,6 @@ export default async function seedUsers(prisma: PrismaClient) {
         firstName: user.firstName!,
         lastName: user.lastName!,
       }),
-    { concurrency: CLERK_CONCURRENCY },
   )
 
   const upsertedIds = new Set([adminUser.id, candidateUser.id])
