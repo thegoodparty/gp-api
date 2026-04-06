@@ -193,6 +193,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         { zip: user.zip } as object,
         initialData.details as object,
       ) as PrismaJson.CampaignDetails
+      delete mergedDetails.positionId
+      delete mergedDetails.office
+      delete mergedDetails.otherOffice
 
       return tx.campaign.create({
         data: {

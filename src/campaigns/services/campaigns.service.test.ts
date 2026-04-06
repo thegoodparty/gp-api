@@ -218,6 +218,29 @@ describe('CampaignsService - Organization positionId sync', () => {
       )
     })
 
+    it('strips positionId, office, and otherOffice from persisted details', async () => {
+      const { service, mockCampaignCreate } = await buildOrgSyncModule()
+
+      vi.spyOn(service, 'findSlug').mockResolvedValue('test-slug')
+
+      const user = { id: 1, zip: '90210' } as User
+      const details = {
+        state: 'CA',
+        positionId: 'br-pos-123',
+        office: 'Other',
+        otherOffice: 'City Council',
+      } as PrismaJson.CampaignDetails
+
+      await service.createForUser(user, { details })
+
+      const created = mockCampaignCreate.mock.calls[0][0].data.details
+      expect(created.state).toBe('CA')
+      expect(created.zip).toBe('90210')
+      expect(created).not.toHaveProperty('positionId')
+      expect(created).not.toHaveProperty('office')
+      expect(created).not.toHaveProperty('otherOffice')
+    })
+
     describe('details json deep merge (same deepMerge as createForUser)', () => {
       it('keeps user zip when patch omits zip', () => {
         expect(deepMerge({ zip: '90210' } as object, {} as object)).toEqual({
