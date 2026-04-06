@@ -3,8 +3,12 @@ import { createClerkClient } from '@clerk/backend'
 import { SingleBar, Presets } from 'cli-progress'
 import pmap from 'p-map'
 import { clerkThrottle } from '../seed/util/clerkThrottle.util'
+import { FIXED_EMAILS } from '../seed/users'
 
 const BATCH_SIZE = 100
+
+const PRESERVE_FIXED = process.argv.includes('--preserve-fixed')
+const SKIP_DB = process.argv.includes('--skip-db')
 
 const { CLERK_SECRET_KEY } = process.env
 
@@ -24,7 +28,7 @@ const prisma = new PrismaClient()
 const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY })
 
 const fetchAllClerkUsers = async () => {
-  const allUserIds: string[] = []
+  const allUsers: { id: string; email: string }[] = []
   let offset = 0
 
   while (true) {
@@ -37,13 +41,18 @@ const fetchAllClerkUsers = async () => {
 
     if (batch.data.length === 0) break
 
-    allUserIds.push(...batch.data.map((u) => u.id))
+    allUsers.push(
+      ...batch.data.map((u) => ({
+        id: u.id,
+        email: u.emailAddresses[0]?.emailAddress ?? '',
+      })),
+    )
     offset += batch.data.length
 
     if (batch.data.length < BATCH_SIZE) break
   }
 
-  return allUserIds
+  return allUsers
 }
 
 const deleteClerkUsers = async (userIds: string[]) => {
@@ -82,18 +91,30 @@ const deleteClerkUsers = async (userIds: string[]) => {
 
 const main = async () => {
   console.log('Fetching all Clerk users...')
-  const clerkUserIds = await fetchAllClerkUsers()
-  console.log(`Found ${clerkUserIds.length} Clerk user(s)`)
+  const clerkUsers = await fetchAllClerkUsers()
 
-  if (clerkUserIds.length > 0) {
+  const toDelete = PRESERVE_FIXED
+    ? clerkUsers.filter((u) => !FIXED_EMAILS.has(u.email))
+    : clerkUsers
+
+  const preserved = clerkUsers.length - toDelete.length
+
+  console.log(
+    `Found ${clerkUsers.length} Clerk user(s)` +
+      (PRESERVE_FIXED ? ` — preserving ${preserved} fixed` : ''),
+  )
+
+  if (toDelete.length > 0) {
     console.log('Deleting Clerk users...')
-    const deleted = await deleteClerkUsers(clerkUserIds)
-    console.log(`Deleted ${deleted}/${clerkUserIds.length} Clerk user(s)`)
+    const deleted = await deleteClerkUsers(toDelete.map((u) => u.id))
+    console.log(`Deleted ${deleted}/${toDelete.length} Clerk user(s)`)
   }
 
-  console.log('Deleting all local DB users...')
-  const { count } = await prisma.user.deleteMany()
-  console.log(`Deleted ${count} local DB user(s)`)
+  if (!SKIP_DB) {
+    console.log('Deleting all local DB users...')
+    const { count } = await prisma.user.deleteMany()
+    console.log(`Deleted ${count} local DB user(s)`)
+  }
 
   console.log('Done.')
 }
