@@ -6,9 +6,7 @@ const prisma = new PrismaClient()
 const main = async () => {
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) {
-    console.log(
-      '[pre-reset] No CLERK_SECRET_KEY — skipping Clerk cleanup',
-    )
+    console.log('[pre-reset] No CLERK_SECRET_KEY — skipping Clerk cleanup')
     return
   }
 
