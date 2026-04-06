@@ -61,6 +61,9 @@ declare global {
       officeTermLength?: string
       partisanType?: string | null
       priorElectionDates?: string[]
+      positionId?: string | null
+      office?: string
+      otherOffice?: string
       electionId?: string | null
       tier?: string
       einNumber?: string | null

@@ -290,6 +290,67 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       expect(mockOrgUpdate).not.toHaveBeenCalled()
     })
+
+    it('should sync organization when legacy positionId is in details', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst, mockGetPosition } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
+      mockGetPosition.mockResolvedValue({
+        id: 'gp-pos-99',
+        brPositionId: 'br-legacy-1',
+        brDatabaseId: 'br-db-1',
+        state: 'CA',
+        name: 'Mayor',
+      })
+
+      await service.updateJsonFields(10, {
+        details: { positionId: 'br-legacy-1', office: 'Mayor' },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith('br-legacy-1')
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        data: {
+          positionId: 'gp-pos-99',
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+      })
+    })
+
+    it('should sync organization with customPositionName when no positionId', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { office: 'Other', otherOffice: 'Town Clerk' },
+      })
+
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        data: {
+          positionId: null,
+          customPositionName: 'Town Clerk',
+          overrideDistrictId: null,
+        },
+      })
+    })
+
+    it('should not sync organization when details lacks legacy position fields', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { city: 'Austin', state: 'TX' },
+      })
+
+      expect(mockOrgUpdate).not.toHaveBeenCalled()
+    })
   })
 })
 

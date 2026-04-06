@@ -185,13 +185,22 @@ export class CampaignsController {
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
+    const ballotReadyPositionId =
+      body.ballotReadyPositionId ?? body.details?.positionId ?? undefined
+
+    const customPositionName =
+      body.customPositionName ??
+      (!ballotReadyPositionId
+        ? (OrganizationsService.resolveCustomPositionName(
+            body.details?.office,
+            body.details?.otherOffice,
+          ) ?? undefined)
+        : undefined)
+
     return this.campaigns.createForUser(
       user,
       { details: body.details, data: body.data },
-      {
-        ballotReadyPositionId: body.ballotReadyPositionId ?? undefined,
-        customPositionName: body.customPositionName ?? undefined,
-      },
+      { ballotReadyPositionId, customPositionName },
     )
   }
 
@@ -218,9 +227,11 @@ export class CampaignsController {
       })
 
       if (body?.details) {
-        const { city, electionDate, pledged, party } = body.details
+        const { city, office, electionDate, pledged, party } = body.details
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         await this.analytics.identify(campaign.userId, {
           ...(city && { officeMunicipality: city }),
+          ...(office && { officeName: office }),
           ...(electionDate && { officeElectionDate: electionDate }),
           ...(party && { affiliation: party }),
           ...(pledged && { pledged }),

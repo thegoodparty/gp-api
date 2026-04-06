@@ -536,6 +536,58 @@ describe('CampaignsController', () => {
       )
       expect(result).toEqual(mockCampaign)
     })
+
+    it('falls back to details.positionId when top-level field absent', async () => {
+      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null!)
+      vi.spyOn(campaignsService, 'createForUser').mockResolvedValue(
+        mockCampaign,
+      )
+
+      const legacyBody = {
+        details: {
+          state: 'CA',
+          positionId: 'legacy-pos-1',
+          office: 'Other',
+          otherOffice: 'Mayor',
+        },
+      } as CreateCampaignSchema
+
+      await controller.create(mockUser, legacyBody)
+
+      expect(campaignsService.createForUser).toHaveBeenCalledWith(
+        mockUser,
+        { details: legacyBody.details, data: undefined },
+        {
+          ballotReadyPositionId: 'legacy-pos-1',
+          customPositionName: undefined,
+        },
+      )
+    })
+
+    it('falls back to details.office for customPositionName when no positionId', async () => {
+      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null!)
+      vi.spyOn(campaignsService, 'createForUser').mockResolvedValue(
+        mockCampaign,
+      )
+
+      const legacyBody = {
+        details: {
+          state: 'CA',
+          office: 'City Council',
+        },
+      } as CreateCampaignSchema
+
+      await controller.create(mockUser, legacyBody)
+
+      expect(campaignsService.createForUser).toHaveBeenCalledWith(
+        mockUser,
+        { details: legacyBody.details, data: undefined },
+        {
+          ballotReadyPositionId: undefined,
+          customPositionName: 'City Council',
+        },
+      )
+    })
   })
 
   describe('update', () => {
@@ -621,6 +673,7 @@ describe('CampaignsController', () => {
         slug: OVERRIDE_SLUG,
         details: {
           city: 'Springfield',
+          office: 'Mayor',
           electionDate: '2025-11-04',
           party: 'Independent',
           pledged: true,
@@ -632,6 +685,7 @@ describe('CampaignsController', () => {
         {
           details: {
             city: 'Springfield',
+            office: 'Mayor',
             electionDate: '2025-11-04',
             party: 'Independent',
             pledged: true,
@@ -641,6 +695,7 @@ describe('CampaignsController', () => {
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
         officeMunicipality: 'Springfield',
+        officeName: 'Mayor',
         officeElectionDate: '2025-11-04',
         affiliation: 'Independent',
         pledged: true,

@@ -309,6 +309,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           ) as PrismaJson.CampaignAiContent
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const typedDetails = details as Partial<PrismaJson.CampaignDetails>
+        await this.syncLegacyPositionToOrg(typedDetails, campaign, tx)
+
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const districtId = overrideDistrictId ?? null
@@ -371,6 +375,48 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     return updatedCampaign ? updatedCampaign : null
   }
+
+  /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
+  private async syncLegacyPositionToOrg(
+    details: Partial<PrismaJson.CampaignDetails> | undefined,
+    campaign: { id: number; details: PrismaJson.CampaignDetails },
+    tx: { organization: Pick<Prisma.OrganizationDelegate, 'update'> },
+  ) {
+    if (!details || !('positionId' in details || 'office' in details)) return
+
+    const incomingPositionId =
+      typeof details.positionId === 'string' ? details.positionId : null
+    const resolvedBallotReadyId =
+      'positionId' in details
+        ? incomingPositionId
+        : (campaign.details?.positionId ?? null)
+
+    const resolvedPosition = resolvedBallotReadyId
+      ? await this.elections.getPositionByBallotReadyId(resolvedBallotReadyId)
+      : null
+
+    const mergedOffice = details.office ?? campaign.details?.office
+    const mergedOtherOffice =
+      details.otherOffice ?? campaign.details?.otherOffice
+
+    const customPositionName = !resolvedPosition
+      ? OrganizationsService.resolveCustomPositionName(
+          mergedOffice,
+          mergedOtherOffice,
+        )
+      : null
+
+    const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+    await tx.organization.update({
+      where: { slug: orgSlug },
+      data: {
+        positionId: resolvedPosition?.id ?? null,
+        customPositionName,
+        overrideDistrictId: null,
+      },
+    })
+  }
+  /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
 
   async patchCampaignDetails(
     campaignId: number,
