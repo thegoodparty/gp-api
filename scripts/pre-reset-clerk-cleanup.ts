@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
-import { deleteEphemeralClerkUsers } from './util/clerk-cleanup.util'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
