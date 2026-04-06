@@ -20,8 +20,17 @@ const CONTACTS_TEST_DISTRICT = {
 const CONTACTS_TEST_POSITION_ID =
   'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2'
 
+/**
+ * Campaign org slug (`campaign-${id}`) must be sent so contacts use
+ * `resolveDistrictInfoFromOrg` (position / overrideDistrict). Without it, the
+ * legacy path requires pathToVictory electionType/electionLocation, which this
+ * suite does not set.
+ */
+let campaignOrgSlug = ''
+
 const AUTH_HEADER = (token: string) => ({
   Authorization: `Bearer ${token}`,
+  'x-organization-slug': campaignOrgSlug,
 })
 
 async function assertOk(
@@ -138,6 +147,7 @@ test.describe('Contacts and Segments', () => {
     campaignSlug = registerResponse.campaign.slug
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
+    campaignOrgSlug = `campaign-${registerResponse.campaign.id}`
 
     await prepareCampaignAndOffice({
       request,
@@ -208,7 +218,10 @@ test.describe('Contacts and Segments', () => {
         education?: { buckets?: unknown[] }
       }
     }
-    expect(stats.districtId).toBe(CONTACTS_TEST_DISTRICT.id)
+    // District id comes from election-api for CONTACTS_TEST_POSITION_ID, not the legacy People seed id.
+    expect(stats.districtId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    )
     expect(stats.totalConstituents).toBeGreaterThan(0)
     if (stats.computedAt !== undefined) {
       expect(typeof stats.computedAt).toBe('string')

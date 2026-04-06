@@ -298,6 +298,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
               description: string
             }>
           }
+          if ('positionId' in details || 'office' in details) {
+            delete mergedDetails.positionId
+            delete mergedDetails.office
+            delete mergedDetails.otherOffice
+          }
           campaignUpdateData.details = mergedDetails
         }
         if (objectNotEmpty(aiContent)) {
@@ -391,9 +396,22 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         ? incomingPositionId
         : (campaign.details?.positionId ?? null)
 
-    const resolvedPosition = resolvedBallotReadyId
-      ? await this.elections.getPositionByBallotReadyId(resolvedBallotReadyId)
-      : null
+    let resolvedPosition: Awaited<
+      ReturnType<ElectionsService['getPositionByBallotReadyId']>
+    > = null
+    if (resolvedBallotReadyId) {
+      try {
+        resolvedPosition = await this.elections.getPositionByBallotReadyId(
+          resolvedBallotReadyId,
+        )
+      } catch (err: unknown) {
+        this.logger.warn(
+          { resolvedBallotReadyId, err },
+          'Election API position lookup failed during legacy org sync; treating as unresolved',
+        )
+        resolvedPosition = null
+      }
+    }
 
     const mergedOffice = details.office ?? campaign.details?.office
     const mergedOtherOffice =

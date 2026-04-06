@@ -94,13 +94,22 @@ export class ContactsService {
     organization?: Organization,
   ): Promise<boolean> {
     if (organization) {
-      // Org path: check if this organization has an elected office.
-      // Campaign orgs (campaign-*) won't match — this is intentional.
-      // The org header represents the user's chosen context (campaign vs EO).
       const eo = await this.electedOfficeService.findFirst({
         where: { organizationSlug: organization.slug },
       })
-      return eo !== null
+      if (eo) return true
+
+      // Elected offices use eo-* org slugs; contacts often use campaign-* context.
+      const campaignOrg = /^campaign-(\d+)$/.exec(organization.slug)
+      if (campaignOrg) {
+        const campaignId = Number(campaignOrg[1])
+        const eoForCampaign = await this.electedOfficeService.findFirst({
+          where: { campaignId, userId },
+        })
+        return eoForCampaign !== null
+      }
+
+      return false
     }
     // LEGACY: Remove this branch when org migration is complete.
     //         The userId param and getCurrentElectedOffice call become unnecessary.
@@ -133,7 +142,28 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory | undefined,
     fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
   ): Promise<Result> {
-    const { districtId, state } = await this.resolveDistrictInfoFromOrg(org)
+    const resolved = await this.resolveDistrictInfoFromOrg(org)
+    let districtId = resolved.districtId
+    let state = resolved.state
+
+    // Custom office / statewide: org may have only customPositionName; use campaign state + approval.
+    if (!districtId && !state && campaign?.details) {
+      const details = campaign.details as {
+        state?: string
+        ballotLevel?: BallotReadyPositionLevel
+      }
+      const level = details.ballotLevel
+      if (
+        details.state &&
+        typeof details.state === 'string' &&
+        details.state.length === 2 &&
+        (level === BallotReadyPositionLevel.STATE ||
+          level === BallotReadyPositionLevel.FEDERAL) &&
+        Boolean(campaign.canDownloadFederal)
+      ) {
+        state = details.state.toUpperCase()
+      }
+    }
 
     if (districtId) {
       return fn({ districtId })

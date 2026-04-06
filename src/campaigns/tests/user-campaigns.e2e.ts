@@ -12,6 +12,10 @@ import {
   updateCampaignWithRetry,
 } from '../../../e2e-tests/utils/request.util'
 
+/** BallotReady ID shared with race-target-details / contacts e2e for election-api lookups */
+const E2E_BALLOT_READY_POSITION_ID =
+  'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM='
+
 test.describe('Campaigns - User Campaign Operations', () => {
   let reg: RegisterResponse
 
@@ -136,7 +140,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
       details: {
         office: 'Other',
         otherOffice: 'State Representative',
-        positionId: '123',
+        positionId: E2E_BALLOT_READY_POSITION_ID,
       },
     })
 
