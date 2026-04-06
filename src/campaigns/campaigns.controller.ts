@@ -39,7 +39,6 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { userHasRole } from 'src/users/util/users.util'
-import { SegmentIdentityTraits } from 'src/vendors/segment/segment.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
@@ -229,17 +228,16 @@ export class CampaignsController {
         where: { slug },
       })
 
-      if (dto.details) {
-        const d = dto.details
-        const traits: SegmentIdentityTraits = {}
-        if (d.city !== undefined) traits.officeMunicipality = d.city
-        if (d.office !== undefined) traits.officeName = d.office
-        if (d.electionDate !== undefined)
-          traits.officeElectionDate = d.electionDate
-        if (d.party !== undefined) traits.affiliation = d.party
-        if (d.pledged !== undefined) traits.pledged = d.pledged
+      if (body?.details) {
+        const { city, office, electionDate, pledged, party } = body.details
 
-        await this.analytics.identify(campaign.userId, traits)
+        await this.analytics.identify(campaign.userId, {
+          ...(city && { officeMunicipality: city }),
+          ...(office && { officeName: office }),
+          ...(electionDate && { officeElectionDate: electionDate }),
+          ...(party && { affiliation: party }),
+          ...(pledged && { pledged }),
+        })
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 

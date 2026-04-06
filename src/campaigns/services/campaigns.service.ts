@@ -149,7 +149,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     this.logger.debug(user, 'Creating campaign for user')
     const slug = await this.findSlug(user)
 
-    const baseDetails: PrismaJson.CampaignDetails = { zip: user.zip }
     const baseData: PrismaJson.CampaignData = {
       slug,
     }
@@ -190,10 +189,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         },
       })
 
-      const mergedDetails: PrismaJson.CampaignDetails = {
-        ...baseDetails,
-        ...initialData.details,
-      }
+      const mergedDetails = deepMerge(
+        { zip: user.zip } as object,
+        initialData.details as object,
+      ) as PrismaJson.CampaignDetails
 
       return tx.campaign.create({
         data: {

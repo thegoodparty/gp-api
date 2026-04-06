@@ -11,6 +11,7 @@ import { StripeService } from '@/vendors/stripe/services/stripe.service'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { Campaign, Prisma, PrismaClient, User } from '@prisma/client'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import {
@@ -135,6 +136,7 @@ const buildOrgSyncModule = async (overrides?: {
     mockOrgCreate,
     mockOrgUpdate,
     mockOrgUpsert,
+    mockCampaignCreate,
     mockCampaignFindFirst,
     mockCampaignFindUnique,
     mockCampaignUpdate,
@@ -187,6 +189,85 @@ describe('CampaignsService - Organization positionId sync', () => {
           }),
         }),
       )
+    })
+
+    it('persists details as deep merge of user zip and initial details', async () => {
+      const { service, mockCampaignCreate } = await buildOrgSyncModule()
+
+      vi.spyOn(service, 'findSlug').mockResolvedValue('test-slug')
+
+      const user = { id: 1, zip: '90210' } as User
+      const details = {
+        state: 'CA',
+        geoLocation: { lat: 37, lng: -122 },
+      } as PrismaJson.CampaignDetails
+
+      await service.createForUser(user, { details })
+
+      const expectedDetails = deepMerge(
+        { zip: user.zip } as object,
+        details as object,
+      ) as PrismaJson.CampaignDetails
+
+      expect(mockCampaignCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            details: expectedDetails,
+          }),
+        }),
+      )
+    })
+
+    describe('details json deep merge (same deepMerge as createForUser)', () => {
+      it('keeps user zip when patch omits zip', () => {
+        expect(deepMerge({ zip: '90210' } as object, {} as object)).toEqual({
+          zip: '90210',
+        })
+      })
+
+      it('lets patch override zip', () => {
+        expect(
+          deepMerge({ zip: '90210' } as object, { zip: '10001' } as object),
+        ).toEqual({ zip: '10001' })
+      })
+
+      it('merges nested geoLocation keys instead of replacing the whole object', () => {
+        const base = {
+          zip: '90210',
+          geoLocation: { lat: 0, lng: 0, geoHash: 'abc' },
+        } as PrismaJson.CampaignDetails
+        const patch = {
+          geoLocation: { lat: 37.7 },
+        } as PrismaJson.CampaignDetails
+
+        expect(deepMerge(base as object, patch as object)).toEqual({
+          zip: '90210',
+          geoLocation: { lat: 37.7, lng: 0, geoHash: 'abc' },
+        })
+      })
+
+      it('merges plain-object pastExperience when both sides are records', () => {
+        const base = {
+          pastExperience: { roleA: 'Mayor' },
+        } as PrismaJson.CampaignDetails
+        const patch = {
+          pastExperience: { roleB: 'Councilor' },
+        } as PrismaJson.CampaignDetails
+
+        expect(deepMerge(base as object, patch as object)).toEqual({
+          pastExperience: { roleA: 'Mayor', roleB: 'Councilor' },
+        })
+      })
+
+      it('adds top-level fields from patch without dropping base zip', () => {
+        const patch = {
+          state: 'CA',
+          city: 'Oakland',
+        } as PrismaJson.CampaignDetails
+
+        const result = deepMerge({ zip: '94601' } as object, patch as object)
+        expect(result).toEqual({ zip: '94601', state: 'CA', city: 'Oakland' })
+      })
     })
   })
 
