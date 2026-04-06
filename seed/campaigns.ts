@@ -135,7 +135,19 @@ async function createCampaignAndUser(
     data: campaignData,
   })
 
-  // create a campaign plan version
+  const canonicalSlug = `campaign-${campaign.id}`
+  await prisma.organization.create({
+    data: { slug: canonicalSlug, ownerId: user.id },
+  })
+  await prisma.campaign.update({
+    where: { id: campaign.id },
+    data: { organizationSlug: canonicalSlug },
+  })
+  await prisma.organization.delete({
+    where: { slug: campaignData.organizationSlug },
+  })
+  campaign.organizationSlug = canonicalSlug
+
   await prisma.campaignPlanVersion.create({
     data: campaignPlanVersionFactory({ campaignId: campaign.id }),
   })

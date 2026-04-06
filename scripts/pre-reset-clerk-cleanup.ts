@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
+import { SingleBar, Presets } from 'cli-progress'
 import pmap from 'p-map'
 import { FIXED_EMAILS } from '../seed/users'
 import { clerkThrottle } from '../seed/util/clerkThrottle.util'
@@ -9,9 +10,7 @@ const prisma = new PrismaClient()
 const main = async () => {
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) {
-    console.log(
-      '[pre-reset] No CLERK_SECRET_KEY — skipping Clerk cleanup',
-    )
+    console.log('[pre-reset] No CLERK_SECRET_KEY — skipping Clerk cleanup')
     return
   }
 
@@ -37,25 +36,36 @@ const main = async () => {
   )
 
   let deleted = 0
-  await pmap(
-    clerkIds,
-    async (id) => {
-      try {
-        await clerkThrottle(() => clerk.users.deleteUser(id))
-        deleted++
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : String(err)
-        console.error(
-          `[pre-reset] Failed to delete ${id}: ${message}`,
-        )
-      }
+  let failed = 0
+
+  const bar = new SingleBar(
+    {
+      format:
+        '[pre-reset] Deleting [{bar}] {percentage}% | ' +
+        '{value}/{total} | deleted: {deleted} | ' +
+        'failed: {failed}',
+      hideCursor: true,
     },
+    Presets.shades_classic,
   )
 
-  console.log(
-    `[pre-reset] Deleted ${deleted}/${clerkIds.length} Clerk user(s)`,
-  )
+  bar.start(clerkIds.length, 0, { deleted: 0, failed: 0 })
+
+  await pmap(clerkIds, async (id) => {
+    try {
+      await clerkThrottle(() => clerk.users.deleteUser(id))
+      deleted++
+    } catch (err) {
+      failed++
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`\n[pre-reset] Failed to delete ${id}: ${message}`)
+    }
+    bar.increment({ deleted, failed })
+  })
+
+  bar.stop()
+
+  console.log(`[pre-reset] Deleted ${deleted}/${clerkIds.length} Clerk user(s)`)
 }
 
 main()
