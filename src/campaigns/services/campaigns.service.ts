@@ -141,10 +141,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       details: PrismaJson.CampaignDetails
       data?: PrismaJson.CampaignData
     },
-    orgContext?: {
-      positionId?: string | null
-      office?: string | null
-      otherOffice?: string | null
+    orgPosition?: {
+      ballotReadyPositionId?: string
+      customPositionName?: string
     },
   ) {
     this.logger.debug(user, 'Creating campaign for user')
@@ -155,15 +154,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       slug,
     }
 
-    const position = orgContext?.positionId
-      ? await this.elections.getPositionByBallotReadyId(orgContext.positionId)
+    const position = orgPosition?.ballotReadyPositionId
+      ? await this.elections.getPositionByBallotReadyId(
+          orgPosition.ballotReadyPositionId,
+        )
       : null
 
-    const customPositionName = !position
-      ? OrganizationsService.resolveCustomPositionName(
-          orgContext?.office ?? undefined,
-          orgContext?.otherOffice ?? undefined,
-        )
+    const resolvedCustomPositionName = !position
+      ? (orgPosition?.customPositionName ?? null)
       : null
 
     const newCampaign = await this.client.$transaction(async (tx) => {
@@ -175,7 +173,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       this.logger.info(
         {
-          ballotReadyPositionId: orgContext?.positionId,
+          ballotReadyPositionId: orgPosition?.ballotReadyPositionId,
           position,
           campaignId,
           orgSlug,
@@ -188,7 +186,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           slug: orgSlug,
           ownerId: user.id,
           positionId: position?.id ?? null,
-          customPositionName,
+          customPositionName: resolvedCustomPositionName,
         },
       })
 
@@ -234,11 +232,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
     scalarFields?: Prisma.CampaignUpdateInput,
-    orgContext?: {
-      positionId?: string | null
-      office?: string | null
-      otherOffice?: string | null
-    },
   ) {
     const {
       data,
@@ -250,16 +243,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       canDownloadFederal,
       overrideDistrictId,
     } = body
-
-    let position: Awaited<
-      ReturnType<ElectionsService['getPositionByBallotReadyId']>
-    > = null
-
-    if (orgContext?.positionId) {
-      position = await this.elections.getPositionByBallotReadyId(
-        orgContext.positionId,
-      )
-    }
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
@@ -324,24 +307,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             (campaign.aiContent as object) || {},
             aiContent,
           ) as PrismaJson.CampaignAiContent
-        }
-
-        if (orgContext) {
-          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-          const customPositionName = !position
-            ? OrganizationsService.resolveCustomPositionName(
-                orgContext.office ?? undefined,
-                orgContext.otherOffice ?? undefined,
-              )
-            : null
-          await tx.organization.update({
-            where: { slug: orgSlug },
-            data: {
-              positionId: position?.id ?? null,
-              customPositionName,
-              overrideDistrictId: null as string | null,
-            },
-          })
         }
 
         if (overrideDistrictId !== undefined) {

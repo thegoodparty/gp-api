@@ -110,8 +110,6 @@ const mockCampaign: Campaign = {
   details: {
     electionDate: '2025-11-04',
     state: 'CA',
-    positionId: 'pos-1',
-    otherOffice: 'Mayor',
   } as unknown as Campaign['details'],
 }
 
@@ -508,7 +506,8 @@ describe('CampaignsController', () => {
 
   describe('create', () => {
     const mockCreateBody = {
-      details: { state: 'CA', office: 'Mayor' },
+      details: { state: 'CA' },
+      ballotReadyPositionId: 'br-pos-1',
     } as CreateCampaignSchema
 
     it('throws ConflictException when campaign already exists', async () => {
@@ -529,11 +528,10 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.createForUser).toHaveBeenCalledWith(
         mockUser,
-        { ...mockCreateBody, details: { state: 'CA' } },
+        { details: { state: 'CA' }, data: undefined },
         {
-          positionId: undefined,
-          office: 'Mayor',
-          otherOffice: undefined,
+          ballotReadyPositionId: 'br-pos-1',
+          customPositionName: undefined,
         },
       )
       expect(result).toEqual(mockCampaign)
@@ -561,9 +559,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
         { canDownloadFederal: true },
-        undefined,
-        undefined,
-        undefined,
       )
     })
 
@@ -586,9 +581,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockOtherCampaign.id,
         { data: { foo: 'bar' } },
-        undefined,
-        undefined,
-        undefined,
       )
     })
 
@@ -611,9 +603,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockOtherCampaign.id,
         { data: { foo: 'bar' } },
-        undefined,
-        undefined,
-        undefined,
       )
     })
 
@@ -632,7 +621,6 @@ describe('CampaignsController', () => {
         slug: OVERRIDE_SLUG,
         details: {
           city: 'Springfield',
-          office: 'Mayor',
           electionDate: '2025-11-04',
           party: 'Independent',
           pledged: true,
@@ -649,18 +637,10 @@ describe('CampaignsController', () => {
             pledged: true,
           },
         },
-        undefined,
-        undefined,
-        {
-          positionId: undefined,
-          office: 'Mayor',
-          otherOffice: undefined,
-        },
       )
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
         officeMunicipality: 'Springfield',
-        officeName: 'Mayor',
         officeElectionDate: '2025-11-04',
         affiliation: 'Independent',
         pledged: true,
@@ -685,9 +665,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockOtherCampaign.id,
         { data: { foo: 'bar' } },
-        undefined,
-        undefined,
-        undefined,
       )
 
       expect(analyticsService.identify).not.toHaveBeenCalled()
@@ -712,13 +689,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockOtherCampaign.id,
         { details: { city: 'Springfield' } },
-        undefined,
-        undefined,
-        {
-          positionId: undefined,
-          office: undefined,
-          otherOffice: undefined,
-        },
       )
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
@@ -745,9 +715,6 @@ describe('CampaignsController', () => {
       expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
         mockCampaign.id,
         { data: { currentStep: 'goals' } },
-        undefined,
-        undefined,
-        undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -809,7 +776,6 @@ describe('CampaignsController', () => {
         { data: undefined, details: undefined, aiContent: undefined },
         true,
         { isActive: false, slug: 'new-slug' },
-        undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -824,7 +790,6 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         { data: { name: 'Updated' }, details: undefined, aiContent: undefined },
         true,
-        undefined,
         undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
@@ -845,11 +810,6 @@ describe('CampaignsController', () => {
         },
         true,
         { isActive: true },
-        {
-          positionId: undefined,
-          office: undefined,
-          otherOffice: undefined,
-        },
       )
       expect(result).toEqual(mockCampaignWithP2V)
     })
@@ -864,7 +824,6 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         { data: undefined, details: undefined, aiContent: undefined },
         true,
-        undefined,
         undefined,
       )
       expect(result).toEqual(mockCampaignWithP2V)
