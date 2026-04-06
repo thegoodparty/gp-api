@@ -6,6 +6,7 @@ import { CONTROLLER_NAMES } from '../../src/generated/route-types'
 
 export interface GrafanaConfig {
   environment: 'dev' | 'qa' | 'prod'
+  domain: string
 }
 
 const LOKI_DATASOURCE_UID = 'grafanacloud-logs'
@@ -20,7 +21,10 @@ const datasourceConfig = {
   metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
 } as const
 
-export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
+export const createGrafanaResources = async ({
+  environment,
+  domain,
+}: GrafanaConfig) => {
   const folder = new grafana.oss.Folder('gp-api-folder', {
     title: `gp-api-${environment}`,
   })
@@ -239,4 +243,31 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
       rules: controllerAlerts(controller).map(alertToRule),
     })
   }
+
+  const { probes } = await grafana.syntheticmonitoring.getProbes()
+
+  new grafana.syntheticmonitoring.Check('health-check', {
+    job: `gp-api-${environment}-health`,
+    target: `https://${domain}/v1/health`,
+    enabled: true,
+    frequency: 60000,
+    timeout: 10000,
+    probes: [
+      probes['NorthCalifornia'],
+      probes['NorthVirginia'],
+      probes['Ohio'],
+    ],
+    labels: {
+      environment,
+      alert_slug: 'health-check',
+    },
+    settings: {
+      http: {
+        method: 'GET',
+        ipVersion: 'V4',
+        validStatusCodes: [200],
+        failIfNotSsl: true,
+      },
+    },
+  })
 }
