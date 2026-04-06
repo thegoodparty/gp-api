@@ -37,6 +37,8 @@ import {
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
 
+const CAMPAIGN_OR_ORGANIZATION_REQUIRED = 'Campaign or organization is required'
+
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
 if (!PEOPLE_API_URL) {
@@ -143,7 +145,7 @@ export class ContactsService {
     fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
   ): Promise<Result> {
     const resolved = await this.resolveDistrictInfoFromOrg(org)
-    let districtId = resolved.districtId
+    const districtId = resolved.districtId
     let state = resolved.state
 
     // Custom office / statewide: org may have only customPositionName; use campaign state + approval.
@@ -254,7 +256,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
@@ -357,7 +359,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     return this.withFallbackDistrictName(
       campaign,
@@ -440,7 +442,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
@@ -481,7 +483,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     return this.withFallbackDistrictName(
       campaign,
