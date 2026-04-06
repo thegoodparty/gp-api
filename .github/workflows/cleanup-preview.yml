@@ -80,6 +80,7 @@ jobs:
       - run: npm ci
 
       - name: Delete Clerk users
+        continue-on-error: true
         run: |
           STACK_NAME="${{ matrix.stack }}"
           PR_NUM="${STACK_NAME#gp-api-pr-}"
