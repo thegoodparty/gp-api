@@ -56,10 +56,7 @@ const buildOrgSyncModule = async (overrides?: {
   const mockCampaignFindUnique = vi.fn()
   const mockQueryRaw = vi.fn().mockResolvedValue([{ nextval: BigInt(42) }])
   const mockTransaction = vi.fn(
-    async (
-      callback: Parameters<PrismaClient['$transaction']>[0],
-      _options?: Parameters<PrismaClient['$transaction']>[1],
-    ) => {
+    async (callback: Parameters<PrismaClient['$transaction']>[0]) => {
       const tx = {
         $queryRaw: mockQueryRaw,
         organization: {
@@ -510,10 +507,7 @@ describe('CampaignsService - redeemFreeTexts', () => {
 
       // Mock transaction callback
       mockPrismaClient.$transaction = vi.fn(
-        async (
-          callback: Parameters<PrismaClient['$transaction']>[0],
-          _options?: Parameters<PrismaClient['$transaction']>[1],
-        ) => {
+        async (callback: Parameters<PrismaClient['$transaction']>[0]) => {
           const mockTx: MockTransactionClient = {
             campaign: {
               updateMany: mockUpdateMany,

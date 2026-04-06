@@ -234,7 +234,6 @@ export class CrmCampaignsService {
       ballotLevel,
       state,
       pledged,
-      campaignCommittee: _campaignCommittee,
       district: candidateDistrict,
       city,
       runForOffice,
@@ -379,7 +378,7 @@ export class CrmCampaignsService {
     const validated = CRMCompanyPropertiesSchema.transform((obj) =>
       Object.fromEntries(
         // remove undefined values, just to be safe
-        Object.entries(obj).filter(([_, v]) => v !== undefined),
+        Object.entries(obj).filter(([, v]) => v !== undefined),
       ),
     ).safeParse(fieldsToSync)
 

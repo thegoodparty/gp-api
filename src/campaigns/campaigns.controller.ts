@@ -39,6 +39,7 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { userHasRole } from 'src/users/util/users.util'
+import { SegmentIdentityTraits } from 'src/vendors/segment/segment.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
@@ -209,8 +210,10 @@ export class CampaignsController {
   async update(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
-    @Body() { slug, ...body }: UpdateCampaignSchema,
+    @Body() dto: UpdateCampaignSchema,
   ) {
+    const { slug, ...body } = dto
+
     if (body.canDownloadFederal && !userHasRole(user, [UserRole.admin])) {
       throw new ForbiddenException(
         'User does not have permission to download federal data',
@@ -226,16 +229,17 @@ export class CampaignsController {
         where: { slug },
       })
 
-      if (body?.details) {
-        const { city, office, electionDate, pledged, party } = body.details
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        await this.analytics.identify(campaign.userId, {
-          ...(city && { officeMunicipality: city }),
-          ...(office && { officeName: office }),
-          ...(electionDate && { officeElectionDate: electionDate }),
-          ...(party && { affiliation: party }),
-          ...(pledged && { pledged }),
-        })
+      if (dto.details) {
+        const d = dto.details
+        const traits: SegmentIdentityTraits = {}
+        if (d.city !== undefined) traits.officeMunicipality = d.city
+        if (d.office !== undefined) traits.officeName = d.office
+        if (d.electionDate !== undefined)
+          traits.officeElectionDate = d.electionDate
+        if (d.party !== undefined) traits.affiliation = d.party
+        if (d.pledged !== undefined) traits.pledged = d.pledged
+
+        await this.analytics.identify(campaign.userId, traits)
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
@@ -548,9 +552,10 @@ export class CampaignsController {
   }
 
   private async resolveRaceTargetPositionContext(campaign: Campaign) {
-    const campaignOrganization = campaign.organizationSlug
+    const { organizationSlug } = campaign
+    const campaignOrganization = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
     const { ballotReadyPositionId: ballotreadyPositionId, positionName } =

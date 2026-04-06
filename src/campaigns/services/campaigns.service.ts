@@ -314,9 +314,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           ) as PrismaJson.CampaignAiContent
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const typedDetails = details as Partial<PrismaJson.CampaignDetails>
-        await this.syncLegacyPositionToOrg(typedDetails, campaign, tx)
+        await this.syncLegacyPositionToOrg(details, campaign, tx)
 
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
@@ -381,20 +379,31 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return updatedCampaign ? updatedCampaign : null
   }
 
-  /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
   private async syncLegacyPositionToOrg(
-    details: Partial<PrismaJson.CampaignDetails> | undefined,
-    campaign: { id: number; details: PrismaJson.CampaignDetails },
+    details: UpdateCampaignFieldsInput['details'],
+    campaign: {
+      id: number
+      details: {
+        positionId?: string | null
+        office?: string
+        otherOffice?: string
+      }
+    },
     tx: { organization: Pick<Prisma.OrganizationDelegate, 'update'> },
   ) {
-    if (!details || !('positionId' in details || 'office' in details)) return
+    if (!details || typeof details !== 'object') return
+    if (!('positionId' in details) && !('office' in details)) return
 
+    const positionIdRaw = details['positionId']
     const incomingPositionId =
-      typeof details.positionId === 'string' ? details.positionId : null
+      typeof positionIdRaw === 'string' ? positionIdRaw : null
+
+    const storedPositionIdRaw = campaign.details.positionId
+    const storedBallotReadyId =
+      typeof storedPositionIdRaw === 'string' ? storedPositionIdRaw : null
+
     const resolvedBallotReadyId =
-      'positionId' in details
-        ? incomingPositionId
-        : (campaign.details?.positionId ?? null)
+      'positionId' in details ? incomingPositionId : storedBallotReadyId
 
     let resolvedPosition: Awaited<
       ReturnType<ElectionsService['getPositionByBallotReadyId']>
@@ -404,18 +413,25 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         resolvedPosition = await this.elections.getPositionByBallotReadyId(
           resolvedBallotReadyId,
         )
-      } catch (err: unknown) {
+      } catch (caught: unknown) {
+        const errMessage =
+          caught instanceof Error ? caught.message : String(caught)
         this.logger.warn(
-          { resolvedBallotReadyId, err },
+          { resolvedBallotReadyId, errMessage },
           'Election API position lookup failed during legacy org sync; treating as unresolved',
         )
         resolvedPosition = null
       }
     }
 
-    const mergedOffice = details.office ?? campaign.details?.office
+    const officeRaw = details['office']
+    const otherOfficeRaw = details['otherOffice']
+    const mergedOffice =
+      (typeof officeRaw === 'string' ? officeRaw : undefined) ??
+      campaign.details.office
     const mergedOtherOffice =
-      details.otherOffice ?? campaign.details?.otherOffice
+      (typeof otherOfficeRaw === 'string' ? otherOfficeRaw : undefined) ??
+      campaign.details.otherOffice
 
     const customPositionName = !resolvedPosition
       ? OrganizationsService.resolveCustomPositionName(
@@ -434,7 +450,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-  /* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
 
   async patchCampaignDetails(
     campaignId: number,
@@ -578,7 +593,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
 
-    const { data, details, slug, id } = campaign
+    const {
+      data,
+      details,
+      slug,
+      id,
+      isActive,
+      organizationSlug,
+      isVerified: campaignIsVerified,
+    } = campaign
 
     await this.model.update({
       where: { id },
@@ -588,11 +611,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
 
     const isVerified =
-      campaign.isVerified ||
+      campaignIsVerified ||
       data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
         CandidateVerification.yes
 
-    if (campaign.isActive) {
+    if (isActive) {
       return {
         status: CampaignStatus.candidate,
         slug,
@@ -600,9 +623,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
     let step = 1
-    const org = campaign.organizationSlug
+    const org = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
     if (org?.positionId || org?.customPositionName) {
@@ -631,19 +654,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async launch(campaign: Campaign) {
-    const campaignData = campaign.data
+    const { id, organizationSlug, data: campaignData, isActive } = campaign
 
     if (
-      campaign.isActive ||
+      isActive ||
       campaignData.launchStatus === CampaignLaunchStatus.launched
     ) {
       this.logger.info('Campaign already launched, skipping launch')
       return true
     }
 
-    const org = campaign.organizationSlug
+    const org = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
     if (!org?.positionId && !org?.customPositionName) {
@@ -651,7 +674,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     await this.model.update({
-      where: { id: campaign.id },
+      where: { id },
       data: {
         isActive: true,
         data: {
@@ -662,7 +685,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    await this.crm.trackCampaign(campaign.id)
+    await this.crm.trackCampaign(id)
 
     return true
   }
@@ -823,12 +846,13 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async fetchLiveRaceTargetMetrics(
     campaign: Campaign,
   ): Promise<RaceTargetMetrics | null> {
-    const { electionDate } = campaign.details ?? {}
+    const { details, organizationSlug, id: campaignId } = campaign
+    const { electionDate } = details ?? {}
     if (!electionDate) return null
 
-    const org = campaign.organizationSlug
+    const org = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
 
@@ -857,7 +881,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         positionId: org.positionId!,
         electionDate,
         includeTurnout: true,
-        campaignId: campaign.id,
+        campaignId,
         officeName: undefined,
       })
       .catch(() => null)

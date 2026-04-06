@@ -122,11 +122,17 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   private async buildCampaignPlanRequest(
     campaign: CampaignWithPathToVictory,
   ): Promise<StartCampaignPlanRequest> {
-    const { details, data, pathToVictory } = campaign
+    const {
+      details,
+      data,
+      pathToVictory,
+      organizationSlug,
+      id: campaignId,
+    } = campaign
 
-    const positionName = campaign.organizationSlug
+    const positionName = organizationSlug
       ? await this.organizations.resolvePositionNameByOrganizationSlug(
-          campaign.organizationSlug,
+          organizationSlug,
         )
       : null
     const office = positionName || details.normalizedOffice || 'Local Office'
@@ -160,7 +166,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         : 1
 
     return {
-      candidate_name: data.name || `Campaign ${campaign.id}`,
+      candidate_name: data.name || `Campaign ${campaignId}`,
       election_date:
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,

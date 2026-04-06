@@ -147,6 +147,7 @@ export class ContactsService {
     const resolved = await this.resolveDistrictInfoFromOrg(org)
     const districtId = resolved.districtId
     let state = resolved.state
+    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
 
     // Custom office / statewide: org may have only customPositionName; use campaign state + approval.
     if (!districtId && !state && campaign?.details) {
@@ -161,7 +162,7 @@ export class ContactsService {
         details.state.length === 2 &&
         (level === BallotReadyPositionLevel.STATE ||
           level === BallotReadyPositionLevel.FEDERAL) &&
-        Boolean(campaign.canDownloadFederal)
+        canDownloadFederal
       ) {
         state = details.state.toUpperCase()
       }
@@ -179,7 +180,6 @@ export class ContactsService {
       )
     }
     // LEGACY: Replace with org-based approval when org migration is complete.
-    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
     if (!canDownloadFederal) {
       throw new BadRequestException(
         'Statewide or federal contacts require admin approval',

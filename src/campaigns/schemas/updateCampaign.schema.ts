@@ -81,21 +81,25 @@ const CampaignDetailsSchema = z
   .passthrough()
 
 // TODO: make schemas data, pathToVictory, aiContent
-export class UpdateCampaignSchema extends createZodDto(
-  CampaignSchema.pick({
-    slug: true,
-    data: true,
-    aiContent: true,
-    formattedAddress: true,
-    placeId: true,
-    canDownloadFederal: true,
+export const updateCampaignBodySchema = CampaignSchema.pick({
+  slug: true,
+  data: true,
+  aiContent: true,
+  formattedAddress: true,
+  placeId: true,
+  canDownloadFederal: true,
+})
+  .partial()
+  .extend({
+    details: CampaignDetailsSchema.optional(),
+    pathToVictory: z.record(z.string(), z.unknown()).optional(),
   })
-    .partial()
-    .extend({
-      details: CampaignDetailsSchema.optional(),
-      pathToVictory: z.record(z.string(), z.unknown()).optional(),
-    })
-    .strict(),
+  .strict()
+
+export type UpdateCampaignBody = z.infer<typeof updateCampaignBodySchema>
+
+export class UpdateCampaignSchema extends createZodDto(
+  updateCampaignBodySchema,
 ) {}
 
 export class CreateCampaignSchema extends createZodDto(

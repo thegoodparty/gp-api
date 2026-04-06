@@ -420,9 +420,10 @@ export class PaymentEventsService {
 
   async sendProCancellationSlackMessage(user: User, campaign: Campaign) {
     const fullName = getUserFullName(user)
-    const positionName = campaign.organizationSlug
+    const { organizationSlug, slug } = campaign
+    const positionName = organizationSlug
       ? await this.organizationsService.resolvePositionNameByOrganizationSlug(
-          campaign.organizationSlug,
+          organizationSlug,
         )
       : null
 
@@ -431,7 +432,7 @@ export class PaymentEventsService {
         text: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
         }, running for '${positionName || 'Unknown Office'}' and campaign slug \`${
-          campaign.slug
+          slug
         }\` ended their pro subscription!`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
@@ -448,19 +449,19 @@ export class PaymentEventsService {
   }
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {
-    const { details = {}, data = {} } = campaign || {}
+    const { details = {}, data = {}, organizationSlug, slug } = campaign
     const { state } = details
     const { hubspotId } = data
     const name = `${user.firstName}${user.firstName ? ` ${user.lastName}` : ''}`
-    const positionName = campaign.organizationSlug
+    const positionName = organizationSlug
       ? await this.organizationsService.resolvePositionNameByOrganizationSlug(
-          campaign.organizationSlug,
+          organizationSlug,
         )
       : null
 
     await this.slackService.message(
       {
-        text: `PRO PLAN SIGN UP!!! :gp:\nName: ${name}\nEmail: ${user.email}\nCampaign slug: ${campaign.slug}\nState: ${state}\nOffice: ${positionName || 'Unknown Office'}\nAssigned PA: ${
+        text: `PRO PLAN SIGN UP!!! :gp:\nName: ${name}\nEmail: ${user.email}\nCampaign slug: ${slug}\nState: ${state}\nOffice: ${positionName || 'Unknown Office'}\nAssigned PA: ${
           hubspotId
             ? await this.crm.getCrmCompanyOwnerName(hubspotId)
             : 'None assigned'

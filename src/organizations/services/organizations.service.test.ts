@@ -121,7 +121,8 @@ describe('OrganizationsService', () => {
 
     it('resolves all three fields together', async () => {
       mockGetPositionByBallotReadyId.mockImplementation(
-        (_id: string, opts?: { includeDistrict?: boolean }) => {
+        (...args: [string, { includeDistrict?: boolean }?]) => {
+          const opts = args[1]
           if (opts?.includeDistrict) {
             return {
               id: 'pos-id',
