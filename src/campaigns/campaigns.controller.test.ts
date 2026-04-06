@@ -17,8 +17,6 @@ import {
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -100,13 +98,6 @@ const mockCampaign: Campaign = {
   },
 }
 
-const mockTestCampaign: Campaign = {
-  ...mockCampaign,
-  id: 101,
-  slug: 'test-candidate',
-  data: { name: 'Test Campaign' },
-}
-
 const mockP2V: PathToVictory = {
   id: 10,
   createdAt: new Date(CREATED_AT),
@@ -150,8 +141,6 @@ describe('CampaignsController', () => {
   let campaignsService: CampaignsService
   let planVersionsService: CampaignPlanVersionsService
   let slackService: SlackService
-  let p2vService: PathToVictoryService
-  let enqueueP2VService: EnqueuePathToVictoryService
   let electionsService: ElectionsService
   let organizationsService: OrganizationsService
   let analyticsService: AnalyticsService
@@ -168,6 +157,7 @@ describe('CampaignsController', () => {
       createForUser: vi.fn(),
       updateJsonFields: vi.fn(),
       launch: vi.fn(),
+      fetchLiveRaceTargetMetrics: vi.fn().mockResolvedValue(null),
     }
     campaignsService = campaignsServiceMock as CampaignsService
 
@@ -181,21 +171,9 @@ describe('CampaignsController', () => {
     }
     slackService = slackServiceMock as SlackService
 
-    const p2vServiceMock: Partial<PathToVictoryService> = {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    }
-    p2vService = p2vServiceMock as PathToVictoryService
-
-    const enqueueP2VServiceMock: Partial<EnqueuePathToVictoryService> = {
-      enqueuePathToVictory: vi.fn(),
-    }
-    enqueueP2VService = enqueueP2VServiceMock as EnqueuePathToVictoryService
-
     const electionsServiceMock: Partial<ElectionsService> = {
       buildRaceTargetDetails: vi.fn(),
-      getBallotReadyMatchedRaceTargetDetails: vi.fn(),
+      getPositionMatchedRaceTargetDetails: vi.fn(),
       getDistrictId: vi.fn().mockResolvedValue(null),
     }
     electionsService = electionsServiceMock as ElectionsService
@@ -226,150 +204,12 @@ describe('CampaignsController', () => {
       campaignsService,
       planVersionsService,
       slackService,
-      p2vService,
-      enqueueP2VService,
       electionsService,
       organizationsService,
       analyticsService,
       queueProducerServiceMock as QueueProducerService,
       createMockLogger(),
     )
-  })
-
-  describe('createPathToVictory', () => {
-    it('throws NotFoundException when no campaign and no slug', async () => {
-      await expect(
-        controller.createPathToVictory({}, mockUser, undefined),
-      ).rejects.toThrow(NotFoundException)
-    })
-
-    it('admin can override campaign via slug param', async () => {
-      const otherCampaign: Campaign = {
-        ...mockCampaign,
-        slug: 'other-slug',
-      }
-      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
-        otherCampaign,
-      )
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory(
-        { slug: 'other-slug' },
-        mockAdminUser,
-        mockCampaign,
-      )
-
-      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
-        where: { slug: 'other-slug' },
-      })
-    })
-
-    it('sales can override campaign via slug param', async () => {
-      const otherCampaign: Campaign = {
-        ...mockCampaign,
-        slug: 'other-slug',
-      }
-      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
-        otherCampaign,
-      )
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory(
-        { slug: 'other-slug' },
-        mockSalesUser,
-        mockCampaign,
-      )
-
-      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
-        where: { slug: 'other-slug' },
-      })
-    })
-
-    it('does not override when slug matches campaign slug', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory(
-        { slug: mockCampaign.slug },
-        mockAdminUser,
-        mockCampaign,
-      )
-
-      expect(campaignsService.findUniqueOrThrow).not.toHaveBeenCalled()
-    })
-
-    it('sets p2vStatus to Complete for test campaigns', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory({}, mockUser, mockTestCampaign)
-
-      expect(p2vService.create).toHaveBeenCalledWith({
-        data: {
-          campaignId: mockTestCampaign.id,
-          data: { p2vStatus: P2VStatus.complete },
-        },
-      })
-    })
-
-    it('creates a new P2V when none exists', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      const result = await controller.createPathToVictory(
-        {},
-        mockUser,
-        mockCampaign,
-      )
-
-      expect(p2vService.create).toHaveBeenCalledWith({
-        data: {
-          campaignId: mockCampaign.id,
-          data: { p2vStatus: P2VStatus.waiting },
-        },
-      })
-      expect(result).toEqual(mockP2V)
-    })
-
-    it('updates existing P2V when one already exists', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(mockP2V)
-      vi.spyOn(p2vService, 'update').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory({}, mockUser, mockCampaign)
-
-      expect(p2vService.update).toHaveBeenCalledWith({
-        where: { id: mockP2V.id },
-        data: {
-          data: {
-            ...mockP2V.data,
-            p2vStatus: P2VStatus.waiting,
-            p2vAttempts: 0,
-          },
-        },
-      })
-    })
-
-    it('enqueues P2V when status is waiting', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory({}, mockUser, mockCampaign)
-
-      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
-        mockCampaign.id,
-      )
-    })
-
-    it('does not enqueue when p2vStatus is Complete (test campaign)', async () => {
-      vi.spyOn(p2vService, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(p2vService, 'create').mockResolvedValue(mockP2V)
-
-      await controller.createPathToVictory({}, mockUser, mockTestCampaign)
-
-      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
-    })
   })
 
   describe('findAll', () => {
@@ -464,6 +304,34 @@ describe('CampaignsController', () => {
         ...campaignWithRelations,
         positionName: 'Mayor',
       })
+    })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithRelations: CampaignWith<
+        'organization' | 'pathToVictory'
+      > = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: {} as Organization,
+      }
+
+      const result = await controller.findMine(campaignWithRelations)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
     })
   })
 
@@ -591,6 +459,33 @@ describe('CampaignsController', () => {
       await expect(controller.findBySlug('nonexistent')).rejects.toThrow(
         NotFoundException,
       )
+    })
+
+    it('injects live metrics into pathToVictory.data', async () => {
+      const liveMetrics = {
+        projectedTurnout: 5000,
+        winNumber: 2501,
+        voterContactGoal: 12505,
+      }
+      vi.spyOn(
+        campaignsService,
+        'fetchLiveRaceTargetMetrics',
+      ).mockResolvedValue(liveMetrics)
+
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: { ...mockP2V, data: { p2vStatus: P2VStatus.complete } },
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+
+      const result = await controller.findBySlug(mockCampaign.slug)
+
+      expect(result.pathToVictory?.data).toEqual({
+        p2vStatus: P2VStatus.complete,
+        ...liveMetrics,
+      })
+      expect(result.positionName).toBe('Mayor')
     })
   })
 
@@ -1158,6 +1053,113 @@ describe('CampaignsController', () => {
     })
   })
 
+  describe('setDistrictM2M', () => {
+    const districtBody = {
+      L2DistrictType: 'State Senate',
+      L2DistrictName: 'District 5',
+    }
+
+    it('throws when campaign is not found', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockRejectedValue(
+        new NotFoundException('Campaign not found'),
+      )
+
+      await expect(
+        controller.setDistrictM2M({ id: 999 }, districtBody),
+      ).rejects.toThrow(NotFoundException)
+
+      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 999 },
+      })
+    })
+
+    it('calls applyDistrictUpdate with the resolved campaign and district values', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue({
+        projectedTurnout: 5000,
+        winNumber: 2500,
+        voterContactGoal: 3000,
+      })
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.setDistrictM2M({ id: mockCampaign.id }, districtBody)
+
+      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: mockCampaign.id },
+      })
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            electionType: 'State Senate',
+            electionLocation: 'District 5',
+            projectedTurnout: 5000,
+            districtManuallySet: true,
+          }),
+        }),
+      )
+    })
+
+    it('works without user context (M2M auth)', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        null,
+      )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      const result = await controller.setDistrictM2M(
+        { id: mockCampaign.id },
+        districtBody,
+      )
+
+      expect(result).toBeDefined()
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            electionType: 'State Senate',
+            electionLocation: 'District 5',
+            p2vStatus: P2VStatus.districtMatched,
+            districtManuallySet: true,
+          }),
+        }),
+      )
+    })
+
+    it('uses sentinel values when buildRaceTargetDetails returns null', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
+        null,
+      )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.setDistrictM2M({ id: mockCampaign.id }, districtBody)
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        expect.objectContaining({
+          pathToVictory: expect.objectContaining({
+            projectedTurnout: -1,
+            winNumber: -1,
+            voterContactGoal: -1,
+          }),
+        }),
+      )
+    })
+  })
+
   describe('updateRaceTargetDetails', () => {
     it('throws BadRequestException when no positionId', async () => {
       const campaign: Campaign = {
@@ -1189,10 +1191,10 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('falls back to silver flow when raceTargetDetails is null', async () => {
+    it('sets failed status when raceTargetDetails is null', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1204,21 +1206,18 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         {
           pathToVictory: {
-            p2vStatus: P2VStatus.waiting,
+            p2vStatus: P2VStatus.failed,
             p2vAttempts: 0,
             officeContextFingerprint: null,
           },
         },
-      )
-      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
-        mockCampaign.id,
       )
     })
 
     it('updates with complete status when hasTurnout', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1250,7 +1249,7 @@ describe('CampaignsController', () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(noTurnout)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1263,39 +1262,10 @@ describe('CampaignsController', () => {
       expect(callArgs.pathToVictory?.p2vStatus).toBe(P2VStatus.districtMatched)
     })
 
-    it('does not enqueue silver when district matched but no turnout', async () => {
-      const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
-      vi.spyOn(
-        electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
-      ).mockResolvedValue(noTurnout)
-      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
-        mockCampaignWithP2V,
-      )
-
-      await controller.updateRaceTargetDetails(mockCampaign)
-
-      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
-    })
-
-    it('does not enqueue when hasTurnout', async () => {
-      vi.spyOn(
-        electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
-      ).mockResolvedValue(mockRaceTargetDetails)
-      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
-        mockCampaignWithP2V,
-      )
-
-      await controller.updateRaceTargetDetails(mockCampaign)
-
-      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
-    })
-
     it('passes includeTurnout: true and officeName to elections service', async () => {
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1304,7 +1274,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith({
         campaignId: mockCampaign.id,
         ballotreadyPositionId: 'br-pos-1',
@@ -1324,7 +1294,7 @@ describe('CampaignsController', () => {
       })
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(mockRaceTargetDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1333,7 +1303,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetails(mockCampaign)
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           officeName: undefined,
@@ -1349,7 +1319,7 @@ describe('CampaignsController', () => {
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(raceDetails)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1374,7 +1344,7 @@ describe('CampaignsController', () => {
       })
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: false }))
     })
 
@@ -1384,7 +1354,7 @@ describe('CampaignsController', () => {
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
 
       expect(
-        electionsService.getBallotReadyMatchedRaceTargetDetails,
+        electionsService.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith(expect.objectContaining({ includeTurnout: true }))
     })
 
@@ -1410,13 +1380,13 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('falls back to silver flow when raceTargetDetails is null', async () => {
+    it('sets failed status when raceTargetDetails is null', async () => {
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         mockCampaign,
       )
       vi.spyOn(
         electionsService,
-        'getBallotReadyMatchedRaceTargetDetails',
+        'getPositionMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
@@ -1428,14 +1398,11 @@ describe('CampaignsController', () => {
         mockCampaign.id,
         {
           pathToVictory: {
-            p2vStatus: P2VStatus.waiting,
+            p2vStatus: P2VStatus.failed,
             p2vAttempts: 0,
             officeContextFingerprint: null,
           },
         },
-      )
-      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
-        mockCampaign.id,
       )
     })
 
@@ -1451,7 +1418,7 @@ describe('CampaignsController', () => {
       expect(callArgs.pathToVictory?.source).toBe(P2VSource.ElectionApi)
     })
 
-    it('sets districtMatched status and does not enqueue when no turnout', async () => {
+    it('sets districtMatched status when no turnout', async () => {
       setupSlugMocks({ ...mockRaceTargetDetails, projectedTurnout: 0 })
 
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
@@ -1459,15 +1426,6 @@ describe('CampaignsController', () => {
       const callArgs = vi.mocked(campaignsService.updateJsonFields).mock
         .calls[0][1]
       expect(callArgs.pathToVictory?.p2vStatus).toBe(P2VStatus.districtMatched)
-      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
-    })
-
-    it('does not enqueue when hasTurnout', async () => {
-      setupSlugMocks()
-
-      await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
-
-      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
     })
   })
 })

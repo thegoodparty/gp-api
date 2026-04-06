@@ -1,21 +1,19 @@
 import { TcrCompliance } from '@prisma/client'
-import type { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import z from 'zod'
 
 export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
-  PATH_TO_VICTORY = 'pathToVictory',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
   GENERATE_TASKS = 'generateTasks',
   DOMAIN_EMAIL_FORWARDING = 'domainEmailForwarding',
   POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
   POLL_CREATION = 'pollCreation',
   POLL_EXPANSION = 'pollExpansion',
+  CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
 }
 
 export type QueueMessage =
   | { type: QueueType.GENERATE_AI_CONTENT; data: GenerateAiContentMessageData }
-  | { type: QueueType.PATH_TO_VICTORY; data: PathToVictoryInput }
   | {
       type: QueueType.TCR_COMPLIANCE_STATUS_CHECK
       data: TcrComplianceStatusCheckMessage
@@ -31,6 +29,10 @@ export type QueueMessage =
   | { type: QueueType.POLL_CREATION; data: PollCreationEvent['data'] }
   | { type: QueueType.POLL_EXPANSION; data: PollExpansionEvent['data'] }
   | { type: QueueType.GENERATE_TASKS; data: GenerateTasksMessage }
+  | {
+      type: QueueType.CAMPAIGN_PLAN_COMPLETE
+      data: CampaignPlanCompleteMessage
+    }
 
 export type GenerateAiContentMessageData = {
   slug: string
@@ -49,6 +51,15 @@ export type GenerateTasksMessage = {
 export type DomainEmailForwardingMessage = {
   domainId: number
   forwardingEmailAddress: string
+}
+
+export type CampaignPlanCompleteMessage = {
+  campaignId: number
+  status: 'completed' | 'error'
+  s3Key?: string
+  taskCount?: number
+  generationTimestamp?: string
+  error?: string
 }
 
 export const PollAnalysisCompleteEventSchema = z.object({

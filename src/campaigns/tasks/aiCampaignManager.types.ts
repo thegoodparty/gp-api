@@ -4,7 +4,9 @@ export interface StartCampaignPlanRequest {
   office_and_jurisdiction: string
   race_type: string
   number_of_opponents: number
+  seats_available: number
   win_number: number
+  incumbent_status: 'Elected' | 'Appointed' | 'N/A'
   total_likely_voters: number
   available_cell_phones: number
   available_landlines: number

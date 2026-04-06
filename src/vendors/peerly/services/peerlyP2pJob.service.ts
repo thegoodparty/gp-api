@@ -10,13 +10,11 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyMediaService } from './peerlyMedia.service'
-import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
-import { CreateJobParams, PeerlyAgent, PeerlyJob } from '../peerly.types'
+import { CreateJobParams, PeerlyJob } from '../peerly.types'
 
 interface CreateP2pJobParams {
   campaignId: number
-  crmCompanyId?: string
   listId: number
   imageInfo: {
     fileStream: Readable | Buffer
@@ -40,14 +38,12 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     private readonly peerlyMediaService: PeerlyMediaService,
     private readonly peerlyHttpService: PeerlyHttpService,
     private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
-    private readonly crmCampaigns: CrmCampaignsService,
   ) {
     super(logger)
   }
 
   async createPeerlyP2pJob({
     campaignId,
-    crmCompanyId,
     listId,
     imageInfo,
     scriptText,
@@ -76,7 +72,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
 
       this.logger.info('Creating P2P job')
       jobId = await this.createJob({
-        crmCompanyId: crmCompanyId || '',
         name,
         templates: [
           {
@@ -149,7 +144,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   }
 
   private async createJob({
-    crmCompanyId,
     name,
     templates,
     didState,
@@ -158,26 +152,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     scheduledDate,
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
-    const agentIds: string[] = []
-    try {
-      const owner = crmCompanyId
-        ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId)
-        : null
-      const agentId = owner?.email
-        ? await this.getAgentIdByEmail(owner.email)
-        : null
-      if (agentId) {
-        agentIds.push(agentId)
-        this.logger.info(`Successfully assigned agent ${agentId} to job`)
-      } else if (owner?.email) {
-        this.logger.warn(`No Peerly agent found for PA email: ${owner.email}`)
-      }
-    } catch (error) {
-      this.logger.error(
-        { error },
-        'Failed to assign PA as agent, creating job without agent assignment',
-      )
-    }
 
     const body = {
       account_id: this.accountNumber,
@@ -186,7 +160,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       did_state: didState,
       ...(didNpaSubset.length > 0 && { did_npa_subset: didNpaSubset }),
       can_use_mms: hasMms,
-      ...(agentIds.length > 0 && { agent_ids: agentIds }),
       schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
       ...(scheduledDate && {
@@ -262,35 +235,5 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
         logger: this.logger,
       })
     }
-  }
-
-  private async listAgents(): Promise<PeerlyAgent[]> {
-    try {
-      const response =
-        await this.peerlyHttpService.get<PeerlyAgent[]>('/1to1/agents')
-      this.logger.debug(`Fetched ${response.data.length} Peerly agents`)
-      return response.data
-    } catch (error) {
-      return this.peerlyErrorHandling.handleApiError({
-        error,
-        logger: this.logger,
-      })
-    }
-  }
-
-  private async getAgentIdByEmail(email: string): Promise<string | null> {
-    if (!email || !email.trim()) {
-      return null
-    }
-
-    const normalizedEmail = email.toLowerCase()
-    const agents = await this.listAgents()
-    const agent = agents.find(
-      (a) =>
-        a.display_email &&
-        a.status === 'active' &&
-        a.display_email.toLowerCase() === normalizedEmail,
-    )
-    return agent?.id || null
   }
 }

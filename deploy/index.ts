@@ -308,6 +308,13 @@ export = async () => {
     prod: 'goodparty.org',
   })
 
+  const domain = select({
+    preview: `${stage}.preview.goodparty.org`,
+    dev: 'gp-api-dev.goodparty.org',
+    qa: 'gp-api-qa.goodparty.org',
+    prod: 'gp-api.goodparty.org',
+  })
+
   const service = createService({
     dependsOn: [rdsInstance],
     environment,
@@ -317,12 +324,7 @@ export = async () => {
     securityGroupIds: vpcSecurityGroupIds,
     publicSubnetIds: vpcSubnetIds.public,
     hostedZoneId,
-    domain: select({
-      preview: `${stage}.preview.goodparty.org`,
-      dev: 'gp-api-dev.goodparty.org',
-      qa: 'gp-api-qa.goodparty.org',
-      prod: 'gp-api.goodparty.org',
-    }),
+    domain,
     certificateArn: select({
       preview:
         'arn:aws:acm:us-west-2:333022194791:certificate/b009d1a6-68ff-4d24-84f7-93683ca3f786',
@@ -351,7 +353,7 @@ export = async () => {
       }),
       WEBAPP_ROOT_URL: `https://${productDomain}`,
       AI_MODELS:
-        'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,Qwen/Qwen3-235B-A22B-fp8-tput',
+        'Qwen/Qwen3-235B-A22B-Instruct-2507-tput,MiniMaxAI/MiniMax-M2.5',
       LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
@@ -410,7 +412,7 @@ export = async () => {
   })
 
   if (environment !== 'preview') {
-    createGrafanaResources({ environment })
+    await createGrafanaResources({ environment, domain })
   }
 
   return {

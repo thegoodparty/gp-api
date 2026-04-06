@@ -65,16 +65,14 @@ export const GLOBAL_ALERTS: Alert[] = [
     ].join('\n\n'),
   },
   {
-    slug: 'missing-health-check',
-    name: 'Missing health check logs',
-    type: 'log',
-    expr: 'absent_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Request completed" |= "/v1/health" [2m])',
-    threshold: 0,
+    slug: 'health-check-probe-failure',
+    name: 'Health check probe failures',
+    type: 'metric',
+    expr: '1 - (sum(rate(probe_all_success_sum{job="gp-api-$ENV-health"}[5m])) / sum(rate(probe_all_success_count{job="gp-api-$ENV-health"}[5m])))',
+    threshold: 0.1,
     for: '2m',
-    message: [
-      'No health check requests logged in the last 2 minutes — the service may be down.',
-      'Check the ECS console for task status and recent events. If the task is crashing, click *View in Grafana* to check recent logs for crash output. If the task is running but not logging, investigate network or load balancer connectivity.',
-    ].join('\n\n'),
+    message:
+      'Synthetic monitoring probes are failing against the health endpoint — the service may be unreachable externally.',
   },
   {
     slug: 'slow-prisma-connections',
@@ -96,11 +94,40 @@ export const GLOBAL_ALERTS: Alert[] = [
     name: '[Serve] Background job failed',
     type: 'log',
     expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Message processing failed" |= "poll" [5m]))',
-    threshold: 1,
-    for: '5m',
+    threshold: 0,
+    for: '0m',
     message: [
       'A Serve-related background SQS job has failed in the last 5 minutes.',
       'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
     ].join('\n\n'),
+    notify: 'serve-bugs',
+  },
+  // ------ Win Warnings ------ //
+  {
+    slug: 'win-peerly-warnings',
+    name: '[Win] Peerly endpoint errors detected',
+    type: 'log',
+    expr: [
+      'sum(count_over_time(',
+      '{service_name="gp-api", deployment_environment_name="$ENV"}',
+      // Excluding: happens when users input an incorrect PIN.
+      '!= "Campaign Verify Verify PIN API request failed"',
+      // Excluding: transient phone list status error, safe to ignore.
+      '!= "There may be an error with the phone list for context"',
+      '| json',
+      '| detected_level = "error"',
+      '| request_endpoint =~ ".*(p2p|tcr-compliance|outreach).*"',
+      '| request_endpoint != "GET /v1/campaigns/tcr-compliance/mine"',
+      // Excluding: HttpExceptionFilter duplicates every error, would double-count.
+      '| context != "HttpExceptionFilter"',
+      '[15m]))',
+    ].join(' '),
+    threshold: 0,
+    for: '1m',
+    message: [
+      'Peerly-related endpoint errors detected in the last 15 minutes.',
+      'Dashboard: https://goodparty.grafana.net/d/peerly-prod/peerly-e28094-prod',
+    ].join('\n\n'),
+    notify: 'win-bugs',
   },
 ]

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -15,6 +16,7 @@ import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { CampaignWithPathToVictory } from '../campaigns.types'
+import { completeTaskBodySchema } from './schemas/completeTaskBody.schema'
 
 @Controller('campaigns/tasks')
 @UseCampaign({ include: { pathToVictory: true } })
@@ -30,8 +32,13 @@ export class CampaignTasksController {
   async completeTask(
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Param('id') id: string,
+    @Body() body?: Record<string, unknown>,
   ) {
-    return this.tasksService.completeTask(campaign, id)
+    const voterContact =
+      body && Object.keys(body).length > 0
+        ? completeTaskBodySchema.parse(body)
+        : undefined
+    return this.tasksService.completeTask(campaign, id, voterContact)
   }
 
   @Delete('complete/:id')
@@ -40,6 +47,13 @@ export class CampaignTasksController {
     @Param('id') id: string,
   ) {
     return this.tasksService.unCompleteTask(campaign, id)
+  }
+
+  // TODO: This is a temporary endpoint to delete all tasks for a campaign for testing purposes
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAllTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    await this.tasksService.deleteAllTasks(campaign.id)
   }
 
   @Post('generate')

@@ -133,6 +133,13 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     )
 
     const additionalContext = this.buildAdditionalRaceContext(campaign)
+    const incumbentStatus =
+      pathData?.viability?.isIncumbent === true ? 'Elected' : 'N/A'
+
+    const seatsAvailable =
+      pathData?.viability?.seats && pathData.viability.seats >= 1
+        ? pathData.viability.seats
+        : 1
 
     return {
       candidate_name: data.name || `Campaign ${campaign.id}`,
@@ -140,6 +147,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,
       race_type: this.determineRaceType(details),
+      incumbent_status: incumbentStatus,
+      seats_available: seatsAvailable,
       number_of_opponents: this.extractNumberOfOpponents(details),
       win_number: winNumber,
       total_likely_voters: Math.floor(projectedTurnout),
@@ -392,8 +401,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       general: CampaignTaskType.education,
     }
 
-    const isFlowTypeKey = (key: string): key is FlowTypeKey => key in flowTypeMap
-    return isFlowTypeKey(category) ? flowTypeMap[category] : CampaignTaskType.education
+    const isFlowTypeKey = (key: string): key is FlowTypeKey =>
+      key in flowTypeMap
+    return isFlowTypeKey(category)
+      ? flowTypeMap[category]
+      : CampaignTaskType.education
   }
 
   private calculateWeekFromDate(
@@ -451,6 +463,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       election_date: request.election_date,
       office_and_jurisdiction: request.office_and_jurisdiction,
       race_type: request.race_type,
+      incumbent_status: request.incumbent_status,
+      seats_available: request.seats_available,
       number_of_opponents: request.number_of_opponents,
       win_number: request.win_number,
       total_likely_voters: request.total_likely_voters,

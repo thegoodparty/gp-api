@@ -1,5 +1,5 @@
 import { HttpModule } from '@nestjs/axios'
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { AiModule } from 'src/ai/ai.module'
 import { EmailModule } from 'src/email/email.module'
 import { PurchaseType } from 'src/payments/purchase.types'
@@ -18,7 +18,7 @@ import { OutreachPurchaseHandlerService } from './services/outreachPurchase.serv
     EmailModule,
     FilesModule,
     PaymentsModule,
-    PeerlyModule,
+    forwardRef(() => PeerlyModule),
     GoogleModule,
     AiModule,
   ],

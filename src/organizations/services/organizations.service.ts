@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, ElectedOffice, Organization } from '@prisma/client'
+import { Campaign, ElectedOffice, Organization, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   AdminListOrganizationsDto,
@@ -57,15 +57,23 @@ export class OrganizationsService extends createPrismaBase(
   async resolvePositionNameByOrganizationSlug(
     organizationSlug: string,
   ): Promise<string | null> {
+    const { positionName } =
+      await this.resolvePositionContextByOrgSlug(organizationSlug)
+    return positionName
+  }
+
+  async resolvePositionContextByOrgSlug(organizationSlug: string): Promise<{
+    ballotReadyPositionId: string | null
+    positionName: string | null
+  }> {
     const organization = await this.findUnique({
       where: { slug: organizationSlug },
     })
 
-    const { positionName } = await this.resolvePositionContext({
+    return this.resolvePositionContext({
       customPositionName: organization?.customPositionName,
       positionId: organization?.positionId,
     })
-    return positionName
   }
 
   async listOrganizations(userId: number) {
@@ -122,13 +130,16 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   async adminListOrganizations(query: AdminListOrganizationsDto) {
+    const OR: Prisma.OrganizationWhereInput[] = []
+    if (query.slug) {
+      OR.push({ slug: query.slug })
+    }
+    if (query.email) {
+      OR.push({ owner: { email: { contains: query.email } } })
+    }
+
     const organizations = await this.client.organization.findMany({
-      where: {
-        OR: [
-          { slug: { contains: query.slug } },
-          { owner: { email: { contains: query.email } } },
-        ],
-      },
+      where: { OR },
       include: { owner: true, campaign: true, electedOffice: true },
       // This is important to prevent the query from scanning the whole table.
       take: 25,

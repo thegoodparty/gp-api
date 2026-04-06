@@ -9,7 +9,6 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { GenerationStatus } from './aiContent.types'
-import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import {
   MessageGroup,
   QueueMessage,
@@ -30,6 +29,18 @@ export class AiContentService {
     this.logger.setContext(AiContentService.name)
   }
 
+  private static readonly STALE_PROCESSING_MS = 5 * 60 * 1000
+
+  private isStaleProcessing(keyStatus: {
+    createdAt?: number | string
+  }): boolean {
+    const createdAt = Number(keyStatus.createdAt)
+    return (
+      !Number.isNaN(createdAt) &&
+      Date.now() - createdAt > AiContentService.STALE_PROCESSING_MS
+    )
+  }
+
   /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
@@ -41,16 +52,15 @@ export class AiContentService {
       aiContent.generationStatus = {}
     }
 
-    if (
-      !regenerate &&
-      aiContent.generationStatus[key] !== undefined &&
-      aiContent.generationStatus[key].status !== undefined &&
-      aiContent.generationStatus[key].status === GenerationStatus.processing
-    ) {
-      return {
-        status: GenerationStatus.processing,
-        key,
+    const keyStatus = aiContent.generationStatus[key]
+    if (!regenerate && keyStatus?.status === GenerationStatus.processing) {
+      if (!this.isStaleProcessing(keyStatus)) {
+        return { status: GenerationStatus.processing, key }
       }
+      this.logger.warn(
+        { key, createdAt: keyStatus.createdAt },
+        'Stale processing status detected, re-generating',
+      )
     }
     const existing = aiContent[key]
 
@@ -93,7 +103,14 @@ export class AiContentService {
     if (!campaignWithRelations) {
       throw new NotFoundException(`Campaign not found: ${campaign.id}`)
     }
-    prompt = await this.aiService.promptReplace(prompt, campaignWithRelations)
+    const liveMetrics = await this.campaignsService.fetchLiveRaceTargetMetrics(
+      campaignWithRelations,
+    )
+    prompt = await this.aiService.promptReplace(
+      prompt,
+      campaignWithRelations,
+      liveMetrics,
+    )
     if (!prompt || prompt === '') {
       await this.slack.errorMessage({
         message: 'empty prompt replace',
@@ -128,12 +145,10 @@ export class AiContentService {
       createdAt: new Date().valueOf(),
     }
 
-    await this.slack.message(
-      {
-        body: JSON.stringify(aiContent.generationStatus),
-      },
-      SlackChannel.botDev,
-    )
+    await this.slack.aiMessage({
+      message: 'Generation status update',
+      error: aiContent.generationStatus,
+    })
 
     try {
       this.logger.info(aiContent)
@@ -193,14 +208,10 @@ export class AiContentService {
       aiContent.generationStatus?.[key] || {}
 
     if (!aiContent || !prompt) {
-      await this.slack.message(
-        {
-          body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
-            campaign?.id
-          }. message: ${JSON.stringify(message)}`,
-        },
-        SlackChannel.botDev,
-      )
+      await this.slack.errorMessage({
+        message: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${campaign?.id}`,
+        error: message,
+      })
       throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)
     }
 

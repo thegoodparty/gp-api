@@ -204,11 +204,16 @@ export class CrmCampaignsService {
 
     const {
       p2vStatus,
-      winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
       viability: { score } = {},
     } = p2vData || {}
+
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+    const winNumber = liveMetrics?.winNumber ?? p2vData?.winNumber
+    const voterContactGoal =
+      liveMetrics?.voterContactGoal ?? p2vData?.voterContactGoal
 
     const {
       lastStepDate,
@@ -263,11 +268,11 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const positionName = campaign.organizationSlug
-      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+    const { positionName, ballotReadyPositionId } = campaign.organizationSlug
+      ? await this.organizations.resolvePositionContextByOrgSlug(
           campaign.organizationSlug,
         )
-      : null
+      : { positionName: null, ballotReadyPositionId: null }
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
@@ -338,7 +343,7 @@ export class CrmCampaignsService {
       running: runForOffice ? HubSpot.Running.YES : HubSpot.Running.NO,
 
       // election details
-      br_position_id: campaignDetails?.positionId ?? undefined,
+      br_position_id: ballotReadyPositionId ?? undefined,
       br_race_id: campaignDetails?.raceId ?? undefined,
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?
@@ -367,9 +372,7 @@ export class CrmCampaignsService {
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,
-      votegoal: p2vData?.voterContactGoal
-        ? Number(p2vData?.voterContactGoal)
-        : undefined,
+      votegoal: voterContactGoal ? Number(voterContactGoal) : undefined,
       win_number: winNumber ? Number(winNumber) : undefined,
     }
 
