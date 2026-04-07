@@ -96,12 +96,9 @@ export class ContactsService {
     organization?: Organization,
   ): Promise<boolean> {
     if (organization) {
-      const eo = await this.electedOfficeService.findFirst({
-        where: { organizationSlug: organization.slug },
-      })
-      if (eo) return true
+      if (organization.slug.startsWith('eo-')) return true
 
-      // Elected offices use eo-* org slugs; contacts often use campaign-* context.
+      // LEGACY: campaign-* slug fallback for backwards compatibility.
       const campaignOrg = /^campaign-(\d+)$/.exec(organization.slug)
       if (campaignOrg) {
         const campaignId = Number(campaignOrg[1])

@@ -300,7 +300,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
               description: string
             }>
           }
-          if ('positionId' in details || 'office' in details) {
+          if (
+            'positionId' in details ||
+            'office' in details ||
+            'otherOffice' in details
+          ) {
             delete mergedDetails.positionId
             delete mergedDetails.office
             delete mergedDetails.otherOffice
@@ -415,11 +419,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         resolvedPosition = await this.elections.getPositionByBallotReadyId(
           resolvedBallotReadyId,
         )
-      } catch (caught: unknown) {
-        const errMessage =
-          caught instanceof Error ? caught.message : String(caught)
+      } catch (err: unknown) {
         this.logger.warn(
-          { resolvedBallotReadyId, errMessage },
+          { resolvedBallotReadyId, err },
           'Election API position lookup failed during legacy org sync; treating as unresolved',
         )
         resolvedPosition = null

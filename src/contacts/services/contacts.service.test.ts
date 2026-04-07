@@ -177,7 +177,7 @@ describe('ContactsService', () => {
         ).resolves.toBeDefined()
 
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { organizationSlug: org.slug },
+          where: { campaignId: 1, userId: org.ownerId },
         })
         expect(
           mockElectedOfficeService.getCurrentElectedOffice,
@@ -200,7 +200,7 @@ describe('ContactsService', () => {
         ).rejects.toThrow(SEARCH_REQUIRES_PRO_MSG)
 
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { organizationSlug: org.slug },
+          where: { campaignId: 1, userId: org.ownerId },
         })
         // Does NOT fall through to userId — org header represents the user's chosen context
         expect(
@@ -297,7 +297,7 @@ describe('ContactsService', () => {
         ).resolves.toBeUndefined()
 
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { organizationSlug: org.slug },
+          where: { campaignId: 1, userId: org.ownerId },
         })
         expect(
           mockElectedOfficeService.getCurrentElectedOffice,
@@ -317,7 +317,7 @@ describe('ContactsService', () => {
         ).rejects.toThrow('Campaign is not pro')
 
         expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { organizationSlug: org.slug },
+          where: { campaignId: 1, userId: org.ownerId },
         })
         // Does NOT fall through to userId — org header represents the user's chosen context
         expect(
