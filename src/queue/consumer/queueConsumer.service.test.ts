@@ -10,6 +10,7 @@ import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.ser
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { PollIssuesService } from '@/polls/services/pollIssues.service'
+import { CampaignTaskType } from '@prisma/client'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
@@ -985,25 +986,25 @@ describe('QueueConsumerService - message type routing', () => {
       },
       campaignTasks: [
         {
-          flowType: 'text',
+          flowType: CampaignTaskType.text,
           isDefaultTask: false,
           title: 'Text Blast 1',
           date: new Date('2026-05-01'),
         },
         {
-          flowType: 'robocall',
+          flowType: CampaignTaskType.robocall,
           isDefaultTask: false,
           title: 'Robocall Wave',
           date: new Date('2026-06-15'),
         },
         {
-          flowType: 'text',
+          flowType: CampaignTaskType.text,
           isDefaultTask: true,
           title: 'Introduction Text',
           date: null,
         },
         {
-          flowType: 'doorKnocking',
+          flowType: CampaignTaskType.doorKnocking,
           isDefaultTask: false,
           title: 'Door Knock',
           date: new Date('2026-05-10'),
@@ -1080,13 +1081,13 @@ describe('QueueConsumerService - message type routing', () => {
       },
       campaignTasks: [
         {
-          flowType: 'doorKnocking',
+          flowType: CampaignTaskType.doorKnocking,
           isDefaultTask: false,
           title: 'Door Knock',
           date: new Date('2026-05-10'),
         },
         {
-          flowType: 'text',
+          flowType: CampaignTaskType.text,
           isDefaultTask: true,
           title: 'Introduction Text',
           date: null,
