@@ -163,8 +163,7 @@ export class OrganizationsService extends createPrismaBase(
    */
   async resolveOrgData(params: {
     ballotReadyPositionId?: string | null
-    office?: string
-    otherOffice?: string
+    customPositionName?: string | null
     state?: string
     L2DistrictType?: string
     L2DistrictName?: string
@@ -175,8 +174,7 @@ export class OrganizationsService extends createPrismaBase(
   }> {
     const {
       ballotReadyPositionId,
-      office,
-      otherOffice,
+      customPositionName,
       state,
       L2DistrictType,
       L2DistrictName,
@@ -185,10 +183,6 @@ export class OrganizationsService extends createPrismaBase(
     const positionId = ballotReadyPositionId
       ? await this.resolvePositionId(ballotReadyPositionId)
       : null
-    const customPositionName = OrganizationsService.resolveCustomPositionName(
-      office,
-      otherOffice,
-    )
 
     let overrideDistrictId: string | null = null
     if (state && L2DistrictType && L2DistrictName) {
@@ -200,7 +194,11 @@ export class OrganizationsService extends createPrismaBase(
       })
     }
 
-    return { positionId, customPositionName, overrideDistrictId }
+    return {
+      positionId,
+      customPositionName: customPositionName ?? null,
+      overrideDistrictId,
+    }
   }
 
   /**

@@ -20,6 +20,7 @@ import {
   DistrictTypeItem,
   PositionWithOptionalDistrict,
   ProjectedTurnout,
+  RaceTargetDetailsResult,
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
@@ -318,7 +319,7 @@ export class ElectionsService {
 
   async buildRaceTargetDetails(
     data: BuildRaceTargetDetailsInput,
-  ): Promise<PrismaJson.PathToVictoryData | null> {
+  ): Promise<RaceTargetDetailsResult | null> {
     const query =
       'districtId' in data
         ? data

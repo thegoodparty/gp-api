@@ -112,14 +112,9 @@ test.describe('Campaigns - Race Target Details', () => {
       const { data } = campaign.pathToVictory!
       expect(data?.source).toBeTruthy()
       expect(data?.p2vStatus).toBeTruthy()
-      expect(data?.winNumber).toBeGreaterThan(0)
-      expect(data?.districtId).toBeTruthy()
-      expect(data?.electionType).toBeTruthy()
-      expect(data?.electionLocation).toBeTruthy()
-      expect(data?.projectedTurnout).toBeGreaterThan(0)
-      expect(data?.voterContactGoal).toBeGreaterThan(0)
       expect(data?.p2vCompleteDate).toBeTruthy()
-      expect(data?.districtManuallySet).toBe(false)
+      expect(data?.p2vAttempts).toBe(0)
+      expect(data?.officeContextFingerprint).toBeNull()
     }
   })
 
@@ -176,9 +171,8 @@ test.describe('Campaigns - Race Target Details', () => {
 
       const { pathToVictory } = campaign
       expect(pathToVictory).toHaveProperty('data')
-      expect(typeof pathToVictory?.data?.projectedTurnout).toBe('number')
-      expect(typeof pathToVictory?.data?.voterContactGoal).toBe('number')
-      expect(typeof pathToVictory?.data?.winNumber).toBe('number')
+      expect(pathToVictory?.data?.p2vAttempts).toBe(0)
+      expect(pathToVictory?.data?.officeContextFingerprint).toBeNull()
     }
   })
 })
@@ -312,9 +306,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       const campaign = (await response.json()) as CampaignWithPathToVictory
       expect(campaign.pathToVictory).toBeTruthy()
       expect(campaign.pathToVictory?.data).toBeTruthy()
-      expect(campaign.pathToVictory?.data?.winNumber).toBeGreaterThan(0)
-      expect(campaign.pathToVictory?.data?.projectedTurnout).toBeGreaterThan(0)
-      expect(campaign.pathToVictory?.data?.voterContactGoal).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data?.source).toBeTruthy()
+      expect(campaign.pathToVictory?.data?.p2vStatus).toBeTruthy()
+      expect(campaign.pathToVictory?.data?.p2vAttempts).toBe(0)
+      expect(campaign.pathToVictory?.data?.officeContextFingerprint).toBeNull()
     }
   })
 })

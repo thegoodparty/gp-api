@@ -598,7 +598,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
   } {
     const { isJsonObject, getString } = OrganizationsBackfillService
     const C = BackfillCategory
-    const details = campaign.details
+    const details = campaign.details as PrismaJson.CampaignDetails | null
 
     if (!isJsonObject(details)) {
       return {
@@ -617,10 +617,9 @@ export class OrganizationsBackfillService extends createPrismaBase(
     return {
       error: null,
       state: getString(details, 'state'),
-      // Treat non-string positionId as absent — the rest of the fields
-      // (district, office) are still valid and should be resolved.
-      ballotReadyPositionId:
-        typeof details.positionId === 'string' ? details.positionId : null,
+      // Historical data may still have positionId on campaign.details
+      // before the org migration.
+      ballotReadyPositionId: getString(details, 'positionId') || null,
       L2DistrictType: isJsonObject(p2vData)
         ? getString(p2vData, 'electionType')
         : '',
