@@ -145,8 +145,6 @@ export type CampaignDetails = {
   city?: string | null
   county?: string | null
   normalizedOffice?: string | null
-  otherOffice?: string
-  office?: string
   party?: string
   otherParty?: string
   district?: string
@@ -168,7 +166,6 @@ export type CampaignDetails = {
   officeTermLength?: string
   partisanType?: string
   priorElectionDates?: string[]
-  positionId?: string | null
   electionId?: string | null
   tier?: string
   einNumber?: string | null

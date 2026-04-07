@@ -106,6 +106,9 @@ if (!headers) {
         (span.endTime[0] - span.startTime[0]) * 1e3 +
         (span.endTime[1] - span.startTime[1]) / 1e6
       prismaConnectionDuration.record(durationMs)
+      if (durationMs > 150) {
+        prismaSlowConnections.add(1)
+      }
     },
     forceFlush: () => Promise.resolve(),
     shutdown: () => Promise.resolve(),
@@ -164,6 +167,12 @@ if (!headers) {
     .createHistogram('prisma.connection.duration', {
       description: 'Duration of prisma:engine:connection spans in milliseconds',
       unit: 'ms',
+    })
+
+  const prismaSlowConnections = metrics
+    .getMeter('gp-api')
+    .createCounter('prisma.connection.slow', {
+      description: 'Count of prisma:engine:connection spans exceeding 150ms',
     })
 
   const hostMetrics = new HostMetrics()
