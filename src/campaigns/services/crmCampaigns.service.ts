@@ -200,7 +200,8 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    const p2vData = pathToVictory?.data || {}
+
+    const p2vData = (pathToVictory?.data || {}) as PrismaJson.PathToVictoryData
 
     const {
       p2vStatus,
@@ -211,9 +212,8 @@ export class CrmCampaignsService {
 
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    const winNumber = liveMetrics?.winNumber ?? p2vData?.winNumber
-    const voterContactGoal =
-      liveMetrics?.voterContactGoal ?? p2vData?.voterContactGoal
+    const winNumber = liveMetrics?.winNumber
+    const voterContactGoal = liveMetrics?.voterContactGoal
 
     const {
       lastStepDate,
@@ -234,7 +234,6 @@ export class CrmCampaignsService {
       ballotLevel,
       state,
       pledged,
-      campaignCommittee: _campaignCommittee,
       district: candidateDistrict,
       city,
       runForOffice,
@@ -379,7 +378,7 @@ export class CrmCampaignsService {
     const validated = CRMCompanyPropertiesSchema.transform((obj) =>
       Object.fromEntries(
         // remove undefined values, just to be safe
-        Object.entries(obj).filter(([_, v]) => v !== undefined),
+        Object.entries(obj).filter(([, v]) => v !== undefined),
       ),
     ).safeParse(fieldsToSync)
 

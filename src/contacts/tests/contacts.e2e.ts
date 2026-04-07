@@ -20,8 +20,17 @@ const CONTACTS_TEST_DISTRICT = {
 const CONTACTS_TEST_POSITION_ID =
   'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2'
 
+/**
+ * Campaign org slug (`campaign-${id}`) must be sent so contacts use
+ * `resolveDistrictInfoFromOrg` (position / overrideDistrict). Without it, the
+ * legacy path requires pathToVictory electionType/electionLocation, which this
+ * suite does not set.
+ */
+let campaignOrgSlug = ''
+
 const AUTH_HEADER = (token: string) => ({
   Authorization: `Bearer ${token}`,
+  'x-organization-slug': campaignOrgSlug,
 })
 
 async function assertOk(
@@ -85,13 +94,9 @@ async function prepareCampaignAndOffice(params: {
         source: P2VSource.ElectionApi,
         p2vStatus: P2VStatus.complete,
         winNumber: 3142,
-        districtId: CONTACTS_TEST_DISTRICT.id,
-        electionType: CONTACTS_TEST_DISTRICT.type,
-        electionLocation: CONTACTS_TEST_DISTRICT.name,
         p2vCompleteDate: '2025-09-25',
         projectedTurnout: 6282,
         voterContactGoal: 15710,
-        districtManuallySet: false,
       },
     },
   })
@@ -142,6 +147,7 @@ test.describe('Contacts and Segments', () => {
     campaignSlug = registerResponse.campaign.slug
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
+    campaignOrgSlug = `campaign-${registerResponse.campaign.id}`
 
     await prepareCampaignAndOffice({
       request,
@@ -212,7 +218,10 @@ test.describe('Contacts and Segments', () => {
         education?: { buckets?: unknown[] }
       }
     }
-    expect(stats.districtId).toBe(CONTACTS_TEST_DISTRICT.id)
+    // District id comes from election-api for CONTACTS_TEST_POSITION_ID, not the legacy People seed id.
+    expect(stats.districtId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    )
     expect(stats.totalConstituents).toBeGreaterThan(0)
     if (stats.computedAt !== undefined) {
       expect(typeof stats.computedAt).toBe('string')
@@ -257,9 +266,6 @@ test.describe('Contacts and Segments', () => {
         pathToVictory: {
           source: P2VSource.ElectionApi,
           p2vStatus: P2VStatus.complete,
-          districtId: 'cfa28085-cf71-6c78-7605-a24b8e2d41ab',
-          electionType: 'State',
-          electionLocation: 'AL',
           p2vCompleteDate: '2025-09-25',
         },
       },

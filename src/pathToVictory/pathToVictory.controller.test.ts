@@ -15,9 +15,7 @@ const mockP2V: PathToVictory = {
   campaignId: 100,
   data: {
     p2vStatus: P2VStatus.waiting,
-    electionType: 'State_House',
-    electionLocation: 'STATE HOUSE 005',
-  },
+  } as PrismaJson.PathToVictoryData,
 }
 
 const mockP2V2: PathToVictory = {
@@ -27,10 +25,8 @@ const mockP2V2: PathToVictory = {
   campaignId: 101,
   data: {
     p2vStatus: P2VStatus.complete,
-    electionType: 'City_Council',
-    electionLocation: 'WARD 3',
-    projectedTurnout: 500,
-  },
+    averageTurnout: 500,
+  } as PrismaJson.PathToVictoryData,
 }
 
 describe('PathToVictoryController', () => {
@@ -159,16 +155,18 @@ describe('PathToVictoryController', () => {
       vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
         mockP2V,
       )
-      const updatedP2V = {
+      const updatedP2V: PathToVictory = {
         ...mockP2V,
         data: {
           ...(mockP2V.data as object),
-          projectedTurnout: 1000,
-        },
+          averageTurnout: 1000,
+        } as PrismaJson.PathToVictoryData,
       }
       vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
 
-      const body = { data: { projectedTurnout: 1000 } }
+      const body = {
+        data: { averageTurnout: 1000 } as PrismaJson.PathToVictoryData,
+      }
       const result = await controller.update({ id: 10 }, body)
 
       expect(pathToVictoryService.findUniqueOrThrow).toHaveBeenCalledWith({
@@ -179,9 +177,7 @@ describe('PathToVictoryController', () => {
         data: {
           data: {
             p2vStatus: P2VStatus.waiting,
-            electionType: 'State_House',
-            electionLocation: 'STATE HOUSE 005',
-            projectedTurnout: 1000,
+            averageTurnout: 1000,
           },
         },
       })
@@ -193,26 +189,29 @@ describe('PathToVictoryController', () => {
       vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
         mockP2V2,
       )
-      const updatedP2V = {
+      const updatedP2V: PathToVictory = {
         ...mockP2V2,
         data: {
           ...(mockP2V2.data as object),
-          winNumber: 300,
-        },
+          totalRegisteredVoters: 300,
+        } as PrismaJson.PathToVictoryData,
       }
       vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
 
-      await controller.update({ id: 11 }, { data: { winNumber: 300 } })
+      await controller.update(
+        { id: 11 },
+        {
+          data: { totalRegisteredVoters: 300 } as PrismaJson.PathToVictoryData,
+        },
+      )
 
       expect(pathToVictoryService.update).toHaveBeenCalledWith({
         where: { id: 11 },
         data: {
           data: {
             p2vStatus: P2VStatus.complete,
-            electionType: 'City_Council',
-            electionLocation: 'WARD 3',
-            projectedTurnout: 500,
-            winNumber: 300,
+            averageTurnout: 500,
+            totalRegisteredVoters: 300,
           },
         },
       })

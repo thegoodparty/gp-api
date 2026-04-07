@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { ContentService } from 'src/content/services/content.service'
+import { RaceTargetMetrics } from 'src/elections/types/elections.types'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
@@ -27,6 +28,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   async create(
     campaign: PromptReplaceCampaign,
     { message, initial }: CreateAiChatSchema,
+    liveMetrics?: RaceTargetMetrics | null,
   ) {
     // Create a new chat
     const { candidateJson, systemPrompt } =
@@ -35,6 +37,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const candidateContext = await this.aiService.promptReplace(
       candidateJson,
       campaign,
+      liveMetrics,
     )
 
     const chatMessage: AiChatMessage = {
@@ -100,6 +103,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     threadId: string,
     campaign: PromptReplaceCampaign,
     { regenerate, message }: UpdateAiChatSchema,
+    liveMetrics?: RaceTargetMetrics | null,
   ) {
     if (regenerate && !threadId) {
       throw new Error('Cannot regenerate without threadId')
@@ -120,6 +124,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const candidateContext = await this.aiService.promptReplace(
       candidateJson,
       campaign,
+      liveMetrics,
     )
 
     let messageId: string | undefined
