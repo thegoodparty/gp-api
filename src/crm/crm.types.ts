@@ -191,7 +191,6 @@ export namespace HubSpot {
 
     // p2v details / viability
     automated_score = 'automated_score',
-    p2v_status = 'p2v_status',
     totalregisteredvoters = 'totalregisteredvoters',
     votegoal = 'votegoal',
     win_number = 'win_number',
