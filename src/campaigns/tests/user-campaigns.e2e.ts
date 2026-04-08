@@ -12,6 +12,10 @@ import {
   updateCampaignWithRetry,
 } from '../../../e2e-tests/utils/request.util'
 
+/** BallotReady ID shared with race-target-details / contacts e2e for election-api lookups */
+const E2E_BALLOT_READY_POSITION_ID =
+  'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM='
+
 test.describe('Campaigns - User Campaign Operations', () => {
   let reg: RegisterResponse
 
@@ -114,7 +118,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
       },
       data: {
         details: {
-          otherOffice: ['array'],
+          website: ['array'],
         },
       },
     })
@@ -129,15 +133,25 @@ test.describe('Campaigns - User Campaign Operations', () => {
     expect(body.errors[0].message).toBe('Expected string, received array')
   })
 
-  test('should set campaign office', async ({ request }) => {
+  test('should strip org-managed fields from persisted details', async ({
+    request,
+  }) => {
     const response = await updateCampaignWithRetry(request, reg.token, {
       details: {
         office: 'Other',
         otherOffice: 'State Representative',
+        positionId: E2E_BALLOT_READY_POSITION_ID,
       },
     })
 
     expect(response.status()).toBe(200)
+
+    const campaign = (await response.json()) as {
+      details: Record<string, unknown>
+    }
+    expect(campaign.details).not.toHaveProperty('office')
+    expect(campaign.details).not.toHaveProperty('otherOffice')
+    expect(campaign.details).not.toHaveProperty('positionId')
   })
 
   test('should launch campaign', async ({ request }) => {

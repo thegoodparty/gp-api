@@ -37,6 +37,8 @@ import {
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
 
+const CAMPAIGN_OR_ORGANIZATION_REQUIRED = 'Campaign or organization is required'
+
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
 if (!PEOPLE_API_URL) {
@@ -81,17 +83,11 @@ export class ContactsService {
       if (!alternativeDistrictName || !is404) {
         throw error
       }
-      const result = await fn({
+      return fn({
         state,
         districtType,
         districtName: alternativeDistrictName,
       })
-      await this.campaigns.updateJsonFields(
-        campaign.id,
-        { pathToVictory: { electionLocation: alternativeDistrictName } },
-        false,
-      )
-      return result
     }
   }
 
@@ -100,13 +96,19 @@ export class ContactsService {
     organization?: Organization,
   ): Promise<boolean> {
     if (organization) {
-      // Org path: check if this organization has an elected office.
-      // Campaign orgs (campaign-*) won't match — this is intentional.
-      // The org header represents the user's chosen context (campaign vs EO).
-      const eo = await this.electedOfficeService.findFirst({
-        where: { organizationSlug: organization.slug },
-      })
-      return eo !== null
+      if (organization.slug.startsWith('eo-')) return true
+
+      // LEGACY: campaign-* slug fallback for backwards compatibility.
+      const campaignOrg = /^campaign-(\d+)$/.exec(organization.slug)
+      if (campaignOrg) {
+        const campaignId = Number(campaignOrg[1])
+        const eoForCampaign = await this.electedOfficeService.findFirst({
+          where: { campaignId, userId },
+        })
+        return eoForCampaign !== null
+      }
+
+      return false
     }
     // LEGACY: Remove this branch when org migration is complete.
     //         The userId param and getCurrentElectedOffice call become unnecessary.
@@ -139,7 +141,29 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory | undefined,
     fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
   ): Promise<Result> {
-    const { districtId, state } = await this.resolveDistrictInfoFromOrg(org)
+    const resolved = await this.resolveDistrictInfoFromOrg(org)
+    const districtId = resolved.districtId
+    let state = resolved.state
+    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
+
+    // Custom office / statewide: org may have only customPositionName; use campaign state + approval.
+    if (!districtId && !state && campaign?.details) {
+      const details = campaign.details as {
+        state?: string
+        ballotLevel?: BallotReadyPositionLevel
+      }
+      const level = details.ballotLevel
+      if (
+        details.state &&
+        typeof details.state === 'string' &&
+        details.state.length === 2 &&
+        (level === BallotReadyPositionLevel.STATE ||
+          level === BallotReadyPositionLevel.FEDERAL) &&
+        canDownloadFederal
+      ) {
+        state = details.state.toUpperCase()
+      }
+    }
 
     if (districtId) {
       return fn({ districtId })
@@ -153,7 +177,6 @@ export class ContactsService {
       )
     }
     // LEGACY: Replace with org-based approval when org migration is complete.
-    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
     if (!canDownloadFederal) {
       throw new BadRequestException(
         'Statewide or federal contacts require admin approval',
@@ -230,7 +253,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
@@ -333,7 +356,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     return this.withFallbackDistrictName(
       campaign,
@@ -416,7 +439,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     const filters = await this.legacySegmentToFilters(segment, campaign)
     return this.withFallbackDistrictName(campaign, (params) =>
@@ -457,7 +480,7 @@ export class ContactsService {
 
     // LEGACY: Remove when org migration is complete.
     if (!campaign) {
-      throw new BadRequestException('Campaign or organization is required')
+      throw new BadRequestException(CAMPAIGN_OR_ORGANIZATION_REQUIRED)
     }
     return this.withFallbackDistrictName(
       campaign,
@@ -569,6 +592,8 @@ export class ContactsService {
   } {
     const state = this.getCampaignState(campaign)
 
+    // LEGACY: These fields still exist in old DB rows until the cleanup migration runs.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const ptv = campaign.pathToVictory?.data as
       | { electionType?: string; electionLocation?: string }
       | undefined

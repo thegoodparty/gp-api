@@ -303,7 +303,7 @@ describe('GET /v1/organizations', () => {
       data: {
         userId: service.user.id,
         slug: 'test-campaign-multi',
-        details: { positionId: 'br-pos-456' },
+        details: {},
         organizationSlug: 'campaign-10',
       },
     })

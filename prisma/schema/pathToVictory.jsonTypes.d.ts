@@ -15,10 +15,6 @@ declare global {
       p2vAttempts?: number
       p2vCompleteDate?: string
       completedBy?: number
-      electionType?: string
-      electionLocation?: string
-      voterContactGoal?: number
-      winNumber?: number
       p2vNotNeeded?: boolean
       totalRegisteredVoters?: number
       republicans?: number
@@ -31,11 +27,8 @@ declare global {
       africanAmerican?: number
       hispanic?: number
       averageTurnout?: number
-      projectedTurnout?: number
       viability?: ViabilityScore
       source?: P2VSource
-      districtId?: string
-      districtManuallySet?: boolean
       officeContextFingerprint?: string | null
     }
   }

@@ -1,4 +1,3 @@
-import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import {
@@ -14,12 +13,8 @@ import {
   ElectedOfficeService,
 } from './electedOffice.service'
 
-const GP_POSITION_ID = 'gp-position-uuid-123'
-const BR_POSITION_ID = 'br-position-456'
-
 describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
-  let mockResolveOrgData: ReturnType<typeof vi.fn>
   let mockOrgCreate: ReturnType<typeof vi.fn>
   let mockEoCreate: ReturnType<typeof vi.fn>
   let mockModel: {
@@ -33,11 +28,6 @@ describe('ElectedOfficeService', () => {
   }
 
   beforeEach(() => {
-    mockResolveOrgData = vi.fn().mockResolvedValue({
-      positionId: GP_POSITION_ID,
-      customPositionName: null,
-      overrideDistrictId: null,
-    })
     mockOrgCreate = vi.fn().mockResolvedValue({})
     mockEoCreate = vi.fn().mockResolvedValue({
       id: 'mock-uuid',
@@ -70,9 +60,7 @@ describe('ElectedOfficeService', () => {
       findMany: vi.fn(),
     }
 
-    service = new ElectedOfficeService({
-      resolveOrgData: mockResolveOrgData,
-    } as unknown as OrganizationsService)
+    service = new ElectedOfficeService()
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
       configurable: true,
@@ -87,7 +75,6 @@ describe('ElectedOfficeService', () => {
   describe('create', () => {
     it('throws ConflictException when user already has an elected office', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         userId: 1,
         campaignId: 1,
       }
@@ -108,9 +95,8 @@ describe('ElectedOfficeService', () => {
       expect(mockEoCreate).not.toHaveBeenCalled()
     })
 
-    it('creates organization with resolved org data and elected office in transaction', async () => {
+    it('creates organization with default org data and elected office in transaction', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         userId: 1,
         campaignId: 1,
       }
@@ -119,19 +105,11 @@ describe('ElectedOfficeService', () => {
 
       await service.create(createArgs)
 
-      expect(mockResolveOrgData).toHaveBeenCalledWith({
-        ballotReadyPositionId: BR_POSITION_ID,
-        office: undefined,
-        otherOffice: undefined,
-        state: undefined,
-        L2DistrictType: undefined,
-        L2DistrictName: undefined,
-      })
       expect(mockOrgCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           slug: expect.stringMatching(/^eo-/),
           ownerId: 1,
-          positionId: GP_POSITION_ID,
+          positionId: null,
           customPositionName: null,
           overrideDistrictId: null,
         }),
@@ -145,59 +123,7 @@ describe('ElectedOfficeService', () => {
       })
     })
 
-    it('creates organization with null positionId when resolveOrgData returns null', async () => {
-      mockResolveOrgData.mockResolvedValue({
-        positionId: null,
-        customPositionName: null,
-        overrideDistrictId: null,
-      })
-
-      const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
-        userId: 1,
-        campaignId: 1,
-      }
-
-      mockModel.findFirst.mockResolvedValue(null)
-
-      await service.create(createArgs)
-
-      expect(mockResolveOrgData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ballotReadyPositionId: BR_POSITION_ID,
-        }),
-      )
-      expect(mockOrgCreate).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          positionId: null,
-        }),
-      })
-    })
-
-    it('passes district data to resolveOrgData', async () => {
-      const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
-        userId: 1,
-        campaignId: 1,
-        state: 'CA',
-        L2DistrictType: 'State Senate',
-        L2DistrictName: 'District 1',
-      }
-
-      mockModel.findFirst.mockResolvedValue(null)
-
-      await service.create(createArgs)
-
-      expect(mockResolveOrgData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          state: 'CA',
-          L2DistrictType: 'State Senate',
-          L2DistrictName: 'District 1',
-        }),
-      )
-    })
-
-    it('uses orgData directly when provided, skipping campaign org lookup and resolveOrgData', async () => {
+    it('uses orgData directly when provided', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         userId: 1,
         campaignId: 1,
@@ -208,11 +134,10 @@ describe('ElectedOfficeService', () => {
         },
       }
 
-      mockModel.count.mockResolvedValue(0)
+      mockModel.findFirst.mockResolvedValue(null)
 
       await service.create(createArgs)
 
-      expect(mockResolveOrgData).not.toHaveBeenCalled()
       expect(mockOrgCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           slug: expect.stringMatching(/^eo-/),
@@ -226,7 +151,6 @@ describe('ElectedOfficeService', () => {
 
     it('links elected office to organization via matching slug', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         userId: 1,
         campaignId: 1,
       }

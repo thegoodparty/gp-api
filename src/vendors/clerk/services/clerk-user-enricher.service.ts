@@ -30,7 +30,19 @@ export class ClerkUserEnricherService {
     this.logger.setContext(ClerkUserEnricherService.name)
   }
 
+  private readonly fieldsCache = new Map<
+    string,
+    { fields: ClerkUserFields; expiresAt: number }
+  >()
+
+  private readonly cacheTtlMs = 30_000
+
   async fetchClerkFields(clerkId: string): Promise<ClerkUserFields | null> {
+    const cached = this.fieldsCache.get(clerkId)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.fields
+    }
+
     try {
       const clerkUser = await this.clerkClient.users.getUser(clerkId)
       const email =
@@ -40,13 +52,20 @@ export class ClerkUserEnricherService {
       const firstName = clerkUser.firstName ?? ''
       const lastName = clerkUser.lastName ?? ''
 
-      return {
+      const fields: ClerkUserFields = {
         email: email ?? '',
         firstName,
         lastName,
         name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
         avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
       }
+
+      this.fieldsCache.set(clerkId, {
+        fields,
+        expiresAt: Date.now() + this.cacheTtlMs,
+      })
+
+      return fields
     } catch (err) {
       this.logger.warn(
         { err, clerkId },
@@ -85,11 +104,24 @@ export class ClerkUserEnricherService {
     clerkIds: string[],
   ): Promise<Map<string, ClerkUserFields>> {
     const result = new Map<string, ClerkUserFields>()
+    const now = Date.now()
+    const uncachedIds: string[] = []
+
+    for (const id of clerkIds) {
+      const cached = this.fieldsCache.get(id)
+      if (cached && cached.expiresAt > now) {
+        result.set(id, cached.fields)
+      } else {
+        uncachedIds.push(id)
+      }
+    }
+
+    if (uncachedIds.length === 0) return result
 
     try {
       const clerkUsers = await this.clerkClient.users.getUserList({
-        userId: clerkIds,
-        limit: clerkIds.length,
+        userId: uncachedIds,
+        limit: uncachedIds.length,
       })
 
       for (const clerkUser of clerkUsers.data) {
@@ -100,17 +132,23 @@ export class ClerkUserEnricherService {
         const firstName = clerkUser.firstName ?? ''
         const lastName = clerkUser.lastName ?? ''
 
-        result.set(clerkUser.id, {
+        const fields: ClerkUserFields = {
           email: email ?? '',
           firstName,
           lastName,
           name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
           avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
+        }
+
+        result.set(clerkUser.id, fields)
+        this.fieldsCache.set(clerkUser.id, {
+          fields,
+          expiresAt: now + this.cacheTtlMs,
         })
       }
     } catch (err) {
       this.logger.warn(
-        { err, count: clerkIds.length },
+        { err, count: uncachedIds.length },
         'Failed to bulk fetch user fields from Clerk',
       )
     }

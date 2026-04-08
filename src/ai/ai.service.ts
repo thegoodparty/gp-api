@@ -486,12 +486,12 @@ export class AiService {
       { find: 'pathToVictory', replace: JSON.stringify(ptv.data) },
       {
         find: 'projectedTurnout',
-        replace: liveMetrics?.projectedTurnout ?? data.projectedTurnout,
+        replace: liveMetrics?.projectedTurnout,
       },
       { find: 'totalRegisteredVoters', replace: data.totalRegisteredVoters },
       {
         find: 'winNumber',
-        replace: liveMetrics?.winNumber ?? data.winNumber,
+        replace: liveMetrics?.winNumber,
       },
       { find: 'republicans', replace: data.republicans },
       { find: 'democrats', replace: data.democrats },

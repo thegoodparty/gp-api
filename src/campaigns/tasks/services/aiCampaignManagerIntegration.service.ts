@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { createHash } from 'crypto'
 import { AiCampaignManagerService } from './aiCampaignManager.service'
@@ -9,7 +9,10 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 const CAMPAIGN_PLAN_VERSION = Number(process.env.CAMPAIGN_PLAN_VERSION) || 2
 
@@ -35,14 +38,19 @@ type CampaignWithPathToVictory = Campaign & {
 export class AiCampaignManagerIntegrationService extends createPrismaBase(
   MODELS.CampaignPlan,
 ) {
-  constructor(private readonly aiCampaignManager: AiCampaignManagerService) {
+  constructor(
+    private readonly aiCampaignManager: AiCampaignManagerService,
+    private readonly organizations: OrganizationsService,
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaigns: WrapperType<CampaignsService>,
+  ) {
     super()
   }
 
   async generateCampaignTasks(
     campaign: CampaignWithPathToVictory,
   ): Promise<CampaignTask[]> {
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
       request,
@@ -76,7 +84,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     | { cached: true; tasks: CampaignTask[] }
     | { cached: false; sessionId: string }
   > {
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
       request,
@@ -106,29 +114,45 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   ): Promise<CampaignTask[]> {
     const campaignPlanJson =
       await this.aiCampaignManager.downloadJson(sessionId)
-    const request = this.buildCampaignPlanRequest(campaign)
+    const request = await this.buildCampaignPlanRequest(campaign)
     await this.saveCampaignPlan(campaignPlanJson, campaign, request)
     return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
   }
 
-  private buildCampaignPlanRequest(
+  private async buildCampaignPlanRequest(
     campaign: CampaignWithPathToVictory,
-  ): StartCampaignPlanRequest {
-    const { details, data, pathToVictory } = campaign
+  ): Promise<StartCampaignPlanRequest> {
+    const {
+      details,
+      data,
+      pathToVictory,
+      organizationSlug,
+      id: campaignId,
+    } = campaign
 
-    const office = details.office || details.normalizedOffice || 'Local Office'
+    const positionName = organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          organizationSlug,
+        )
+      : null
+    const office = positionName || details.normalizedOffice || 'Local Office'
     const jurisdiction = details.state || 'Unknown State'
     const district = details.district ? ` - ${details.district}` : ''
     const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
-    const pathData = pathToVictory?.data
-    const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
+    const pathData = pathToVictory?.data as
+      | PrismaJson.PathToVictoryData
+      | undefined
+
+    const liveMetrics =
+      await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const totalRegisteredVoters = this.extractNumberValue(
       pathData?.totalRegisteredVoters,
       5000,
     )
+    const winNumber = this.extractNumberValue(liveMetrics?.winNumber, 1000)
     const projectedTurnout = this.extractNumberValue(
-      pathData?.projectedTurnout,
+      liveMetrics?.projectedTurnout,
       totalRegisteredVoters * 0.6,
     )
 
@@ -142,7 +166,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         : 1
 
     return {
-      candidate_name: data.name || `Campaign ${campaign.id}`,
+      candidate_name: data.name || `Campaign ${campaignId}`,
       election_date:
         details.electionDate || new Date().toISOString().split('T')[0],
       office_and_jurisdiction: officeAndJurisdiction,

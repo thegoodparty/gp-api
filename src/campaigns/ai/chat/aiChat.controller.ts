@@ -19,6 +19,7 @@ import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
 import { PinoLogger } from 'nestjs-pino'
@@ -28,6 +29,7 @@ import { PinoLogger } from 'nestjs-pino'
 export class AiChatController {
   constructor(
     private aiChatService: AiChatService,
+    private campaigns: CampaignsService,
     private slack: SlackService,
     private readonly logger: PinoLogger,
   ) {
@@ -87,7 +89,9 @@ export class AiChatController {
     @Body() body: CreateAiChatSchema,
   ) {
     try {
-      return await this.aiChatService.create(campaign, body)
+      const liveMetrics =
+        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+      return await this.aiChatService.create(campaign, body, liveMetrics)
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
@@ -119,7 +123,14 @@ export class AiChatController {
     @Body() body: UpdateAiChatSchema,
   ) {
     try {
-      return await this.aiChatService.update(threadId, campaign, body)
+      const liveMetrics =
+        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+      return await this.aiChatService.update(
+        threadId,
+        campaign,
+        body,
+        liveMetrics,
+      )
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
