@@ -136,13 +136,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should launch campaign', async ({ request }) => {
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      {
-        headers: authHeaders(reg.token, orgSlug),
-        data: { ballotReadyPositionId: E2E_BALLOT_READY_POSITION_ID },
-      },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers: authHeaders(reg.token, orgSlug),
+      data: { ballotReadyPositionId: E2E_BALLOT_READY_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     const response = await retryOnConflict(() =>

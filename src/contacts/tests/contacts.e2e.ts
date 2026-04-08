@@ -80,13 +80,10 @@ async function setOrganizationPosition(params: {
   authToken: string
 }) {
   const { request, authToken } = params
-  const response = await request.patch(
-    `/v1/organizations/${campaignOrgSlug}`,
-    {
-      headers: AUTH_HEADER(authToken),
-      data: { ballotReadyPositionId: CONTACTS_TEST_POSITION_ID },
-    },
-  )
+  const response = await request.patch(`/v1/organizations/${campaignOrgSlug}`, {
+    headers: AUTH_HEADER(authToken),
+    data: { ballotReadyPositionId: CONTACTS_TEST_POSITION_ID },
+  })
   await assertOk(response, 'Organization position update failed')
 }
 

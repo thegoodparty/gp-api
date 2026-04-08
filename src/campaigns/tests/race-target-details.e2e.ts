@@ -15,8 +15,7 @@ import {
 } from '../../../e2e-tests/utils/request.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 
-const E2E_POSITION_ID =
-  'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM='
+const E2E_POSITION_ID = 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM='
 
 test.describe('Campaigns - Race Target Details', () => {
   const testUsers: Array<{ id: number; token: string }> = []
@@ -53,10 +52,10 @@ test.describe('Campaigns - Race Target Details', () => {
     const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     const headers = authHeaders(registerResponse.token, orgSlug)
 
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      { headers, data: { ballotReadyPositionId: E2E_POSITION_ID } },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     const updateResponse = await updateCampaignWithRetry(
@@ -100,10 +99,10 @@ test.describe('Campaigns - Race Target Details', () => {
     const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     const headers = authHeaders(registerResponse.token, orgSlug)
 
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      { headers, data: { ballotReadyPositionId: E2E_POSITION_ID } },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     await updateCampaignWithRetry(
@@ -166,10 +165,10 @@ test.describe('Campaigns - Race Target Details', () => {
     const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     const headers = authHeaders(registerResponse.token, orgSlug)
 
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      { headers, data: { ballotReadyPositionId: E2E_POSITION_ID } },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     await updateCampaignWithRetry(
@@ -251,10 +250,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     const headers = authHeaders(registerResponse.token, orgSlug)
 
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      { headers, data: { ballotReadyPositionId: E2E_POSITION_ID } },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     await updateCampaignWithRetry(
@@ -320,10 +319,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     const headers = authHeaders(registerResponse.token, orgSlug)
 
-    const patchOrgRes = await request.patch(
-      `/v1/organizations/${orgSlug}`,
-      { headers, data: { ballotReadyPositionId: E2E_POSITION_ID } },
-    )
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
     await assertResponseOk(patchOrgRes, 'Org position update failed')
 
     await updateCampaignWithRetry(
