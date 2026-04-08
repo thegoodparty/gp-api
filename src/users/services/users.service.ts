@@ -1,41 +1,44 @@
 import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from '@/shared/constants/paginationOptions.consts'
+import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { ClerkClient } from '@clerk/backend'
+import { type ListUsersPagination } from '@goodparty_org/contracts'
+import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
   forwardRef,
   Inject,
   Injectable,
 } from '@nestjs/common'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { Interval } from '@nestjs/schedule'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { subHours } from 'date-fns'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
+import throttle from 'p-throttle'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   PaginatedResults,
   WithOptional,
   WrapperType,
 } from 'src/shared/types/utility.types'
+import Stripe from 'stripe'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
-import { StripeService } from '../../vendors/stripe/services/stripe.service'
-import Stripe from 'stripe'
-import { Interval } from '@nestjs/schedule'
-import { subHours } from 'date-fns'
-import throttle from 'p-throttle'
-import { chunk } from 'es-toolkit'
-import ms from 'ms'
-import {
-  DEFAULT_PAGINATION_LIMIT,
-  DEFAULT_PAGINATION_OFFSET,
-  DEFAULT_SORT_BY,
-  DEFAULT_SORT_ORDER,
-} from '@/shared/constants/paginationOptions.consts'
-import { type ListUsersPagination } from '@goodparty_org/contracts'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -50,6 +53,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     private readonly stripeService: WrapperType<StripeService>,
     @Inject(forwardRef(() => ClerkUserEnricherService))
     private readonly clerkEnricher: WrapperType<ClerkUserEnricherService>,
+    @Inject(CLERK_CLIENT_PROVIDER_TOKEN)
+    private readonly clerkClient: ClerkClient,
   ) {
     super()
   }
@@ -182,12 +187,12 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           : []),
         ...(signUpMode
           ? [
-              {
-                name: 'facilitated_signup',
-                value:
-                  signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
-              },
-            ]
+            {
+              name: 'facilitated_signup',
+              value:
+                signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
+            },
+          ]
           : []),
       ],
       'registerPage',
@@ -348,6 +353,30 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     })
   }
 
+  async impersonateUser(userId: number, actorClerkId: string) {
+    const user = await this.findUser({ id: userId })
+    if (!user?.clerkId) {
+      throw new BadRequestException('User does not have an associated Clerk ID')
+    }
+    try {
+      const { token } = await this.clerkClient.actorTokens.create({
+        userId: user.clerkId,
+        actor: { sub: actorClerkId },
+        expiresInSeconds: 3600,
+      })
+      if (!token) {
+        throw new BadGatewayException('Clerk did not return an actor token')
+      }
+      return { token }
+    } catch (err) {
+      this.logger.error(
+        { err, userId, clerkId: user.clerkId },
+        'Failed to create Clerk impersonation token',
+      )
+      throw new BadGatewayException('Failed to create impersonation token')
+    }
+  }
+
   async flushLastVisited(
     userId: number,
     pendingLastVisitedMs: number,
@@ -394,19 +423,19 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     const where: Prisma.UserWhereInput = {
       ...(firstName
         ? {
-            firstName: {
-              contains: firstName,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          }
+          firstName: {
+            contains: firstName,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        }
         : {}),
       ...(lastName
         ? {
-            lastName: {
-              contains: lastName,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          }
+          lastName: {
+            contains: lastName,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        }
         : {}),
       ...(email
         ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
