@@ -303,7 +303,7 @@ export class QueueConsumerService {
           'received campaignPlanComplete message',
         )
         return await this.withLegacyErrorSwallowing(message, () =>
-          this.handleCampaignPlanComplete(queueMessage.data),
+          this.notifySlackCampaignPlanCreated(queueMessage.data),
         )
       default:
         this.logger.warn(
@@ -938,7 +938,7 @@ export class QueueConsumerService {
     return cellPhonesToPeopleIds
   }
 
-  private async handleCampaignPlanComplete(
+  private async notifySlackCampaignPlanCreated(
     message: CampaignPlanCompleteMessage,
   ) {
     if (message.status === 'error') {
