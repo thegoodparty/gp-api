@@ -17,11 +17,8 @@ import { CampaignsService } from '../services/campaigns.service'
 /**
  * Guard that resolves a Campaign and attaches it to the request.
  *
- * Resolution order:
- * 1. `X-Organization-Slug` header — look up Organization, get its campaign.
- * 2. Legacy fallback — find campaign by userId.
- *
- * Once all requests include the organization header, the legacy fallback can be removed.
+ * Requires the `X-Organization-Slug` header. Looks up the Organization by slug
+ * and owner, then fetches the associated campaign.
  */
 @Injectable()
 export class UseCampaignGuard implements CanActivate {
@@ -51,7 +48,6 @@ export class UseCampaignGuard implements CanActivate {
     const include = campaignInclude ?? { pathToVictory: true }
     let campaign: Campaign | null = null
 
-    // Step 1: Try x-organization-slug header
     const slug = request.headers['x-organization-slug']
     if (typeof slug === 'string') {
       const [org, cam] = await Promise.all([
@@ -66,8 +62,6 @@ export class UseCampaignGuard implements CanActivate {
       if (org && cam) {
         campaign = cam
       }
-    } else {
-      campaign = await this.campaignsService.findByUserId(userId, include)
     }
 
     if (campaign) {

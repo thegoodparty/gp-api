@@ -16,11 +16,8 @@ import { ElectedOfficeService } from '../services/electedOffice.service'
 /**
  * Guard that resolves an ElectedOffice and attaches it to the request.
  *
- * Resolution order:
- * 1. `X-Organization-Slug` header — look up Organization, get its electedOffice.
- * 2. Legacy fallback — user's active elected office (userId + isActive).
- *
- * Once all requests include the organization header, the legacy fallback can be removed.
+ * Requires the `X-Organization-Slug` header. Looks up the Organization by slug
+ * and owner, then fetches the associated elected office.
  */
 @Injectable()
 export class UseElectedOfficeGuard implements CanActivate {
@@ -48,7 +45,6 @@ export class UseElectedOfficeGuard implements CanActivate {
     const userId = request.user.id
     let electedOffice: ElectedOffice | null = null
 
-    // Step 1: Try x-organization-slug header
     const slug = request.headers['x-organization-slug']
     if (typeof slug === 'string') {
       const [org, eo] = await Promise.all([
@@ -63,11 +59,6 @@ export class UseElectedOfficeGuard implements CanActivate {
       if (org && eo) {
         electedOffice = eo
       }
-    } else {
-      electedOffice = await this.electedOfficeService.findFirst({
-        where: { userId },
-        include,
-      })
     }
 
     if (electedOffice) {

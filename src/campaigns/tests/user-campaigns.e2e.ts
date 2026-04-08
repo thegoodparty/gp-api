@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
+  authHeaders,
+  campaignOrgSlug,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
@@ -8,6 +10,7 @@ import {
   RegisterResponse,
 } from '../../../e2e-tests/utils/auth.util'
 import {
+  assertResponseOk,
   retryOnConflict,
   updateCampaignWithRetry,
 } from '../../../e2e-tests/utils/request.util'
@@ -18,6 +21,7 @@ const E2E_BALLOT_READY_POSITION_ID =
 
 test.describe('Campaigns - User Campaign Operations', () => {
   let reg: RegisterResponse
+  let orgSlug: string
 
   test.beforeAll(async ({ request }) => {
     reg = await registerUser(request, {
@@ -29,6 +33,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    orgSlug = campaignOrgSlug(reg.campaign.id)
   })
 
   test.afterAll(async ({ request }) => {
@@ -39,9 +44,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
   test('should get campaign status for logged in user', async ({ request }) => {
     const response = await request.get('/v1/campaigns/mine/status', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     expect(response.status()).toBe(200)
@@ -55,9 +58,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
   test('should get logged in user campaign', async ({ request }) => {
     const response = await request.get('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     expect(response.status()).toBe(200)
@@ -78,9 +79,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
     request,
   }) => {
     const response = await request.get('/v1/campaigns/mine/plan-version', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     expect([200, 404]).toContain(response.status())
@@ -90,14 +89,19 @@ test.describe('Campaigns - User Campaign Operations', () => {
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    const response = await updateCampaignWithRetry(request, reg.token, {
-      data: {
-        name: randomName,
+    const response = await updateCampaignWithRetry(
+      request,
+      reg.token,
+      {
+        data: {
+          name: randomName,
+        },
+        details: {
+          website: randomWebsite,
+        },
       },
-      details: {
-        website: randomWebsite,
-      },
-    })
+      orgSlug,
+    )
 
     expect(response.status()).toBe(200)
 
@@ -113,9 +117,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
     request,
   }) => {
     const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
       data: {
         details: {
           website: ['array'],
@@ -133,31 +135,19 @@ test.describe('Campaigns - User Campaign Operations', () => {
     expect(body.errors[0].message).toBe('Expected string, received array')
   })
 
-  test('should strip org-managed fields from persisted details', async ({
-    request,
-  }) => {
-    const response = await updateCampaignWithRetry(request, reg.token, {
-      details: {
-        office: 'Other',
-        otherOffice: 'State Representative',
-        positionId: E2E_BALLOT_READY_POSITION_ID,
-      },
-    })
-
-    expect(response.status()).toBe(200)
-
-    const campaign = (await response.json()) as {
-      details: Record<string, unknown>
-    }
-    expect(campaign.details).not.toHaveProperty('office')
-    expect(campaign.details).not.toHaveProperty('otherOffice')
-    expect(campaign.details).not.toHaveProperty('positionId')
-  })
-
   test('should launch campaign', async ({ request }) => {
+    const patchOrgRes = await request.patch(
+      `/v1/organizations/${orgSlug}`,
+      {
+        headers: authHeaders(reg.token, orgSlug),
+        data: { ballotReadyPositionId: E2E_BALLOT_READY_POSITION_ID },
+      },
+    )
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
     const response = await retryOnConflict(() =>
       request.post('/v1/campaigns/launch', {
-        headers: { Authorization: `Bearer ${reg.token}` },
+        headers: authHeaders(reg.token, orgSlug),
       }),
     )
 

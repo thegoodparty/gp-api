@@ -72,14 +72,6 @@ export class ElectedOfficeService extends createPrismaBase(
     return this.model.delete(args)
   }
 
-  // LEGACY: Remove when org migration is complete.
-  //         Callers should use findFirst({ where: { organizationSlug } }) instead.
-  getCurrentElectedOffice(userId: number) {
-    return this.model.findFirst({
-      where: { userId },
-    })
-  }
-
   async listElectedOffices({
     offset: skip = DEFAULT_PAGINATION_OFFSET,
     limit = DEFAULT_PAGINATION_LIMIT,

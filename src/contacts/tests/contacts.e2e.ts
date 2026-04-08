@@ -22,9 +22,7 @@ const CONTACTS_TEST_POSITION_ID =
 
 /**
  * Campaign org slug (`campaign-${id}`) must be sent so contacts use
- * `resolveDistrictInfoFromOrg` (position / overrideDistrict). Without it, the
- * legacy path requires pathToVictory electionType/electionLocation, which this
- * suite does not set.
+ * `resolveDistrictInfoFromOrg` (position / overrideDistrict).
  */
 let campaignOrgSlug = ''
 
@@ -51,7 +49,12 @@ async function updateCampaignMine(params: {
 }) {
   const { request, authToken, data } = params
 
-  const response = await updateCampaignWithRetry(request, authToken, data)
+  const response = await updateCampaignWithRetry(
+    request,
+    authToken,
+    data,
+    campaignOrgSlug,
+  )
   await assertOk(response, 'Campaign update failed')
 }
 
@@ -72,11 +75,27 @@ async function createElectedOffice(params: {
   return payload.id
 }
 
+async function setOrganizationPosition(params: {
+  request: APIRequestContext
+  authToken: string
+}) {
+  const { request, authToken } = params
+  const response = await request.patch(
+    `/v1/organizations/${campaignOrgSlug}`,
+    {
+      headers: AUTH_HEADER(authToken),
+      data: { ballotReadyPositionId: CONTACTS_TEST_POSITION_ID },
+    },
+  )
+  await assertOk(response, 'Organization position update failed')
+}
+
 async function prepareCampaignAndOffice(params: {
   request: APIRequestContext
   authToken: string
 }) {
   const { request, authToken } = params
+  await setOrganizationPosition({ request, authToken })
   await updateCampaignMine({
     request,
     authToken,
@@ -84,9 +103,6 @@ async function prepareCampaignAndOffice(params: {
       details: {
         state: CONTACTS_TEST_DISTRICT.state,
         zip: '82001',
-        office: 'Other',
-        otherOffice: 'Cheyenne City Council Ward 1',
-        positionId: CONTACTS_TEST_POSITION_ID,
         electionDate: '2026-11-03',
         ballotLevel: 'CITY',
       },
@@ -126,11 +142,17 @@ async function approveCampaignForStatewideDownload(params: {
   await assertOk(response, 'Admin campaign approval failed')
 }
 
+const EO_AUTH_HEADER = (token: string, eoSlug: string) => ({
+  Authorization: `Bearer ${token}`,
+  'x-organization-slug': eoSlug,
+})
+
 test.describe('Contacts and Segments', () => {
   let authToken: string
   let campaignSlug: string
   let testUserId: number
   let testAuthToken: string
+  let eoOrgSlug: string
 
   test.beforeEach(async ({ request }) => {
     const registerResponse = await registerUser(request, {
@@ -149,10 +171,11 @@ test.describe('Contacts and Segments', () => {
     testAuthToken = registerResponse.token
     campaignOrgSlug = `campaign-${registerResponse.campaign.id}`
 
-    await prepareCampaignAndOffice({
+    const electedOfficeId = await prepareCampaignAndOffice({
       request,
       authToken,
     })
+    eoOrgSlug = `eo-${electedOfficeId}`
   })
 
   test.afterEach(async ({ request }) => {
@@ -251,6 +274,17 @@ test.describe('Contacts and Segments', () => {
       campaignSlug,
     })
 
+    const stateOrgRes = await request.patch(
+      `/v1/organizations/${campaignOrgSlug}`,
+      {
+        headers: AUTH_HEADER(authToken),
+        data: {
+          customPositionName: 'Alabama Governor',
+        },
+      },
+    )
+    await assertOk(stateOrgRes, 'Statewide org update failed')
+
     await updateCampaignMine({
       request,
       authToken,
@@ -258,9 +292,6 @@ test.describe('Contacts and Segments', () => {
         details: {
           state: 'AL',
           ballotLevel: 'STATE',
-          office: 'Other',
-          otherOffice: 'Alabama Governor',
-          positionId: null,
           electionDate: '2026-11-03',
         },
         pathToVictory: {
@@ -290,7 +321,7 @@ test.describe('Contacts and Segments', () => {
     request,
   }) => {
     const response = await request.get(`/v1/contacts/download`, {
-      headers: AUTH_HEADER(authToken),
+      headers: EO_AUTH_HEADER(authToken, eoOrgSlug),
     })
 
     expect(response.status()).toBe(HttpStatus.OK)

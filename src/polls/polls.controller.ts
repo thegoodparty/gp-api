@@ -1,6 +1,3 @@
-import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
-import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
-import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import {
   BadRequestException,
@@ -135,20 +132,14 @@ export class PollsController {
     return { hasPolls: userHasPolls }
   }
 
-  // LEGACY: When org migration is complete:
-  //         - Remove @UseCampaign and @ReqCampaign (campaign param)
-  //         - @UseOrganization becomes required (remove continueIfNotFound)
-  //         - organization becomes non-optional, campaign no longer passed to getDistrictStats
   @Post('initial-poll')
   @UseElectedOffice()
-  @UseCampaign({ continueIfNotFound: true })
-  @UseOrganization({ continueIfNotFound: true })
+  @UseOrganization()
   async createInitialPoll(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
-    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
-    @ReqOrganization() organization: Organization | undefined,
+    @ReqOrganization() organization: Organization,
   ) {
     electedOffice = await this.electedOfficeService.update({
       where: { id: electedOffice.id },
@@ -159,7 +150,7 @@ export class PollsController {
 
     const [userHasPolls, districtStats] = await Promise.all([
       this.pollsService.hasPolls(electedOffice.id),
-      this.contactService.getDistrictStats(campaign, organization),
+      this.contactService.getDistrictStats(undefined, organization),
     ])
     if (userHasPolls) {
       throw new ConflictException(

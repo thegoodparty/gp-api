@@ -193,9 +193,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         { zip: user.zip } as object,
         initialData.details as object,
       ) as PrismaJson.CampaignDetails
-      delete mergedDetails.positionId
-      delete mergedDetails.office
-      delete mergedDetails.otherOffice
 
       return tx.campaign.create({
         data: {
@@ -300,15 +297,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
               description: string
             }>
           }
-          if (
-            'positionId' in details ||
-            'office' in details ||
-            'otherOffice' in details
-          ) {
-            delete mergedDetails.positionId
-            delete mergedDetails.office
-            delete mergedDetails.otherOffice
-          }
           campaignUpdateData.details = mergedDetails
         }
         if (objectNotEmpty(aiContent)) {
@@ -319,8 +307,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             aiContent,
           ) as PrismaJson.CampaignAiContent
         }
-
-        await this.syncLegacyPositionToOrg(details, campaign, tx)
 
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
@@ -383,76 +369,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     return updatedCampaign ? updatedCampaign : null
-  }
-
-  private async syncLegacyPositionToOrg(
-    details: UpdateCampaignFieldsInput['details'],
-    campaign: {
-      id: number
-      details: {
-        positionId?: string | null
-        office?: string
-        otherOffice?: string
-      }
-    },
-    tx: { organization: Pick<Prisma.OrganizationDelegate, 'update'> },
-  ) {
-    if (!details || typeof details !== 'object') return
-    if (!('positionId' in details) && !('office' in details)) return
-
-    const positionIdRaw = details['positionId']
-    const incomingPositionId =
-      typeof positionIdRaw === 'string' ? positionIdRaw : null
-
-    const storedPositionIdRaw = campaign.details.positionId
-    const storedBallotReadyId =
-      typeof storedPositionIdRaw === 'string' ? storedPositionIdRaw : null
-
-    const resolvedBallotReadyId =
-      'positionId' in details ? incomingPositionId : storedBallotReadyId
-
-    let resolvedPosition: Awaited<
-      ReturnType<ElectionsService['getPositionByBallotReadyId']>
-    > = null
-    if (resolvedBallotReadyId) {
-      try {
-        resolvedPosition = await this.elections.getPositionByBallotReadyId(
-          resolvedBallotReadyId,
-        )
-      } catch (err: unknown) {
-        this.logger.warn(
-          { resolvedBallotReadyId, err },
-          'Election API position lookup failed during legacy org sync; treating as unresolved',
-        )
-        resolvedPosition = null
-      }
-    }
-
-    const officeRaw = details['office']
-    const otherOfficeRaw = details['otherOffice']
-    const mergedOffice =
-      (typeof officeRaw === 'string' ? officeRaw : undefined) ??
-      campaign.details.office
-    const mergedOtherOffice =
-      (typeof otherOfficeRaw === 'string' ? otherOfficeRaw : undefined) ??
-      campaign.details.otherOffice
-
-    const customPositionName = !resolvedPosition
-      ? OrganizationsService.resolveCustomPositionName(
-          mergedOffice,
-          mergedOtherOffice,
-        )
-      : null
-
-    const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-    await tx.organization.update({
-      where: { slug: orgSlug },
-      data: {
-        positionId: resolvedPosition?.id ?? null,
-        customPositionName,
-        overrideDistrictId: null,
-      },
-    })
   }
 
   async patchCampaignDetails(

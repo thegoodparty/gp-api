@@ -5,6 +5,8 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 import { WebsiteContact } from '@prisma/client'
@@ -41,19 +43,16 @@ test.describe('Websites - Contacts', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `contact-path-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -105,19 +104,16 @@ test.describe('Websites - Contacts', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `unpublished-contact-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'unpublished',
@@ -158,19 +154,16 @@ test.describe('Websites - Contacts', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `get-contacts-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -188,9 +181,7 @@ test.describe('Websites - Contacts', () => {
     })
 
     const response = await request.get('/v1/websites/mine/contacts', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     expect(response.status()).toBe(200)
@@ -228,19 +219,16 @@ test.describe('Websites - Contacts', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `pagination-contacts-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -262,9 +250,7 @@ test.describe('Websites - Contacts', () => {
     const response = await request.get(
       '/v1/websites/mine/contacts?limit=2&page=1',
       {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers: authHeaders(authToken, orgSlug),
       },
     )
 
