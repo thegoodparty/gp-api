@@ -40,8 +40,6 @@ declare global {
       city?: string | null
       county?: string | null
       normalizedOffice?: string | null
-      otherOffice?: string
-      office?: string
       party?: string
       otherParty?: string
       district?: string
@@ -64,6 +62,8 @@ declare global {
       partisanType?: string | null
       priorElectionDates?: string[]
       positionId?: string | null
+      office?: string
+      otherOffice?: string
       electionId?: string | null
       tier?: string
       einNumber?: string | null

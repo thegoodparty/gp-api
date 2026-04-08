@@ -122,10 +122,7 @@ export class ElectedOfficeController {
               overrideDistrictId: campaign.organization.overrideDistrictId,
             },
           }
-        : {
-            office: campaign.details.office,
-            otherOffice: campaign.details.otherOffice,
-          }),
+        : {}),
     })
     return this.toApi(created)
   }

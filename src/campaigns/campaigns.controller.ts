@@ -185,7 +185,23 @@ export class CampaignsController {
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return this.campaigns.createForUser(user, body)
+    const ballotReadyPositionId =
+      body.ballotReadyPositionId ?? body.details?.positionId ?? undefined
+
+    const customPositionName =
+      body.customPositionName ??
+      (!ballotReadyPositionId
+        ? (OrganizationsService.resolveCustomPositionName(
+            body.details?.office,
+            body.details?.otherOffice,
+          ) ?? undefined)
+        : undefined)
+
+    return this.campaigns.createForUser(
+      user,
+      { details: body.details, data: body.data },
+      { ballotReadyPositionId, customPositionName },
+    )
   }
 
   @Put('mine')
@@ -193,41 +209,34 @@ export class CampaignsController {
   async update(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
-    @Body() { slug, ...body }: UpdateCampaignSchema,
+    @Body() dto: UpdateCampaignSchema,
   ) {
+    const { slug, ...body } = dto
+
     if (body.canDownloadFederal && !userHasRole(user, [UserRole.admin])) {
       throw new ForbiddenException(
         'User does not have permission to download federal data',
       )
     }
+
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin or Sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
 
       if (body?.details) {
         const { city, office, electionDate, pledged, party } = body.details
+
         await this.analytics.identify(campaign.userId, {
-          ...(city && {
-            officeMunicipality: city,
-          }),
-          ...(office && {
-            officeName: office,
-          }),
-          ...(electionDate && {
-            officeElectionDate: electionDate,
-          }),
-          ...(party && {
-            affiliation: party,
-          }),
-          ...(pledged && {
-            pledged,
-          }),
+          ...(city && { officeMunicipality: city }),
+          ...(office && { officeName: office }),
+          ...(electionDate && { officeElectionDate: electionDate }),
+          ...(party && { affiliation: party }),
+          ...(pledged && { pledged }),
         })
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
@@ -358,18 +367,7 @@ export class CampaignsController {
 
     const updated = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...(raceTargetDetails || {}),
-        electionType: l2DistrictType,
-        electionLocation: l2DistrictName,
-        districtManuallySet: true,
-        ...(!hasTurnout
-          ? {
-              projectedTurnout: -1,
-              winNumber: -1,
-              voterContactGoal: -1,
-              p2vStatus: P2VStatus.districtMatched,
-            }
-          : {}),
+        ...(!hasTurnout ? { p2vStatus: P2VStatus.districtMatched } : {}),
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -441,25 +439,13 @@ export class CampaignsController {
       return this.withLiveMetrics(result)
     }
 
-    const { district, winNumber, voterContactGoal, projectedTurnout } =
-      raceTargetDetails
-    const { L2DistrictType, L2DistrictName } = district
+    const { projectedTurnout } = raceTargetDetails
     const hasTurnout = projectedTurnout > 0
     const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        districtId: district.id,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
-        // Always write turnout values: real data when available, sentinel -1
-        // when district matched but no turnout. This ensures stale turnout
-        // from a previous district is cleared.
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
-        districtManuallySet: false,
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -528,25 +514,13 @@ export class CampaignsController {
       return this.withLiveMetrics(result)
     }
 
-    const { district, winNumber, voterContactGoal, projectedTurnout } =
-      raceTargetDetails
-    const { L2DistrictType, L2DistrictName } = district
+    const { projectedTurnout } = raceTargetDetails
     const hasTurnout = projectedTurnout > 0
     const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        districtId: district.id,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
-        // Always write turnout values: real data when available, sentinel -1
-        // when district matched but no turnout. This ensures stale turnout
-        // from a previous district is cleared.
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
-        districtManuallySet: false,
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
@@ -576,9 +550,10 @@ export class CampaignsController {
   }
 
   private async resolveRaceTargetPositionContext(campaign: Campaign) {
-    const campaignOrganization = campaign.organizationSlug
+    const { organizationSlug } = campaign
+    const campaignOrganization = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
     const { ballotReadyPositionId: ballotreadyPositionId, positionName } =
