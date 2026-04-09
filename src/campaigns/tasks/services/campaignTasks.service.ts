@@ -514,7 +514,7 @@ export class CampaignTasksService extends createPrismaBase(
       cta: task.cta ?? null,
       flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? parseIsoDateString(task.date) : null,
+      date: task.date ? startOfDay(parseIsoDateString(task.date)) : null,
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,
