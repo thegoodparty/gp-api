@@ -128,7 +128,7 @@ describe('CampaignTasksService', () => {
   })
 
   describe('listCampaignTasks', () => {
-    it('eturns tasks ordered by week desc then date asc', async () => {
+    it('Returns tasks ordered by week desc then date asc', async () => {
       const tasks = [makeDbTask({ week: 8 }), makeDbTask({ week: 4 })]
       mockModel.findMany.mockResolvedValue(tasks)
 
