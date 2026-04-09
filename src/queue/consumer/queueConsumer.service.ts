@@ -967,7 +967,7 @@ export class QueueConsumerService {
       const dueDate = task.date
         ? format(task.date, 'MMM d, yyyy')
         : 'No date set'
-      return `- ${task.flowType.toUpperCase()}: ${task.title} (Due: ${dueDate})`
+      return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
     })
 
     const { hubspotId } = campaign.data
