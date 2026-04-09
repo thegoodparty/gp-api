@@ -36,7 +36,7 @@ export interface ApiEcanvasserInteraction {
   id: number
   type: string
   status: {
-    name: string
+    name: string | null
   } | null
   rating?: number
   contact_id?: number
