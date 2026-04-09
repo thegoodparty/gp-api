@@ -128,7 +128,7 @@ describe('CampaignTasksService', () => {
   })
 
   describe('listCampaignTasks', () => {
-    it('returns tasks ordered by week desc', async () => {
+    it('eturns tasks ordered by week desc then date asc', async () => {
       const tasks = [makeDbTask({ week: 8 }), makeDbTask({ week: 4 })]
       mockModel.findMany.mockResolvedValue(tasks)
 
@@ -136,7 +136,7 @@ describe('CampaignTasksService', () => {
 
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: [{ week: 'desc' }, { date: 'asc' }],
+        orderBy: [{ week: 'desc' }, { date: 'asc' }, { id: 'asc' }],
       })
       expect(result).toEqual(tasks)
     })
@@ -999,7 +999,7 @@ describe('CampaignTasksService', () => {
       })
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: [{ week: 'desc' }, { date: 'asc' }],
+        orderBy: [{ week: 'desc' }, { date: 'asc' }, { id: 'asc' }],
       })
       expect(result).toEqual(
         expect.arrayContaining([
