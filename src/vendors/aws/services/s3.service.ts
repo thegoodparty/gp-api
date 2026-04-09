@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   PutObjectCommandInput,
@@ -160,5 +161,30 @@ export class S3Service extends AwsService {
     options?: { baseUrl?: string },
   ): string {
     return this.buildUrl(bucket, key, options?.baseUrl)
+  }
+
+  async listKeys(bucket: string, prefix: string): Promise<string[]> {
+    return this.executeAwsOperation(async () => {
+      const keys: string[] = []
+      let continuationToken: string | undefined
+
+      do {
+        const response = await this.s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }),
+        )
+
+        for (const obj of response.Contents ?? []) {
+          if (obj.Key) keys.push(obj.Key)
+        }
+
+        continuationToken = response.NextContinuationToken
+      } while (continuationToken)
+
+      return keys
+    }, 'listKeys')
   }
 }
