@@ -4,8 +4,8 @@ import { PinoLogger } from 'nestjs-pino'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
-import { BriefingListItem } from '../types/briefing.types'
 import { BriefingSchema } from '../types/briefing.schema'
+import { BriefingListItem } from '../types/briefing.types'
 
 const MEETING_PIPELINE_BUCKET =
   process.env.MEETING_PIPELINE_BUCKET ?? 'meeting-pipeline-dev'
@@ -48,14 +48,6 @@ export class MeetingsService {
     const citySlug = await this.resolveCitySlug(org)
     const prefix = `${OUTPUT_PREFIX}/briefings/${citySlug}_`
 
-    console.log(
-      '----------------------------------------------------------------------------`',
-    )
-    console.log('citySlug', citySlug)
-    console.log('prefix', prefix)
-    console.log(
-      '----------------------------------------------------------------------------',
-    )
     this.logger.debug({ citySlug, prefix }, 'Listing briefings from S3')
 
     // S3Service.getFile doesn't support listing — use AWS SDK list directly
