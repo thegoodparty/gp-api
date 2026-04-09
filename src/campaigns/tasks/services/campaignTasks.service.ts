@@ -477,8 +477,8 @@ export class CampaignTasksService extends createPrismaBase(
 
   private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
     return [...tasks].sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0
-      const dateB = b.date ? new Date(b.date).getTime() : 0
+      const dateA = a.date ? parseIsoDateString(a.date).getTime() : 0
+      const dateB = b.date ? parseIsoDateString(b.date).getTime() : 0
       return dateA - dateB
     })
   }
@@ -497,7 +497,7 @@ export class CampaignTasksService extends createPrismaBase(
           date: formatDate(saturday, DateFormats.isoDate),
         }
       })
-      .filter((task) => !isBefore(new Date(task.date), today))
+      .filter((task) => !isBefore(parseIsoDateString(task.date), today))
   }
 
   private mapTasksToCreateData(
