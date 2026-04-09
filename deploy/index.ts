@@ -10,7 +10,6 @@ export = async () => {
   const config = new pulumi.Config()
 
   // Pulumi config returns string — narrowing to known environment literals, validated by select() usage
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const environment = config.require('environment') as
     | 'preview'
     | 'dev'
@@ -357,6 +356,22 @@ export = async () => {
       LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
+      CAMPAIGN_PLAN_INPUT_QUEUE_URL: select({
+        preview: '',
+        dev: 'https://sqs.us-west-2.amazonaws.com/333022194791/campaign-plan-input-dev.fifo',
+        qa: 'https://sqs.us-west-2.amazonaws.com/333022194791/campaign-plan-input-qa.fifo',
+        // prod disabled until we're ready to generate events in prod
+        // prod: 'https://sqs.us-west-2.amazonaws.com/333022194791/campaign-plan-input-prod.fifo',
+        prod: '',
+      }),
+      CAMPAIGN_PLAN_RESULTS_BUCKET: select({
+        preview: '',
+        dev: 'campaign-plan-results-dev',
+        qa: 'campaign-plan-results-qa',
+        // prod disabled until we're ready to generate events in prod
+        // prod: 'campaign-plan-results-prod',
+        prod: '',
+      }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
