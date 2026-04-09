@@ -3,7 +3,7 @@ import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Campaign } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { RequireCamapaignMetadata } from '../decorators/UseCampaign.decorator'
+import { RequireCampaignMetadata } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'
 import { UseCampaignGuard } from './UseCampaign.guard'
 
@@ -40,7 +40,7 @@ describe('UseCampaignGuard', () => {
     } as unknown as ExecutionContext
   }
 
-  function mockMetadata(meta: RequireCamapaignMetadata = {}) {
+  function mockMetadata(meta: RequireCampaignMetadata = {}) {
     vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(meta)
   }
 

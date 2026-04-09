@@ -10,7 +10,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { CampaignWith } from '../campaigns.types'
 import {
   REQUIRE_CAMPAIGN_META_KEY,
-  RequireCamapaignMetadata,
+  RequireCampaignMetadata,
 } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'
 
@@ -33,13 +33,12 @@ export class UseCampaignGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>
-      params: { slug: string }
       campaign?: Campaign
       user: { id: number }
     }>()
 
     const { continueIfNotFound, include: campaignInclude } =
-      this.reflector.getAllAndOverride<RequireCamapaignMetadata>(
+      this.reflector.getAllAndOverride<RequireCampaignMetadata>(
         REQUIRE_CAMPAIGN_META_KEY,
         [context.getHandler(), context.getClass()],
       )

@@ -18,8 +18,7 @@ import { OrganizationsService } from '../services/organizations.service'
  *
  * Used when you need Organization data directly (positionId, overrideDistrictId, etc.).
  * For ElectedOffice or Campaign context, use @UseElectedOffice() or @UseCampaign()
- * instead — those guards also try the organization header before falling back to
- * userId-based lookups.
+ * instead — those guards also resolve via the `X-Organization-Slug` header.
  *
  * Resolution:
  * 1. Read `X-Organization-Slug` header.

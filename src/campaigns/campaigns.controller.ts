@@ -402,7 +402,7 @@ export class CampaignsController {
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
-        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+        `Error: The campaign's organization has no BallotReady position or the campaign has no electionDate — the candidate likely hasn't selected an office yet`,
       )
     }
 
@@ -478,7 +478,7 @@ export class CampaignsController {
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
-        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+        `Error: The campaign's organization has no BallotReady position or the campaign has no electionDate — the candidate likely hasn't selected an office yet`,
       )
     }
     const raceTargetDetails = await this.elections

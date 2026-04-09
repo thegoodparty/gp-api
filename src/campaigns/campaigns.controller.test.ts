@@ -1225,7 +1225,7 @@ describe('CampaignsController', () => {
     it('throws BadRequestException when no electionDate', async () => {
       const campaign: Campaign = {
         ...mockCampaign,
-        details: { positionId: 'pos-1' } as unknown as Campaign['details'],
+        details: {} as Campaign['details'],
       }
 
       await expect(
