@@ -10,6 +10,7 @@ import { CampaignUpdateHistoryType } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignTask } from '../campaignTasks.types'
+import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
@@ -762,8 +763,9 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + generalAwarenessTasks.length,
+      )
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
@@ -802,11 +804,9 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       expect(tasks).toHaveLength(
-        primaryDefaultTasks.length + generalDefaultTasks.length,
-      )
-      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
-      expect(tasks[primaryDefaultTasks.length].title).toBe(
-        generalDefaultTasks[0].title,
+        primaryDefaultTasks.length +
+          generalDefaultTasks.length +
+          generalAwarenessTasks.length,
       )
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
@@ -856,8 +856,9 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + generalAwarenessTasks.length,
+      )
     })
 
     it('distributes only primary when general is past and primary is future', async () => {
@@ -940,7 +941,7 @@ describe('CampaignTasksService', () => {
       })
     })
 
-    it('treats election date equal to today as future', async () => {
+    it('treats election date equal to today as future with no awareness tasks', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(
