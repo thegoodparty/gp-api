@@ -6,10 +6,13 @@ import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { CampaignUpdateHistoryType } from '@prisma/client'
+import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { startOfDay } from 'date-fns'
+import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
+import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
@@ -128,7 +131,7 @@ describe('CampaignTasksService', () => {
   })
 
   describe('listCampaignTasks', () => {
-    it('returns tasks ordered by week desc', async () => {
+    it('Returns tasks ordered by week desc then date asc', async () => {
       const tasks = [makeDbTask({ week: 8 }), makeDbTask({ week: 4 })]
       mockModel.findMany.mockResolvedValue(tasks)
 
@@ -136,7 +139,11 @@ describe('CampaignTasksService', () => {
 
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [
+          { week: Prisma.SortOrder.desc },
+          { date: Prisma.SortOrder.asc },
+          { id: Prisma.SortOrder.asc },
+        ],
       })
       expect(result).toEqual(tasks)
     })
@@ -762,8 +769,9 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + generalAwarenessTasks.length,
+      )
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
@@ -802,11 +810,9 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       expect(tasks).toHaveLength(
-        primaryDefaultTasks.length + generalDefaultTasks.length,
-      )
-      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
-      expect(tasks[primaryDefaultTasks.length].title).toBe(
-        generalDefaultTasks[0].title,
+        primaryDefaultTasks.length +
+          generalDefaultTasks.length +
+          generalAwarenessTasks.length,
       )
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
@@ -856,8 +862,9 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + generalAwarenessTasks.length,
+      )
     })
 
     it('distributes only primary when general is past and primary is future', async () => {
@@ -940,7 +947,7 @@ describe('CampaignTasksService', () => {
       })
     })
 
-    it('treats election date equal to today as future', async () => {
+    it('treats election date equal to today as future with no awareness tasks', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(
@@ -991,7 +998,7 @@ describe('CampaignTasksService', () => {
             flowType: CampaignTaskType.text,
             week: 2,
             proRequired: true,
-            date: new Date('2025-11-01'),
+            date: startOfDay(parseIsoDateString('2025-11-01')),
             completed: false,
             isDefaultTask: false,
           }),
@@ -999,7 +1006,11 @@ describe('CampaignTasksService', () => {
       })
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [
+          { week: Prisma.SortOrder.desc },
+          { date: Prisma.SortOrder.asc },
+          { id: Prisma.SortOrder.asc },
+        ],
       })
       expect(result).toEqual(
         expect.arrayContaining([

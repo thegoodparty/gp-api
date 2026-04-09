@@ -12,6 +12,8 @@ import {
   isAfter,
   isBefore,
   startOfDay,
+  startOfWeek,
+  subWeeks,
 } from 'date-fns'
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -25,6 +27,7 @@ import {
 import { sleep } from 'src/shared/util/sleep.util'
 import { ProgressStreamData } from '../aiCampaignManager.types'
 import { CampaignTask } from '../campaignTasks.types'
+import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
@@ -71,7 +74,11 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where,
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
+      ],
     })
   }
 
@@ -378,7 +385,7 @@ export class CampaignTasksService extends createPrismaBase(
     const generalDate = this.hasFutureDate(details.electionDate, today)
 
     if (primaryDate && generalDate) {
-      return [
+      return this.sortTasksByDate([
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -389,7 +396,12 @@ export class CampaignTasksService extends createPrismaBase(
           primaryDate,
           generalDate,
         ),
-      ]
+        ...this.computeAwarenessTasks(
+          generalAwarenessTasks,
+          generalDate,
+          today,
+        ),
+      ])
     }
 
     if (primaryDate) {
@@ -401,11 +413,18 @@ export class CampaignTasksService extends createPrismaBase(
     }
 
     if (generalDate) {
-      return this.distributeTasksOverWindow(
-        generalDefaultTasks,
-        today,
-        generalDate,
-      )
+      return this.sortTasksByDate([
+        ...this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          today,
+          generalDate,
+        ),
+        ...this.computeAwarenessTasks(
+          generalAwarenessTasks,
+          generalDate,
+          today,
+        ),
+      ])
     }
 
     const hasAnyElectionDate =
@@ -460,6 +479,31 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
+  private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
+    return [...tasks].sort((a, b) => {
+      const dateA = a.date ? parseIsoDateString(a.date).getTime() : 0
+      const dateB = b.date ? parseIsoDateString(b.date).getTime() : 0
+      return dateA - dateB
+    })
+  }
+
+  private computeAwarenessTasks(
+    tasks: CampaignTask[],
+    electionDate: Date,
+    today: Date,
+  ): CampaignTask[] {
+    return tasks
+      .map((task) => {
+        const weekRef = subWeeks(electionDate, task.week)
+        const saturday = addDays(startOfWeek(weekRef), 6)
+        return {
+          ...task,
+          date: formatDate(saturday, DateFormats.isoDate),
+        }
+      })
+      .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
   private mapTasksToCreateData(
     campaignId: number,
     tasks: CampaignTask[],
@@ -468,10 +512,10 @@ export class CampaignTasksService extends createPrismaBase(
       campaignId,
       title: task.title,
       description: task.description,
-      cta: task.cta,
-      flowType: task.flowType,
+      cta: task.cta ?? null,
+      flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? new Date(task.date) : null,
+      date: task.date ? startOfDay(parseIsoDateString(task.date)) : null,
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,
@@ -502,7 +546,11 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where: { campaignId },
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
+      ],
     })
   }
 }
