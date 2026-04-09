@@ -136,7 +136,7 @@ describe('CampaignTasksService', () => {
 
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [{ week: 'desc' }, { date: 'asc' }],
       })
       expect(result).toEqual(tasks)
     })
@@ -999,7 +999,7 @@ describe('CampaignTasksService', () => {
       })
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [{ week: 'desc' }, { date: 'asc' }],
       })
       expect(result).toEqual(
         expect.arrayContaining([
