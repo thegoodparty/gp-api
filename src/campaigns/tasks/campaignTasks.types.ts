@@ -7,14 +7,15 @@ export enum CampaignTaskType {
   events = 'events',
   education = 'education',
   compliance = 'compliance',
+  awareness = 'awareness',
 }
 
 export type CampaignTask = {
   id: string
   title: string
   description: string
-  cta: string
-  flowType: CampaignTaskType
+  cta?: string
+  flowType?: CampaignTaskType
   week: number
   date?: string
   link?: string
