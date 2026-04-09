@@ -6,12 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization, Prisma } from '@prisma/client'
+import pmap from 'p-map'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   AdminListOrganizationsDto,
   PatchOrganizationDto,
 } from '../schemas/organization.schema'
-import pmap from 'p-map'
 
 import { OrgDistrict } from '../organizations.types'
 
@@ -350,7 +350,10 @@ export class OrganizationsService extends createPrismaBase(
     name = name.replace(/^(City|Town|Village|Borough|Township)\s+of\s+/i, '')
 
     // Strip trailing ward/district/precinct suffixes: "Ward 4", "District 3", "Precinct 2A"
-    name = name.replace(/\s+(Ward|District|Precinct|Division|At-Large)\s*[\w-]*$/i, '')
+    name = name.replace(
+      /\s+(Ward|District|Precinct|Division|At-Large)\s*[\w-]*$/i,
+      '',
+    )
 
     // Strip trailing municipality type: "Johnstown City" → "Johnstown"
     name = name.replace(/\s+(City|Town|Village|Borough|Township)$/i, '')
