@@ -9,6 +9,7 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
@@ -996,7 +997,7 @@ describe('CampaignTasksService', () => {
             flowType: CampaignTaskType.text,
             week: 2,
             proRequired: true,
-            date: parseIsoDateString('2025-11-01'),
+            date: startOfDay(parseIsoDateString('2025-11-01')),
             completed: false,
             isDefaultTask: false,
           }),
