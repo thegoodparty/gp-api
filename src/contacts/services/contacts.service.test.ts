@@ -119,6 +119,29 @@ describe('ContactsService', () => {
         ).resolves.toBeDefined()
       })
 
+      it('allows search when campaign is pro (isPro) even with a non-EO org', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        const proCampaign = {
+          ...baseCampaign,
+          isPro: true,
+        } as unknown as Campaign
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            proCampaign,
+            org,
+          ),
+        ).resolves.toBeDefined()
+      })
+
       it('does not check access when search is not provided', async () => {
         const org = makeOrganization({
           slug: 'campaign-1',
@@ -158,6 +181,30 @@ describe('ContactsService', () => {
         await expect(
           service.downloadContacts({ segment: 'all' }, baseCampaign, res, org),
         ).rejects.toThrow('Campaign is not pro')
+      })
+
+      it('allows download when campaign is pro (isPro) even with a non-EO org', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        const proCampaign = {
+          ...baseCampaign,
+          isPro: true,
+        } as unknown as Campaign
+
+        const mockStream = {
+          pipe: vi.fn(),
+          on: vi.fn((event: string, cb: () => void) => {
+            if (event === 'end') setImmediate(cb)
+          }),
+        }
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const res = { raw: {} } as never
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, proCampaign, res, org),
+        ).resolves.toBeUndefined()
       })
 
       it('allows download when organization is an elected office', async () => {

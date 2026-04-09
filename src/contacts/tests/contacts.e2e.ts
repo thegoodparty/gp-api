@@ -276,6 +276,7 @@ test.describe('Contacts and Segments', () => {
       {
         headers: AUTH_HEADER(authToken),
         data: {
+          ballotReadyPositionId: null,
           customPositionName: 'Alabama Governor',
         },
       },

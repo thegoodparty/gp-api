@@ -125,7 +125,11 @@ export class ContactsService {
     campaign: Campaign | undefined,
     organization: Organization,
   ) {
-    if (search && !this.hasElectedOfficeAccess(organization)) {
+    if (
+      search &&
+      !(campaign?.isPro ?? false) &&
+      !this.hasElectedOfficeAccess(organization)
+    ) {
       throw new BadRequestException(
         'Search is only available for pro campaigns',
       )
@@ -259,7 +263,10 @@ export class ContactsService {
     res: FastifyReply,
     organization: Organization,
   ) {
-    if (!this.hasElectedOfficeAccess(organization)) {
+    if (
+      !(campaign?.isPro ?? false) &&
+      !this.hasElectedOfficeAccess(organization)
+    ) {
       throw new BadRequestException('Campaign is not pro')
     }
 
