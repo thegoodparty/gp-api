@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Organization } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { OrganizationsService } from 'src/organizations/services/organizations.service'
-import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BriefingSchema } from '../types/briefing.schema'
 import { BriefingListItem } from '../types/briefing.types'
 
@@ -50,19 +50,10 @@ export class MeetingsService {
 
     this.logger.debug({ citySlug, prefix }, 'Listing briefings from S3')
 
-    // S3Service.getFile doesn't support listing — use AWS SDK list directly
-    // We load the combined normalized_meetings index to enumerate available dates,
-    // then check which have briefings.
-    const briefingsPrefix = `${OUTPUT_PREFIX}/briefings/`
-    const keys = await this.listS3Keys(briefingsPrefix, `${citySlug}_`)
+    const keys = await this.s3Service.listKeys(MEETING_PIPELINE_BUCKET, prefix)
 
     this.logger.info(
-      {
-        citySlug,
-        bucket: MEETING_PIPELINE_BUCKET,
-        keyCount: keys.length,
-        keys,
-      },
+      { citySlug, bucket: MEETING_PIPELINE_BUCKET, keyCount: keys.length },
       'Briefing S3 keys found',
     )
 
@@ -111,46 +102,5 @@ export class MeetingsService {
     }
 
     return BriefingSchema.parse(JSON.parse(raw) as unknown)
-  }
-
-  /**
-   * List S3 keys under a prefix, filtered by an optional key prefix match.
-   * Uses the AWS SDK directly since S3Service doesn't expose list operations.
-   */
-  private async listS3Keys(
-    prefix: string,
-    filterPrefix?: string,
-  ): Promise<string[]> {
-    const { ListObjectsV2Command, S3Client } = await import(
-      '@aws-sdk/client-s3'
-    )
-
-    const client = new S3Client({
-      region: process.env.AWS_REGION ?? 'us-west-2',
-    })
-    const keys: string[] = []
-    let continuationToken: string | undefined
-
-    do {
-      const response = await client.send(
-        new ListObjectsV2Command({
-          Bucket: MEETING_PIPELINE_BUCKET,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        }),
-      )
-
-      for (const obj of response.Contents ?? []) {
-        if (!obj.Key) continue
-        const filename = obj.Key.split('/').pop() ?? ''
-        if (!filterPrefix || filename.startsWith(filterPrefix)) {
-          keys.push(obj.Key)
-        }
-      }
-
-      continuationToken = response.NextContinuationToken
-    } while (continuationToken)
-
-    return keys
   }
 }

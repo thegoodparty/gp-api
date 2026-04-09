@@ -1,8 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common'
 import { Organization } from '@prisma/client'
-import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
-import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
-import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
+import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqOrganization } from '@/organizations/decorators/ReqOrganization.decorator'
+import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
 import { MeetingsService } from '../services/meetings.service'
 
 /**
