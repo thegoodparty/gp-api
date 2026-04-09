@@ -74,7 +74,10 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where,
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+      ],
     })
   }
 
@@ -511,7 +514,7 @@ export class CampaignTasksService extends createPrismaBase(
       cta: task.cta ?? null,
       flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? new Date(task.date) : null,
+      date: task.date ? parseIsoDateString(task.date) : null,
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,
@@ -542,7 +545,10 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where: { campaignId },
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+      ],
     })
   }
 }

@@ -6,9 +6,10 @@ import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { CampaignUpdateHistoryType } from '@prisma/client'
+import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
@@ -137,7 +138,10 @@ describe('CampaignTasksService', () => {
 
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [
+          { week: Prisma.SortOrder.desc },
+          { date: Prisma.SortOrder.asc },
+        ],
       })
       expect(result).toEqual(tasks)
     })
@@ -992,7 +996,7 @@ describe('CampaignTasksService', () => {
             flowType: CampaignTaskType.text,
             week: 2,
             proRequired: true,
-            date: new Date('2025-11-01'),
+            date: parseIsoDateString('2025-11-01'),
             completed: false,
             isDefaultTask: false,
           }),
@@ -1000,7 +1004,10 @@ describe('CampaignTasksService', () => {
       })
       expect(mockModel.findMany).toHaveBeenCalledWith({
         where: { campaignId: 1 },
-        orderBy: { week: 'desc' },
+        orderBy: [
+          { week: Prisma.SortOrder.desc },
+          { date: Prisma.SortOrder.asc },
+        ],
       })
       expect(result).toEqual(
         expect.arrayContaining([
