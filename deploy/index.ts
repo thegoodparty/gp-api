@@ -358,6 +358,7 @@ export = async () => {
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
+      MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       DB_HOST: rdsCluster.endpoint,

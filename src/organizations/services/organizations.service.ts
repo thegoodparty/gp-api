@@ -302,25 +302,20 @@ export class OrganizationsService extends createPrismaBase(
    * to a stored value or manual configuration.
    */
   async resolveCitySlug(org: Organization): Promise<string | null> {
-    const [position, overrideDistrict] = await Promise.all([
+    const [district, position] = await Promise.all([
+      this.resolveDistrict(org),
       org.positionId
         ? this.electionsService.getPositionById(org.positionId, {
-            includeDistrict: true,
+            includeDistrict: false,
           })
-        : Promise.resolve(null),
-      org.overrideDistrictId
-        ? this.electionsService.getDistrict(org.overrideDistrictId)
         : Promise.resolve(null),
     ])
 
     const state = position?.state
-    if (!state) return null
-
-    const district = overrideDistrict ?? position?.district
-    if (!district?.L2DistrictName) return null
+    if (!state || !district?.l2Name) return null
 
     const city = OrganizationsService.extractCityFromDistrictName(
-      district.L2DistrictName,
+      district.l2Name,
     )
     if (!city) return null
 
