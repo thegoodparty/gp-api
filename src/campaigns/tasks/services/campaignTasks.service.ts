@@ -77,6 +77,7 @@ export class CampaignTasksService extends createPrismaBase(
       orderBy: [
         { week: Prisma.SortOrder.desc },
         { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
       ],
     })
   }
@@ -548,6 +549,7 @@ export class CampaignTasksService extends createPrismaBase(
       orderBy: [
         { week: Prisma.SortOrder.desc },
         { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
       ],
     })
   }

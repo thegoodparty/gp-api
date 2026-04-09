@@ -131,7 +131,7 @@ describe('CampaignTasksService', () => {
   })
 
   describe('listCampaignTasks', () => {
-    it('returns tasks ordered by week desc', async () => {
+    it('Returns tasks ordered by week desc then date asc', async () => {
       const tasks = [makeDbTask({ week: 8 }), makeDbTask({ week: 4 })]
       mockModel.findMany.mockResolvedValue(tasks)
 
@@ -142,6 +142,7 @@ describe('CampaignTasksService', () => {
         orderBy: [
           { week: Prisma.SortOrder.desc },
           { date: Prisma.SortOrder.asc },
+          { id: Prisma.SortOrder.asc },
         ],
       })
       expect(result).toEqual(tasks)
@@ -1008,6 +1009,7 @@ describe('CampaignTasksService', () => {
         orderBy: [
           { week: Prisma.SortOrder.desc },
           { date: Prisma.SortOrder.asc },
+          { id: Prisma.SortOrder.asc },
         ],
       })
       expect(result).toEqual(
