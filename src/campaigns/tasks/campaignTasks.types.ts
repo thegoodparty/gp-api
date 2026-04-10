@@ -1,14 +1,5 @@
-export enum CampaignTaskType {
-  text = 'text',
-  robocall = 'robocall',
-  doorKnocking = 'doorKnocking',
-  phoneBanking = 'phoneBanking',
-  socialMedia = 'socialMedia',
-  events = 'events',
-  education = 'education',
-  compliance = 'compliance',
-  awareness = 'awareness',
-}
+export { CampaignTaskType } from '@prisma/client'
+import type { CampaignTaskType } from '@prisma/client'
 
 export type CampaignTask = {
   id: string
@@ -23,4 +14,22 @@ export type CampaignTask = {
   isDefaultTask?: boolean
   deadline?: number
   defaultAiTemplateId?: string
+}
+
+export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+export type RecurrenceRule =
+  | { type: 'weekly'; dayOfWeek: DayOfWeek }
+  | { type: 'monthlyNthDay'; dayOfWeek: DayOfWeek; occurrences: number[] }
+  | {
+      type: 'weeksBeforeElection'
+      dayOfWeek: DayOfWeek
+      weeksBefore: number
+    }
+
+export type RecurringTaskTemplate = {
+  id: string
+  title: string
+  description: string
+  recurrence: RecurrenceRule
 }
