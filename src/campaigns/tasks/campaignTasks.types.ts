@@ -1,5 +1,5 @@
 export { CampaignTaskType } from '@prisma/client'
-import { CampaignTaskType } from '@prisma/client'
+import type { CampaignTaskType } from '@prisma/client'
 
 export type CampaignTask = {
   id: string
