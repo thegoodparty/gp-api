@@ -276,7 +276,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
           interactions: {
             create: interactions.map((interaction) => ({
               type: interaction.type,
-              status: interaction.status.name,
+              status: interaction.status?.name ?? 'Unknown',
               contactId: interaction.contact_id || 0,
               createdBy: interaction.created_by || 0,
               date: interaction.created_at,

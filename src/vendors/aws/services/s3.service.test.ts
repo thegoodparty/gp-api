@@ -1,6 +1,7 @@
 import {
   GetObjectCommand,
   GetObjectCommandOutput,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -492,6 +493,112 @@ describe('S3Service', () => {
 
         expect(result).toBe(`${baseUrl}/${key}`)
       }
+    })
+  })
+
+  describe('listKeys', () => {
+    const bucket = 'test-bucket'
+    const prefix = 'meeting_pipeline/output/briefings/pittsboro-NC_'
+
+    it('returns all keys matching the prefix in a single page', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({
+        Contents: [
+          { Key: `${prefix}2026-04-13_briefing.json` },
+          { Key: `${prefix}2026-03-10_briefing.json` },
+        ],
+        IsTruncated: false,
+        $metadata: {},
+      })
+
+      const result = await service.listKeys(bucket, prefix)
+
+      expect(result).toEqual([
+        `${prefix}2026-04-13_briefing.json`,
+        `${prefix}2026-03-10_briefing.json`,
+      ])
+    })
+
+    it('paginates through multiple pages using NextContinuationToken', async () => {
+      s3Mock
+        .on(ListObjectsV2Command, { ContinuationToken: undefined })
+        .resolves({
+          Contents: [{ Key: `${prefix}2026-04-13_briefing.json` }],
+          IsTruncated: true,
+          NextContinuationToken: 'token-abc',
+          $metadata: {},
+        })
+        .on(ListObjectsV2Command, { ContinuationToken: 'token-abc' })
+        .resolves({
+          Contents: [{ Key: `${prefix}2026-03-10_briefing.json` }],
+          IsTruncated: false,
+          $metadata: {},
+        })
+
+      const result = await service.listKeys(bucket, prefix)
+
+      expect(result).toEqual([
+        `${prefix}2026-04-13_briefing.json`,
+        `${prefix}2026-03-10_briefing.json`,
+      ])
+    })
+
+    it('returns empty array when no objects match', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({
+        Contents: [],
+        IsTruncated: false,
+        $metadata: {},
+      })
+
+      const result = await service.listKeys(bucket, prefix)
+
+      expect(result).toEqual([])
+    })
+
+    it('skips entries with no Key', async () => {
+      s3Mock.on(ListObjectsV2Command).resolves({
+        Contents: [
+          { Key: `${prefix}2026-04-13_briefing.json` },
+          { Key: undefined },
+          { Key: `${prefix}2026-03-10_briefing.json` },
+        ],
+        IsTruncated: false,
+        $metadata: {},
+      })
+
+      const result = await service.listKeys(bucket, prefix)
+
+      expect(result).toEqual([
+        `${prefix}2026-04-13_briefing.json`,
+        `${prefix}2026-03-10_briefing.json`,
+      ])
+    })
+
+    it('throws BadGatewayException on AWS service errors', async () => {
+      const awsError = new ServiceException({
+        name: 'InternalServerError',
+        message: 'AWS service error',
+        $fault: 'server',
+        $metadata: {},
+      })
+      s3Mock.on(ListObjectsV2Command).rejects(awsError)
+
+      await expect(service.listKeys(bucket, prefix)).rejects.toThrow(
+        BadGatewayException,
+      )
+    })
+
+    it('throws UnauthorizedException on access denied errors', async () => {
+      const awsError = new ServiceException({
+        name: 'AccessDeniedException',
+        message: 'Access denied',
+        $fault: 'client',
+        $metadata: {},
+      })
+      s3Mock.on(ListObjectsV2Command).rejects(awsError)
+
+      await expect(service.listKeys(bucket, prefix)).rejects.toThrow(
+        UnauthorizedException,
+      )
     })
   })
 

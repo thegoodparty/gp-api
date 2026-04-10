@@ -1,4 +1,4 @@
-export const enum SlackChannel {
+export enum SlackChannel {
   botDev = 'bot-dev',
   botPathToVictory = 'bot-path-to-victory',
   botPathToVictoryIssues = 'bot-path-to-victory-issues',
@@ -9,6 +9,7 @@ export const enum SlackChannel {
   botDeletions = 'bot-deletions',
   bot10DlcCompliance = 'bot-10dlc-compliance',
   botTevynApi = 'bot-tevyn-api',
+  casClickupTasks = 'cas-clickup-tasks',
 }
 
 export enum SlackMessageType {
