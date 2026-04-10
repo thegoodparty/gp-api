@@ -9,6 +9,8 @@ import {
   addDays,
   differenceInCalendarDays,
   differenceInWeeks,
+  getDate,
+  getDay,
   isAfter,
   isBefore,
   startOfDay,
@@ -26,8 +28,15 @@ import {
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
 import { ProgressStreamData } from '../aiCampaignManager.types'
-import { CampaignTask } from '../campaignTasks.types'
+import {
+  CampaignTask,
+  CampaignTaskType,
+  DayOfWeek,
+  RecurrenceRule,
+  RecurringTaskTemplate,
+} from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
@@ -401,15 +410,27 @@ export class CampaignTasksService extends createPrismaBase(
           generalDate,
           today,
         ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          generalDate,
+        ),
       ])
     }
 
     if (primaryDate) {
-      return this.distributeTasksOverWindow(
-        primaryDefaultTasks,
-        today,
-        primaryDate,
-      )
+      return this.sortTasksByDate([
+        ...this.distributeTasksOverWindow(
+          primaryDefaultTasks,
+          today,
+          primaryDate,
+        ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          primaryDate,
+        ),
+      ])
     }
 
     if (generalDate) {
@@ -423,6 +444,11 @@ export class CampaignTasksService extends createPrismaBase(
           generalAwarenessTasks,
           generalDate,
           today,
+        ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          generalDate,
         ),
       ])
     }
@@ -502,6 +528,106 @@ export class CampaignTasksService extends createPrismaBase(
         }
       })
       .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
+  private computeRecurringTasks(
+    templates: RecurringTaskTemplate[],
+    windowStart: Date,
+    electionDate: Date,
+  ): CampaignTask[] {
+    return templates.flatMap((template) =>
+      this.computeRecurrenceDates(
+        template.recurrence,
+        windowStart,
+        electionDate,
+      ).map((date) => ({
+        id: `${template.id}-${formatDate(date, DateFormats.isoDate)}`,
+        title: template.title,
+        description: template.description,
+        flowType: CampaignTaskType.recurring,
+        week: differenceInWeeks(electionDate, date, {
+          roundingMethod: 'ceil',
+        }),
+        date: formatDate(date, DateFormats.isoDate),
+        isDefaultTask: true,
+      })),
+    )
+  }
+
+  private computeRecurrenceDates(
+    recurrence: RecurrenceRule,
+    windowStart: Date,
+    electionDate: Date,
+  ): Date[] {
+    switch (recurrence.type) {
+      case 'weekly':
+        return this.getWeeklyDates(
+          recurrence.dayOfWeek,
+          windowStart,
+          electionDate,
+        )
+      case 'monthlyNthDay':
+        return this.getMonthlyNthDayDates(
+          recurrence.dayOfWeek,
+          recurrence.occurrences,
+          windowStart,
+          electionDate,
+        )
+      case 'weeksBeforeElection':
+        return this.getSingleOccurrenceDate(
+          recurrence.dayOfWeek,
+          recurrence.weeksBefore,
+          electionDate,
+          windowStart,
+        )
+    }
+  }
+
+  private getWeeklyDates(dayOfWeek: DayOfWeek, start: Date, end: Date): Date[] {
+    const dates: Date[] = []
+    let current = this.nextOrSameDayOfWeek(start, dayOfWeek)
+    while (!isAfter(current, end)) {
+      dates.push(current)
+      current = addDays(current, 7)
+    }
+    return dates
+  }
+
+  private getMonthlyNthDayDates(
+    dayOfWeek: DayOfWeek,
+    occurrences: number[],
+    start: Date,
+    end: Date,
+  ): Date[] {
+    const dates: Date[] = []
+    let current = this.nextOrSameDayOfWeek(start, dayOfWeek)
+    while (!isAfter(current, end)) {
+      const weekOfMonth = Math.ceil(getDate(current) / 7)
+      if (occurrences.includes(weekOfMonth)) {
+        dates.push(current)
+      }
+      current = addDays(current, 7)
+    }
+    return dates
+  }
+
+  private getSingleOccurrenceDate(
+    dayOfWeek: DayOfWeek,
+    weeksBefore: number,
+    electionDate: Date,
+    windowStart: Date,
+  ): Date[] {
+    const weekRef = subWeeks(electionDate, weeksBefore)
+    const date = addDays(startOfWeek(weekRef), dayOfWeek)
+    return !isBefore(date, windowStart) && !isAfter(date, electionDate)
+      ? [date]
+      : []
+  }
+
+  private nextOrSameDayOfWeek(date: Date, dayOfWeek: DayOfWeek): Date {
+    const currentDay = getDay(date)
+    const daysUntil = (dayOfWeek - currentDay + 7) % 7
+    return daysUntil === 0 ? date : addDays(date, daysUntil)
   }
 
   private mapTasksToCreateData(

@@ -13,6 +13,7 @@ import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
@@ -743,10 +744,20 @@ describe('CampaignTasksService', () => {
           week: number
           isDefaultTask: boolean
           campaignId: number
+          flowType: CampaignTaskType | null
         }[]
       }
       return call.data
     }
+
+    const splitByRecurring = (
+      tasks: ReturnType<typeof getCreatedTaskData>,
+    ) => ({
+      recurring: tasks.filter((t) => t.flowType === CampaignTaskType.recurring),
+      nonRecurring: tasks.filter(
+        (t) => t.flowType !== CampaignTaskType.recurring,
+      ),
+    })
 
     it('uses general tasks without dates when details is empty', async () => {
       setupForCreation()
@@ -769,9 +780,11 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(
+      const { nonRecurring, recurring } = splitByRecurring(tasks)
+      expect(nonRecurring).toHaveLength(
         generalDefaultTasks.length + generalAwarenessTasks.length,
       )
+      expect(recurring.length).toBeGreaterThan(0)
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
@@ -788,8 +801,10 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(primaryDefaultTasks.length)
-      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
+      const { nonRecurring, recurring } = splitByRecurring(tasks)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
+      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(recurring.length).toBeGreaterThan(0)
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
@@ -809,11 +824,13 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(
+      const { nonRecurring, recurring } = splitByRecurring(tasks)
+      expect(nonRecurring).toHaveLength(
         primaryDefaultTasks.length +
           generalDefaultTasks.length +
           generalAwarenessTasks.length,
       )
+      expect(recurring.length).toBeGreaterThan(0)
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
@@ -862,9 +879,11 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(
+      const { nonRecurring, recurring } = splitByRecurring(tasks)
+      expect(nonRecurring).toHaveLength(
         generalDefaultTasks.length + generalAwarenessTasks.length,
       )
+      expect(recurring.length).toBeGreaterThan(0)
     })
 
     it('distributes only primary when general is past and primary is future', async () => {
@@ -880,8 +899,10 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(primaryDefaultTasks.length)
-      expect(tasks[0].title).toBe(primaryDefaultTasks[0].title)
+      const { nonRecurring, recurring } = splitByRecurring(tasks)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
+      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(recurring.length).toBeGreaterThan(0)
     })
 
     it('assigns dates in chronological order', async () => {
@@ -947,7 +968,7 @@ describe('CampaignTasksService', () => {
       })
     })
 
-    it('treats election date equal to today as future with no awareness tasks', async () => {
+    it('treats election date equal to today as future with no awareness or recurring tasks', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(
@@ -961,6 +982,38 @@ describe('CampaignTasksService', () => {
       tasks.forEach((task) => {
         expect(task.date).toBeInstanceOf(Date)
       })
+    })
+
+    it('generates recurring tasks with correct flowType and dates', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const { recurring } = splitByRecurring(getCreatedTaskData())
+      expect(recurring.length).toBeGreaterThan(0)
+      recurring.forEach((task) => {
+        expect(task.flowType).toBe(CampaignTaskType.recurring)
+        expect(task.date).toBeInstanceOf(Date)
+        expect(task.isDefaultTask).toBe(true)
+      })
+
+      const recurringTitles = new Set(recurring.map((t) => t.title))
+      defaultRecurringTasks.forEach((template) => {
+        expect(recurringTitles.has(template.title)).toBe(true)
+      })
+    })
+
+    it('does not generate recurring tasks when no election dates exist', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(makeCampaign({ details: {} }))
+
+      const { recurring } = splitByRecurring(getCreatedTaskData())
+      expect(recurring).toHaveLength(0)
     })
   })
 
