@@ -9,11 +9,10 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { addDays, getDay, startOfDay, startOfWeek, subWeeks } from 'date-fns'
+import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
-import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
@@ -740,8 +739,15 @@ describe('CampaignTasksService', () => {
       const call = mockTxModel.createMany.mock.calls[0][0] as {
         data: {
           title: string
+          description: string
+          cta: string | null
           date: Date | null
           week: number
+          link: string | undefined
+          proRequired: boolean
+          deadline: number | undefined
+          defaultAiTemplateId: string | undefined
+          completed: boolean
           isDefaultTask: boolean
           campaignId: number
           flowType: CampaignTaskType | null
@@ -984,7 +990,113 @@ describe('CampaignTasksService', () => {
       })
     })
 
-    it('generates recurring tasks with correct flowType and dates', async () => {
+    it('generates weekly recurring tasks on the correct day each week', async () => {
+      const SHORT_ELECTION = '2025-06-15'
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: SHORT_ELECTION },
+        }),
+      )
+
+      const { recurring } = splitByRecurring(getCreatedTaskData())
+      const socialPosts = recurring.filter(
+        (t) => t.title === 'Plan and Schedule 2 Social Posts for the week',
+      )
+      expect(socialPosts).toEqual([
+        {
+          campaignId: 1,
+          title: 'Plan and Schedule 2 Social Posts for the week',
+          description:
+            'Keep your campaign visible! Plan and schedule two social posts to engage supporters and reach more voters.',
+          cta: null,
+          flowType: CampaignTaskType.recurring,
+          week: 2,
+          date: startOfDay(parseIsoDateString('2025-06-06')),
+          link: undefined,
+          proRequired: false,
+          deadline: undefined,
+          defaultAiTemplateId: undefined,
+          completed: false,
+          isDefaultTask: true,
+        },
+        {
+          campaignId: 1,
+          title: 'Plan and Schedule 2 Social Posts for the week',
+          description:
+            'Keep your campaign visible! Plan and schedule two social posts to engage supporters and reach more voters.',
+          cta: null,
+          flowType: CampaignTaskType.recurring,
+          week: 1,
+          date: startOfDay(parseIsoDateString('2025-06-13')),
+          link: undefined,
+          proRequired: false,
+          deadline: undefined,
+          defaultAiTemplateId: undefined,
+          completed: false,
+          isDefaultTask: true,
+        },
+      ])
+    })
+
+    it('generates monthlyNthDay recurring tasks on correct week-of-month occurrences', async () => {
+      const SHORT_ELECTION = '2025-06-22'
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: SHORT_ELECTION },
+        }),
+      )
+
+      const { recurring } = splitByRecurring(getCreatedTaskData())
+      const houseParty = recurring.filter(
+        (t) => t.title === 'Organize a House Party with Supporters',
+      )
+      expect(houseParty).toEqual([
+        {
+          campaignId: 1,
+          title: 'Organize a House Party with Supporters',
+          description:
+            'Work with your supporters to organize an informational house party where you can talk to voters directly.',
+          cta: null,
+          flowType: CampaignTaskType.recurring,
+          week: 3,
+          date: startOfDay(parseIsoDateString('2025-06-04')),
+          link: undefined,
+          proRequired: false,
+          deadline: undefined,
+          defaultAiTemplateId: undefined,
+          completed: false,
+          isDefaultTask: true,
+        },
+      ])
+
+      const fundraiser = recurring.filter(
+        (t) => t.title === 'Organize a Fundraiser',
+      )
+      expect(fundraiser).toEqual([
+        {
+          campaignId: 1,
+          title: 'Organize a Fundraiser',
+          description:
+            'Work with your supporters to plan and organize a fundraiser to get the financial support you need',
+          cta: null,
+          flowType: CampaignTaskType.recurring,
+          week: 2,
+          date: startOfDay(parseIsoDateString('2025-06-10')),
+          link: undefined,
+          proRequired: false,
+          deadline: undefined,
+          defaultAiTemplateId: undefined,
+          completed: false,
+          isDefaultTask: true,
+        },
+      ])
+    })
+
+    it('generates weeksBeforeElection recurring task at the exact computed date', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(
@@ -994,62 +1106,70 @@ describe('CampaignTasksService', () => {
       )
 
       const { recurring } = splitByRecurring(getCreatedTaskData())
-      expect(recurring.length).toBeGreaterThan(0)
+      const lettersToEditor = recurring.filter(
+        (t) =>
+          t.title ===
+          'Submit 2 Letters to the Editor in support of your campaign',
+      )
+      expect(lettersToEditor).toEqual([
+        {
+          campaignId: 1,
+          title: 'Submit 2 Letters to the Editor in support of your campaign',
+          description:
+            'Have some of your supporters write some Letters to the Editor in support of your campaign to the local press.',
+          cta: null,
+          flowType: CampaignTaskType.recurring,
+          week: 4,
+          date: startOfDay(parseIsoDateString('2025-10-09')),
+          link: undefined,
+          proRequired: false,
+          deadline: undefined,
+          defaultAiTemplateId: undefined,
+          completed: false,
+          isDefaultTask: true,
+        },
+      ])
+    })
+
+    it('generates all recurring task templates with correct total counts', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+      )
+
+      const { recurring } = splitByRecurring(getCreatedTaskData())
+      expect(recurring).toHaveLength(125)
+
+      const countByTitle = recurring.reduce<Record<string, number>>(
+        (acc, t) => {
+          acc[t.title] = (acc[t.title] || 0) + 1
+          return acc
+        },
+        {},
+      )
+
+      expect(countByTitle).toEqual({
+        'Plan and Schedule 2 Social Posts for the week': 22,
+        'Social media update': 22,
+        'Fundraising ask': 22,
+        'Email update': 22,
+        'Organize a House Party with Supporters': 5,
+        'Organize a Fundraiser': 10,
+        'Organize a Volunteer Voter Contact Event': 10,
+        'Hold a Volunteer Voter Contact Event': 11,
+        'Submit 2 Letters to the Editor in support of your campaign': 1,
+      })
+
       recurring.forEach((task) => {
         expect(task.flowType).toBe(CampaignTaskType.recurring)
         expect(task.date).toBeInstanceOf(Date)
         expect(task.isDefaultTask).toBe(true)
+        expect(task.campaignId).toBe(1)
+        expect(task.completed).toBe(false)
       })
-
-      const recurringTitles = new Set(recurring.map((t) => t.title))
-      defaultRecurringTasks.forEach((template) => {
-        expect(recurringTitles.has(template.title)).toBe(true)
-      })
-
-      const weeklyTemplate = defaultRecurringTasks.find(
-        (t) => t.recurrence.type === 'weekly',
-      )!
-      const weeklyTasks = recurring.filter(
-        (t) => t.title === weeklyTemplate.title,
-      )
-      expect(weeklyTasks.length).toBeGreaterThan(0)
-      weeklyTasks.forEach((task) => {
-        expect(getDay(task.date!)).toBe(weeklyTemplate.recurrence.dayOfWeek)
-      })
-
-      const monthlyTemplate = defaultRecurringTasks.find(
-        (t) => t.recurrence.type === 'monthlyNthDay',
-      )!
-      const mr = monthlyTemplate.recurrence as {
-        type: 'monthlyNthDay'
-        dayOfWeek: number
-        occurrences: number[]
-      }
-      const monthlyTasks = recurring.filter(
-        (t) => t.title === monthlyTemplate.title,
-      )
-      expect(monthlyTasks.length).toBeGreaterThan(0)
-      monthlyTasks.forEach((task) => {
-        const d = task.date!
-        expect(getDay(d)).toBe(mr.dayOfWeek)
-        const weekOfMonth = Math.ceil(d.getDate() / 7)
-        expect(mr.occurrences).toContain(weekOfMonth)
-      })
-
-      const beTemplate = defaultRecurringTasks.find(
-        (t) => t.recurrence.type === 'weeksBeforeElection',
-      )!
-      const ber = beTemplate.recurrence as {
-        type: 'weeksBeforeElection'
-        dayOfWeek: number
-        weeksBefore: number
-      }
-      const beTasks = recurring.filter((t) => t.title === beTemplate.title)
-      expect(beTasks).toHaveLength(1)
-      const electionDate = startOfDay(parseIsoDateString(FUTURE_GENERAL))
-      const weekRef = subWeeks(electionDate, ber.weeksBefore)
-      const expectedDate = addDays(startOfWeek(weekRef), ber.dayOfWeek)
-      expect(beTasks[0].date!.getTime()).toBe(expectedDate.getTime())
     })
 
     it('does not generate recurring tasks when no election dates exist', async () => {
