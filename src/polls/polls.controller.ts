@@ -150,7 +150,7 @@ export class PollsController {
 
     const [userHasPolls, districtStats] = await Promise.all([
       this.pollsService.hasPolls(electedOffice.id),
-      this.contactService.getDistrictStats(undefined, organization),
+      this.contactService.getDistrictStats(organization),
     ])
     if (userHasPolls) {
       throw new ConflictException(
