@@ -390,7 +390,13 @@ export class CampaignTasksService extends createPrismaBase(
     today: Date,
   ): CampaignTask[] {
     const { details } = campaign
-    if (!details) return generalDefaultTasks
+    if (!details) {
+      return this.distributeTasksOverWindow(
+        generalDefaultTasks,
+        today,
+        addDays(today, MAX_TASK_WINDOW_DAYS),
+      )
+    }
 
     const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
     const generalDate = this.hasFutureDate(details.electionDate, today)
@@ -457,7 +463,13 @@ export class CampaignTasksService extends createPrismaBase(
 
     const hasAnyElectionDate =
       details.primaryElectionDate || details.electionDate
-    return hasAnyElectionDate ? [] : generalDefaultTasks
+    return hasAnyElectionDate
+      ? []
+      : this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          today,
+          addDays(today, MAX_TASK_WINDOW_DAYS),
+        )
   }
 
   private hasFutureDate(
