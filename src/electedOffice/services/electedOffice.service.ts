@@ -15,7 +15,7 @@ import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficeP
 export type CreateElectedOfficeArgs = {
   swornInDate?: Date | null
   userId: number
-  campaignId: number
+  campaignId?: number
   orgData?: {
     positionId: string | null
     customPositionName: string | null
