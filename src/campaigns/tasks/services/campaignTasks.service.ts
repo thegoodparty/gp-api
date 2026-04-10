@@ -360,8 +360,10 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateDefaultTasks(campaign: Campaign) {
-    const today = startOfDay(new Date())
+  async generateDefaultTasks(
+    campaign: Campaign,
+    today = startOfDay(new Date()),
+  ) {
     await this.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
       const existingDefaults = await tx.campaignTask.count({
