@@ -48,8 +48,6 @@ const CampaignDetailsSchema = z
     city: z.string(),
     county: z.string(),
     normalizedOffice: z.string(),
-    office: z.string(),
-    otherOffice: z.string(),
     party: z.string(),
     otherParty: z.string(),
     district: z.string(),
@@ -73,7 +71,6 @@ const CampaignDetailsSchema = z
     officeTermLength: z.string(),
     partisanType: z.string().nullish().optional(),
     priorElectionDates: z.array(z.string()),
-    positionId: z.string().nullish(),
     electionId: z.string().nullish(),
     tier: z.string(),
   })

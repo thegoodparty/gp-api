@@ -15,7 +15,7 @@ export type RequireOrganizationMetadata = {
  * Used when you need Organization data directly (positionId, overrideDistrictId, etc.).
  *
  * For ElectedOffice or Campaign resolution, use @UseElectedOffice() or @UseCampaign()
- * instead — those guards also resolve via the organization header with userId fallback.
+ * instead — those guards also resolve via the `X-Organization-Slug` header.
  */
 export const UseOrganization = (args: RequireOrganizationMetadata = {}) => {
   return applyDecorators(

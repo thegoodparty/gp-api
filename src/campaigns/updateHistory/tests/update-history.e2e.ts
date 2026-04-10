@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
+  authHeaders,
+  campaignOrgSlug,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
@@ -12,6 +14,7 @@ import { CampaignUpdateHistory } from '@prisma/client'
 
 test.describe('Campaigns - Update History', () => {
   let reg: RegisterResponse
+  let orgSlug: string
 
   test.beforeAll(async ({ request }) => {
     reg = await registerUser(request, {
@@ -23,6 +26,7 @@ test.describe('Campaigns - Update History', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    orgSlug = campaignOrgSlug(reg.campaign.id)
   })
 
   test.afterAll(async ({ request }) => {
@@ -33,9 +37,7 @@ test.describe('Campaigns - Update History', () => {
 
   test('should get current user update history', async ({ request }) => {
     const response = await request.get('/v1/campaigns/mine/update-history', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     expect(response.status()).toBe(200)
@@ -50,9 +52,7 @@ test.describe('Campaigns - Update History', () => {
     const quantity = Math.floor(Math.random() * 100) + 1
 
     const response = await request.post('/v1/campaigns/mine/update-history', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
       data: {
         type: 'doorKnocking',
         quantity,
@@ -72,9 +72,7 @@ test.describe('Campaigns - Update History', () => {
     const createResponse = await request.post(
       '/v1/campaigns/mine/update-history',
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
         data: {
           type: 'doorKnocking',
           quantity,
@@ -87,9 +85,7 @@ test.describe('Campaigns - Update History', () => {
     const response = await request.delete(
       `/v1/campaigns/mine/update-history/${created.id}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 
@@ -100,18 +96,14 @@ test.describe('Campaigns - Update History', () => {
     request,
   }) => {
     const slugResponse = await request.get('/v1/campaigns/mine/status', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
     const { slug } = (await slugResponse.json()) as { slug: string }
 
     const response = await request.get(
       `/v1/campaigns/mine/update-history?slug=${slug}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 
@@ -123,6 +115,7 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
   let candidateReg: RegisterResponse
+  let candidateOrgSlug: string
 
   test.beforeAll(async ({ request }) => {
     test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
@@ -136,11 +129,10 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    candidateOrgSlug = campaignOrgSlug(candidateReg.campaign.id)
 
     await request.post('/v1/campaigns/mine/update-history', {
-      headers: {
-        Authorization: `Bearer ${candidateReg.token}`,
-      },
+      headers: authHeaders(candidateReg.token, candidateOrgSlug),
       data: {
         type: 'doorKnocking',
         quantity: 5,
@@ -158,9 +150,7 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
     request,
   }) => {
     const slugResponse = await request.get('/v1/campaigns/mine/status', {
-      headers: {
-        Authorization: `Bearer ${candidateReg.token}`,
-      },
+      headers: authHeaders(candidateReg.token, candidateOrgSlug),
     })
     const { slug } = (await slugResponse.json()) as { slug: string }
 
@@ -173,9 +163,7 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
     const response = await request.get(
       `/v1/campaigns/mine/update-history?slug=${slug}`,
       {
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: authHeaders(adminToken, candidateOrgSlug),
       },
     )
 

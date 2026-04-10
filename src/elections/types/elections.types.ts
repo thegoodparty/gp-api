@@ -68,8 +68,6 @@ export type RaceTargetMetrics = {
 
 export type RaceTargetDetailsResult = RaceTargetMetrics & {
   source: string
-  electionType: string
-  electionLocation: string
   p2vStatus: string
   p2vCompleteDate: string
 }
