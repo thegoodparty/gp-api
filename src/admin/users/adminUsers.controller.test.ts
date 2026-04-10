@@ -150,11 +150,13 @@ describe('AdminUsersController', () => {
     })
 
     it('throws BadRequestException when no actorClerkId can be resolved', async () => {
-      const req = { user: { ...mockUser, clerkId: null } } as unknown as IncomingRequest
+      const req = {
+        user: { ...mockUser, clerkId: null },
+      } as unknown as IncomingRequest
 
-      await expect(
-        controller.impersonate(42, req, {}),
-      ).rejects.toThrow(BadRequestException)
+      await expect(controller.impersonate(42, req, {})).rejects.toThrow(
+        BadRequestException,
+      )
 
       expect(usersService.findUniqueOrThrow).not.toHaveBeenCalled()
       expect(usersService.impersonateUser).not.toHaveBeenCalled()
@@ -163,9 +165,9 @@ describe('AdminUsersController', () => {
     it('throws BadRequestException with descriptive message when actorClerkId is missing', async () => {
       const req = { user: undefined } as IncomingRequest
 
-      await expect(
-        controller.impersonate(42, req, {}),
-      ).rejects.toThrow('actorClerkId is required when using M2M auth')
+      await expect(controller.impersonate(42, req, {})).rejects.toThrow(
+        'actorClerkId is required when using M2M auth',
+      )
     })
 
     it('looks up target user by the path param id before impersonating', async () => {
