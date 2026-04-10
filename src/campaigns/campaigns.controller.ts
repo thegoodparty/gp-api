@@ -156,22 +156,13 @@ export class CampaignsController {
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    const ballotReadyPositionId =
-      body.ballotReadyPositionId ?? body.details?.positionId ?? undefined
-
-    const customPositionName =
-      body.customPositionName ??
-      (!ballotReadyPositionId
-        ? (OrganizationsService.resolveCustomPositionName(
-            body.details?.office,
-            body.details?.otherOffice,
-          ) ?? undefined)
-        : undefined)
-
     return this.campaigns.createForUser(
       user,
       { details: body.details, data: body.data },
-      { ballotReadyPositionId, customPositionName },
+      {
+        ballotReadyPositionId: body.ballotReadyPositionId ?? undefined,
+        customPositionName: body.customPositionName ?? undefined,
+      },
     )
   }
 
@@ -200,11 +191,10 @@ export class CampaignsController {
       })
 
       if (body?.details) {
-        const { city, office, electionDate, pledged, party } = body.details
+        const { city, electionDate, pledged, party } = body.details
 
         await this.analytics.identify(campaign.userId, {
           ...(city && { officeMunicipality: city }),
-          ...(office && { officeName: office }),
           ...(electionDate && { officeElectionDate: electionDate }),
           ...(party && { affiliation: party }),
           ...(pledged && { pledged }),
@@ -383,7 +373,7 @@ export class CampaignsController {
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
-        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+        `Error: The campaign's organization has no BallotReady position or the campaign has no electionDate — the candidate likely hasn't selected an office yet`,
       )
     }
 
@@ -459,7 +449,7 @@ export class CampaignsController {
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
-        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+        `Error: The campaign's organization has no BallotReady position or the campaign has no electionDate — the candidate likely hasn't selected an office yet`,
       )
     }
     const raceTargetDetails = await this.elections

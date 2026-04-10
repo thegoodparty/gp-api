@@ -157,38 +157,17 @@ describe('UseElectedOfficeGuard', () => {
     })
   })
 
-  describe('step 2: legacy fallback (userId)', () => {
-    it('resolves EO by userId when no header', async () => {
+  describe('no header behavior', () => {
+    it('throws NotFoundException when no header and no continueIfNotFound', async () => {
       mockMetadata()
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
-
-      const ctx = buildContext()
-      const result = await guard.canActivate(ctx)
-
-      expect(result).toBe(true)
-      expect(mockOrgFindFirst).not.toHaveBeenCalled()
-      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1 },
-        include: undefined,
-      })
-      const req = ctx.switchToHttp().getRequest() as {
-        electedOffice?: ElectedOffice
-      }
-      expect(req.electedOffice).toEqual(mockEO)
-    })
-
-    it('throws NotFoundException when no EO found at all', async () => {
-      mockMetadata()
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
 
       const ctx = buildContext()
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
     })
 
-    it('returns true when continueIfNotFound and no EO found', async () => {
+    it('returns true when continueIfNotFound and no header', async () => {
       mockMetadata({ continueIfNotFound: true })
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
 
       const ctx = buildContext()
       const result = await guard.canActivate(ctx)

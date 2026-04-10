@@ -50,16 +50,9 @@ describe('UseElectedOffice guard (integration)', () => {
     return { org, eo }
   }
 
-  describe('legacy fallback (no header)', () => {
-    it('resolves elected office by userId', async () => {
+  describe('no header', () => {
+    it('returns 404 when no org header is provided (even if user has an elected office)', async () => {
       await createElectedOfficeWithOrg()
-      const result = await service.client.get('/v1/polls/has-polls')
-
-      expect(result.status).toBe(200)
-      expect(result.data).toEqual({ hasPolls: false })
-    })
-
-    it('returns 404 when user has no active elected office', async () => {
       const result = await service.client.get('/v1/polls/has-polls')
 
       expect(result.status).toBe(404)

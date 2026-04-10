@@ -10,7 +10,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { CampaignWith } from '../campaigns.types'
 import {
   REQUIRE_CAMPAIGN_META_KEY,
-  RequireCamapaignMetadata,
+  RequireCampaignMetadata,
 } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
@@ -21,11 +21,8 @@ const isUser = (value: object): value is User =>
 /**
  * Guard that resolves a Campaign and attaches it to the request.
  *
- * Resolution order:
- * 1. `X-Organization-Slug` header — look up Organization, get its campaign.
- * 2. Legacy fallback — find campaign by userId.
- *
- * Once all requests include the organization header, the legacy fallback can be removed.
+ * Requires the `X-Organization-Slug` header. Looks up the Organization by slug
+ * and owner, then fetches the associated campaign.
  */
 @Injectable()
 export class UseCampaignGuard implements CanActivate {
@@ -41,13 +38,12 @@ export class UseCampaignGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>
-      params: { slug: string }
       campaign?: Campaign
       user: { id: number }
     }>()
 
     const { continueIfNotFound, include: campaignInclude } =
-      this.reflector.getAllAndOverride<RequireCamapaignMetadata>(
+      this.reflector.getAllAndOverride<RequireCampaignMetadata>(
         REQUIRE_CAMPAIGN_META_KEY,
         [context.getHandler(), context.getClass()],
       )
@@ -56,7 +52,6 @@ export class UseCampaignGuard implements CanActivate {
     const include = campaignInclude ?? { pathToVictory: true }
     let campaign: Campaign | null = null
 
-    // Step 1: Try x-organization-slug header
     const slug = request.headers['x-organization-slug']
     if (typeof slug === 'string') {
       const [org, cam] = await Promise.all([
@@ -71,8 +66,6 @@ export class UseCampaignGuard implements CanActivate {
       if (org && cam) {
         campaign = cam
       }
-    } else {
-      campaign = await this.campaignsService.findByUserId(userId, include)
     }
 
     if (campaign) {

@@ -5,6 +5,8 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { Prisma } from '@prisma/client'
 
@@ -54,19 +56,16 @@ test.describe('Websites - Vanity Path', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `unique-path-${Date.now()}`
 
     const response = await request.post('/v1/websites/validate-vanity-path', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       data: {
         vanityPath,
       },
@@ -95,18 +94,16 @@ test.describe('Websites - Vanity Path', () => {
       signUpMode: 'candidate',
     })
 
+    const orgSlug1 = campaignOrgSlug(registerResponse1.campaign.id)
+
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${registerResponse1.token}`,
-      },
+      headers: authHeaders(registerResponse1.token, orgSlug1),
     })
 
     const vanityPath = `shared-path-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse1.token}`,
-      },
+      headers: authHeaders(registerResponse1.token, orgSlug1),
       multipart: {
         vanityPath,
       },
@@ -124,17 +121,14 @@ test.describe('Websites - Vanity Path', () => {
 
     testUserId = registerResponse2.user.id
     authToken = registerResponse2.token
+    const orgSlug2 = campaignOrgSlug(registerResponse2.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug2),
     })
 
     const response = await request.post('/v1/websites/validate-vanity-path', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug2),
       data: {
         vanityPath,
       },
@@ -170,19 +164,16 @@ test.describe('Websites - Vanity Path', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `view-path-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -221,19 +212,16 @@ test.describe('Websites - Vanity Path', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `unpublished-path-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'unpublished',

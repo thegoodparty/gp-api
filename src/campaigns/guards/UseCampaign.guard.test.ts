@@ -4,7 +4,7 @@ import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Campaign } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { RequireCamapaignMetadata } from '../decorators/UseCampaign.decorator'
+import { RequireCampaignMetadata } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'
 import { UseCampaignGuard } from './UseCampaign.guard'
 
@@ -41,7 +41,7 @@ describe('UseCampaignGuard', () => {
     } as unknown as ExecutionContext
   }
 
-  function mockMetadata(meta: RequireCamapaignMetadata = {}) {
+  function mockMetadata(meta: RequireCampaignMetadata = {}) {
     vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(meta)
   }
 
@@ -50,7 +50,6 @@ describe('UseCampaignGuard', () => {
 
     campaignsService = {
       findFirst: vi.fn(),
-      findByUserId: vi.fn(),
       client: {
         organization: {
           findFirst: mockOrgFindFirst,
@@ -122,7 +121,6 @@ describe('UseCampaignGuard', () => {
       })
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
-      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
 
     it('throws NotFoundException when org not found', async () => {
@@ -135,7 +133,6 @@ describe('UseCampaignGuard', () => {
       })
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
-      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
 
     it('throws NotFoundException when ownerId does not match', async () => {
@@ -152,54 +149,20 @@ describe('UseCampaignGuard', () => {
       expect(mockOrgFindFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 999 },
       })
-      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
-    })
-
-    it('does not call findByUserId when org header resolves campaign', async () => {
-      mockMetadata()
-      mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
-      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(mockCampaign)
-
-      const ctx = buildContext({
-        headers: { 'x-organization-slug': 'campaign-100' },
-      })
-      await guard.canActivate(ctx)
-
-      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
   })
 
-  describe('step 2: legacy fallback (findByUserId)', () => {
-    it('resolves campaign by userId when no header', async () => {
+  describe('no header behavior', () => {
+    it('throws NotFoundException when no header and no continueIfNotFound', async () => {
       mockMetadata()
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
-
-      const ctx = buildContext()
-      const result = await guard.canActivate(ctx)
-
-      expect(result).toBe(true)
-      expect(mockOrgFindFirst).not.toHaveBeenCalled()
-      expect(campaignsService.findByUserId).toHaveBeenCalledWith(1, {
-        pathToVictory: true,
-      })
-      const req = ctx.switchToHttp().getRequest() as {
-        campaign?: Campaign
-      }
-      expect(req.campaign).toEqual(mockCampaign)
-    })
-
-    it('throws NotFoundException when no campaign found', async () => {
-      mockMetadata()
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null)
 
       const ctx = buildContext()
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
     })
 
-    it('returns true when continueIfNotFound and no campaign found', async () => {
+    it('returns true when continueIfNotFound and no header', async () => {
       mockMetadata({ continueIfNotFound: true })
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null)
 
       const ctx = buildContext()
       const result = await guard.canActivate(ctx)

@@ -6,9 +6,16 @@ import {
   generateRandomName,
   generateRandomPassword,
   loginUser,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
-import { updateCampaignWithRetry } from '../../../e2e-tests/utils/request.util'
+import {
+  assertResponseOk,
+  updateCampaignWithRetry,
+} from '../../../e2e-tests/utils/request.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
+
+const E2E_POSITION_ID = 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM='
 
 test.describe('Campaigns - Race Target Details', () => {
   let currentUser: { id: number; token: string } | undefined
@@ -43,18 +50,25 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     }
 
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
+    const headers = authHeaders(registerResponse.token, orgSlug)
+
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
+    })
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
     const updateResponse = await updateCampaignWithRetry(
       request,
       registerResponse.token,
       {
         details: {
-          office: 'Other',
-          otherOffice: 'Creola City Mayor',
           state: 'GA',
           electionDate: '2025-11-03',
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
         },
       },
+      orgSlug,
     )
 
     expect(updateResponse.status()).toBe(200)
@@ -83,23 +97,30 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     }
 
-    await updateCampaignWithRetry(request, registerResponse.token, {
-      details: {
-        office: 'Other',
-        otherOffice: 'Creola City Mayor',
-        state: 'GA',
-        electionDate: '2025-11-03',
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-      },
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
+    const headers = authHeaders(registerResponse.token, orgSlug)
+
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
     })
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
+    await updateCampaignWithRetry(
+      request,
+      registerResponse.token,
+      {
+        details: {
+          state: 'GA',
+          electionDate: '2025-11-03',
+        },
+      },
+      orgSlug,
+    )
 
     const response = await request.put(
       '/v1/campaigns/mine/race-target-details',
-      {
-        headers: {
-          Authorization: `Bearer ${registerResponse.token}`,
-        },
-      },
+      { headers },
     )
 
     expect([200, 404, 502]).toContain(response.status())
@@ -142,20 +163,29 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     }
 
-    await updateCampaignWithRetry(request, registerResponse.token, {
-      details: {
-        office: 'Other',
-        otherOffice: 'Creola City Mayor',
-        state: 'GA',
-        electionDate: '2025-11-03',
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-      },
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
+    const headers = authHeaders(registerResponse.token, orgSlug)
+
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
     })
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
+    await updateCampaignWithRetry(
+      request,
+      registerResponse.token,
+      {
+        details: {
+          state: 'GA',
+          electionDate: '2025-11-03',
+        },
+      },
+      orgSlug,
+    )
 
     const response = await request.put('/v1/campaigns/mine/district', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
+      headers: authHeaders(registerResponse.token, orgSlug),
       data: {
         L2DistrictType: 'Town_District',
         L2DistrictName: 'CREOLOA TOWN',
@@ -219,15 +249,26 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     }
     testSlug = registerResponse.campaign.slug
 
-    await updateCampaignWithRetry(request, registerResponse.token, {
-      details: {
-        office: 'Other',
-        otherOffice: 'Creola City Mayor',
-        state: 'GA',
-        electionDate: '2025-11-03',
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-      },
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
+    const headers = authHeaders(registerResponse.token, orgSlug)
+
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
     })
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
+    await updateCampaignWithRetry(
+      request,
+      registerResponse.token,
+      {
+        details: {
+          state: 'GA',
+          electionDate: '2025-11-03',
+        },
+      },
+      orgSlug,
+    )
 
     const response = await request.put(
       `/v1/campaigns/admin/${testSlug}/race-target-details`,
@@ -277,15 +318,26 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     }
     testSlug = registerResponse.campaign.slug
 
-    await updateCampaignWithRetry(request, registerResponse.token, {
-      details: {
-        office: 'Other',
-        otherOffice: 'Creola City Mayor',
-        state: 'GA',
-        electionDate: '2025-11-03',
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-      },
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
+    const headers = authHeaders(registerResponse.token, orgSlug)
+
+    const patchOrgRes = await request.patch(`/v1/organizations/${orgSlug}`, {
+      headers,
+      data: { ballotReadyPositionId: E2E_POSITION_ID },
     })
+    await assertResponseOk(patchOrgRes, 'Org position update failed')
+
+    await updateCampaignWithRetry(
+      request,
+      registerResponse.token,
+      {
+        details: {
+          state: 'GA',
+          electionDate: '2025-11-03',
+        },
+      },
+      orgSlug,
+    )
 
     const { token: adminToken } = await loginUser(
       request,

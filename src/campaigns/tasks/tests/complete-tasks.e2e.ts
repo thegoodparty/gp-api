@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
+  authHeaders,
+  campaignOrgSlug,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
@@ -16,6 +18,7 @@ type CampaignTaskWithCompletion = CampaignTask & { completed: boolean }
 
 test.describe('Campaigns Tasks - Complete Tasks', () => {
   let reg: RegisterResponse
+  let orgSlug: string
   let testTaskId: string
 
   test.beforeAll(async ({ request }) => {
@@ -29,11 +32,10 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    orgSlug = campaignOrgSlug(reg.campaign.id)
 
     const generateResponse = await request.post(`${TASKS_BASE_PATH}/generate`, {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
     expect(generateResponse.status()).toBe(HttpStatus.ACCEPTED)
 
@@ -41,9 +43,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       .poll(
         async () => {
           const response = await request.get(TASKS_BASE_PATH, {
-            headers: {
-              Authorization: `Bearer ${reg.token}`,
-            },
+            headers: authHeaders(reg.token, orgSlug),
           })
           expect(response.status()).toBe(HttpStatus.OK)
           const tasks = (await response.json()) as CampaignTask[]
@@ -68,9 +68,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     const listResponse = await request.get(
       `${TASKS_BASE_PATH}?date=${date}&endDate=${endDate}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 
@@ -80,9 +78,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     const response = await request.put(
       `${TASKS_BASE_PATH}/complete/${testTaskId}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 
@@ -101,9 +97,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     const listResponse = await request.get(
       `${TASKS_BASE_PATH}?date=${date}&endDate=${endDate}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 
@@ -111,17 +105,13 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     testTaskId = tasks[0].id
 
     await request.put(`${TASKS_BASE_PATH}/complete/${testTaskId}`, {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     const response = await request.delete(
       `${TASKS_BASE_PATH}/complete/${testTaskId}`,
       {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
+        headers: authHeaders(reg.token, orgSlug),
       },
     )
 

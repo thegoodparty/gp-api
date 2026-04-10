@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export class PatchOrganizationDto extends createZodDto(
   z.object({
-    ballotReadyPositionId: z.string().optional(),
+    ballotReadyPositionId: z.string().nullable().optional(),
     overrideDistrictId: z.string().nullable().optional(),
     customPositionName: z.string().nullable().optional(),
   }),

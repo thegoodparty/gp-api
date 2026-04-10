@@ -36,8 +36,6 @@ function mockRaceTargetResult(
     winNumber: 0,
     voterContactGoal: 0,
     source: 'test',
-    electionType: 'General',
-    electionLocation: 'Test Location',
     p2vStatus: 'Complete',
     p2vCompleteDate: '2025-01-01',
     ...overrides,
@@ -491,58 +489,6 @@ describe('CampaignsController', () => {
       )
       expect(result).toEqual(mockCampaign)
     })
-
-    it('falls back to details.positionId when top-level field absent', async () => {
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null!)
-      vi.spyOn(campaignsService, 'createForUser').mockResolvedValue(
-        mockCampaign,
-      )
-
-      const legacyBody = {
-        details: {
-          state: 'CA',
-          positionId: 'legacy-pos-1',
-          office: 'Other',
-          otherOffice: 'Mayor',
-        },
-      } as CreateCampaignSchema
-
-      await controller.create(mockUser, legacyBody)
-
-      expect(campaignsService.createForUser).toHaveBeenCalledWith(
-        mockUser,
-        { details: legacyBody.details, data: undefined },
-        {
-          ballotReadyPositionId: 'legacy-pos-1',
-          customPositionName: undefined,
-        },
-      )
-    })
-
-    it('falls back to details.office for customPositionName when no positionId', async () => {
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(null!)
-      vi.spyOn(campaignsService, 'createForUser').mockResolvedValue(
-        mockCampaign,
-      )
-
-      const legacyBody = {
-        details: {
-          state: 'CA',
-          office: 'City Council',
-        },
-      } as CreateCampaignSchema
-
-      await controller.create(mockUser, legacyBody)
-
-      expect(campaignsService.createForUser).toHaveBeenCalledWith(
-        mockUser,
-        { details: legacyBody.details, data: undefined },
-        {
-          ballotReadyPositionId: undefined,
-          customPositionName: 'City Council',
-        },
-      )
-    })
   })
 
   describe('update', () => {
@@ -650,7 +596,6 @@ describe('CampaignsController', () => {
 
       expect(analyticsService.identify).toHaveBeenCalledWith(5, {
         officeMunicipality: 'Springfield',
-        officeName: 'Mayor',
         officeElectionDate: '2025-11-04',
         affiliation: 'Independent',
         pledged: true,
@@ -1235,7 +1180,7 @@ describe('CampaignsController', () => {
     it('throws BadRequestException when no electionDate', async () => {
       const campaign: Campaign = {
         ...mockCampaign,
-        details: { positionId: 'pos-1' } as unknown as Campaign['details'],
+        details: {} as Campaign['details'],
       }
 
       await expect(

@@ -51,10 +51,14 @@ export async function updateCampaignWithRetry(
   request: APIRequestContext,
   token: string,
   data: Record<string, unknown>,
+  orgSlug?: string,
 ): Promise<APIResponse> {
   return retryOnConflict(() =>
     request.put('/v1/campaigns/mine', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(orgSlug && { 'x-organization-slug': orgSlug }),
+      },
       data,
     }),
   )

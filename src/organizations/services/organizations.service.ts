@@ -109,14 +109,18 @@ export class OrganizationsService extends createPrismaBase(
 
     let position: { id: string } | null = org.position
 
-    if (updates.ballotReadyPositionId) {
-      position = await this.electionsService.getPositionByBallotReadyId(
-        updates.ballotReadyPositionId,
-        { includeDistrict: true },
-      )
+    if ('ballotReadyPositionId' in updates) {
+      if (updates.ballotReadyPositionId === null) {
+        position = null
+      } else if (updates.ballotReadyPositionId) {
+        position = await this.electionsService.getPositionByBallotReadyId(
+          updates.ballotReadyPositionId,
+          { includeDistrict: true },
+        )
 
-      if (!position) {
-        throw new BadRequestException('Position not found')
+        if (!position) {
+          throw new BadRequestException('Position not found')
+        }
       }
     }
 
