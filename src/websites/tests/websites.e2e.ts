@@ -5,11 +5,14 @@ import {
   deleteUser,
   generateRandomEmail,
   generateRandomName,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 
 test.describe('Candidate Website', () => {
   let authToken: string
+  let orgSlug: string
   let testUserId: number
   let testAuthToken: string
 
@@ -25,6 +28,7 @@ test.describe('Candidate Website', () => {
     })
 
     authToken = registerResponse.token
+    orgSlug = campaignOrgSlug(registerResponse.campaign.id)
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
   })
@@ -37,9 +41,7 @@ test.describe('Candidate Website', () => {
 
   test('should create a website', async ({ request }) => {
     const response = await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     expect(response.status()).toBe(HttpStatus.CREATED)
@@ -54,14 +56,12 @@ test.describe('Candidate Website', () => {
 
   test('should update website content', async ({ request }) => {
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const updateResponse = await request.put('/v1/websites/mine', {
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        ...authHeaders(authToken, orgSlug),
         'Content-Type': 'application/json',
       },
       data: {
@@ -77,17 +77,13 @@ test.describe('Candidate Website', () => {
 
   test('should validate vanity path', async ({ request }) => {
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `test-${Date.now()}`
 
     const response = await request.post('/v1/websites/validate-vanity-path', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       data: {
         vanityPath,
       },
@@ -101,16 +97,14 @@ test.describe('Candidate Website', () => {
 
   test('should get website by vanity path', async ({ request }) => {
     const createResponse = await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const website = (await createResponse.json()) as { vanityPath: string }
 
     await request.put('/v1/websites/mine', {
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        ...authHeaders(authToken, orgSlug),
         'Content-Type': 'application/json',
       },
       data: {

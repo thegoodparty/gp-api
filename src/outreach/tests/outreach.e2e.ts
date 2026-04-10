@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import { OutreachType } from '@prisma/client'
 import {
+  authHeaders,
+  campaignOrgSlug,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
@@ -22,6 +24,7 @@ interface Outreach {
 
 test.describe('Outreach', () => {
   let reg: RegisterResponse
+  let orgSlug: string
 
   test.beforeAll(async ({ request }) => {
     reg = await registerUser(request, {
@@ -33,6 +36,7 @@ test.describe('Outreach', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    orgSlug = campaignOrgSlug(reg.campaign.id)
   })
 
   test.afterAll(async ({ request }) => {
@@ -45,9 +49,7 @@ test.describe('Outreach', () => {
     request,
   }) => {
     const response = await request.get('/v1/outreach', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
     })
 
     expect([HttpStatus.OK, HttpStatus.NOT_FOUND]).toContain(response.status())
@@ -88,6 +90,7 @@ test.describe('Outreach', () => {
 
 test.describe('Outreach - Validation', () => {
   let reg: RegisterResponse
+  let orgSlug: string
 
   test.beforeAll(async ({ request }) => {
     reg = await registerUser(request, {
@@ -99,6 +102,7 @@ test.describe('Outreach - Validation', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+    orgSlug = campaignOrgSlug(reg.campaign.id)
   })
 
   test.afterAll(async ({ request }) => {
@@ -109,9 +113,7 @@ test.describe('Outreach - Validation', () => {
 
   test('should reject POST without required fields', async ({ request }) => {
     const response = await request.post('/v1/outreach', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
       data: {},
     })
 
@@ -122,9 +124,7 @@ test.describe('Outreach - Validation', () => {
     request,
   }) => {
     const response = await request.post('/v1/outreach', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+      headers: authHeaders(reg.token, orgSlug),
       data: {
         campaignId: reg.campaign.id,
         outreachType: OutreachType.p2p,

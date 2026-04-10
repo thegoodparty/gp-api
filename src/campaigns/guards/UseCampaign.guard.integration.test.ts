@@ -29,18 +29,10 @@ describe('UseCampaign guard (integration)', () => {
     return { org, campaign }
   }
 
-  describe('legacy fallback (no header)', () => {
-    it('resolves campaign by userId', async () => {
-      const { campaign } = await createCampaignWithOrg('legacy')
+  describe('no header', () => {
+    it('returns 404 when no org header is provided (even if user has a campaign)', async () => {
+      await createCampaignWithOrg('no-header')
 
-      const result = await service.client.get('/v1/campaigns/mine')
-
-      expect(result.status).toBe(200)
-      expect(result.data.slug).toBe(campaign.slug)
-      expect(result.data.id).toBe(campaign.id)
-    })
-
-    it('returns 404 when user has no campaign', async () => {
       const result = await service.client.get('/v1/campaigns/mine')
 
       expect(result.status).toBe(404)
