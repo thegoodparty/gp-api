@@ -9,7 +9,7 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { startOfDay } from 'date-fns'
+import { addDays, getDay, startOfDay, startOfWeek, subWeeks } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { CampaignTask } from '../campaignTasks.types'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
@@ -1005,6 +1005,51 @@ describe('CampaignTasksService', () => {
       defaultRecurringTasks.forEach((template) => {
         expect(recurringTitles.has(template.title)).toBe(true)
       })
+
+      const weeklyTemplate = defaultRecurringTasks.find(
+        (t) => t.recurrence.type === 'weekly',
+      )!
+      const weeklyTasks = recurring.filter(
+        (t) => t.title === weeklyTemplate.title,
+      )
+      expect(weeklyTasks.length).toBeGreaterThan(0)
+      weeklyTasks.forEach((task) => {
+        expect(getDay(task.date!)).toBe(weeklyTemplate.recurrence.dayOfWeek)
+      })
+
+      const monthlyTemplate = defaultRecurringTasks.find(
+        (t) => t.recurrence.type === 'monthlyNthDay',
+      )!
+      const mr = monthlyTemplate.recurrence as {
+        type: 'monthlyNthDay'
+        dayOfWeek: number
+        occurrences: number[]
+      }
+      const monthlyTasks = recurring.filter(
+        (t) => t.title === monthlyTemplate.title,
+      )
+      expect(monthlyTasks.length).toBeGreaterThan(0)
+      monthlyTasks.forEach((task) => {
+        const d = task.date!
+        expect(getDay(d)).toBe(mr.dayOfWeek)
+        const weekOfMonth = Math.ceil(d.getDate() / 7)
+        expect(mr.occurrences).toContain(weekOfMonth)
+      })
+
+      const beTemplate = defaultRecurringTasks.find(
+        (t) => t.recurrence.type === 'weeksBeforeElection',
+      )!
+      const ber = beTemplate.recurrence as {
+        type: 'weeksBeforeElection'
+        dayOfWeek: number
+        weeksBefore: number
+      }
+      const beTasks = recurring.filter((t) => t.title === beTemplate.title)
+      expect(beTasks).toHaveLength(1)
+      const electionDate = startOfDay(parseIsoDateString(FUTURE_GENERAL))
+      const weekRef = subWeeks(electionDate, ber.weeksBefore)
+      const expectedDate = addDays(startOfWeek(weekRef), ber.dayOfWeek)
+      expect(beTasks[0].date!.getTime()).toBe(expectedDate.getTime())
     })
 
     it('does not generate recurring tasks when no election dates exist', async () => {
