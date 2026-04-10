@@ -499,7 +499,6 @@ export class QueueConsumerService {
 
     const constituency = await this.contactsService.findContacts(
       { segment: 'all', resultsPerPage: 5, page: 1 },
-      campaign,
       organization,
     )
 
@@ -792,7 +791,6 @@ export class QueueConsumerService {
       )
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
-        campaign,
         organization,
       )
       if (sample.length === 0) {

@@ -1,4 +1,3 @@
-import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -7,13 +6,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Organization } from '@prisma/client'
+import { Organization } from '@prisma/client'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { PinoLogger } from 'nestjs-pino'
 import { Readable } from 'node:stream'
 import { lastValueFrom } from 'rxjs'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { StatsResponse } from '../contacts.types'
@@ -46,6 +46,7 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
+    private readonly campaigns: CampaignsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(ContactsService.name)
@@ -55,88 +56,59 @@ export class ContactsService {
     return organization.slug.startsWith('eo-')
   }
 
+  private async isProAccess(organization: Organization): Promise<boolean> {
+    if (this.hasElectedOfficeAccess(organization)) return true
+    const campaign = await this.campaigns.findFirst({
+      where: { organizationSlug: organization.slug },
+      select: { isPro: true },
+    })
+    return campaign?.isPro ?? false
+  }
+
   private async resolveDistrictInfoFromOrg(
     org: Organization,
-  ): Promise<{ districtId: string | null; state: string | null }> {
+  ): Promise<{ districtId: string | null }> {
     if (org.overrideDistrictId) {
-      return { districtId: org.overrideDistrictId, state: null }
+      return { districtId: org.overrideDistrictId }
     }
 
     if (org.positionId) {
       const position = await this.elections.getPositionById(org.positionId, {
         includeDistrict: true,
       })
-      return {
-        districtId: position?.district?.id ?? null,
-        state: position?.state ?? null,
-      }
+      return { districtId: position?.district?.id ?? null }
     }
 
-    return { districtId: null, state: null }
+    return { districtId: null }
   }
 
   private async withOrgDistrictResolution<Result>(
     org: Organization,
-    campaign: Campaign | undefined,
-    fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
+    fn: (params: { districtId: string }) => Promise<Result>,
   ): Promise<Result> {
-    const resolved = await this.resolveDistrictInfoFromOrg(org)
-    const districtId = resolved.districtId
-    let state = resolved.state
-    const canDownloadFederal = Boolean(campaign?.canDownloadFederal)
+    const { districtId } = await this.resolveDistrictInfoFromOrg(org)
 
-    if (!districtId && !state && campaign?.details) {
-      const details = campaign.details as {
-        state?: string
-        ballotLevel?: BallotReadyPositionLevel
-      }
-      const level = details.ballotLevel
-      if (
-        details.state &&
-        typeof details.state === 'string' &&
-        details.state.length === 2 &&
-        (level === BallotReadyPositionLevel.STATE ||
-          level === BallotReadyPositionLevel.FEDERAL) &&
-        canDownloadFederal
-      ) {
-        state = details.state.toUpperCase()
-      }
-    }
-
-    if (districtId) {
-      return fn({ districtId })
-    }
-
-    if (!state) {
+    if (!districtId) {
       throw new BadRequestException(
         'Organization does not have sufficient data to resolve district',
       )
     }
-    if (!canDownloadFederal) {
-      throw new BadRequestException(
-        'Statewide or federal contacts require admin approval',
-      )
-    }
-    return fn({ state })
+
+    return fn({ districtId })
   }
 
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
-    campaign: Campaign | undefined,
     organization: Organization,
   ) {
-    if (
-      search &&
-      !(campaign?.isPro ?? false) &&
-      !this.hasElectedOfficeAccess(organization)
-    ) {
+    if (search && !(await this.isProAccess(organization))) {
       throw new BadRequestException(
         'Search is only available for pro campaigns',
       )
     }
 
     const fetchPeople = async (
-      districtParams: { districtId?: string; state?: string },
+      districtParams: { districtId: string },
       filters: FilterObject,
     ) => {
       try {
@@ -165,20 +137,13 @@ export class ContactsService {
     }
 
     const filters = await this.segmentToFilters(segment, organization)
-    return this.withOrgDistrictResolution(organization, campaign, (params) =>
+    return this.withOrgDistrictResolution(organization, (params) =>
       fetchPeople(params, filters),
     )
   }
 
-  async sampleContacts(
-    dto: SampleContacts,
-    campaign: Campaign,
-    organization: Organization,
-  ) {
-    const fetchSample = async (districtParams: {
-      districtId?: string
-      state?: string
-    }) => {
+  async sampleContacts(dto: SampleContacts, organization: Organization) {
+    const fetchSample = async (districtParams: { districtId: string }) => {
       const body = {
         ...districtParams,
         size: String(dto.size ?? 500),
@@ -211,18 +176,14 @@ export class ContactsService {
       }
     }
 
-    return this.withOrgDistrictResolution(organization, campaign, fetchSample)
+    return this.withOrgDistrictResolution(organization, fetchSample)
   }
 
   async findPerson(
     id: string,
-    campaign: Campaign | undefined,
     organization: Organization,
   ): Promise<PersonOutput> {
-    const fetchPerson = async (districtParams: {
-      districtId?: string
-      state?: string
-    }) => {
+    const fetchPerson = async (districtParams: { districtId: string }) => {
       try {
         const response = await lastValueFrom(
           this.httpService.get<PersonOutput>(
@@ -254,24 +215,20 @@ export class ContactsService {
       }
     }
 
-    return this.withOrgDistrictResolution(organization, campaign, fetchPerson)
+    return this.withOrgDistrictResolution(organization, fetchPerson)
   }
 
   async downloadContacts(
     { segment }: DownloadContactsDTO,
-    campaign: Campaign | undefined,
     res: FastifyReply,
     organization: Organization,
   ) {
-    if (
-      !(campaign?.isPro ?? false) &&
-      !this.hasElectedOfficeAccess(organization)
-    ) {
+    if (!(await this.isProAccess(organization))) {
       throw new BadRequestException('Campaign is not pro')
     }
 
     const downloadPeople = async (
-      districtParams: { districtId?: string; state?: string },
+      districtParams: { districtId: string },
       filters: FilterObject,
     ) => {
       try {
@@ -306,19 +263,13 @@ export class ContactsService {
     }
 
     const filters = await this.segmentToFilters(segment, organization)
-    return this.withOrgDistrictResolution(organization, campaign, (params) =>
+    return this.withOrgDistrictResolution(organization, (params) =>
       downloadPeople(params, filters),
     )
   }
 
-  async getDistrictStats(
-    campaign: Campaign | undefined,
-    organization: Organization,
-  ) {
-    const fetchStats = async (districtParams: {
-      districtId?: string
-      state?: string
-    }) => {
+  async getDistrictStats(organization: Organization) {
+    const fetchStats = async (districtParams: { districtId: string }) => {
       const token = this.getValidS2SToken()
 
       const response = await lastValueFrom(
@@ -334,7 +285,7 @@ export class ContactsService {
       return response.data
     }
 
-    return this.withOrgDistrictResolution(organization, campaign, fetchStats)
+    return this.withOrgDistrictResolution(organization, fetchStats)
   }
 
   private getValidS2SToken(): string {

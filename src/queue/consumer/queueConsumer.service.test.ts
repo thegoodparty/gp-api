@@ -930,7 +930,6 @@ describe('QueueConsumerService - triggerPollExecution', () => {
         size: 1000 - existingRecords.length,
         excludeIds: ['person-existing-1', 'person-existing-2'],
       },
-      expect.anything(),
       expect.objectContaining({ slug: 'eo-office-1' }),
     )
   })
