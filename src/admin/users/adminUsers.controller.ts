@@ -90,6 +90,11 @@ export class AdminUsersController {
       )
     }
 
+    this.logger.info(
+      { targetUserId: id, actorClerkId, authSource: req.user ? 'user' : 'm2m' },
+      'Impersonation request received',
+    )
+
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })
     return this.usersService.impersonateUser(user.id, actorClerkId)
   }

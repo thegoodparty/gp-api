@@ -370,7 +370,21 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       return { token }
     } catch (err) {
       this.logger.error(
-        { err, userId, clerkId: user.clerkId },
+        {
+          err,
+          userId,
+          targetClerkId: user.clerkId,
+          actorClerkId,
+          clerkStatus:
+            err instanceof Error
+              ? (err as Error & { status?: unknown }).status
+              : undefined,
+          clerkErrors:
+            err instanceof Error
+              ? (err as Error & { errors?: unknown }).errors
+              : undefined,
+          clerkMessage: err instanceof Error ? err.message : String(err),
+        },
         'Failed to create Clerk impersonation token',
       )
       throw new BadGatewayException('Failed to create impersonation token')
