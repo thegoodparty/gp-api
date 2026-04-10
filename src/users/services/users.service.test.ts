@@ -215,7 +215,10 @@ describe('UsersService', () => {
       })
 
       await expect(
-        usersService.impersonateUser(userWithoutClerkId.id, 'user_actor_clerk_id'),
+        usersService.impersonateUser(
+          userWithoutClerkId.id,
+          'user_actor_clerk_id',
+        ),
       ).rejects.toThrow(BadRequestException)
     })
 
@@ -257,7 +260,9 @@ describe('UsersService', () => {
     it('throws BadGatewayException when Clerk returns no token', async () => {
       vi.spyOn(clerkClient.actorTokens, 'create').mockResolvedValue({
         token: null,
-      } as unknown as Awaited<ReturnType<typeof clerkClient.actorTokens.create>>)
+      } as unknown as Awaited<
+        ReturnType<typeof clerkClient.actorTokens.create>
+      >)
 
       await expect(
         usersService.impersonateUser(service.user.id, 'user_actor_clerk_id'),
