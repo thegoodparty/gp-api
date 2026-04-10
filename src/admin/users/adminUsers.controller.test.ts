@@ -67,7 +67,7 @@ describe('AdminUsersController', () => {
     campaignsService = campaignsServiceMock as CampaignsService
 
     const slackServiceMock: Partial<SlackService> = {
-      sendMessage: vi.fn(),
+      message: vi.fn(),
     }
     slackService = slackServiceMock as SlackService
 
