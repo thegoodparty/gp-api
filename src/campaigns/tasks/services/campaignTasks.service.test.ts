@@ -767,6 +767,22 @@ describe('CampaignTasksService', () => {
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
+    it('distributes general tasks when details is null', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: null as unknown as CampaignWithPathToVictory['details'],
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks[0].date).toBeInstanceOf(Date)
+    })
+
     it('distributes general tasks when only general date is future', async () => {
       setupForCreation()
 
