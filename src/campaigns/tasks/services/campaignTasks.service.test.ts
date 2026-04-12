@@ -783,7 +783,7 @@ describe('CampaignTasksService', () => {
       expect(nonRecurring).toHaveLength(
         generalDefaultTasks.length + generalAwarenessTasks.length,
       )
-      expect(recurring.length).toBeGreaterThan(0)
+      expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
       expect(tasks[tasks.length - 1].date).toBeInstanceOf(Date)
@@ -803,7 +803,8 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
-      expect(recurring.length).toBeGreaterThan(0)
+      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(recurring).toHaveLength(85)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
     })
@@ -828,7 +829,7 @@ describe('CampaignTasksService', () => {
           generalDefaultTasks.length +
           generalAwarenessTasks.length,
       )
-      expect(recurring.length).toBeGreaterThan(0)
+      expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
     })
@@ -882,7 +883,7 @@ describe('CampaignTasksService', () => {
       expect(nonRecurring).toHaveLength(
         generalDefaultTasks.length + generalAwarenessTasks.length,
       )
-      expect(recurring.length).toBeGreaterThan(0)
+      expect(recurring).toHaveLength(169)
     })
 
     it('distributes only primary when general is past and primary is future', async () => {
@@ -901,7 +902,8 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
-      expect(recurring.length).toBeGreaterThan(0)
+      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(recurring).toHaveLength(85)
     })
 
     it('assigns dates in chronological order', async () => {
