@@ -221,8 +221,9 @@ export class CampaignTasksService extends createPrismaBase(
       await this.generateDefaultTasks(campaign)
       const generatedTasks =
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
+      const paradeTasks = this.buildParadeAwarenessTasks(generatedTasks)
 
-      return this.saveTasks(campaign.id, generatedTasks)
+      return this.saveTasks(campaign.id, [...generatedTasks, ...paradeTasks])
     } catch (error) {
       this.logger.error(
         { error, campaignId: campaign.id },
@@ -268,7 +269,11 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.startOrGetCached(campaign)
 
       if (result.cached) {
-        const savedTasks = await this.saveTasks(campaign.id, result.tasks)
+        const paradeTasks = this.buildParadeAwarenessTasks(result.tasks)
+        const savedTasks = await this.saveTasks(campaign.id, [
+          ...result.tasks,
+          ...paradeTasks,
+        ])
         subscriber.next({
           data: { type: 'complete', tasks: savedTasks },
         })
@@ -339,7 +344,11 @@ export class CampaignTasksService extends createPrismaBase(
           sessionId,
           campaign,
         )
-      const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
+      const paradeTasks = this.buildParadeAwarenessTasks(generatedTasks)
+      const savedTasks = await this.saveTasks(campaign.id, [
+        ...generatedTasks,
+        ...paradeTasks,
+      ])
       subscriber.next({
         data: { type: 'complete', tasks: savedTasks },
       })
@@ -632,6 +641,45 @@ export class CampaignTasksService extends createPrismaBase(
     const currentDay = getDay(date)
     const daysUntil = (dayOfWeek - currentDay + 7) % 7
     return daysUntil === 0 ? date : addDays(date, daysUntil)
+  }
+
+  buildParadeAwarenessTasks(
+    aiTasks: CampaignTask[],
+    today = startOfDay(new Date()),
+  ): CampaignTask[] {
+    const paradePattern = /parade/i
+    const minWeeksOut = 4
+
+    return aiTasks.flatMap((task) => {
+      if (!task.date) return []
+      const matchesParade =
+        paradePattern.test(task.title) || paradePattern.test(task.description)
+      if (!matchesParade) return []
+
+      const eventDate = startOfDay(parseIsoDateString(task.date))
+      if (differenceInCalendarDays(eventDate, today) < minWeeksOut * 7) {
+        return []
+      }
+
+      const fourWeeksBefore = subWeeks(eventDate, minWeeksOut)
+      const monday = startOfWeek(fourWeeksBefore, {
+        weekStartsOn: 1,
+      })
+
+      return [
+        {
+          id: `aw-parade-${task.id}`,
+          title: `Contact Parade Organizers for ${task.title}`,
+          description: 'Get signed up to march in the parade',
+          flowType: CampaignTaskType.awareness,
+          week: differenceInWeeks(eventDate, monday, {
+            roundingMethod: 'ceil',
+          }),
+          date: formatDate(monday, DateFormats.isoDate),
+          isDefaultTask: false,
+        },
+      ]
+    })
   }
 
   private mapTasksToCreateData(

@@ -1288,4 +1288,128 @@ describe('CampaignTasksService', () => {
       })
     })
   })
+
+  describe('buildParadeAwarenessTasks', () => {
+    const today = startOfDay(parseIsoDateString('2026-01-05'))
+
+    const makeAiTask = (
+      overrides: Partial<CampaignTask> = {},
+    ): CampaignTask => ({
+      id: 'ai-task-1',
+      title: 'Some Task',
+      description: 'Some description',
+      week: 4,
+      date: '2026-03-15',
+      ...overrides,
+    })
+
+    it('creates an awareness task for a parade event in the title', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for 4th of July Parade',
+      )
+      expect(result[0].description).toBe('Get signed up to march in the parade')
+      expect(result[0].flowType).toBe(CampaignTaskType.awareness)
+      expect(result[0].date).toBe('2026-06-01')
+      expect(result[0].week).toBe(5)
+      expect(result[0].isDefaultTask).toBe(false)
+    })
+
+    it('detects parade in the description (case-insensitive)', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'event-1',
+          title: 'Community March Event',
+          description: 'Join the local PARADE and wave to supporters',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for Community March Event',
+      )
+    })
+
+    it('skips parade events less than 4 weeks out', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-soon',
+          title: 'Parade Tomorrow',
+          date: '2026-01-20',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks without a date', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-no-date',
+          title: 'Some Parade',
+          date: undefined,
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips non-parade tasks', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'normal-task',
+          title: 'Door Knocking',
+          description: 'Go knock on doors',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('handles multiple parade events', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: 'Memorial Day Parade',
+          date: '2026-05-25',
+        }),
+        makeAiTask({
+          id: 'parade-2',
+          title: 'Independence Day Parade',
+          date: '2026-07-04',
+        }),
+        makeAiTask({
+          id: 'normal',
+          title: 'Phone Banking',
+          date: '2026-06-01',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, today)
+
+      expect(result).toHaveLength(2)
+      expect(result[0].id).toBe('aw-parade-parade-1')
+      expect(result[1].id).toBe('aw-parade-parade-2')
+    })
+  })
 })
