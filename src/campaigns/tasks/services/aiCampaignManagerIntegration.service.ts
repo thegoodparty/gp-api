@@ -9,6 +9,7 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -393,7 +394,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       cta: jsonTask.cta || 'Get started',
       flowType: this.mapFlowTypeToValidEnum(jsonTask.flowType),
       week: weekNumber,
-      date: jsonTask.date || undefined,
+      date: jsonTask.date,
       link: undefined,
       proRequired: jsonTask.proRequired || false,
       deadline: jsonTask.deadline || undefined,
@@ -456,6 +457,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private createDefaultTasks(campaignId: number): CampaignTask[] {
+    const today = formatDate(new Date(), DateFormats.isoDate)
     return [
       {
         id: `default-${campaignId}-setup`,
@@ -464,6 +466,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         cta: 'Get started',
         flowType: CampaignTaskType.education,
         week: 12,
+        date: today,
         proRequired: false,
       },
       {
@@ -473,6 +476,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         cta: 'Create posts',
         flowType: CampaignTaskType.socialMedia,
         week: 10,
+        date: today,
         proRequired: false,
       },
     ]

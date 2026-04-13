@@ -1,6 +1,9 @@
-import { CampaignTask, CampaignTaskType } from '../../campaignTasks.types'
+import {
+  CampaignTaskTemplate,
+  CampaignTaskType,
+} from '../../campaignTasks.types'
 
-const tasksWeek2: CampaignTask[] = [
+const tasksWeek2: CampaignTaskTemplate[] = [
   {
     id: 'f58b4523-c36d-4a5b-9e5f-88e4d3a7c70c',
     title: 'Schedule your persuasive text message',

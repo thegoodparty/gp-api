@@ -1,8 +1,8 @@
-import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { CampaignTaskTemplate, CampaignTaskType } from '../campaignTasks.types'
 
 // id mapping to content: https://gp-api.goodparty.org/v1/content/type/aiContentCategories
 
-export const primaryDefaultTasks: CampaignTask[] = [
+export const primaryDefaultTasks: CampaignTaskTemplate[] = [
   {
     id: 'a1c3e5d7-2b4f-6a8c-0d2e-4f6a8c0e2d4b',
     title: 'Introduction Text',

@@ -30,6 +30,7 @@ import { sleep } from 'src/shared/util/sleep.util'
 import { ProgressStreamData } from '../aiCampaignManager.types'
 import {
   CampaignTask,
+  CampaignTaskTemplate,
   CampaignTaskType,
   DayOfWeek,
   RecurrenceRule,
@@ -482,7 +483,7 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private distributeTasksOverWindow(
-    tasks: CampaignTask[],
+    tasks: CampaignTaskTemplate[],
     windowStart: Date,
     endDate: Date,
   ): CampaignTask[] {
@@ -520,15 +521,15 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
-    return [...tasks].sort((a, b) => {
-      const dateA = a.date ? parseIsoDateString(a.date).getTime() : 0
-      const dateB = b.date ? parseIsoDateString(b.date).getTime() : 0
-      return dateA - dateB
-    })
+    return [...tasks].sort(
+      (a, b) =>
+        parseIsoDateString(a.date).getTime() -
+        parseIsoDateString(b.date).getTime(),
+    )
   }
 
   private computeAwarenessTasks(
-    tasks: CampaignTask[],
+    tasks: CampaignTaskTemplate[],
     electionDate: Date,
     today: Date,
   ): CampaignTask[] {
@@ -655,7 +656,7 @@ export class CampaignTasksService extends createPrismaBase(
       cta: task.cta ?? null,
       flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? startOfDay(parseIsoDateString(task.date)) : null,
+      date: startOfDay(parseIsoDateString(task.date)),
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,

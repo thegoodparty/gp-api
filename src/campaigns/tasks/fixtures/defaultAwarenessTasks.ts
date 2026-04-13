@@ -1,6 +1,6 @@
-import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { CampaignTaskTemplate, CampaignTaskType } from '../campaignTasks.types'
 
-export const generalAwarenessTasks: CampaignTask[] = [
+export const generalAwarenessTasks: CampaignTaskTemplate[] = [
   {
     id: 'aw-voter-10pct',
     title: 'Reach 10% of your Voter Contact Goal',

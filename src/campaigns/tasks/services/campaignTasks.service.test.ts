@@ -96,7 +96,7 @@ const makeDbTask = (overrides = {}) => ({
   cta: 'Do it',
   flowType: CampaignTaskType.education,
   week: 4,
-  date: null,
+  date: new Date('2026-06-01'),
   link: null,
   proRequired: false,
   isDefaultTask: false,
@@ -513,6 +513,7 @@ describe('CampaignTasksService', () => {
           cta: 'Go',
           flowType: CampaignTaskType.socialMedia,
           week: 3,
+          date: '2026-06-01',
         },
       ]
       const savedTasks = [makeDbTask()]
@@ -565,6 +566,7 @@ describe('CampaignTasksService', () => {
           cta: 'Go',
           flowType: CampaignTaskType.education,
           week: 3,
+          date: '2026-06-01',
         },
       ]
       const savedTasks = [makeDbTask({ id: 'saved-1' })]
@@ -606,6 +608,7 @@ describe('CampaignTasksService', () => {
           cta: 'Go',
           flowType: CampaignTaskType.education,
           week: 2,
+          date: '2026-06-01',
         },
       ]
 
@@ -1237,6 +1240,7 @@ describe('CampaignTasksService', () => {
           cta: 'Go',
           flowType: CampaignTaskType.education,
           week: 1,
+          date: '2026-06-01',
         },
       ]
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
@@ -1248,7 +1252,7 @@ describe('CampaignTasksService', () => {
       expect(mockTxModel.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
-            date: null,
+            date: expect.any(Date),
             link: undefined,
             proRequired: false,
             deadline: undefined,

@@ -8,13 +8,15 @@ export type CampaignTask = {
   cta?: string
   flowType?: CampaignTaskType
   week: number
-  date?: string
+  date: string
   link?: string
   proRequired?: boolean
   isDefaultTask?: boolean
   deadline?: number
   defaultAiTemplateId?: string
 }
+
+export type CampaignTaskTemplate = Omit<CampaignTask, 'date'>
 
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 

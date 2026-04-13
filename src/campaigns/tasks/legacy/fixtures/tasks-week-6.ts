@@ -1,6 +1,9 @@
-import { CampaignTask, CampaignTaskType } from '../../campaignTasks.types'
+import {
+  CampaignTaskTemplate,
+  CampaignTaskType,
+} from '../../campaignTasks.types'
 
-const tasksWeek6: CampaignTask[] = [
+const tasksWeek6: CampaignTaskTemplate[] = [
   {
     id: '6a7b8c9d-0e1f-2g3h-4i5j-6k7l8m9n0o1p',
     title: 'Knock on doors to persuade voters',
