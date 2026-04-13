@@ -10,6 +10,7 @@ import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -261,8 +262,8 @@ export class AdminCampaignsService {
           {
             pathToVictory: {
               data: {
-                path: ['electionType'],
-                not: Prisma.AnyNull,
+                path: ['source'],
+                equals: P2VSource.ElectionApi,
               },
             },
           },
@@ -272,7 +273,6 @@ export class AdminCampaignsService {
   }
 
   private async getManualP2V(electionDate: string) {
-    // TODO: switch to checking for data->>'completedBy' IS NULL (comment copied from tgp-api)
     return this.campaigns.count({
       where: {
         AND: [
@@ -299,10 +299,12 @@ export class AdminCampaignsService {
             },
           },
           {
-            pathToVictory: {
-              data: {
-                path: ['electionType'],
-                equals: Prisma.AnyNull,
+            NOT: {
+              pathToVictory: {
+                data: {
+                  path: ['source'],
+                  equals: P2VSource.ElectionApi,
+                },
               },
             },
           },

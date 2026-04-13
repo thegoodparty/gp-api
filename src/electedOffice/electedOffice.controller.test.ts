@@ -6,13 +6,14 @@ const service = useTestService()
 
 describe('ElectedOfficeController', () => {
   let campaign: Campaign
+  let orgSlug: string
 
   beforeEach(async () => {
     const suffix = Date.now()
-    const organizationSlug = `campaign-${suffix}`
+    orgSlug = `campaign-${suffix}`
     await service.prisma.organization.create({
       data: {
-        slug: organizationSlug,
+        slug: orgSlug,
         ownerId: service.user.id,
         positionId: '2875e5f3-ecf0-6fae-f270-6951f85e8468',
       },
@@ -21,13 +22,15 @@ describe('ElectedOfficeController', () => {
       data: {
         userId: service.user.id,
         slug: `test-campaign-${suffix}`,
-        organizationSlug,
+        organizationSlug: orgSlug,
       },
     })
   })
 
   const createElectedOffice = (body: Record<string, unknown> = {}) =>
-    service.client.post('/v1/elected-office', body)
+    service.client.post('/v1/elected-office', body, {
+      headers: { 'x-organization-slug': orgSlug },
+    })
 
   describe('GET /elected-office/current', () => {
     it('returns current elected office', async () => {
@@ -36,7 +39,10 @@ describe('ElectedOfficeController', () => {
       })
       expect(created.status).toBe(201)
 
-      const result = await service.client.get('/v1/elected-office/current')
+      const eoOrgSlug = `eo-${created.data.id}`
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': eoOrgSlug },
+      })
 
       expect(result.status).toBe(200)
       expect(result.data).toEqual({
@@ -46,7 +52,9 @@ describe('ElectedOfficeController', () => {
     })
 
     it('returns 404 when no elected office exists', async () => {
-      const result = await service.client.get('/v1/elected-office/current')
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': orgSlug },
+      })
 
       expect(result.status).toBe(404)
     })

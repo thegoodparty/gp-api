@@ -10,6 +10,8 @@ const service = useTestService()
 
 const getStats = vi.fn(ContactsService.prototype.getDistrictStats)
 
+let eoOrgSlug: string
+
 beforeEach(async () => {
   const campaignId = 8888
   const organizationSlug = `campaign-${campaignId}`
@@ -42,7 +44,7 @@ beforeEach(async () => {
   })
 
   const electedOfficeId = uuidv7()
-  const eoOrgSlug = `eo-${electedOfficeId}`
+  eoOrgSlug = `eo-${electedOfficeId}`
   await service.prisma.organization.create({
     data: { slug: eoOrgSlug, ownerId: service.user.id },
   })
@@ -64,12 +66,17 @@ beforeEach(async () => {
 })
 
 describe('POST /polls/initial-poll', () => {
+  const eoHeaders = () => ({
+    headers: { 'x-organization-slug': eoOrgSlug },
+  })
+
   it.each([{ message: '', swornInDate: '2025-01-01' }])(
     'blocks bad input',
     async (payload) => {
       const result = await service.client.post(
         '/v1/polls/initial-poll',
         payload,
+        eoHeaders(),
       )
       expect(result).toMatchObject({
         status: 400,
@@ -83,10 +90,14 @@ describe('POST /polls/initial-poll', () => {
       totalConstituents: 499,
       totalConstituentsWithCellPhone: 499,
     } as StatsResponse)
-    const result = await service.client.post('/v1/polls/initial-poll', {
-      message: 'This is a test message',
-      swornInDate: '2025-01-01',
-    })
+    const result = await service.client.post(
+      '/v1/polls/initial-poll',
+      {
+        message: 'This is a test message',
+        swornInDate: '2025-01-01',
+      },
+      eoHeaders(),
+    )
     expect(result).toMatchObject({
       status: 400,
       data: {
@@ -102,10 +113,14 @@ describe('POST /polls/initial-poll', () => {
       data: { details: {} },
     })
 
-    const result = await service.client.post('/v1/polls/initial-poll', {
-      message: 'This is a test message',
-      swornInDate: '2025-01-01',
-    })
+    const result = await service.client.post(
+      '/v1/polls/initial-poll',
+      {
+        message: 'This is a test message',
+        swornInDate: '2025-01-01',
+      },
+      eoHeaders(),
+    )
 
     expect(result).toMatchObject({
       status: 201,
@@ -116,10 +131,14 @@ describe('POST /polls/initial-poll', () => {
   })
 
   it('creates a poll', async () => {
-    const result = await service.client.post('/v1/polls/initial-poll', {
-      message: 'This is a test message',
-      swornInDate: '2025-01-01',
-    })
+    const result = await service.client.post(
+      '/v1/polls/initial-poll',
+      {
+        message: 'This is a test message',
+        swornInDate: '2025-01-01',
+      },
+      eoHeaders(),
+    )
 
     expect(result).toMatchObject({
       status: 201,
@@ -129,13 +148,19 @@ describe('POST /polls/initial-poll', () => {
     })
 
     // Appears in list
-    const fetched = await service.client.get<{ results: Poll[] }>(`/v1/polls`)
+    const fetched = await service.client.get<{ results: Poll[] }>(
+      `/v1/polls`,
+      eoHeaders(),
+    )
     expect(fetched.data.results).toContainEqual(
       expect.objectContaining({ id: result.data.id }),
     )
 
     // Can be fetched by ID
-    const fetchedById = await service.client.get(`/v1/polls/${result.data.id}`)
+    const fetchedById = await service.client.get(
+      `/v1/polls/${result.data.id}`,
+      eoHeaders(),
+    )
     expect(fetchedById).toMatchObject({
       status: 200,
       data: result.data,

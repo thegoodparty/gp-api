@@ -3,7 +3,6 @@ import { BadRequestException } from '@nestjs/common'
 import { Organization } from '@prisma/client'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignWithPathToVictory } from '../contacts.types'
 import { ContactsService } from './contacts.service'
 
 vi.mock('@nestjs/axios', () => ({
@@ -11,7 +10,6 @@ vi.mock('@nestjs/axios', () => ({
 }))
 
 const SEARCH_REQUIRES_PRO_MSG = 'Search is only available for pro campaigns'
-const TEST_ELECTION_DISTRICT_NAME = 'District 1'
 const OVERRIDE_DISTRICT_ID = 'override-district-uuid'
 const POSITION_ID_FIXTURE = 'position-uuid'
 const PEOPLE_V1_PATH = '/v1/people'
@@ -38,31 +36,15 @@ describe('ContactsService', () => {
       get: ReturnType<typeof vi.fn>
     }
     let mockVoterFileFilterService: {
-      findByIdAndCampaignId: ReturnType<typeof vi.fn>
       findByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     }
     let mockElectionsService: {
       cleanDistrictName: ReturnType<typeof vi.fn>
       getPositionById: ReturnType<typeof vi.fn>
     }
-    let mockCampaignsService: { updateJsonFields: ReturnType<typeof vi.fn> }
-    let mockElectedOfficeService: {
-      getCurrentElectedOffice: ReturnType<typeof vi.fn>
+    let mockCampaignsService: {
       findFirst: ReturnType<typeof vi.fn>
     }
-
-    const baseCampaign = {
-      id: 1,
-      userId: 100,
-      isPro: false,
-      details: { state: 'NC' },
-      pathToVictory: {
-        data: {
-          electionType: 'district',
-          electionLocation: TEST_ELECTION_DISTRICT_NAME,
-        },
-      },
-    } as unknown as CampaignWithPathToVictory
 
     beforeEach(() => {
       mockHttpService = {
@@ -72,7 +54,6 @@ describe('ContactsService', () => {
         get: vi.fn(),
       }
       mockVoterFileFilterService = {
-        findByIdAndCampaignId: vi.fn().mockResolvedValue(null),
         findByIdAndOrganizationSlug: vi.fn().mockResolvedValue(null),
       }
       mockElectionsService = {
@@ -80,10 +61,6 @@ describe('ContactsService', () => {
         getPositionById: vi.fn().mockResolvedValue(null),
       }
       mockCampaignsService = {
-        updateJsonFields: vi.fn().mockResolvedValue(undefined),
-      }
-      mockElectedOfficeService = {
-        getCurrentElectedOffice: vi.fn().mockResolvedValue(null),
         findFirst: vi.fn().mockResolvedValue(null),
       }
 
@@ -92,195 +69,135 @@ describe('ContactsService', () => {
         mockVoterFileFilterService as never,
         mockElectionsService as never,
         mockCampaignsService as never,
-        mockElectedOfficeService as never,
         createMockLogger(),
       )
       vi.clearAllMocks()
     })
 
     describe('findContacts (search)', () => {
-      it('throws BadRequestException when search is used and campaign is not pro and user has no elected office', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: false }
+      it('throws when search is used and organization is not pro', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        mockCampaignsService.findFirst.mockResolvedValue({ isPro: false })
 
         await expect(
           service.findContacts(
             { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
+            org,
           ),
         ).rejects.toThrow(BadRequestException)
         await expect(
           service.findContacts(
             { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
-          ),
-        ).rejects.toThrow(SEARCH_REQUIRES_PRO_MSG)
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
-      })
-
-      it('does not throw when search is used and campaign is pro', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: true }
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
-          ),
-        ).resolves.toBeDefined()
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
-      })
-
-      it('does not throw when search is used and user has elected office', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue({
-          id: 'office-1',
-          userId: 100,
-          isActive: true,
-        })
-        const campaign = { ...baseCampaign, isPro: false }
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
-          ),
-        ).resolves.toBeDefined()
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
-      })
-
-      it('uses findFirst with organizationSlug check when organization is provided', async () => {
-        mockElectedOfficeService.findFirst.mockResolvedValue({
-          id: 'office-1',
-          userId: 100,
-          organizationSlug: 'eo-office-1',
-        })
-        const campaign = { ...baseCampaign, isPro: false }
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
-            org,
-          ),
-        ).resolves.toBeDefined()
-
-        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { campaignId: 1, userId: org.ownerId },
-        })
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).not.toHaveBeenCalled()
-      })
-
-      it('throws when search is used with organization and user has no org-linked elected office', async () => {
-        mockElectedOfficeService.findFirst.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: false }
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            campaign,
             org,
           ),
         ).rejects.toThrow(SEARCH_REQUIRES_PRO_MSG)
+      })
 
-        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { campaignId: 1, userId: org.ownerId },
+      it('allows search when organization is an elected office (eo- slug)', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
-        // Does NOT fall through to userId — org header represents the user's chosen context
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).not.toHaveBeenCalled()
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            org,
+          ),
+        ).resolves.toBeDefined()
+      })
+
+      it('allows search when campaign is pro (isPro) even with a non-EO org', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        mockCampaignsService.findFirst.mockResolvedValue({ isPro: true })
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            org,
+          ),
+        ).resolves.toBeDefined()
+      })
+
+      it('does not check access when search is not provided', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+
+        mockHttpService.post.mockReturnValue(
+          of({ data: { people: [], pagination: {} } }),
+        )
+
+        await expect(
+          service.findContacts(
+            {
+              resultsPerPage: 10,
+              page: 1,
+              search: undefined,
+              segment: 'all',
+            },
+            org,
+          ),
+        ).resolves.toBeDefined()
       })
     })
 
     describe('downloadContacts', () => {
-      it('throws BadRequestException when campaign is not pro and user has no elected office', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: false }
+      it('throws when organization is not pro', async () => {
+        const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        mockCampaignsService.findFirst.mockResolvedValue({ isPro: false })
         const res = { raw: {} } as never
 
         await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res),
+          service.downloadContacts({ segment: 'all' }, res, org),
         ).rejects.toThrow(BadRequestException)
         await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res),
+          service.downloadContacts({ segment: 'all' }, res, org),
         ).rejects.toThrow('Campaign is not pro')
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
       })
 
-      it('does not throw when campaign is pro', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: true }
-        const mockStream = {
-          pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
-          }),
-        }
-        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
-
-        await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res),
-        ).resolves.toBeUndefined()
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
-      })
-
-      it('does not throw when user has elected office', async () => {
-        mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue({
-          id: 'office-1',
-          userId: 100,
-          isActive: true,
-        })
-        const campaign = { ...baseCampaign, isPro: false }
-        const mockStream = {
-          pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
-          }),
-        }
-        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
-
-        await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res),
-        ).resolves.toBeUndefined()
-
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).toHaveBeenCalledWith(campaign.userId)
-      })
-
-      it('uses findFirst with organizationSlug check when organization is provided', async () => {
-        mockElectedOfficeService.findFirst.mockResolvedValue({
-          id: 'office-1',
-          userId: 100,
-          organizationSlug: 'eo-office-1',
-        })
-        const campaign = { ...baseCampaign, isPro: false }
+      it('allows download when campaign is pro (isPro) even with a non-EO org', async () => {
         const org = makeOrganization({
+          slug: 'campaign-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        mockCampaignsService.findFirst.mockResolvedValue({ isPro: true })
+
+        const mockStream = {
+          pipe: vi.fn(),
+          on: vi.fn((event: string, cb: () => void) => {
+            if (event === 'end') setImmediate(cb)
+          }),
+        }
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const res = { raw: {} } as never
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, res, org),
+        ).resolves.toBeUndefined()
+      })
+
+      it('allows download when organization is an elected office', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
         const mockStream = {
@@ -293,67 +210,8 @@ describe('ContactsService', () => {
         const res = { raw: {} } as never
 
         await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res, org),
+          service.downloadContacts({ segment: 'all' }, res, org),
         ).resolves.toBeUndefined()
-
-        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { campaignId: 1, userId: org.ownerId },
-        })
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).not.toHaveBeenCalled()
-      })
-
-      it('throws when organization is provided but user has no org-linked elected office', async () => {
-        mockElectedOfficeService.findFirst.mockResolvedValue(null)
-        const campaign = { ...baseCampaign, isPro: false }
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-        const res = { raw: {} } as never
-
-        await expect(
-          service.downloadContacts({ segment: 'all' }, campaign, res, org),
-        ).rejects.toThrow('Campaign is not pro')
-
-        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-          where: { campaignId: 1, userId: org.ownerId },
-        })
-        // Does NOT fall through to userId — org header represents the user's chosen context
-        expect(
-          mockElectedOfficeService.getCurrentElectedOffice,
-        ).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('getDistrictStats', () => {
-      it('allows statewide fallback (state only) when campaign is approved for statewide contacts', async () => {
-        const campaign = {
-          ...baseCampaign,
-          canDownloadFederal: true,
-          details: { state: 'WY', ballotLevel: 'STATE' },
-          pathToVictory: {
-            data: { electionType: 'State', electionLocation: 'WY' },
-          },
-        } as unknown as CampaignWithPathToVictory
-
-        mockHttpService.get.mockReturnValue(
-          of({
-            data: {
-              districtId: 'statewide-wy',
-              totalConstituents: 1000,
-              buckets: {},
-            },
-          }),
-        )
-
-        await expect(service.getDistrictStats(campaign)).resolves.toBeDefined()
-        expect(mockHttpService.get).toHaveBeenCalledWith(
-          expect.stringContaining(`${PEOPLE_V1_PATH}/stats`),
-          expect.objectContaining({
-            params: { state: 'WY' },
-          }),
-        )
       })
     })
 
@@ -370,7 +228,6 @@ describe('ContactsService', () => {
 
         await service.findContacts(
           { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          baseCampaign,
           org,
         )
 
@@ -381,7 +238,6 @@ describe('ContactsService', () => {
           }),
           expect.any(Object),
         )
-        // Should not call getPositionById since overrideDistrictId takes priority
         expect(mockElectionsService.getPositionById).not.toHaveBeenCalled()
       })
 
@@ -395,7 +251,7 @@ describe('ContactsService', () => {
           district: {
             id: 'position-district-uuid',
             L2DistrictType: 'State_Senate',
-            L2DistrictName: TEST_ELECTION_DISTRICT_NAME,
+            L2DistrictName: 'District 1',
           },
         })
         mockHttpService.post.mockReturnValue(
@@ -404,7 +260,6 @@ describe('ContactsService', () => {
 
         await service.findContacts(
           { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          baseCampaign,
           org,
         )
 
@@ -421,45 +276,7 @@ describe('ContactsService', () => {
         )
       })
 
-      it('falls back to state-only when position has no district and campaign is approved for statewide', async () => {
-        const org = makeOrganization({ positionId: POSITION_ID_FIXTURE })
-        mockElectionsService.getPositionById.mockResolvedValue({
-          id: POSITION_ID_FIXTURE,
-          state: 'WY',
-          district: null,
-        })
-        const statewideCampaign = {
-          ...baseCampaign,
-          canDownloadFederal: true,
-        } as unknown as CampaignWithPathToVictory
-
-        mockHttpService.post.mockReturnValue(
-          of({ data: { people: [], pagination: {} } }),
-        )
-
-        await service.findContacts(
-          { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          statewideCampaign,
-          org,
-        )
-
-        expect(mockElectionsService.getPositionById).toHaveBeenCalledWith(
-          POSITION_ID_FIXTURE,
-          { includeDistrict: true },
-        )
-        expect(mockHttpService.post).toHaveBeenCalledWith(
-          expect.stringContaining(PEOPLE_V1_PATH),
-          expect.objectContaining({ state: 'WY' }),
-          expect.any(Object),
-        )
-        const callBody = mockHttpService.post.mock.calls[0][1] as Record<
-          string,
-          unknown
-        >
-        expect(callBody.districtId).toBeUndefined()
-      })
-
-      it('throws when position has no district and campaign is not approved for statewide', async () => {
+      it('throws when position has no district', async () => {
         const org = makeOrganization({ positionId: POSITION_ID_FIXTURE })
         mockElectionsService.getPositionById.mockResolvedValue({
           id: POSITION_ID_FIXTURE,
@@ -475,11 +292,10 @@ describe('ContactsService', () => {
               search: undefined,
               segment: 'all',
             },
-            baseCampaign,
             org,
           ),
         ).rejects.toThrow(
-          'Statewide or federal contacts require admin approval',
+          'Organization does not have sufficient data to resolve district',
         )
       })
 
@@ -494,7 +310,6 @@ describe('ContactsService', () => {
               search: undefined,
               segment: 'all',
             },
-            baseCampaign,
             org,
           ),
         ).rejects.toThrow(
@@ -502,30 +317,7 @@ describe('ContactsService', () => {
         )
       })
 
-      it('uses legacy campaign path when organization is undefined', async () => {
-        mockHttpService.post.mockReturnValue(
-          of({ data: { people: [], pagination: {} } }),
-        )
-
-        await service.findContacts(
-          { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          baseCampaign,
-          undefined,
-        )
-
-        // Legacy path uses state + districtType + districtName from campaign
-        expect(mockHttpService.post).toHaveBeenCalledWith(
-          expect.stringContaining(PEOPLE_V1_PATH),
-          expect.objectContaining({
-            state: 'NC',
-            districtType: 'district',
-            districtName: TEST_ELECTION_DISTRICT_NAME,
-          }),
-          expect.any(Object),
-        )
-      })
-
-      it('uses overrideDistrictId for getDistrictStats with organization', async () => {
+      it('uses overrideDistrictId for getDistrictStats', async () => {
         const org = makeOrganization({
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
@@ -540,7 +332,7 @@ describe('ContactsService', () => {
           }),
         )
 
-        await service.getDistrictStats(baseCampaign, org)
+        await service.getDistrictStats(org)
 
         expect(mockHttpService.get).toHaveBeenCalledWith(
           expect.stringContaining(`${PEOPLE_V1_PATH}/stats`),
@@ -550,7 +342,7 @@ describe('ContactsService', () => {
         )
       })
 
-      it('uses overrideDistrictId for findPerson with organization', async () => {
+      it('uses overrideDistrictId for findPerson', async () => {
         const org = makeOrganization({
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
@@ -561,7 +353,7 @@ describe('ContactsService', () => {
           }),
         )
 
-        await service.findPerson('person-1', baseCampaign, org)
+        await service.findPerson('person-1', org)
 
         expect(mockHttpService.get).toHaveBeenCalledWith(
           expect.stringContaining(`${PEOPLE_V1_PATH}/person-1`),
@@ -571,11 +363,11 @@ describe('ContactsService', () => {
         )
       })
 
-      it('uses overrideDistrictId for downloadContacts with organization', async () => {
+      it('uses overrideDistrictId for downloadContacts', async () => {
         const org = makeOrganization({
+          slug: 'eo-office-1',
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
-        const campaign = { ...baseCampaign, isPro: true }
 
         const mockStream = {
           pipe: vi.fn(),
@@ -586,7 +378,7 @@ describe('ContactsService', () => {
         mockHttpService.post.mockReturnValue(of({ data: mockStream }))
         const res = { raw: {} } as never
 
-        await service.downloadContacts({ segment: 'all' }, campaign, res, org)
+        await service.downloadContacts({ segment: 'all' }, res, org)
 
         expect(mockHttpService.post).toHaveBeenCalledWith(
           expect.stringContaining(`${PEOPLE_V1_PATH}/download`),
@@ -598,11 +390,12 @@ describe('ContactsService', () => {
       })
     })
 
-    describe('org-only path (no campaign)', () => {
-      it('findContacts succeeds with org and no campaign', async () => {
+    describe('org-only path (no campaign in org)', () => {
+      it('findContacts succeeds with org that has no linked campaign', async () => {
         const org = makeOrganization({
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
+        mockCampaignsService.findFirst.mockResolvedValue(null)
 
         mockHttpService.post.mockReturnValue(
           of({ data: { people: [], pagination: {} } }),
@@ -610,7 +403,6 @@ describe('ContactsService', () => {
 
         await service.findContacts(
           { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-          undefined,
           org,
         )
 
@@ -620,106 +412,6 @@ describe('ContactsService', () => {
             districtId: OVERRIDE_DISTRICT_ID,
           }),
           expect.any(Object),
-        )
-      })
-
-      it('findContacts search succeeds with org + EO access and no campaign', async () => {
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-        mockElectedOfficeService.findFirst.mockResolvedValue({
-          id: 'office-1',
-          organizationSlug: org.slug,
-        })
-
-        mockHttpService.post.mockReturnValue(
-          of({ data: { people: [], pagination: {} } }),
-        )
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            undefined,
-            org,
-          ),
-        ).resolves.toBeDefined()
-      })
-
-      it('findContacts search throws with org + no EO access and no campaign', async () => {
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-        mockElectedOfficeService.findFirst.mockResolvedValue(null)
-
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
-            undefined,
-            org,
-          ),
-        ).rejects.toThrow(SEARCH_REQUIRES_PRO_MSG)
-      })
-
-      it('downloadContacts succeeds with org + EO access and no campaign', async () => {
-        const org = makeOrganization({
-          overrideDistrictId: OVERRIDE_DISTRICT_ID,
-        })
-        mockElectedOfficeService.findFirst.mockResolvedValue({
-          id: 'office-1',
-          organizationSlug: org.slug,
-        })
-
-        const mockStream = {
-          pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
-          }),
-        }
-        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
-
-        await expect(
-          service.downloadContacts({ segment: 'all' }, undefined, res, org),
-        ).resolves.toBeUndefined()
-      })
-
-      it('throws when neither campaign nor organization is provided', async () => {
-        await expect(
-          service.findContacts(
-            { resultsPerPage: 10, page: 1, search: undefined, segment: 'all' },
-            undefined,
-            undefined,
-          ),
-        ).rejects.toThrow('Campaign or organization is required')
-      })
-
-      it('getDistrictStats throws when neither campaign nor organization is provided', async () => {
-        await expect(
-          service.getDistrictStats(undefined, undefined),
-        ).rejects.toThrow('Campaign or organization is required')
-      })
-
-      it('statewide org with no campaign throws (canDownloadFederal defaults to false)', async () => {
-        const org = makeOrganization({ positionId: POSITION_ID_FIXTURE })
-        mockElectionsService.getPositionById.mockResolvedValue({
-          id: POSITION_ID_FIXTURE,
-          state: 'WY',
-          district: null,
-        })
-
-        await expect(
-          service.findContacts(
-            {
-              resultsPerPage: 10,
-              page: 1,
-              search: undefined,
-              segment: 'all',
-            },
-            undefined,
-            org,
-          ),
-        ).rejects.toThrow(
-          'Statewide or federal contacts require admin approval',
         )
       })
     })

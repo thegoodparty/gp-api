@@ -2,11 +2,8 @@ import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
 import { Organization } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
 import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
-import { CampaignWithPathToVictory } from './contacts.types'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
   DownloadContactsDTO,
@@ -15,11 +12,7 @@ import {
 import { ContactsService } from './services/contacts.service'
 
 @Controller('contacts')
-// LEGACY: Remove @UseCampaign and @ReqCampaign from all endpoints when org migration is complete.
-//         @UseOrganization becomes required (remove continueIfNotFound).
-//         campaign parameter removed from all service calls.
-@UseCampaign({ continueIfNotFound: true })
-@UseOrganization({ continueIfNotFound: true })
+@UseOrganization()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
@@ -27,43 +20,32 @@ export class ContactsController {
   @Get()
   async listContacts(
     @Query() filterDto: ListContactsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
-    @ReqOrganization() organization: Organization | undefined,
+    @ReqOrganization() organization: Organization,
   ) {
-    return this.contactsService.findContacts(filterDto, campaign, organization)
+    return this.contactsService.findContacts(filterDto, organization)
   }
 
   @Get('download')
   async downloadContacts(
     @Query() dto: DownloadContactsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
-    @ReqOrganization() organization: Organization | undefined,
+    @ReqOrganization() organization: Organization,
     @Res() res: FastifyReply,
   ) {
     res.header('Content-Type', 'text/csv')
     res.header('Content-Disposition', 'attachment; filename="contacts.csv"')
-    await this.contactsService.downloadContacts(
-      dto,
-      campaign,
-      res,
-      organization,
-    )
+    await this.contactsService.downloadContacts(dto, res, organization)
   }
 
   @Get('stats')
-  getContactsStats(
-    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
-    @ReqOrganization() organization: Organization | undefined,
-  ) {
-    return this.contactsService.getDistrictStats(campaign, organization)
+  getContactsStats(@ReqOrganization() organization: Organization) {
+    return this.contactsService.getDistrictStats(organization)
   }
 
   @Get(':id')
   async getContact(
     @Param() params: GetPersonParamsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory | undefined,
-    @ReqOrganization() organization: Organization | undefined,
+    @ReqOrganization() organization: Organization,
   ) {
-    return this.contactsService.findPerson(params.id, campaign, organization)
+    return this.contactsService.findPerson(params.id, organization)
   }
 }

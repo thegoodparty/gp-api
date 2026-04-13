@@ -7,11 +7,15 @@ import { CampaignTaskType } from '../campaignTasks.types'
 const service = useTestService()
 
 const TASKS_BASE_PATH = '/v1/campaigns/tasks'
+const ORG_SLUG = 'campaign-org-tasks-test'
+const orgHeaders = {
+  headers: { 'x-organization-slug': ORG_SLUG },
+}
 
 async function createCampaignWithTasks() {
   const org = await service.prisma.organization.create({
     data: {
-      slug: 'campaign-org-tasks-test',
+      slug: ORG_SLUG,
       ownerId: service.user.id,
     },
   })
@@ -70,8 +74,10 @@ describe('Campaigns Tasks - List Tasks', () => {
   it('lists all tasks', async () => {
     await createCampaignWithTasks()
 
-    const result =
-      await service.client.get<PrismaCampaignTask[]>(TASKS_BASE_PATH)
+    const result = await service.client.get<PrismaCampaignTask[]>(
+      TASKS_BASE_PATH,
+      orgHeaders,
+    )
 
     expect(result.status).toBe(HttpStatus.OK)
     expect(Array.isArray(result.data)).toBe(true)
@@ -84,8 +90,10 @@ describe('Campaigns Tasks - List Tasks', () => {
   it('returns tasks ordered by week descending', async () => {
     await createCampaignWithTasks()
 
-    const result =
-      await service.client.get<PrismaCampaignTask[]>(TASKS_BASE_PATH)
+    const result = await service.client.get<PrismaCampaignTask[]>(
+      TASKS_BASE_PATH,
+      orgHeaders,
+    )
 
     expect(result.status).toBe(HttpStatus.OK)
     expect(result.data.length).toBeGreaterThan(0)
@@ -104,9 +112,10 @@ describe('Campaigns Tasks - List Tasks', () => {
     const endDate = '2025-04-01T21:17:31.648Z'
 
     const [allResult, filteredResult] = await Promise.all([
-      service.client.get<PrismaCampaignTask[]>(TASKS_BASE_PATH),
+      service.client.get<PrismaCampaignTask[]>(TASKS_BASE_PATH, orgHeaders),
       service.client.get<PrismaCampaignTask[]>(
         `${TASKS_BASE_PATH}?date=${date}&endDate=${endDate}`,
+        orgHeaders,
       ),
     ])
 
