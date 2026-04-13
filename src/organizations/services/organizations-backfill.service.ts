@@ -1,7 +1,6 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { Injectable } from '@nestjs/common'
-import { ElectedOffice } from '@prisma/client'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { Campaign, ElectedOffice } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { OrganizationsService } from './organizations.service'
 
@@ -77,7 +76,7 @@ export const BackfillCategory = {
  * 1. Iterate all Campaigns in batches (cursor-based pagination).
  * 2. For each campaign, resolve the best position + district from the
  *    election-api using the campaign's BallotReady positionId and/or
- *    pathToVictory district data.
+ *    district data used for organization resolution.
  * 3. Upsert an Organization row with the resolved data.
  * 4. Repeat the same process for ElectedOffices (which share their
  *    campaign's position/district data but get their own Organization).
@@ -141,7 +140,6 @@ export class OrganizationsBackfillService extends createPrismaBase(
         take: OrganizationsBackfillService.BATCH_SIZE,
         ...(campaignCursor ? { skip: 1, cursor: { id: campaignCursor } } : {}),
         orderBy: { id: 'asc' },
-        include: { pathToVictory: true },
       })
 
       if (campaigns.length === 0) break
@@ -169,13 +167,15 @@ export class OrganizationsBackfillService extends createPrismaBase(
         take: OrganizationsBackfillService.BATCH_SIZE,
         ...(eoCursor ? { skip: 1, cursor: { id: eoCursor } } : {}),
         orderBy: { id: 'asc' },
-        include: { campaign: { include: { pathToVictory: true } } },
+        include: { campaign: true },
       })
 
       if (electedOffices.length === 0) break
 
       for (const eo of electedOffices) {
-        const record = await this.dryRunElectedOffice(eo)
+        const { campaign } = eo
+        if (campaign === null) continue
+        const record = await this.dryRunElectedOffice({ ...eo, campaign })
         eoStats[record.resolved?.category ?? 'error']++
         onRecord(record)
       }
@@ -196,7 +196,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
   }
 
   private async dryRunCampaign(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
   ): Promise<BackfillDryRunRecord> {
     const slug = OrganizationsService.campaignOrgSlug(campaign.id)
     const fields = this.extractCampaignFields(campaign)
@@ -267,7 +267,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
   }
 
   private async dryRunElectedOffice(
-    eo: ElectedOffice & { campaign: CampaignWith<'pathToVictory'> },
+    eo: ElectedOffice & { campaign: Campaign },
   ): Promise<BackfillDryRunRecord> {
     const slug = OrganizationsService.electedOfficeOrgSlug(eo.id)
     const fields = this.extractCampaignFields(eo.campaign)
@@ -355,7 +355,6 @@ export class OrganizationsBackfillService extends createPrismaBase(
         take: OrganizationsBackfillService.BATCH_SIZE,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         orderBy: { id: 'asc' },
-        include: { pathToVictory: true },
       })
 
       if (campaigns.length === 0) break
@@ -386,7 +385,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
    * Errors are caught and logged so one bad campaign doesn't halt the batch.
    */
   private async backfillCampaignOrganization(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
   ): Promise<string> {
     const slug = OrganizationsService.campaignOrgSlug(campaign.id)
     const logCtx = { campaignId: campaign.id, slug }
@@ -467,13 +466,18 @@ export class OrganizationsBackfillService extends createPrismaBase(
         take: OrganizationsBackfillService.BATCH_SIZE,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         orderBy: { id: 'asc' },
-        include: { campaign: { include: { pathToVictory: true } } },
+        include: { campaign: true },
       })
 
       if (electedOffices.length === 0) break
 
       for (const eo of electedOffices) {
-        const category = await this.backfillElectedOfficeOrganization(eo)
+        const { campaign } = eo
+        if (campaign === null) continue
+        const category = await this.backfillElectedOfficeOrganization({
+          ...eo,
+          campaign,
+        })
         categoryCounts[category]++
       }
 
@@ -493,7 +497,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
    * but uses the elected office's linked campaign for position/district data.
    */
   private async backfillElectedOfficeOrganization(
-    eo: ElectedOffice & { campaign: CampaignWith<'pathToVictory'> },
+    eo: ElectedOffice & { campaign: Campaign },
   ): Promise<string> {
     const slug = OrganizationsService.electedOfficeOrgSlug(eo.id)
     const logCtx = {
@@ -576,7 +580,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
   }
 
   /**
-   * Defensively extracts fields from campaign.details and pathToVictory.data.
+   * Defensively extracts fields from campaign.details.
    *
    * These are JSON columns, so the data shape is not guaranteed by Prisma.
    * We validate that details is an object and safely extract all fields with
@@ -587,7 +591,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
    * Returns an error string only if details itself is not an object (nothing
    * to extract), otherwise error is null.
    */
-  extractCampaignFields(campaign: CampaignWith<'pathToVictory'>): {
+  extractCampaignFields(campaign: Campaign): {
     error: string | null
     state: string
     ballotReadyPositionId: string | null
@@ -612,20 +616,14 @@ export class OrganizationsBackfillService extends createPrismaBase(
       }
     }
 
-    const p2vData = campaign.pathToVictory?.data
-
     return {
       error: null,
       state: getString(details, 'state'),
       // Historical data may still have positionId on campaign.details
       // before the org migration.
       ballotReadyPositionId: getString(details, 'positionId') || null,
-      L2DistrictType: isJsonObject(p2vData)
-        ? getString(p2vData, 'electionType')
-        : '',
-      L2DistrictName: isJsonObject(p2vData)
-        ? getString(p2vData, 'electionLocation')
-        : '',
+      L2DistrictType: '',
+      L2DistrictName: '',
       office: getString(details, 'office'),
       otherOffice: getString(details, 'otherOffice'),
     }
@@ -656,7 +654,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
    * office/otherOffice resolution logic.
    */
   private async resolvePositionAndDistrict(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
   ): Promise<{
     positionId: string | null
     overrideDistrictId: string | null

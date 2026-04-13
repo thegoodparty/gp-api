@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BadGatewayException, NotFoundException } from '@nestjs/common'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
+import { Campaign, CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { startOfDay } from 'date-fns'
@@ -70,9 +69,7 @@ const mockQueueProducer: Partial<QueueProducerService> = {
   sendMessage: vi.fn(),
 }
 
-const makeCampaign = (
-  overrides: Partial<CampaignWithPathToVictory> = {},
-): CampaignWithPathToVictory =>
+const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -85,9 +82,8 @@ const makeCampaign = (
     details: {},
     aiContent: {},
     vendorTsData: {},
-    pathToVictory: null,
     ...overrides,
-  }) as CampaignWithPathToVictory
+  }) as Campaign
 
 const makeDbTask = (overrides = {}) => ({
   id: 'task-1',

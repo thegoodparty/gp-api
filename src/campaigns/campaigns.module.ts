@@ -8,7 +8,6 @@ import { UsersModule } from 'src/users/users.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { CrmModule } from '../crm/crmModule'
-import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { EcanvasserIntegrationModule } from '../vendors/ecanvasserIntegration/ecanvasserIntegration.module'
@@ -43,7 +42,6 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
-    PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,

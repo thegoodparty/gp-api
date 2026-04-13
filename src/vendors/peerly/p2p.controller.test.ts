@@ -1,14 +1,14 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadGatewayException } from '@nestjs/common'
 import { FastifyReply } from 'fastify'
+import { Campaign } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignWith } from '../../campaigns/campaigns.types'
 import { P2pController } from './p2p.controller'
 import { PhoneListState } from './peerly.types'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 
-const mockCampaign: CampaignWith<'pathToVictory'> = {
+const mockCampaign: Campaign = {
   id: 1,
   userId: 1,
   slug: 'test-campaign',
@@ -32,13 +32,6 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   updatedAt: new Date('2025-01-01'),
   data: {},
   details: { state: 'CA', electionDate: '2026-11-03' },
-  pathToVictory: {
-    id: 1,
-    campaignId: 1,
-    createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01'),
-    data: {} as PrismaJson.PathToVictoryData,
-  },
 }
 
 function createMockReply(): FastifyReply {

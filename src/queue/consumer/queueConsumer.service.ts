@@ -892,9 +892,13 @@ export class QueueConsumerService {
       return
     }
 
+    if (office.campaignId == null) {
+      this.logger.info('Elected office has no campaign, ignoring event')
+      return
+    }
+
     const campaign = await this.campaignsService.findUnique({
       where: { id: office.campaignId },
-      include: { pathToVictory: true },
     })
 
     if (!campaign) {
@@ -1009,7 +1013,6 @@ export class QueueConsumerService {
 
       const campaign = await this.campaignsService.findUniqueOrThrow({
         where: { id: message.campaignId },
-        include: { pathToVictory: true },
       })
 
       const user = await this.usersService.findUniqueOrThrow({

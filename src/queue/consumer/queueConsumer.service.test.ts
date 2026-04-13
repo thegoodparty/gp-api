@@ -166,7 +166,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       findUnique: vi.fn().mockResolvedValue({
         id: campaignId,
         userId: campaignUserId,
-        pathToVictory: { data: {} },
       }),
     }
     contactsService = {
@@ -810,7 +809,6 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       findUnique: vi.fn().mockResolvedValue({
         id: campaignId,
         userId: 'user-1',
-        pathToVictory: { data: {} },
       }),
     }
     contactsService = {

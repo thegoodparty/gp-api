@@ -70,7 +70,6 @@ const buildOrgSyncModule = async (overrides?: {
           update: mockCampaignUpdate,
           findFirst: mockCampaignFindFirst,
         },
-        pathToVictory: { update: vi.fn(), create: vi.fn() },
         electedOffice: { findFirst: vi.fn().mockResolvedValue(null) },
       }
       return callback(
@@ -319,7 +318,6 @@ describe('CampaignsService - Organization positionId sync', () => {
       data: {},
       details: {},
       aiContent: {},
-      pathToVictory: null,
     }
 
     it('should update organization overrideDistrictId when provided', async () => {
@@ -329,7 +327,6 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { p2vCompleteDate: '2025-01-01' },
         overrideDistrictId: 'district-uuid-123',
       })
 
@@ -346,7 +343,6 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { p2vCompleteDate: '2025-01-01' },
         overrideDistrictId: null,
       })
 
@@ -363,7 +359,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
 
       await service.updateJsonFields(10, {
-        pathToVictory: { p2vCompleteDate: '2025-01-01' },
+        data: { someField: 'value' },
       })
 
       expect(mockOrgUpdate).not.toHaveBeenCalled()
@@ -996,9 +992,6 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 6000,
       winNumber: 3001,
       voterContactGoal: 15005,
-      source: 'test',
-      p2vStatus: 'Complete',
-      p2vCompleteDate: '2026-01-01',
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
@@ -1027,9 +1020,6 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 4000,
       winNumber: 2001,
       voterContactGoal: 10005,
-      source: 'test',
-      p2vStatus: 'Complete',
-      p2vCompleteDate: '2026-01-01',
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
