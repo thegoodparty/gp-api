@@ -517,6 +517,41 @@ describe('AiCampaignManagerIntegrationService', () => {
 
       expect(tasks[0].flowType).toBe(CampaignTaskType.education)
     })
+
+    it('falls back to today when AI task has no date', async () => {
+      const campaign = makeCampaign()
+      const planResponse = makePlanResponse({
+        ai_tasks: [
+          makeAiTask({
+            date: '' as string,
+          }),
+        ],
+      })
+      mockModel.findUnique.mockResolvedValue(null)
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 's',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
+        progress: 100,
+        status: 'completed',
+        message: '',
+        logs: [],
+        timestamp: '',
+        has_pdf: false,
+        has_json: true,
+        download_links: {},
+        expires_at: null,
+        expires_at_formatted: null,
+        files_ready: { pdf: false, json: true, total: 1 },
+      })
+      vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(planResponse)
+      mockModel.upsert.mockResolvedValue({})
+
+      const tasks = await service.generateCampaignTasks(campaign)
+
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    })
   })
 
   describe('saveCampaignPlan', () => {

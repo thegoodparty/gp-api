@@ -394,7 +394,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       cta: jsonTask.cta || 'Get started',
       flowType: this.mapFlowTypeToValidEnum(jsonTask.flowType),
       week: weekNumber,
-      date: jsonTask.date,
+      date: jsonTask.date || formatDate(new Date(), DateFormats.isoDate),
       link: undefined,
       proRequired: jsonTask.proRequired || false,
       deadline: jsonTask.deadline || undefined,
