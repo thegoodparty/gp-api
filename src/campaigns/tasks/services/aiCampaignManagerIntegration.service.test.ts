@@ -518,14 +518,14 @@ describe('AiCampaignManagerIntegrationService', () => {
       expect(tasks[0].flowType).toBe(CampaignTaskType.education)
     })
 
-    it('falls back to today when AI task has no date', async () => {
-      const campaign = makeCampaign()
+    it('derives date from week and election date when AI task date is empty', async () => {
+      const campaign = makeCampaign({
+        details: {
+          electionDate: '2025-11-04',
+        } as PrismaJson.CampaignDetails,
+      })
       const planResponse = makePlanResponse({
-        ai_tasks: [
-          makeAiTask({
-            date: '' as string,
-          }),
-        ],
+        ai_tasks: [makeAiTask({ date: '' as string, week: 4 })],
       })
       mockModel.findUnique.mockResolvedValue(null)
       vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
@@ -550,7 +550,44 @@ describe('AiCampaignManagerIntegrationService', () => {
       const tasks = await service.generateCampaignTasks(campaign)
 
       expect(tasks).toHaveLength(1)
-      expect(tasks[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(tasks[0].date).toBe('2025-10-07')
+      expect(tasks[0].week).toBe(4)
+    })
+
+    it('derives date from week when AI task date is malformed', async () => {
+      const campaign = makeCampaign({
+        details: {
+          electionDate: '2025-11-04',
+        } as PrismaJson.CampaignDetails,
+      })
+      const planResponse = makePlanResponse({
+        ai_tasks: [makeAiTask({ date: 'not-a-date', week: 2 })],
+      })
+      mockModel.findUnique.mockResolvedValue(null)
+      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
+        session_id: 's',
+      })
+      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
+        progress: 100,
+        status: 'completed',
+        message: '',
+        logs: [],
+        timestamp: '',
+        has_pdf: false,
+        has_json: true,
+        download_links: {},
+        expires_at: null,
+        expires_at_formatted: null,
+        files_ready: { pdf: false, json: true, total: 1 },
+      })
+      vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(planResponse)
+      mockModel.upsert.mockResolvedValue({})
+
+      const tasks = await service.generateCampaignTasks(campaign)
+
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0].date).toBe('2025-10-21')
+      expect(tasks[0].week).toBe(2)
     })
   })
 

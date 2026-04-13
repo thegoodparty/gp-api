@@ -9,7 +9,13 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
-import { DateFormats, formatDate } from 'src/shared/util/date.util'
+import {
+  DateFormats,
+  dateFromWeeksBefore,
+  formatDate,
+  isValidIsoDate,
+  parseIsoDateString,
+} from 'src/shared/util/date.util'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -383,8 +389,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     campaign: CampaignWithPathToVictory,
     index: number,
   ): CampaignTask {
+    const validDate = isValidIsoDate(jsonTask.date) ? jsonTask.date : null
     const weekNumber =
-      jsonTask.week || this.calculateWeekFromDate(jsonTask.date, campaign)
+      jsonTask.week ||
+      (validDate ? this.calculateWeekFromDate(validDate, campaign) : 1)
+    const date = validDate || this.deriveDateFromWeek(weekNumber, campaign)
 
     return {
       id: `ai-generated-${campaign.id}-${index}-${Date.now()}`,
@@ -394,12 +403,26 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       cta: jsonTask.cta || 'Get started',
       flowType: this.mapFlowTypeToValidEnum(jsonTask.flowType),
       week: weekNumber,
-      date: jsonTask.date || formatDate(new Date(), DateFormats.isoDate),
+      date,
       link: undefined,
       proRequired: jsonTask.proRequired || false,
       deadline: jsonTask.deadline || undefined,
       defaultAiTemplateId: jsonTask.defaultAiTemplateId || undefined,
     }
+  }
+
+  private deriveDateFromWeek(
+    weekNumber: number,
+    campaign: CampaignWithPathToVictory,
+  ): string {
+    const electionDateStr = campaign.details.electionDate
+    if (electionDateStr && isValidIsoDate(electionDateStr)) {
+      return dateFromWeeksBefore(
+        parseIsoDateString(electionDateStr),
+        weekNumber,
+      )
+    }
+    return formatDate(new Date(), DateFormats.isoDate)
   }
 
   private mapFlowTypeToValidEnum(category: string): CampaignTaskType {
