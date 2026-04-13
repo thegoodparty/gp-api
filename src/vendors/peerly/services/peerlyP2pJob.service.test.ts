@@ -6,12 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pJobService } from './peerlyP2pJob.service'
+import { PeerlyScheduleService } from './peerlySchedule.service'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 
 describe('PeerlyP2pJobService', () => {
   let service: PeerlyP2pJobService
   let mockMediaService: { createMedia: ReturnType<typeof vi.fn> }
+  let mockScheduleService: { createSchedule: ReturnType<typeof vi.fn> }
   let mockHttpService: {
     post: ReturnType<typeof vi.fn>
     get: ReturnType<typeof vi.fn>
@@ -38,6 +40,9 @@ describe('PeerlyP2pJobService', () => {
   beforeEach(async () => {
     mockMediaService = {
       createMedia: vi.fn().mockResolvedValue('media-456'),
+    }
+    mockScheduleService = {
+      createSchedule: vi.fn().mockResolvedValue(99999),
     }
     mockHttpService = {
       post: vi.fn(),
@@ -69,6 +74,7 @@ describe('PeerlyP2pJobService', () => {
         PeerlyP2pJobService,
         { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PeerlyMediaService, useValue: mockMediaService },
+        { provide: PeerlyScheduleService, useValue: mockScheduleService },
         { provide: PeerlyHttpService, useValue: mockHttpService },
         {
           provide: PeerlyErrorHandlingService,
@@ -129,11 +135,15 @@ describe('PeerlyP2pJobService', () => {
       expect(jobPostCall![1]).not.toHaveProperty('did_npa_subset')
     })
 
-    it('calls media, createJob, assignList in order', async () => {
+    it('calls media, createSchedule, createJob, assignList in order', async () => {
       const callOrder: string[] = []
       mockMediaService.createMedia.mockImplementation(async () => {
         callOrder.push('createMedia')
         return 'media-456'
+      })
+      mockScheduleService.createSchedule.mockImplementation(async () => {
+        callOrder.push('createSchedule')
+        return 99999
       })
       mockHttpService.post.mockImplementation(async (path: string) => {
         if (
@@ -148,10 +158,6 @@ describe('PeerlyP2pJobService', () => {
           callOrder.push('assignListToJob')
           return { data: {} }
         }
-        if (path.includes('request_canvassers')) {
-          callOrder.push('requestCanvassers')
-          return { data: {} }
-        }
         return { data: {} }
       })
 
@@ -161,7 +167,41 @@ describe('PeerlyP2pJobService', () => {
         didNpaSubset: ['212'],
       })
 
-      expect(callOrder).toEqual(['createMedia', 'createJob', 'assignListToJob'])
+      expect(callOrder).toEqual([
+        'createMedia',
+        'createSchedule',
+        'createJob',
+        'assignListToJob',
+      ])
+    })
+
+    it('uses dynamic schedule_id from createSchedule in job creation', async () => {
+      mockScheduleService.createSchedule.mockResolvedValue(77777)
+
+      await service.createPeerlyP2pJob(baseJobParams)
+
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
+      )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1]).toEqual(
+        expect.objectContaining({ schedule_id: 77777 }),
+      )
+    })
+
+    it('fails job creation when createSchedule rejects', async () => {
+      mockScheduleService.createSchedule.mockRejectedValue(
+        new BadGatewayException('Schedule API down'),
+      )
+
+      await expect(service.createPeerlyP2pJob(baseJobParams)).rejects.toThrow(
+        BadGatewayException,
+      )
+
+      expect(mockMediaService.createMedia).toHaveBeenCalled()
+      expect(
+        mockHttpService.post.mock.calls.some((c) => c[0] === '/1to1/jobs'),
+      ).toBe(false)
     })
 
     it('passes media ID from createMedia to createJob templates', async () => {

@@ -10,6 +10,7 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyMediaService } from './peerlyMedia.service'
+import { PeerlyScheduleService } from './peerlySchedule.service'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { CreateJobParams, PeerlyJob } from '../peerly.types'
 
@@ -36,6 +37,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
     private readonly peerlyMediaService: PeerlyMediaService,
+    private readonly peerlyScheduleService: PeerlyScheduleService,
     private readonly peerlyHttpService: PeerlyHttpService,
     private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
   ) {
@@ -70,6 +72,14 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       // extract date portion directly from ISO string to preserve the user's intended date
       const dateOnly = scheduledDate?.slice(0, 10)
 
+      this.logger.info('Creating schedule for P2P job')
+      const targetDate = dateOnly || 'no-date'
+      const createdAt = new Date().toISOString()
+      const scheduleName = `GP P2P - Campaign ${campaignId} - ${targetDate} - ${createdAt}`
+      const scheduleId =
+        await this.peerlyScheduleService.createSchedule(scheduleName)
+      this.logger.info(`Schedule created with ID: ${scheduleId}`)
+
       this.logger.info('Creating P2P job')
       jobId = await this.createJob({
         name,
@@ -89,6 +99,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
         didNpaSubset,
         identityId,
         scheduledDate: dateOnly,
+        scheduleId,
       })
       this.logger.info(`Job created with ID: ${jobId}`)
 
@@ -150,6 +161,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     didNpaSubset = [],
     identityId,
     scheduledDate,
+    scheduleId,
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
@@ -160,7 +172,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       did_state: didState,
       ...(didNpaSubset.length > 0 && { did_npa_subset: didNpaSubset }),
       can_use_mms: hasMms,
-      schedule_id: this.scheduleId,
+      schedule_id: scheduleId,
       ...(identityId && { identity_id: identityId }),
       ...(scheduledDate && {
         start_date: scheduledDate,
