@@ -221,7 +221,10 @@ export class CampaignTasksService extends createPrismaBase(
       await this.generateDefaultTasks(campaign)
       const generatedTasks =
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
-      const paradeTasks = this.buildParadeAwarenessTasks(generatedTasks)
+      const paradeTasks = this.buildParadeAwarenessTasks(
+        generatedTasks,
+        campaign.details.electionDate as string | undefined,
+      )
 
       return this.saveTasks(campaign.id, [...generatedTasks, ...paradeTasks])
     } catch (error) {
@@ -269,7 +272,10 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.startOrGetCached(campaign)
 
       if (result.cached) {
-        const paradeTasks = this.buildParadeAwarenessTasks(result.tasks)
+        const paradeTasks = this.buildParadeAwarenessTasks(
+          result.tasks,
+          campaign.details.electionDate as string | undefined,
+        )
         const savedTasks = await this.saveTasks(campaign.id, [
           ...result.tasks,
           ...paradeTasks,
@@ -344,7 +350,10 @@ export class CampaignTasksService extends createPrismaBase(
           sessionId,
           campaign,
         )
-      const paradeTasks = this.buildParadeAwarenessTasks(generatedTasks)
+      const paradeTasks = this.buildParadeAwarenessTasks(
+        generatedTasks,
+        campaign.details.electionDate as string | undefined,
+      )
       const savedTasks = await this.saveTasks(campaign.id, [
         ...generatedTasks,
         ...paradeTasks,
@@ -643,10 +652,14 @@ export class CampaignTasksService extends createPrismaBase(
     return daysUntil === 0 ? date : addDays(date, daysUntil)
   }
 
-  buildParadeAwarenessTasks(
+  private buildParadeAwarenessTasks(
     aiTasks: CampaignTask[],
+    electionDateString?: string,
     today = startOfDay(new Date()),
   ): CampaignTask[] {
+    if (!electionDateString) return []
+
+    const electionDate = startOfDay(parseIsoDateString(electionDateString))
     const paradePattern = /parade/i
     const minWeeksOut = 4
 
@@ -656,7 +669,10 @@ export class CampaignTasksService extends createPrismaBase(
         paradePattern.test(task.title) || paradePattern.test(task.description)
       if (!matchesParade) return []
 
-      const eventDate = startOfDay(parseIsoDateString(task.date))
+      const parsed = parseIsoDateString(task.date)
+      if (isNaN(parsed.getTime())) return []
+
+      const eventDate = startOfDay(parsed)
       if (differenceInCalendarDays(eventDate, today) < minWeeksOut * 7) {
         return []
       }
@@ -666,15 +682,22 @@ export class CampaignTasksService extends createPrismaBase(
         weekStartsOn: 1,
       })
 
+      if (isBefore(monday, today)) {
+        return []
+      }
+
       return [
         {
           id: `aw-parade-${task.id}`,
           title: `Contact Parade Organizers for ${task.title}`,
           description: 'Get signed up to march in the parade',
           flowType: CampaignTaskType.awareness,
-          week: differenceInWeeks(eventDate, monday, {
-            roundingMethod: 'ceil',
-          }),
+          week: Math.max(
+            1,
+            differenceInWeeks(electionDate, monday, {
+              roundingMethod: 'ceil',
+            }),
+          ),
           date: formatDate(monday, DateFormats.isoDate),
           isDefaultTask: false,
         },
@@ -687,6 +710,7 @@ export class CampaignTasksService extends createPrismaBase(
     tasks: CampaignTask[],
   ): Prisma.CampaignTaskCreateManyInput[] {
     return tasks.map((task) => ({
+      id: task.id,
       campaignId,
       title: task.title,
       description: task.description,

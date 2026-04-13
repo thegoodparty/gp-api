@@ -730,6 +730,7 @@ describe('CampaignTasksService', () => {
     const getCreatedTaskData = () => {
       const call = mockTxModel.createMany.mock.calls[0][0] as {
         data: {
+          id: string
           title: string
           description: string
           cta: string | null
@@ -973,6 +974,7 @@ describe('CampaignTasksService', () => {
       )
       expect(socialPosts).toEqual([
         {
+          id: 'rec-social-posts-2025-06-06',
           campaignId: 1,
           title: 'Plan and Schedule 2 Social Posts for the week',
           description:
@@ -989,6 +991,7 @@ describe('CampaignTasksService', () => {
           isDefaultTask: true,
         },
         {
+          id: 'rec-social-posts-2025-06-13',
           campaignId: 1,
           title: 'Plan and Schedule 2 Social Posts for the week',
           description:
@@ -1023,6 +1026,7 @@ describe('CampaignTasksService', () => {
       )
       expect(houseParty).toEqual([
         {
+          id: 'rec-house-party-2025-06-04',
           campaignId: 1,
           title: 'Organize a House Party with Supporters',
           description:
@@ -1045,6 +1049,7 @@ describe('CampaignTasksService', () => {
       )
       expect(fundraiser).toEqual([
         {
+          id: 'rec-fundraiser-2025-06-10',
           campaignId: 1,
           title: 'Organize a Fundraiser',
           description:
@@ -1081,6 +1086,7 @@ describe('CampaignTasksService', () => {
       )
       expect(lettersToEditor).toEqual([
         {
+          id: 'rec-letters-editor-2025-10-09',
           campaignId: 1,
           title: 'Submit 2 Letters to the Editor in support of your campaign',
           description:
@@ -1229,6 +1235,7 @@ describe('CampaignTasksService', () => {
       expect(mockTxModel.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
+            id: 'new-1',
             campaignId: 1,
             title: 'New Task',
             description: 'Description',
@@ -1291,6 +1298,22 @@ describe('CampaignTasksService', () => {
 
   describe('buildParadeAwarenessTasks', () => {
     const today = startOfDay(parseIsoDateString('2026-01-05'))
+    const electionDate = '2026-11-03'
+
+    type BuildFn = (
+      t: CampaignTask[],
+      e: string | undefined,
+      d: Date,
+    ) => CampaignTask[]
+
+    const callBuildParade = (
+      tasks: CampaignTask[],
+      election: string | undefined,
+      todayOverride: Date,
+    ) =>
+      (service as unknown as Record<string, BuildFn>)[
+        'buildParadeAwarenessTasks'
+      ].bind(service)(tasks, election, todayOverride)
 
     const makeAiTask = (
       overrides: Partial<CampaignTask> = {},
@@ -1312,7 +1335,7 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(1)
       expect(result[0].title).toBe(
@@ -1321,7 +1344,7 @@ describe('CampaignTasksService', () => {
       expect(result[0].description).toBe('Get signed up to march in the parade')
       expect(result[0].flowType).toBe(CampaignTaskType.awareness)
       expect(result[0].date).toBe('2026-06-01')
-      expect(result[0].week).toBe(5)
+      expect(result[0].week).toBe(23)
       expect(result[0].isDefaultTask).toBe(false)
     })
 
@@ -1335,7 +1358,7 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(1)
       expect(result[0].title).toBe(
@@ -1352,7 +1375,7 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(0)
     })
@@ -1366,7 +1389,7 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(0)
     })
@@ -1381,7 +1404,7 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(0)
     })
@@ -1405,11 +1428,54 @@ describe('CampaignTasksService', () => {
         }),
       ]
 
-      const result = service.buildParadeAwarenessTasks(tasks, today)
+      const result = callBuildParade(tasks, electionDate, today)
 
       expect(result).toHaveLength(2)
       expect(result[0].id).toBe('aw-parade-parade-1')
       expect(result[1].id).toBe('aw-parade-parade-2')
+    })
+
+    it('returns empty when no election date is provided', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = callBuildParade(tasks, undefined, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks with malformed dates', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-bad',
+          title: 'Bad Parade',
+          date: 'not-a-date',
+        }),
+      ]
+
+      const result = callBuildParade(tasks, electionDate, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips when derived monday is before today', () => {
+      const laterToday = startOfDay(parseIsoDateString('2026-06-05'))
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = callBuildParade(tasks, electionDate, laterToday)
+
+      expect(result).toHaveLength(0)
     })
   })
 })
