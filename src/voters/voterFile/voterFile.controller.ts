@@ -41,6 +41,8 @@ import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampai
 import { VoterFileService } from './voterFile.service'
 import { PinoLogger } from 'nestjs-pino'
 
+const NOT_PRO_ERROR = 'Campaign is not pro'
+
 @Controller('voters/voter-file')
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
@@ -160,18 +162,16 @@ export class VoterFileController {
     const electedOffice = await this.electedOfficeService.findFirst({
       where: { organizationSlug: organization.slug },
     })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
-    if (!campaign.organizationSlug) {
-      throw new BadRequestException('Campaign has no organization')
-    }
+    const organizationSlug = this.resolveFilterOrganizationSlug(
+      campaign,
+      electedOffice,
+    )
     const campaignFilter = await this.voterFileFilterService.create(
-      campaign.id,
-      campaign.organizationSlug,
+      campaign?.id,
+      organizationSlug,
       voterFileFilter,
     )
-    if (electedOffice?.organizationSlug) {
+    if (electedOffice?.organizationSlug && campaign?.organizationSlug) {
       await this.voterFileFilterService.create(
         campaign.id,
         electedOffice.organizationSlug,
@@ -179,6 +179,24 @@ export class VoterFileController {
       )
     }
     return campaignFilter
+  }
+
+  private resolveFilterOrganizationSlug(
+    campaign: Campaign | undefined,
+    electedOffice: { organizationSlug: string | null } | null,
+  ): string {
+    if (!(campaign?.isPro ?? false) && !electedOffice) {
+      throw new BadRequestException(NOT_PRO_ERROR)
+    }
+    if (campaign && !campaign.organizationSlug) {
+      throw new BadRequestException('Campaign has no organization')
+    }
+    const organizationSlug =
+      campaign?.organizationSlug ?? electedOffice?.organizationSlug
+    if (!organizationSlug) {
+      throw new BadRequestException('No organization found')
+    }
+    return organizationSlug
   }
 
   @Get('filters')
@@ -217,7 +235,7 @@ export class VoterFileController {
       where: { organizationSlug: organization.slug },
     })
     if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
+      throw new BadRequestException(NOT_PRO_ERROR)
     }
     const filter =
       await this.voterFileFilterService.findByIdAndOrganizationSlug(
@@ -247,7 +265,7 @@ export class VoterFileController {
       where: { organizationSlug: organization.slug },
     })
     if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
+      throw new BadRequestException(NOT_PRO_ERROR)
     }
     await this.voterFileFilterService.deleteByIdAndOrganizationSlug(
       id,
