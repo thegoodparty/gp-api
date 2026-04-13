@@ -32,7 +32,7 @@ export type BackfillDryRunRecord = {
     L2DistrictName: string
     office: string
     otherOffice: string
-  }
+  } | null
   error?: string
 }
 
@@ -175,7 +175,25 @@ export class OrganizationsBackfillService extends createPrismaBase(
       if (electedOffices.length === 0) break
 
       for (const eo of electedOffices) {
-        const record = await this.dryRunElectedOffice(eo)
+        const { campaign } = eo
+        if (!campaign) {
+          eoStats['error']++
+          onRecord({
+            type: 'elected-office',
+            id: eo.id,
+            slug: OrganizationsService.electedOfficeOrgSlug(eo.id),
+            userId: eo.userId,
+            existingOrg: null,
+            resolved: null,
+            wouldWrite: false,
+            wouldCreate: false,
+            wouldLinkRecord: false,
+            inputFields: null,
+            error: 'Elected office has no linked campaign',
+          })
+          continue
+        }
+        const record = await this.dryRunElectedOffice({ ...eo, campaign })
         eoStats[record.resolved?.category ?? 'error']++
         onRecord(record)
       }
@@ -473,7 +491,19 @@ export class OrganizationsBackfillService extends createPrismaBase(
       if (electedOffices.length === 0) break
 
       for (const eo of electedOffices) {
-        const category = await this.backfillElectedOfficeOrganization(eo)
+        const { campaign } = eo
+        if (!campaign) {
+          this.logger.info(
+            { electedOfficeId: eo.id },
+            '[organization backfill] Elected office has no linked campaign, skipping',
+          )
+          categoryCounts['error']++
+          continue
+        }
+        const category = await this.backfillElectedOfficeOrganization({
+          ...eo,
+          campaign,
+        })
         categoryCounts[category]++
       }
 

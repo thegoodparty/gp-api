@@ -479,9 +479,8 @@ export class QueueConsumerService {
       this.logger.info('Poll not found, ignoring event')
       return
     }
-    const { poll, organization, campaign } = data
+    const { poll, office, organization } = data
     const { electedOfficeId } = poll
-    const { userId: campaignUserId } = campaign
 
     if (!electedOfficeId) {
       throw new InternalServerErrorException(
@@ -668,23 +667,21 @@ export class QueueConsumerService {
     })
 
     let district: OrgDistrict | null = null
-    if (campaign.organizationSlug) {
-      try {
-        district = await this.organizationsService.getDistrictForOrgSlug(
-          campaign.organizationSlug,
-        )
-      } catch (e) {
-        this.logger.warn(
-          { e },
-          'Failed to fetch district for analytics, defaulting to null',
-        )
-      }
+    try {
+      district = await this.organizationsService.getDistrictForOrgSlug(
+        organization.slug,
+      )
+    } catch (e) {
+      this.logger.warn(
+        { e },
+        'Failed to fetch district for analytics, defaulting to null',
+      )
     }
 
     await Promise.all([
-      this.analytics.identify(campaignUserId, { pollcount: pollCount }),
+      this.analytics.identify(office.userId, { pollcount: pollCount }),
       this.analytics.track(
-        campaignUserId,
+        office.userId,
         EVENTS.Polls.ResultsSynthesisCompleted,
         {
           pollId,
@@ -759,10 +756,10 @@ export class QueueConsumerService {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
       return
     }
-    const { poll, organization, campaign } = data
+    const { poll, office, organization } = data
 
     const user = await this.usersService.findUnique({
-      where: { id: campaign.userId },
+      where: { id: office.userId },
     })
     this.logger.info(`${params.pollId} Fetched sample and user`)
 
@@ -892,16 +889,7 @@ export class QueueConsumerService {
       return
     }
 
-    const campaign = await this.campaignsService.findUnique({
-      where: { id: office.campaignId },
-      include: { pathToVictory: true },
-    })
-
-    if (!campaign) {
-      this.logger.info('No campaign found, ignoring event')
-      return
-    }
-    return { poll, office, organization, campaign }
+    return { poll, office, organization }
   }
 
   async findMappedPersonIdsForCellPhones(params: {
