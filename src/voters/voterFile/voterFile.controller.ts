@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -150,21 +149,13 @@ export class VoterFileController {
   }
 
   @Post('filter')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   async createVoterFileFilter(
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     return this.voterFileFilterService.create(
-      campaign?.id,
       organization.slug,
       voterFileFilter,
     )
@@ -194,20 +185,13 @@ export class VoterFileController {
   }
 
   @Put('filter/:id')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   async updateVoterFileFilter(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateVoterFileFilterSchema,
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     const filter =
       await this.voterFileFilterService.findByIdAndOrganizationSlug(
         id,
@@ -224,20 +208,13 @@ export class VoterFileController {
   }
 
   @Delete('filter/:id')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteVoterFileFilter(
     @Param('id', ParseIntPipe) id: number,
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     await this.voterFileFilterService.deleteByIdAndOrganizationSlug(
       id,
       organization.slug,
