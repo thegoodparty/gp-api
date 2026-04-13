@@ -13,20 +13,13 @@ describe('VoterFileController', () => {
   let mockVoterFileFilterService: {
     create: ReturnType<typeof vi.fn>
     filterAccessCheck: ReturnType<typeof vi.fn>
-    findByIdAndCampaignId: ReturnType<typeof vi.fn>
     findByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     findByOrganizationSlug: ReturnType<typeof vi.fn>
-    findByCampaignId: ReturnType<typeof vi.fn>
-    updateByIdAndCampaignId: ReturnType<typeof vi.fn>
     updateByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
-    deleteByIdAndCampaignId: ReturnType<typeof vi.fn>
     deleteByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
   }
   let mockOutreachService: {
     model: { findFirst: ReturnType<typeof vi.fn> }
-  }
-  let mockElectedOfficeService: {
-    findFirst: ReturnType<typeof vi.fn>
   }
 
   const baseCampaign = {
@@ -51,20 +44,13 @@ describe('VoterFileController', () => {
     mockVoterFileFilterService = {
       create: vi.fn().mockResolvedValue(mockFilter),
       filterAccessCheck: vi.fn().mockResolvedValue(undefined),
-      findByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       findByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
       findByOrganizationSlug: vi.fn().mockResolvedValue([mockFilter]),
-      findByCampaignId: vi.fn().mockResolvedValue([mockFilter]),
-      updateByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       updateByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
-      deleteByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       deleteByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
     }
     mockOutreachService = {
       model: { findFirst: vi.fn() },
-    }
-    mockElectedOfficeService = {
-      findFirst: vi.fn().mockResolvedValue(null),
     }
 
     controller = new VoterFileController(
@@ -74,7 +60,6 @@ describe('VoterFileController', () => {
       mockCampaignsService as never,
       mockVoterFileFilterService as never,
       mockOutreachService as never,
-      mockElectedOfficeService as never,
       {} as never,
       createMockLogger(),
     )

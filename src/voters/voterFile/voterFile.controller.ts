@@ -22,7 +22,6 @@ import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
 import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
@@ -50,7 +49,6 @@ export class VoterFileController {
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
-    private readonly electedOfficeService: ElectedOfficeService,
     private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
