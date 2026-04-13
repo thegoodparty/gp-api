@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -23,7 +22,6 @@ import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
 import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
@@ -51,7 +49,6 @@ export class VoterFileController {
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
-    private readonly electedOfficeService: ElectedOfficeService,
     private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
@@ -150,21 +147,13 @@ export class VoterFileController {
   }
 
   @Post('filter')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   async createVoterFileFilter(
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     return this.voterFileFilterService.create(
-      campaign?.id,
       organization.slug,
       voterFileFilter,
     )
@@ -194,20 +183,13 @@ export class VoterFileController {
   }
 
   @Put('filter/:id')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   async updateVoterFileFilter(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateVoterFileFilterSchema,
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     const filter =
       await this.voterFileFilterService.findByIdAndOrganizationSlug(
         id,
@@ -224,20 +206,13 @@ export class VoterFileController {
   }
 
   @Delete('filter/:id')
-  @UseCampaign({ continueIfNotFound: true })
   @UseOrganization()
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteVoterFileFilter(
     @Param('id', ParseIntPipe) id: number,
-    @ReqCampaign() campaign: Campaign | undefined,
     @ReqOrganization() organization: Organization,
   ) {
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { organizationSlug: organization.slug },
-    })
-    if (!(campaign?.isPro ?? false) && !electedOffice) {
-      throw new BadRequestException('Campaign is not pro')
-    }
+    await this.voterFileFilterService.filterAccessCheck(organization.slug)
     await this.voterFileFilterService.deleteByIdAndOrganizationSlug(
       id,
       organization.slug,
