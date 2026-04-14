@@ -56,6 +56,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     scheduledDate,
   }: CreateP2pJobParams): Promise<string> {
     let jobId: string | undefined
+    let scheduleId: number | undefined
 
     try {
       this.logger.info('Creating media for P2P job')
@@ -72,13 +73,11 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       // extract date portion directly from ISO string to preserve the user's intended date
       const dateOnly = scheduledDate?.slice(0, 10)
 
-      this.logger.info('Creating schedule for P2P job')
       const targetDate = dateOnly || 'no-date'
       const createdAt = new Date().toISOString()
       const scheduleName = `GP P2P - Campaign ${campaignId} - ${targetDate} - ${createdAt}`
-      const scheduleId =
+      scheduleId =
         await this.peerlyScheduleService.createSchedule(scheduleName)
-      this.logger.info(`Schedule created with ID: ${scheduleId}`)
 
       this.logger.info('Creating P2P job')
       jobId = await this.createJob({
@@ -104,7 +103,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Job created with ID: ${jobId}`)
 
       this.logger.info(`Assigning list ${listId} to job ${jobId}`)
-      await this.assignListToJob(jobId, listId, { campaignId })
+      await this.assignListToJob(jobId, listId, { campaignId, scheduleId })
       this.logger.info('List assigned successfully')
 
       this.logger.info(
@@ -119,7 +118,10 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       if (isListAssignmentFailure) {
         throw error
       }
-      this.logger.error({ error }, P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
+      this.logger.error(
+        { error, scheduleId },
+        P2P_ERROR_MESSAGES.JOB_CREATION_FAILED,
+      )
       throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
@@ -225,7 +227,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   private async assignListToJob(
     jobId: string,
     listId: number,
-    context?: { campaignId?: number },
+    context?: { campaignId?: number; scheduleId?: number },
   ): Promise<void> {
     try {
       await this.peerlyHttpService.post(`/1to1/jobs/${jobId}/assignlist`, {
@@ -241,6 +243,9 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
             listId,
             ...(context?.campaignId != null && {
               campaignId: context.campaignId,
+            }),
+            ...(context?.scheduleId != null && {
+              scheduleId: context.scheduleId,
             }),
           },
         },
