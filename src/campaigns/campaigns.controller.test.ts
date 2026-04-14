@@ -2,7 +2,6 @@ import { OrganizationsService } from '@/organizations/services/organizations.ser
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { CampaignStatus } from '@goodparty_org/contracts'
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,

@@ -41,9 +41,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     super()
   }
 
-  async generateCampaignTasks(
-    campaign: Campaign,
-  ): Promise<CampaignTask[]> {
+  async generateCampaignTasks(campaign: Campaign): Promise<CampaignTask[]> {
     const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
@@ -194,9 +192,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return 1
   }
 
-  private buildAdditionalRaceContext(
-    campaign: Campaign,
-  ): string {
+  private buildAdditionalRaceContext(campaign: Campaign): string {
     const details = campaign.details as PrismaJson.CampaignDetails
     const data = campaign.data as PrismaJson.CampaignData
     const contextParts: string[] = []
@@ -414,10 +410,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       : CampaignTaskType.education
   }
 
-  private calculateWeekFromDate(
-    dateStr: string,
-    campaign: Campaign,
-  ): number {
+  private calculateWeekFromDate(dateStr: string, campaign: Campaign): number {
     if (!dateStr) return 1
 
     try {
