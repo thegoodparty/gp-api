@@ -156,6 +156,9 @@
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
   },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.60.1"
+  },
   "devDependencies": {
     "@contentful/rich-text-types": "^17.0.0",
     "@eslint/eslintrc": "^3.3.5",
