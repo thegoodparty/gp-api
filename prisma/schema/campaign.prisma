@@ -41,7 +41,6 @@ model Campaign {
   freeTextsOfferRedeemedAt DateTime?               @map("free_texts_offer_redeemed_at")
   ScheduledMessage         ScheduledMessage[]
   tcrCompliance            TcrCompliance?
-  voterFileFilters         VoterFileFilter[]
   website                  Website?
   outreach                 Outreach[]
   communityIssue           CommunityIssue[]

@@ -31,7 +31,7 @@ export type BackfillDryRunRecord = {
     L2DistrictName: string
     office: string
     otherOffice: string
-  }
+  } | null
   error?: string
 }
 
@@ -174,7 +174,23 @@ export class OrganizationsBackfillService extends createPrismaBase(
 
       for (const eo of electedOffices) {
         const { campaign } = eo
-        if (campaign === null) continue
+        if (!campaign) {
+          eoStats['error']++
+          onRecord({
+            type: 'elected-office',
+            id: eo.id,
+            slug: OrganizationsService.electedOfficeOrgSlug(eo.id),
+            userId: eo.userId,
+            existingOrg: null,
+            resolved: null,
+            wouldWrite: false,
+            wouldCreate: false,
+            wouldLinkRecord: false,
+            inputFields: null,
+            error: 'Elected office has no linked campaign',
+          })
+          continue
+        }
         const record = await this.dryRunElectedOffice({ ...eo, campaign })
         eoStats[record.resolved?.category ?? 'error']++
         onRecord(record)
@@ -473,7 +489,14 @@ export class OrganizationsBackfillService extends createPrismaBase(
 
       for (const eo of electedOffices) {
         const { campaign } = eo
-        if (campaign === null) continue
+        if (!campaign) {
+          this.logger.info(
+            { electedOfficeId: eo.id },
+            '[organization backfill] Elected office has no linked campaign, skipping',
+          )
+          categoryCounts['error']++
+          continue
+        }
         const category = await this.backfillElectedOfficeOrganization({
           ...eo,
           campaign,
@@ -653,9 +676,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
    * office name). See OrganizationsService.resolveCustomPositionName for the
    * office/otherOffice resolution logic.
    */
-  private async resolvePositionAndDistrict(
-    campaign: Campaign,
-  ): Promise<{
+  private async resolvePositionAndDistrict(campaign: Campaign): Promise<{
     positionId: string | null
     overrideDistrictId: string | null
     customPositionName: string | null
