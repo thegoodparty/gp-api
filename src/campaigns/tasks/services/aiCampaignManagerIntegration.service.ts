@@ -9,6 +9,7 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -37,6 +38,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     private readonly organizations: OrganizationsService,
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: WrapperType<CampaignsService>,
+    @Inject(forwardRef(() => ContactsService))
+    private readonly contacts: WrapperType<ContactsService>,
   ) {
     super()
   }
@@ -131,9 +134,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
     const totalRegisteredVoters =
-      liveMetrics?.projectedTurnout != null
-        ? Math.max(1000, Math.ceil(liveMetrics.projectedTurnout / 0.6))
-        : 5000
+      await this.fetchTotalRegisteredVoters(campaign)
     const winNumber = this.extractNumberValue(liveMetrics?.winNumber, 1000)
     const projectedTurnout = this.extractNumberValue(
       liveMetrics?.projectedTurnout,
@@ -172,6 +173,32 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       return isNaN(parsed) ? defaultValue : parsed
     }
     return defaultValue
+  }
+
+  private async fetchTotalRegisteredVoters(
+    campaign: Campaign,
+  ): Promise<number> {
+    const DEFAULT_REGISTERED_VOTERS = 5000
+
+    if (!campaign.organizationSlug) return DEFAULT_REGISTERED_VOTERS
+
+    try {
+      const org = await this.client.organization.findUnique({
+        where: { slug: campaign.organizationSlug },
+      })
+      if (!org) return DEFAULT_REGISTERED_VOTERS
+
+      const stats = await this.contacts.getDistrictStats(org)
+      return stats.totalConstituents > 0
+        ? stats.totalConstituents
+        : DEFAULT_REGISTERED_VOTERS
+    } catch (e) {
+      this.logger.warn(
+        { campaignId: campaign.id, error: e },
+        'Failed to fetch district stats for totalRegisteredVoters, using default',
+      )
+      return DEFAULT_REGISTERED_VOTERS
+    }
   }
 
   private determineRaceType(details: PrismaJson.CampaignDetails): string {

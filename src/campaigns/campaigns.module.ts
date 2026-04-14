@@ -5,6 +5,7 @@ import { HttpModule } from '@nestjs/axios'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { EmailModule } from 'src/email/email.module'
 import { UsersModule } from 'src/users/users.module'
+import { ContactsModule } from 'src/contacts/contacts.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { CrmModule } from '../crm/crmModule'
@@ -42,6 +43,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
+    forwardRef(() => ContactsModule),
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,

@@ -9,6 +9,7 @@ import {
 } from '../aiCampaignManager.types'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
@@ -19,6 +20,21 @@ const mockOrganizations: Partial<OrganizationsService> = {
 const mockCampaigns: Partial<CampaignsService> = {
   fetchLiveRaceTargetMetrics: vi.fn(),
 }
+
+const mockContacts: Partial<ContactsService> = {
+  getDistrictStats: vi.fn().mockResolvedValue({
+    totalConstituents: 10000,
+    totalConstituentsWithCellPhone: 7000,
+  }),
+}
+
+const mockOrgFindUnique = vi.fn().mockResolvedValue({
+  slug: 'campaign-1',
+  positionId: 'pos-1',
+  overrideDistrictId: null,
+  customPositionName: null,
+  ownerId: 1,
+})
 
 const mockModel = {
   findUnique: vi.fn(),
@@ -38,6 +54,7 @@ const makeCampaign = (overrides: Partial<Campaign> = {}) =>
   ({
     id: 1,
     slug: 'test-campaign',
+    organizationSlug: 'campaign-1',
     userId: 123,
     isActive: true,
     isDemo: false,
@@ -109,9 +126,13 @@ describe('AiCampaignManagerIntegrationService', () => {
       mockAiManager as AiCampaignManagerService,
       mockOrganizations as OrganizationsService,
       mockCampaigns as CampaignsService,
+      mockContacts as ContactsService,
     )
     Object.defineProperty(service, '_prisma', {
-      get: () => ({ campaignPlan: mockModel }),
+      get: () => ({
+        campaignPlan: mockModel,
+        organization: { findUnique: mockOrgFindUnique },
+      }),
       configurable: true,
     })
     Object.defineProperty(service, 'logger', {
@@ -326,7 +347,8 @@ describe('AiCampaignManagerIntegrationService', () => {
         'Local Office in Unknown State',
       )
       expect(request.win_number).toBe(1000)
-      expect(request.total_likely_voters).toBe(3000)
+      // totalConstituents from district stats (10000) * 0.6
+      expect(request.total_likely_voters).toBe(6000)
     })
   })
 
