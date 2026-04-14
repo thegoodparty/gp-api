@@ -5,6 +5,8 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 import { WebsiteView } from '@prisma/client'
@@ -39,19 +41,16 @@ test.describe('Websites - Views', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `track-view-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -96,19 +95,16 @@ test.describe('Websites - Views', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `multi-views-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -134,9 +130,7 @@ test.describe('Websites - Views', () => {
     }
 
     const viewsResponse = await request.get('/v1/websites/mine/views', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     expect(viewsResponse.status()).toBe(200)
@@ -163,19 +157,16 @@ test.describe('Websites - Views', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `date-range-views-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -196,9 +187,7 @@ test.describe('Websites - Views', () => {
     const response = await request.get(
       `/v1/websites/mine/views?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
       {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers: authHeaders(authToken, orgSlug),
       },
     )
 
@@ -234,19 +223,16 @@ test.describe('Websites - Views', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const vanityPath = `empty-views-${Date.now()}`
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         vanityPath,
         status: 'published',
@@ -261,9 +247,7 @@ test.describe('Websites - Views', () => {
     const response = await request.get(
       `/v1/websites/mine/views?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
       {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers: authHeaders(authToken, orgSlug),
       },
     )
 

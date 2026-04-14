@@ -151,6 +151,20 @@ export function getBearerToken(token: string): string {
   return `Bearer ${token}`
 }
 
+export function campaignOrgSlug(campaignId: number): string {
+  return `campaign-${campaignId}`
+}
+
+export function authHeaders(
+  token: string,
+  orgSlug: string,
+): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    'x-organization-slug': orgSlug,
+  }
+}
+
 export function generateRandomPassword(): string {
   const letters = faker.string.alpha({ length: 8, casing: 'mixed' })
   const numbers = faker.string.numeric({ length: 4 })

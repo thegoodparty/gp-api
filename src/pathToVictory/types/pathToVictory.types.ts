@@ -11,6 +11,5 @@ export interface ViabilityScore {
 }
 
 export enum P2VSource {
-  GpApi = 'GpApi',
   ElectionApi = 'ElectionApi',
 }

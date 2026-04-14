@@ -5,6 +5,8 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  authHeaders,
+  campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { Prisma } from '@prisma/client'
 
@@ -44,11 +46,10 @@ test.describe('Websites - CRUD Operations', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     const response = await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     expect(response.status()).toBe(201)
@@ -76,17 +77,14 @@ test.describe('Websites - CRUD Operations', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const response = await request.get('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     expect(response.status()).toBe(200)
@@ -116,11 +114,10 @@ test.describe('Websites - CRUD Operations', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     const mainTitle = 'Test Campaign Title'
@@ -130,9 +127,7 @@ test.describe('Websites - CRUD Operations', () => {
     const vanityPath = `test-path-${Date.now()}`
 
     const updateResponse = await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         'main[title]': mainTitle,
         'about[issues][0][title]': issueTitle,
@@ -185,17 +180,14 @@ test.describe('Websites - CRUD Operations', () => {
 
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
+    const orgSlug = campaignOrgSlug(registerResponse.campaign.id)
 
     await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
     })
 
     await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         'main[title]': 'Original Title',
         'main[tagline]': 'Original Tagline',
@@ -203,9 +195,7 @@ test.describe('Websites - CRUD Operations', () => {
     })
 
     const updateResponse = await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: authHeaders(authToken, orgSlug),
       multipart: {
         'main[title]': 'Updated Title',
       },

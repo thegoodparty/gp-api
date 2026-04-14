@@ -218,29 +218,6 @@ describe('CampaignsService - Organization positionId sync', () => {
       )
     })
 
-    it('strips positionId, office, and otherOffice from persisted details', async () => {
-      const { service, mockCampaignCreate } = await buildOrgSyncModule()
-
-      vi.spyOn(service, 'findSlug').mockResolvedValue('test-slug')
-
-      const user = { id: 1, zip: '90210' } as User
-      const details = {
-        state: 'CA',
-        positionId: 'br-pos-123',
-        office: 'Other',
-        otherOffice: 'City Council',
-      } as PrismaJson.CampaignDetails
-
-      await service.createForUser(user, { details })
-
-      const created = mockCampaignCreate.mock.calls[0][0].data.details
-      expect(created.state).toBe('CA')
-      expect(created.zip).toBe('90210')
-      expect(created).not.toHaveProperty('positionId')
-      expect(created).not.toHaveProperty('office')
-      expect(created).not.toHaveProperty('otherOffice')
-    })
-
     describe('details json deep merge (same deepMerge as createForUser)', () => {
       it('keeps user zip when patch omits zip', () => {
         expect(deepMerge({ zip: '90210' } as object, {} as object)).toEqual({
@@ -387,67 +364,6 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       await service.updateJsonFields(10, {
         pathToVictory: { p2vCompleteDate: '2025-01-01' },
-      })
-
-      expect(mockOrgUpdate).not.toHaveBeenCalled()
-    })
-
-    it('should sync organization when legacy positionId is in details', async () => {
-      const { service, mockOrgUpdate, mockCampaignFindFirst, mockGetPosition } =
-        await buildOrgSyncModule()
-
-      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
-      mockGetPosition.mockResolvedValue({
-        id: 'gp-pos-99',
-        brPositionId: 'br-legacy-1',
-        brDatabaseId: 'br-db-1',
-        state: 'CA',
-        name: 'Mayor',
-      })
-
-      await service.updateJsonFields(10, {
-        details: { positionId: 'br-legacy-1', office: 'Mayor' },
-      })
-
-      expect(mockGetPosition).toHaveBeenCalledWith('br-legacy-1')
-      expect(mockOrgUpdate).toHaveBeenCalledWith({
-        where: { slug: 'campaign-10' },
-        data: {
-          positionId: 'gp-pos-99',
-          customPositionName: null,
-          overrideDistrictId: null,
-        },
-      })
-    })
-
-    it('should sync organization with customPositionName when no positionId', async () => {
-      const { service, mockOrgUpdate, mockCampaignFindFirst } =
-        await buildOrgSyncModule()
-
-      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
-
-      await service.updateJsonFields(10, {
-        details: { office: 'Other', otherOffice: 'Town Clerk' },
-      })
-
-      expect(mockOrgUpdate).toHaveBeenCalledWith({
-        where: { slug: 'campaign-10' },
-        data: {
-          positionId: null,
-          customPositionName: 'Town Clerk',
-          overrideDistrictId: null,
-        },
-      })
-    })
-
-    it('should not sync organization when details lacks legacy position fields', async () => {
-      const { service, mockOrgUpdate, mockCampaignFindFirst } =
-        await buildOrgSyncModule()
-
-      mockCampaignFindFirst.mockResolvedValue({ ...baseCampaign })
-
-      await service.updateJsonFields(10, {
-        details: { city: 'Austin', state: 'TX' },
       })
 
       expect(mockOrgUpdate).not.toHaveBeenCalled()
@@ -1081,8 +997,6 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       winNumber: 3001,
       voterContactGoal: 15005,
       source: 'test',
-      electionType: 'test',
-      electionLocation: 'test',
       p2vStatus: 'Complete',
       p2vCompleteDate: '2026-01-01',
     })
@@ -1114,8 +1028,6 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       winNumber: 2001,
       voterContactGoal: 10005,
       source: 'test',
-      electionType: 'test',
-      electionLocation: 'test',
       p2vStatus: 'Complete',
       p2vCompleteDate: '2026-01-01',
     })

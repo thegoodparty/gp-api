@@ -190,26 +190,4 @@ describe('ElectedOfficeService', () => {
       expect(result).toEqual(mockElectedOffice)
     })
   })
-
-  describe('getCurrentElectedOffice', () => {
-    it('returns elected office for user', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        swornInDate: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      mockModel.findFirst.mockResolvedValue(mockElectedOffice)
-
-      const result = await service.getCurrentElectedOffice(1)
-
-      expect(mockModel.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1 },
-      })
-      expect(result).toEqual(mockElectedOffice)
-    })
-  })
 })
