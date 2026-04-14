@@ -40,6 +40,5 @@ export type BlockedStateEventAttributes = {
   slug?: string
   feature?: string
 
-  p2vAttempts?: number
   reason?: string
 }
