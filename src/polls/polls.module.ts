@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common'
-import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { LlmModule } from 'src/llm/llm.module'
 import { PaymentsModule } from 'src/payments/payments.module'
@@ -24,7 +23,6 @@ import { OrganizationsModule } from '@/organizations/organizations.module'
     PaymentsModule,
     QueueProducerModule,
     UsersModule,
-    CampaignsModule,
     AwsModule,
     LlmModule,
     ContactsModule,
