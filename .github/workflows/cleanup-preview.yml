@@ -79,6 +79,52 @@ jobs:
 
       - run: npm ci
 
+      - name: Delete Clerk users
+        continue-on-error: true
+        run: |
+          STACK_NAME="${{ matrix.stack }}"
+          PR_NUM="${STACK_NAME#gp-api-pr-}"
+          CLUSTER="gp-pr-${PR_NUM}-fargateCluster"
+          TASK_FAMILY="gp-pr-${PR_NUM}-fargateCluster-gp-api-pr-${PR_NUM}"
+
+          TASK_DEF=$(aws ecs list-task-definitions \
+            --family-prefix "$TASK_FAMILY" \
+            --sort DESC \
+            --query 'taskDefinitionArns[0]' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$TASK_DEF" = "None" ] || [ -z "$TASK_DEF" ]; then
+            echo "No task definition found for $TASK_FAMILY — skipping Clerk cleanup"
+            exit 0
+          fi
+
+          CONTAINER_NAME="gp-api-pr-${PR_NUM}"
+          OVERRIDES=$(printf '{"containerOverrides":[{"name":"%s","command":["npm","run","migrate:destroy"]}]}' "$CONTAINER_NAME")
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-07984b965dabfdedc,subnet-01c540e6428cdd8db],securityGroups=[sg-01de8d67b0f0ec787],assignPublicIp=ENABLED}" \
+            --overrides "$OVERRIDES" \
+            --query 'tasks[0].taskArn' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
+            echo "Failed to start ECS task — skipping Clerk cleanup"
+            exit 0
+          fi
+
+          echo "Waiting for Clerk cleanup task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN" || true
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "$CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text 2>/dev/null || echo "unknown")
+          echo "Clerk cleanup task exit code: $EXIT_CODE"
+
       - name: Destroy Stack
         working-directory: ./deploy
         env:
