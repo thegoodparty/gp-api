@@ -60,14 +60,10 @@ model VoterFileFilter {
   homeownerNo                Boolean?      @default(false) @map("homeowner_no")
   homeownerUnknown           Boolean?      @default(false) @map("homeowner_unknown")
   voterCount                 Int?          @map("voter_count")
-  campaign                   Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId                 Int?          @map("campaign_id")
   outreaches                 Outreach[]
   organizationSlug           String        @map("organization_slug")
   organization               Organization  @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
-  @@index([campaignId])
-  @@index([id, campaignId])
   @@index([organizationSlug])
   @@map("voter_file_filter")
 }

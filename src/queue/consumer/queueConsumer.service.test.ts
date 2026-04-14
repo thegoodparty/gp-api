@@ -123,8 +123,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
   const pollId = 'poll-123'
   const electedOfficeId = 'office-1'
-  const campaignId = 1
-  const campaignUserId = 'user-1'
+  const officeUserId = 1
   const personId = 'person-1'
   const phoneNumber = '+15551234567'
 
@@ -145,12 +144,12 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     electedOfficeService = {
       findUnique: vi
         .fn()
-        .mockResolvedValue({ id: electedOfficeId, campaignId }),
+        .mockResolvedValue({ id: electedOfficeId, userId: officeUserId }),
       client: {
         electedOffice: {
           findUnique: vi.fn().mockResolvedValue({
             id: electedOfficeId,
-            campaignId,
+            userId: officeUserId,
             organizationSlug: 'eo-office-1',
             organization: {
               slug: 'eo-office-1',
@@ -163,11 +162,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       },
     }
     campaignsService = {
-      findUnique: vi.fn().mockResolvedValue({
-        id: campaignId,
-        userId: campaignUserId,
-        pathToVictory: { data: {} },
-      }),
+      findUnique: vi.fn(),
     }
     contactsService = {
       findContacts: vi
@@ -432,11 +427,11 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       confidence: expect.any(String),
     })
     expect(analytics.identify).toHaveBeenCalledWith(
-      campaignUserId,
+      officeUserId,
       expect.objectContaining({ pollcount: expect.any(Number) }),
     )
     expect(analytics.track).toHaveBeenCalledWith(
-      campaignUserId,
+      officeUserId,
       expect.any(String),
       expect.objectContaining({
         pollId,
@@ -485,7 +480,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     await service.processMessage(message)
 
     expect(analytics.track).toHaveBeenCalledWith(
-      campaignUserId,
+      officeUserId,
       expect.any(String),
       expect.objectContaining({
         pollResponses: 0,
@@ -760,7 +755,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
 
   const pollId = 'poll-456'
   const electedOfficeId = 'office-1'
-  const campaignId = 1
+  const officeUserId = 1
 
   const makePoll = (overrides: Record<string, unknown> = {}) => ({
     id: pollId,
@@ -789,12 +784,12 @@ describe('QueueConsumerService - triggerPollExecution', () => {
     electedOfficeService = {
       findUnique: vi
         .fn()
-        .mockResolvedValue({ id: electedOfficeId, campaignId }),
+        .mockResolvedValue({ id: electedOfficeId, userId: officeUserId }),
       client: {
         electedOffice: {
           findUnique: vi.fn().mockResolvedValue({
             id: electedOfficeId,
-            campaignId,
+            userId: officeUserId,
             organizationSlug: 'eo-office-1',
             organization: {
               slug: 'eo-office-1',
@@ -807,11 +802,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       },
     }
     campaignsService = {
-      findUnique: vi.fn().mockResolvedValue({
-        id: campaignId,
-        userId: 'user-1',
-        pathToVictory: { data: {} },
-      }),
+      findUnique: vi.fn(),
     }
     contactsService = {
       sampleContacts: vi.fn().mockResolvedValue([

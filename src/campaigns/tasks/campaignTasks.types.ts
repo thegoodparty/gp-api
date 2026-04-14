@@ -32,4 +32,7 @@ export type RecurringTaskTemplate = {
   title: string
   description: string
   recurrence: RecurrenceRule
+  flowType?: CampaignTaskType
+  proRequired?: boolean
+  defaultAiTemplateId?: string
 }

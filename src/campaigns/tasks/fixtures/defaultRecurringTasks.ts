@@ -1,4 +1,4 @@
-import { RecurringTaskTemplate } from '../campaignTasks.types'
+import { CampaignTaskType, RecurringTaskTemplate } from '../campaignTasks.types'
 
 export const defaultRecurringTasks: RecurringTaskTemplate[] = [
   {
@@ -62,5 +62,25 @@ export const defaultRecurringTasks: RecurringTaskTemplate[] = [
     description:
       'Have some of your supporters write some Letters to the Editor in support of your campaign to the local press.',
     recurrence: { type: 'weeksBeforeElection', dayOfWeek: 4, weeksBefore: 4 },
+  },
+  {
+    id: 'rec-door-knocking',
+    title: 'Knock on Doors',
+    description:
+      'Keep your campaign on track to hit your voter contact goals. Knock on your target doors to connect with voters face-to-face.',
+    recurrence: { type: 'weekly', dayOfWeek: 5 },
+    flowType: CampaignTaskType.doorKnocking,
+    proRequired: true,
+    defaultAiTemplateId: 'wgbnDDTxrf8OrresVE1HU',
+  },
+  {
+    id: 'rec-phone-banking',
+    title: 'Make phone bank calls',
+    description:
+      'Keep your campaign on track to hit your voter contact goals. Complete a phone bank shift to reach voters and share your message.',
+    recurrence: { type: 'weekly', dayOfWeek: 5 },
+    flowType: CampaignTaskType.phoneBanking,
+    proRequired: true,
+    defaultAiTemplateId: '5N93cglp3cvq62EIwu1IOa',
   },
 ]

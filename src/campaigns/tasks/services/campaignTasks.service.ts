@@ -546,7 +546,9 @@ export class CampaignTasksService extends createPrismaBase(
         id: `${template.id}-${formatDate(date, DateFormats.isoDate)}`,
         title: template.title,
         description: template.description,
-        flowType: CampaignTaskType.recurring,
+        flowType: template.flowType ?? CampaignTaskType.recurring,
+        proRequired: template.proRequired,
+        defaultAiTemplateId: template.defaultAiTemplateId,
         week: differenceInWeeks(electionDate, date, {
           roundingMethod: 'ceil',
         }),

@@ -12,20 +12,14 @@ describe('VoterFileController', () => {
   let mockCampaignsService: Record<string, ReturnType<typeof vi.fn>>
   let mockVoterFileFilterService: {
     create: ReturnType<typeof vi.fn>
-    findByIdAndCampaignId: ReturnType<typeof vi.fn>
+    filterAccessCheck: ReturnType<typeof vi.fn>
     findByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     findByOrganizationSlug: ReturnType<typeof vi.fn>
-    findByCampaignId: ReturnType<typeof vi.fn>
-    updateByIdAndCampaignId: ReturnType<typeof vi.fn>
     updateByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
-    deleteByIdAndCampaignId: ReturnType<typeof vi.fn>
     deleteByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
   }
   let mockOutreachService: {
     model: { findFirst: ReturnType<typeof vi.fn> }
-  }
-  let mockElectedOfficeService: {
-    findFirst: ReturnType<typeof vi.fn>
   }
 
   const baseCampaign = {
@@ -39,7 +33,6 @@ describe('VoterFileController', () => {
 
   const mockFilter = {
     id: 1,
-    campaignId: 1,
     name: 'Test Filter',
   } as VoterFileFilter
 
@@ -50,20 +43,14 @@ describe('VoterFileController', () => {
     mockCampaignsService = {}
     mockVoterFileFilterService = {
       create: vi.fn().mockResolvedValue(mockFilter),
-      findByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
+      filterAccessCheck: vi.fn().mockResolvedValue(undefined),
       findByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
       findByOrganizationSlug: vi.fn().mockResolvedValue([mockFilter]),
-      findByCampaignId: vi.fn().mockResolvedValue([mockFilter]),
-      updateByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       updateByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
-      deleteByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       deleteByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
     }
     mockOutreachService = {
       model: { findFirst: vi.fn() },
-    }
-    mockElectedOfficeService = {
-      findFirst: vi.fn().mockResolvedValue(null),
     }
 
     controller = new VoterFileController(
@@ -73,7 +60,6 @@ describe('VoterFileController', () => {
       mockCampaignsService as never,
       mockVoterFileFilterService as never,
       mockOutreachService as never,
-      mockElectedOfficeService as never,
       {} as never,
       createMockLogger(),
     )
@@ -81,60 +67,32 @@ describe('VoterFileController', () => {
   })
 
   describe('createVoterFileFilter', () => {
-    it('throws when campaign is not pro and org has no elected office', async () => {
-      mockElectedOfficeService.findFirst.mockResolvedValue(null)
+    it('throws when filterAccessCheck rejects', async () => {
+      mockVoterFileFilterService.filterAccessCheck.mockRejectedValue(
+        new BadRequestException('Campaign is not pro'),
+      )
       const body = { name: 'My Filter' } as never
 
       await expect(
-        controller.createVoterFileFilter(baseCampaign, baseOrg, body),
+        controller.createVoterFileFilter(baseOrg, body),
       ).rejects.toThrow(BadRequestException)
-      await expect(
-        controller.createVoterFileFilter(baseCampaign, baseOrg, body),
-      ).rejects.toThrow('Campaign is not pro')
 
-      expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { organizationSlug: baseOrg.slug },
-      })
-    })
-
-    it('creates filter when campaign is pro', async () => {
-      const campaign = { ...baseCampaign, isPro: true }
-      const body = { name: 'My Filter' } as never
-
-      const result = await controller.createVoterFileFilter(
-        campaign,
-        baseOrg,
-        body,
-      )
-
-      expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
-        campaign.id,
+      expect(mockVoterFileFilterService.filterAccessCheck).toHaveBeenCalledWith(
         baseOrg.slug,
-        body,
       )
-      expect(result).toEqual(mockFilter)
+      expect(mockVoterFileFilterService.create).not.toHaveBeenCalled()
     })
 
-    it('creates filter when org has elected office access', async () => {
-      const org = { slug: 'eo-org-1' } as Organization
-      mockElectedOfficeService.findFirst.mockResolvedValue({
-        id: 'office-1',
-        organizationSlug: 'eo-org-1',
-      })
+    it('creates filter when access check passes', async () => {
       const body = { name: 'My Filter' } as never
 
-      const result = await controller.createVoterFileFilter(
-        undefined,
-        org,
-        body,
-      )
+      const result = await controller.createVoterFileFilter(baseOrg, body)
 
-      expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { organizationSlug: org.slug },
-      })
+      expect(mockVoterFileFilterService.filterAccessCheck).toHaveBeenCalledWith(
+        baseOrg.slug,
+      )
       expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
-        undefined,
-        org.slug,
+        baseOrg.slug,
         body,
       )
       expect(result).toEqual(mockFilter)
@@ -174,95 +132,70 @@ describe('VoterFileController', () => {
   })
 
   describe('updateVoterFileFilter', () => {
-    it('throws when campaign is not pro and org has no elected office', async () => {
-      mockElectedOfficeService.findFirst.mockResolvedValue(null)
+    it('throws when filterAccessCheck rejects', async () => {
+      mockVoterFileFilterService.filterAccessCheck.mockRejectedValue(
+        new BadRequestException('Campaign is not pro'),
+      )
       const body = { name: 'Updated Filter' } as never
 
       await expect(
-        controller.updateVoterFileFilter(1, body, baseCampaign, baseOrg),
-      ).rejects.toThrow(BadRequestException)
-      await expect(
-        controller.updateVoterFileFilter(1, body, baseCampaign, baseOrg),
+        controller.updateVoterFileFilter(1, body, baseOrg),
       ).rejects.toThrow('Campaign is not pro')
     })
 
-    it('updates filter with organization and EO access', async () => {
-      const org = { slug: 'eo-org-1' } as Organization
-      mockElectedOfficeService.findFirst.mockResolvedValue({
-        id: 'office-1',
-        organizationSlug: 'eo-org-1',
-      })
+    it('updates filter when access check passes', async () => {
       const body = { name: 'Updated Filter' } as never
 
-      const result = await controller.updateVoterFileFilter(
-        1,
-        body,
-        undefined,
-        org,
-      )
+      const result = await controller.updateVoterFileFilter(1, body, baseOrg)
 
+      expect(mockVoterFileFilterService.filterAccessCheck).toHaveBeenCalledWith(
+        baseOrg.slug,
+      )
       expect(
         mockVoterFileFilterService.findByIdAndOrganizationSlug,
-      ).toHaveBeenCalledWith(1, org.slug)
+      ).toHaveBeenCalledWith(1, baseOrg.slug)
       expect(
         mockVoterFileFilterService.updateByIdAndOrganizationSlug,
-      ).toHaveBeenCalledWith(1, org.slug, body)
+      ).toHaveBeenCalledWith(1, baseOrg.slug, body)
       expect(result).toEqual(mockFilter)
     })
 
     it('throws NotFoundException when filter not found', async () => {
-      const org = { slug: 'eo-org-1' } as Organization
-      mockElectedOfficeService.findFirst.mockResolvedValue({
-        id: 'office-1',
-      })
       mockVoterFileFilterService.findByIdAndOrganizationSlug.mockResolvedValue(
         null,
       )
       const body = { name: 'Updated Filter' } as never
 
       await expect(
-        controller.updateVoterFileFilter(1, body, undefined, org),
+        controller.updateVoterFileFilter(1, body, baseOrg),
       ).rejects.toThrow('Voter file filter not found')
     })
   })
 
   describe('deleteVoterFileFilter', () => {
-    it('deletes filter with EO access', async () => {
-      const org = { slug: 'eo-org-1' } as Organization
-      mockElectedOfficeService.findFirst.mockResolvedValue({
-        id: 'office-1',
-        organizationSlug: 'eo-org-1',
-      })
+    it('deletes filter when access check passes', async () => {
+      await controller.deleteVoterFileFilter(1, baseOrg)
 
-      await controller.deleteVoterFileFilter(1, baseCampaign, org)
-
+      expect(mockVoterFileFilterService.filterAccessCheck).toHaveBeenCalledWith(
+        baseOrg.slug,
+      )
       expect(
         mockVoterFileFilterService.deleteByIdAndOrganizationSlug,
-      ).toHaveBeenCalledWith(1, org.slug)
+      ).toHaveBeenCalledWith(1, baseOrg.slug)
     })
 
-    it('throws when no EO access and not pro', async () => {
-      const org = { slug: 'some-org' } as Organization
-      mockElectedOfficeService.findFirst.mockResolvedValue(null)
+    it('throws when filterAccessCheck rejects', async () => {
+      mockVoterFileFilterService.filterAccessCheck.mockRejectedValue(
+        new BadRequestException('Campaign is not pro'),
+      )
 
       await expect(
-        controller.deleteVoterFileFilter(1, baseCampaign, org),
+        controller.deleteVoterFileFilter(1, baseOrg),
       ).rejects.toThrow('Campaign is not pro')
 
       expect(
         mockVoterFileFilterService.deleteByIdAndOrganizationSlug,
       ).not.toHaveBeenCalled()
-    })
-
-    it('deletes when campaign is pro', async () => {
-      const campaign = { ...baseCampaign, isPro: true }
-      mockElectedOfficeService.findFirst.mockResolvedValue(null)
-
-      await controller.deleteVoterFileFilter(1, campaign, baseOrg)
-
-      expect(
-        mockVoterFileFilterService.deleteByIdAndOrganizationSlug,
-      ).toHaveBeenCalledWith(1, baseOrg.slug)
     })
   })
 
