@@ -48,8 +48,6 @@ const CampaignDetailsSchema = z
     city: z.string(),
     county: z.string(),
     normalizedOffice: z.string(),
-    otherOffice: z.string(),
-    office: z.string(),
     party: z.string(),
     otherParty: z.string(),
     district: z.string(),
@@ -73,7 +71,6 @@ const CampaignDetailsSchema = z
     officeTermLength: z.string(),
     partisanType: z.string().nullish().optional(),
     priorElectionDates: z.array(z.string()),
-    positionId: z.string().nullish(),
     electionId: z.string().nullish(),
     tier: z.string(),
   })
@@ -81,27 +78,33 @@ const CampaignDetailsSchema = z
   .passthrough()
 
 // TODO: make schemas data, pathToVictory, aiContent
-export class UpdateCampaignSchema extends createZodDto(
-  CampaignSchema.pick({
-    slug: true,
-    data: true,
-    aiContent: true,
-    formattedAddress: true,
-    placeId: true,
-    canDownloadFederal: true,
+export const updateCampaignBodySchema = CampaignSchema.pick({
+  slug: true,
+  data: true,
+  aiContent: true,
+  formattedAddress: true,
+  placeId: true,
+  canDownloadFederal: true,
+})
+  .partial()
+  .extend({
+    details: CampaignDetailsSchema.optional(),
+    pathToVictory: z.record(z.string(), z.unknown()).optional(),
   })
-    .partial()
-    .extend({
-      details: CampaignDetailsSchema.optional(),
-      pathToVictory: z.record(z.string(), z.unknown()).optional(),
-    })
-    .strict(),
+  .strict()
+
+export type UpdateCampaignBody = z.infer<typeof updateCampaignBodySchema>
+
+export class UpdateCampaignSchema extends createZodDto(
+  updateCampaignBodySchema,
 ) {}
 
 export class CreateCampaignSchema extends createZodDto(
   z.object({
     details: CampaignDetailsSchema,
     data: z.record(z.string(), z.unknown()).optional(),
+    ballotReadyPositionId: z.string().nullish(),
+    customPositionName: z.string().nullish(),
   }),
 ) {}
 

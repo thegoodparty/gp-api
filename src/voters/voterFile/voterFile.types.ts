@@ -8,7 +8,7 @@ export enum VoterFileType {
   directMail = 'directMail',
   telemarketing = 'telemarketing',
   custom = 'custom',
-  robocall = CampaignTaskType.robocall,
+  robocall = 'robocall',
 }
 
 // TODO: these should be cleaned up to only be what is currently used
@@ -56,6 +56,8 @@ export const TASK_TO_TYPE_MAP: {
   [CampaignTaskType.events]: VoterFileType.full,
   [CampaignTaskType.education]: VoterFileType.full,
   [CampaignTaskType.compliance]: VoterFileType.full,
+  [CampaignTaskType.awareness]: VoterFileType.full,
+  [CampaignTaskType.recurring]: VoterFileType.full,
 }
 
 // TODO: store this in DB table? (currently in campaign.data)

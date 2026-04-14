@@ -67,45 +67,18 @@ export class ElectedOfficeController {
     return req.m2mToken ? record : this.toApi(record)
   }
 
-  // LEGACY: When org migration is complete:
-  //         - @UseOrganization becomes required (remove continueIfNotFound)
-  //         - Remove the entire legacy branch (findFirst by userId, campaign.organization/details fallback)
-  //         - organization param becomes non-optional
   @Post('/')
-  @UseOrganization({ continueIfNotFound: true })
+  @UseOrganization()
   async create(
     @ReqUser() user: User,
     @Body() body: CreateElectedOfficeDto,
-    @ReqOrganization() organization: Organization | undefined,
+    @ReqOrganization() organization: Organization,
   ) {
-    if (organization) {
-      // Org path: get campaign from the organization
-      const campaign =
-        await this.electedOfficeService.client.campaign.findUnique({
-          where: { organizationSlug: organization.slug },
-        })
-      if (!campaign) {
-        throw new ForbiddenException('Not allowed to link campaign')
-      }
-
-      const created = await this.electedOfficeService.create({
-        ...body,
-        userId: user.id,
-        campaignId: campaign.id,
-        orgData: {
-          positionId: organization.positionId,
-          customPositionName: organization.customPositionName,
-          overrideDistrictId: organization.overrideDistrictId,
-        },
-      })
-      return this.toApi(created)
-    }
-
-    // LEGACY: Remove this entire branch when org migration is complete.
-    const campaign = await this.electedOfficeService.client.campaign.findFirst({
-      where: { userId: user.id },
-      include: { organization: true },
-    })
+    const campaign = await this.electedOfficeService.client.campaign.findUnique(
+      {
+        where: { organizationSlug: organization.slug },
+      },
+    )
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
@@ -114,18 +87,11 @@ export class ElectedOfficeController {
       ...body,
       userId: user.id,
       campaignId: campaign.id,
-      ...(campaign.organization
-        ? {
-            orgData: {
-              positionId: campaign.organization.positionId,
-              customPositionName: campaign.organization.customPositionName,
-              overrideDistrictId: campaign.organization.overrideDistrictId,
-            },
-          }
-        : {
-            office: campaign.details.office,
-            otherOffice: campaign.details.otherOffice,
-          }),
+      orgData: {
+        positionId: organization.positionId,
+        customPositionName: organization.customPositionName,
+        overrideDistrictId: organization.overrideDistrictId,
+      },
     })
     return this.toApi(created)
   }

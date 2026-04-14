@@ -42,16 +42,6 @@ import {
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
-// Indirection to avoid a circular import at module load time:
-// campaigns.service → features.service → users.service → crmUsers.service → campaigns.service
-// Once CrmUsersService is decoupled from UsersService (or moved out of
-// the users module), FeaturesService can be injected directly and this
-// token + interface can be removed.
-export const FEATURE_FLAG_CHECKER = Symbol('FEATURE_FLAG_CHECKER')
-export interface FeatureFlagChecker {
-  isFeatureEnabled(params: { user: number; feature: string }): Promise<boolean>
-}
-
 enum CandidateVerification {
   yes = 'YES',
   no = 'NO',
@@ -71,40 +61,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly slack: SlackService,
-    @Inject(FEATURE_FLAG_CHECKER)
-    private readonly featureFlags: FeatureFlagChecker,
   ) {
     super()
-  }
-
-  private async shouldReplicateToEO(userId: number): Promise<boolean> {
-    const features = this.featureFlags
-    const isWinServeSplit = await features.isFeatureEnabled({
-      user: userId,
-      feature: 'win-serve-split',
-    })
-    return !isWinServeSplit
-  }
-
-  private async replicateOrgDataToLinkedEO(
-    tx: Prisma.TransactionClient,
-    campaignId: number,
-    orgData: {
-      positionId?: string | null
-      customPositionName?: string | null
-      overrideDistrictId?: string | null
-    },
-  ) {
-    const eo = await tx.electedOffice.findFirst({
-      where: { campaignId },
-      select: { organizationSlug: true },
-    })
-    if (!eo?.organizationSlug) return
-
-    await tx.organization.update({
-      where: { slug: eo.organizationSlug },
-      data: orgData,
-    })
   }
 
   findByUserId<T extends Prisma.CampaignInclude>(
@@ -181,28 +139,28 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     user: User,
     initialData: {
       details: PrismaJson.CampaignDetails
-      data?: Record<string, unknown>
+      data?: PrismaJson.CampaignData
+    },
+    orgPosition?: {
+      ballotReadyPositionId?: string
+      customPositionName?: string
     },
   ) {
     this.logger.debug(user, 'Creating campaign for user')
     const slug = await this.findSlug(user)
 
-    const baseDetails: PrismaJson.CampaignDetails = { zip: user.zip }
     const baseData: PrismaJson.CampaignData = {
       slug,
     }
 
-    const position = initialData.details.positionId
+    const position = orgPosition?.ballotReadyPositionId
       ? await this.elections.getPositionByBallotReadyId(
-          initialData.details.positionId,
+          orgPosition.ballotReadyPositionId,
         )
       : null
 
-    const customPositionName = !position
-      ? OrganizationsService.resolveCustomPositionName(
-          initialData.details.office,
-          initialData.details.otherOffice,
-        )
+    const resolvedCustomPositionName = !position
+      ? (orgPosition?.customPositionName ?? null)
       : null
 
     const newCampaign = await this.client.$transaction(async (tx) => {
@@ -214,7 +172,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       this.logger.info(
         {
-          ballotReadyPositionId: initialData.details.positionId,
+          ballotReadyPositionId: orgPosition?.ballotReadyPositionId,
           position,
           campaignId,
           orgSlug,
@@ -227,9 +185,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           slug: orgSlug,
           ownerId: user.id,
           positionId: position?.id ?? null,
-          customPositionName,
+          customPositionName: resolvedCustomPositionName,
         },
       })
+
+      const mergedDetails = deepMerge(
+        { zip: user.zip } as object,
+        initialData.details as object,
+      ) as PrismaJson.CampaignDetails
 
       return tx.campaign.create({
         data: {
@@ -238,9 +201,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           organizationSlug: orgSlug,
           isActive: false,
           userId: user.id,
-          // @ts-expect-error TS isn't smart enough to know that deepMerge will return
-          // a valid CampaignDetails
-          details: deepMerge(baseDetails, initialData.details),
+          details: mergedDetails,
           data: initialData.data
             ? deepMerge(baseData, initialData.data)
             : baseData,
@@ -254,61 +215,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async update(args: Prisma.CampaignUpdateArgs & { where: { id: number } }) {
-    const hasDetailsUpdate = !!args.data.details
-
-    const existing = hasDetailsUpdate
-      ? await this.model.findUnique({ where: args.where })
-      : null
-
-    const incomingPositionId = args.data.details?.positionId
-    const ballotReadyPositionId = hasDetailsUpdate
-      ? incomingPositionId !== undefined
-        ? (incomingPositionId as string | null)
-        : (existing?.details?.positionId ?? null)
-      : null
-
-    const position = ballotReadyPositionId
-      ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
-      : null
-
-    const replicate =
-      hasDetailsUpdate && existing
-        ? await this.shouldReplicateToEO(existing.userId)
-        : false
-
     const campaign = await this.client.$transaction(async (tx) => {
-      if (hasDetailsUpdate && existing) {
-        const orgSlug = OrganizationsService.campaignOrgSlug(args.where.id)
-        const mergedDetails = {
-          ...existing.details,
-          ...(typeof args.data.details === 'object' ? args.data.details : {}),
-        } as PrismaJson.CampaignDetails
-        const customPositionName = !position
-          ? OrganizationsService.resolveCustomPositionName(
-              mergedDetails.office,
-              mergedDetails.otherOffice,
-            )
-          : null
-
-        this.logger.info(
-          { ballotReadyPositionId, position, orgSlug },
-          'Updating organization',
-        )
-        const orgUpdate = {
-          positionId: position?.id ?? null,
-          customPositionName,
-          overrideDistrictId: null as string | null,
-        }
-        await tx.organization.update({
-          where: { slug: orgSlug },
-          data: orgUpdate,
-        })
-
-        if (replicate) {
-          await this.replicateOrgDataToLinkedEO(tx, args.where.id, orgUpdate)
-        }
-      }
-
       return tx.campaign.update(args)
     })
     const isPro = args?.data?.isPro
@@ -335,40 +242,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       canDownloadFederal,
       overrideDistrictId,
     } = body
-
-    let position: Awaited<
-      ReturnType<ElectionsService['getPositionByBallotReadyId']>
-    > = null
-
-    const needsReplication = !!(details || overrideDistrictId !== undefined)
-    let replicate = false
-    if (needsReplication) {
-      const owner = await this.model.findFirst({
-        where: { id },
-        select: { userId: true },
-      })
-      if (owner) {
-        replicate = await this.shouldReplicateToEO(owner.userId)
-      }
-    }
-
-    if (details) {
-      const existing = await this.model.findFirst({
-        where: { id },
-        select: { details: true },
-      })
-      const incomingPositionId = details.positionId
-      const ballotReadyPositionId =
-        incomingPositionId !== undefined
-          ? // Type narrowing from nullable/union — runtime context guarantees string but type is broader
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (incomingPositionId as string | null)
-          : (existing?.details?.positionId ?? null)
-
-      position = ballotReadyPositionId
-        ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
-        : null
-    }
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
@@ -435,37 +308,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           ) as PrismaJson.CampaignAiContent
         }
 
-        if (details) {
-          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-          const merged =
-            // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            campaignUpdateData.details as PrismaJson.CampaignDetails
-          const customPositionName = !position
-            ? OrganizationsService.resolveCustomPositionName(
-                merged.office,
-                merged.otherOffice,
-              )
-            : null
-          const detailsOrgUpdate = {
-            positionId: position?.id ?? null,
-            customPositionName,
-            overrideDistrictId: null as string | null,
-          }
-          await tx.organization.update({
-            where: { slug: orgSlug },
-            data: detailsOrgUpdate,
-          })
-
-          if (replicate) {
-            await this.replicateOrgDataToLinkedEO(
-              tx,
-              campaign.id,
-              detailsOrgUpdate,
-            )
-          }
-        }
-
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const districtId = overrideDistrictId ?? null
@@ -473,12 +315,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             where: { slug: orgSlug },
             data: { overrideDistrictId: districtId },
           })
-
-          if (replicate) {
-            await this.replicateOrgDataToLinkedEO(tx, campaign.id, {
-              overrideDistrictId: districtId,
-            })
-          }
         }
 
         await tx.campaign.update({
@@ -552,7 +388,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const updatedDetails = {
       ...currentDetails,
       ...details,
-    } as typeof currentDetails
+    }
     const updatedCampaign = await this.client.$transaction(
       async (tx) =>
         tx.campaign.update({
@@ -677,7 +513,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
 
-    const { data, details, slug, id } = campaign
+    const {
+      data,
+      details,
+      slug,
+      id,
+      isActive,
+      organizationSlug,
+      isVerified: campaignIsVerified,
+    } = campaign
 
     await this.model.update({
       where: { id },
@@ -687,11 +531,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
 
     const isVerified =
-      campaign.isVerified ||
+      campaignIsVerified ||
       data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
         CandidateVerification.yes
 
-    if (campaign.isActive) {
+    if (isActive) {
       return {
         status: CampaignStatus.candidate,
         slug,
@@ -699,7 +543,12 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
     let step = 1
-    if (details?.office) {
+    const org = organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: organizationSlug },
+        })
+      : null
+    if (org?.positionId || org?.customPositionName) {
       step = 2
     }
     if (details?.party || details?.otherParty) {
@@ -725,27 +574,27 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async launch(campaign: Campaign) {
-    const campaignData = campaign.data
+    const { id, organizationSlug, data: campaignData, isActive } = campaign
 
     if (
-      campaign.isActive ||
+      isActive ||
       campaignData.launchStatus === CampaignLaunchStatus.launched
     ) {
       this.logger.info('Campaign already launched, skipping launch')
       return true
     }
 
-    // check if the user has office or otherOffice
-    const details = campaign.details
-    if (
-      (!details.office || details.office === '') &&
-      (!details.otherOffice || details.otherOffice === '')
-    ) {
+    const org = organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: organizationSlug },
+        })
+      : null
+    if (!org?.positionId && !org?.customPositionName) {
       throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
     await this.model.update({
-      where: { id: campaign.id },
+      where: { id },
       data: {
         isActive: true,
         data: {
@@ -756,7 +605,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    await this.crm.trackCampaign(campaign.id)
+    await this.crm.trackCampaign(id)
 
     return true
   }
@@ -917,12 +766,13 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async fetchLiveRaceTargetMetrics(
     campaign: Campaign,
   ): Promise<RaceTargetMetrics | null> {
-    const { electionDate } = campaign.details ?? {}
+    const { details, organizationSlug, id: campaignId } = campaign
+    const { electionDate } = details ?? {}
     if (!electionDate) return null
 
-    const org = campaign.organizationSlug
+    const org = organizationSlug
       ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
+          where: { slug: organizationSlug },
         })
       : null
 
@@ -951,7 +801,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         positionId: org.positionId!,
         electionDate,
         includeTurnout: true,
-        campaignId: campaign.id,
+        campaignId,
         officeName: undefined,
       })
       .catch(() => null)

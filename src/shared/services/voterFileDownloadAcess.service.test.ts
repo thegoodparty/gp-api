@@ -362,7 +362,7 @@ function createMockCampaign(
     details?: { ballotLevel?: BallotReadyPositionLevel }
     canDownloadFederal?: boolean
     pathToVictory?: {
-      data?: { electionType?: string; electionLocation?: string }
+      data?: PrismaJson.PathToVictoryData
     } | null
     id?: number
     slug?: string
@@ -378,7 +378,7 @@ function createMockCampaign(
             createdAt: new Date(),
             updatedAt: new Date(),
             campaignId: overrides.id ?? 1,
-            data: overrides.pathToVictory.data,
+            data: overrides.pathToVictory.data as PrismaJson.PathToVictoryData,
           }
         : null
 

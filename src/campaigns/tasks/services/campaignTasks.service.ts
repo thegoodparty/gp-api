@@ -9,9 +9,13 @@ import {
   addDays,
   differenceInCalendarDays,
   differenceInWeeks,
+  getDate,
+  getDay,
   isAfter,
   isBefore,
   startOfDay,
+  startOfWeek,
+  subWeeks,
 } from 'date-fns'
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -24,7 +28,15 @@ import {
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
 import { ProgressStreamData } from '../aiCampaignManager.types'
-import { CampaignTask } from '../campaignTasks.types'
+import {
+  CampaignTask,
+  CampaignTaskType,
+  DayOfWeek,
+  RecurrenceRule,
+  RecurringTaskTemplate,
+} from '../campaignTasks.types'
+import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
@@ -71,7 +83,11 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where,
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
+      ],
     })
   }
 
@@ -344,8 +360,10 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateDefaultTasks(campaign: Campaign) {
-    const today = startOfDay(new Date())
+  async generateDefaultTasks(
+    campaign: Campaign,
+    today = startOfDay(new Date()),
+  ) {
     await this.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
       const existingDefaults = await tx.campaignTask.count({
@@ -378,7 +396,7 @@ export class CampaignTasksService extends createPrismaBase(
     const generalDate = this.hasFutureDate(details.electionDate, today)
 
     if (primaryDate && generalDate) {
-      return [
+      return this.sortTasksByDate([
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -389,23 +407,52 @@ export class CampaignTasksService extends createPrismaBase(
           primaryDate,
           generalDate,
         ),
-      ]
+        ...this.computeAwarenessTasks(
+          generalAwarenessTasks,
+          generalDate,
+          today,
+        ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          generalDate,
+        ),
+      ])
     }
 
     if (primaryDate) {
-      return this.distributeTasksOverWindow(
-        primaryDefaultTasks,
-        today,
-        primaryDate,
-      )
+      return this.sortTasksByDate([
+        ...this.distributeTasksOverWindow(
+          primaryDefaultTasks,
+          today,
+          primaryDate,
+        ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          primaryDate,
+        ),
+      ])
     }
 
     if (generalDate) {
-      return this.distributeTasksOverWindow(
-        generalDefaultTasks,
-        today,
-        generalDate,
-      )
+      return this.sortTasksByDate([
+        ...this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          today,
+          generalDate,
+        ),
+        ...this.computeAwarenessTasks(
+          generalAwarenessTasks,
+          generalDate,
+          today,
+        ),
+        ...this.computeRecurringTasks(
+          defaultRecurringTasks,
+          today,
+          generalDate,
+        ),
+      ])
     }
 
     const hasAnyElectionDate =
@@ -460,6 +507,131 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
+  private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
+    return [...tasks].sort((a, b) => {
+      const dateA = a.date ? parseIsoDateString(a.date).getTime() : 0
+      const dateB = b.date ? parseIsoDateString(b.date).getTime() : 0
+      return dateA - dateB
+    })
+  }
+
+  private computeAwarenessTasks(
+    tasks: CampaignTask[],
+    electionDate: Date,
+    today: Date,
+  ): CampaignTask[] {
+    return tasks
+      .map((task) => {
+        const weekRef = subWeeks(electionDate, task.week)
+        const saturday = addDays(startOfWeek(weekRef), 6)
+        return {
+          ...task,
+          date: formatDate(saturday, DateFormats.isoDate),
+        }
+      })
+      .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
+  private computeRecurringTasks(
+    templates: RecurringTaskTemplate[],
+    windowStart: Date,
+    electionDate: Date,
+  ): CampaignTask[] {
+    return templates.flatMap((template) =>
+      this.computeRecurrenceDates(
+        template.recurrence,
+        windowStart,
+        electionDate,
+      ).map((date) => ({
+        id: `${template.id}-${formatDate(date, DateFormats.isoDate)}`,
+        title: template.title,
+        description: template.description,
+        flowType: CampaignTaskType.recurring,
+        week: differenceInWeeks(electionDate, date, {
+          roundingMethod: 'ceil',
+        }),
+        date: formatDate(date, DateFormats.isoDate),
+        isDefaultTask: true,
+      })),
+    )
+  }
+
+  private computeRecurrenceDates(
+    recurrence: RecurrenceRule,
+    windowStart: Date,
+    electionDate: Date,
+  ): Date[] {
+    switch (recurrence.type) {
+      case 'weekly':
+        return this.getWeeklyDates(
+          recurrence.dayOfWeek,
+          windowStart,
+          electionDate,
+        )
+      case 'monthlyNthDay':
+        return this.getMonthlyNthDayDates(
+          recurrence.dayOfWeek,
+          recurrence.occurrences,
+          windowStart,
+          electionDate,
+        )
+      case 'weeksBeforeElection':
+        return this.getSingleOccurrenceDate(
+          recurrence.dayOfWeek,
+          recurrence.weeksBefore,
+          electionDate,
+          windowStart,
+        )
+    }
+  }
+
+  private getWeeklyDates(dayOfWeek: DayOfWeek, start: Date, end: Date): Date[] {
+    const dates: Date[] = []
+    let current = this.nextOrSameDayOfWeek(start, dayOfWeek)
+    while (!isAfter(current, end)) {
+      dates.push(current)
+      current = addDays(current, 7)
+    }
+    return dates
+  }
+
+  private getMonthlyNthDayDates(
+    dayOfWeek: DayOfWeek,
+    occurrences: number[],
+    start: Date,
+    end: Date,
+  ): Date[] {
+    const dates: Date[] = []
+    let current = this.nextOrSameDayOfWeek(start, dayOfWeek)
+    while (!isAfter(current, end)) {
+      const weekOfMonth = Math.ceil(getDate(current) / 7)
+      if (occurrences.includes(weekOfMonth)) {
+        dates.push(current)
+      }
+      current = addDays(current, 7)
+    }
+    return dates
+  }
+
+  private getSingleOccurrenceDate(
+    dayOfWeek: DayOfWeek,
+    weeksBefore: number,
+    electionDate: Date,
+    windowStart: Date,
+  ): Date[] {
+    const weekRef = subWeeks(electionDate, weeksBefore)
+    const date = addDays(startOfWeek(weekRef), dayOfWeek)
+    return !isBefore(date, windowStart) && !isAfter(date, electionDate)
+      ? [date]
+      : []
+  }
+
+  private nextOrSameDayOfWeek(date: Date, dayOfWeek: DayOfWeek): Date {
+    const currentDay = getDay(date)
+    const daysUntil = (dayOfWeek - currentDay + 7) % 7
+    return daysUntil === 0 ? date : addDays(date, daysUntil)
+  }
+
   private mapTasksToCreateData(
     campaignId: number,
     tasks: CampaignTask[],
@@ -468,10 +640,10 @@ export class CampaignTasksService extends createPrismaBase(
       campaignId,
       title: task.title,
       description: task.description,
-      cta: task.cta,
-      flowType: task.flowType,
+      cta: task.cta ?? null,
+      flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? new Date(task.date) : null,
+      date: task.date ? startOfDay(parseIsoDateString(task.date)) : null,
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,
@@ -502,7 +674,11 @@ export class CampaignTasksService extends createPrismaBase(
 
     return this.model.findMany({
       where: { campaignId },
-      orderBy: { week: 'desc' },
+      orderBy: [
+        { week: Prisma.SortOrder.desc },
+        { date: Prisma.SortOrder.asc },
+        { id: Prisma.SortOrder.asc },
+      ],
     })
   }
 }

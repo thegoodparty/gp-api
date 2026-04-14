@@ -74,13 +74,6 @@ export const CRMCompanyPropertiesSchema = z
       .min(0)
       .max(5)
       .transform(String),
-    [HS_PROPS.p2v_status]: z.union([
-      z.literal('Complete'),
-      z.literal('Waiting'),
-      z.literal('Locked'),
-      z.literal('Failed'),
-      z.literal('DistrictMatched'),
-    ]),
     [HS_PROPS.totalregisteredvoters]: intSchema,
     [HS_PROPS.votegoal]: intSchema,
     [HS_PROPS.win_number]: intSchema,

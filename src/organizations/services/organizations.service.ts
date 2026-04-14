@@ -6,12 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization, Prisma } from '@prisma/client'
+import pmap from 'p-map'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   AdminListOrganizationsDto,
   PatchOrganizationDto,
 } from '../schemas/organization.schema'
-import pmap from 'p-map'
 
 import { OrgDistrict } from '../organizations.types'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
@@ -109,14 +109,18 @@ export class OrganizationsService extends createPrismaBase(
 
     let position: { id: string } | null = org.position
 
-    if (updates.ballotReadyPositionId) {
-      position = await this.electionsService.getPositionByBallotReadyId(
-        updates.ballotReadyPositionId,
-        { includeDistrict: true },
-      )
+    if ('ballotReadyPositionId' in updates) {
+      if (updates.ballotReadyPositionId === null) {
+        position = null
+      } else if (updates.ballotReadyPositionId) {
+        position = await this.electionsService.getPositionByBallotReadyId(
+          updates.ballotReadyPositionId,
+          { includeDistrict: true },
+        )
 
-      if (!position) {
-        throw new BadRequestException('Position not found')
+        if (!position) {
+          throw new BadRequestException('Position not found')
+        }
       }
     }
 
@@ -178,8 +182,7 @@ export class OrganizationsService extends createPrismaBase(
    */
   async resolveOrgData(params: {
     ballotReadyPositionId?: string | null
-    office?: string
-    otherOffice?: string
+    customPositionName?: string | null
     state?: string
     L2DistrictType?: string
     L2DistrictName?: string
@@ -190,8 +193,7 @@ export class OrganizationsService extends createPrismaBase(
   }> {
     const {
       ballotReadyPositionId,
-      office,
-      otherOffice,
+      customPositionName,
       state,
       L2DistrictType,
       L2DistrictName,
@@ -200,10 +202,6 @@ export class OrganizationsService extends createPrismaBase(
     const positionId = ballotReadyPositionId
       ? await this.resolvePositionId(ballotReadyPositionId)
       : null
-    const customPositionName = OrganizationsService.resolveCustomPositionName(
-      office,
-      otherOffice,
-    )
 
     let overrideDistrictId: string | null = null
     if (state && L2DistrictType && L2DistrictName) {
@@ -215,7 +213,11 @@ export class OrganizationsService extends createPrismaBase(
       })
     }
 
-    return { positionId, customPositionName, overrideDistrictId }
+    return {
+      positionId,
+      customPositionName: customPositionName ?? null,
+      overrideDistrictId,
+    }
   }
 
   /**
@@ -300,6 +302,82 @@ export class OrganizationsService extends createPrismaBase(
       L2DistrictType,
       L2DistrictName,
     )
+  }
+
+  /**
+   * Derives a city slug for an organization by resolving its position and district
+   * from the election-api, then extracting city name + state.
+   *
+   * The slug format matches the meeting_pipeline convention:
+   *   "Fayetteville", "NC" → "fayetteville-NC"
+   *   "Canal Winchester", "OH" → "canal-winchester-OH"
+   *
+   * City name extraction is best-effort: L2DistrictName for city-level positions
+   * is usually just the city name, but ward/district positions may include suffixes
+   * like "Fayetteville Ward 4" or prefixes like "City of Kyle". These are stripped
+   * using known patterns. If extraction is unclear, returns null.
+   *
+   * Callers should treat a null return as "city not resolvable" and fall back
+   * to a stored value or manual configuration.
+   */
+  async resolveCitySlug(org: Organization): Promise<string | null> {
+    const [district, position] = await Promise.all([
+      this.resolveDistrict(org),
+      org.positionId
+        ? this.electionsService.getPositionById(org.positionId, {
+            includeDistrict: false,
+          })
+        : Promise.resolve(null),
+    ])
+
+    const state = position?.state
+    if (!state || !district?.l2Name) return null
+
+    const city = OrganizationsService.extractCityFromDistrictName(
+      district.l2Name,
+    )
+    if (!city) return null
+
+    const citySlug = city
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[.']/g, '')
+    return `${citySlug}-${state.toUpperCase()}`
+  }
+
+  /**
+   * Extracts a clean city name from an L2DistrictName string.
+   *
+   * Handles known patterns:
+   *   "Fayetteville Ward 4"      → "Fayetteville"
+   *   "Kyle District 3"          → "Kyle"
+   *   "City of Kyle"             → "Kyle"
+   *   "Town of Chapel Hill"      → "Chapel Hill"
+   *   "Fayetteville"             → "Fayetteville"  (already clean)
+   *
+   * Returns null if the result is empty or looks like a non-city name.
+   */
+  static extractCityFromDistrictName(districtName: string): string | null {
+    let name = districtName.trim()
+
+    // Strip leading "City of", "Town of", "Village of", "Borough of"
+    name = name.replace(/^(City|Town|Village|Borough|Township)\s+of\s+/i, '')
+
+    // Strip trailing ward/district/precinct suffixes: "Ward 4", "District 3", "Precinct 2A"
+    name = name.replace(
+      /\s+(Ward|District|Precinct|Division|At-Large)\s*[\w-]*$/i,
+      '',
+    )
+
+    // Strip trailing municipality type: "Johnstown City" → "Johnstown"
+    name = name.replace(/\s+(City|Town|Village|Borough|Township)$/i, '')
+
+    name = name.trim()
+
+    // Reject if empty or looks non-city (pure number, single char, etc.)
+    if (!name || name.length < 2 || /^\d+$/.test(name)) return null
+
+    return name
   }
 
   async getDistrictForOrgSlug(slug: string): Promise<OrgDistrict | null> {

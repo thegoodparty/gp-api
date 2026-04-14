@@ -19,7 +19,6 @@ import { ListPathToVictoryPaginationSchema } from './schemas/ListPathToVictoryPa
 import { PathToVictorySchema } from './schemas/PathToVictory.schema'
 import { UpdatePathToVictoryM2MSchema } from './schemas/UpdatePathToVictoryM2M.schema'
 import { PinoLogger } from 'nestjs-pino'
-
 @Controller('path-to-victory')
 @UseGuards(M2MOnly)
 @UsePipes(ZodValidationPipe)

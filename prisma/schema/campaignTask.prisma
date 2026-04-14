@@ -7,6 +7,8 @@ enum CampaignTaskType {
   events
   education
   compliance
+  awareness
+  recurring
 }
 
 model CampaignTask {
@@ -15,8 +17,8 @@ model CampaignTask {
   updatedAt           DateTime         @updatedAt @map("updated_at")
   title               String
   description         String
-  cta                 String
-  flowType            CampaignTaskType @map("flow_type")
+  cta                 String?
+  flowType            CampaignTaskType? @map("flow_type")
   week                Int
   date                DateTime?
   link                String?

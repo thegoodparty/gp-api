@@ -20,12 +20,10 @@ import {
   DistrictTypeItem,
   PositionWithOptionalDistrict,
   ProjectedTurnout,
+  RaceTargetDetailsResult,
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
-
-// TODO: Revisit this file after the stakeholders decide on the direction we're going...
-// ...for the win number / p2v solution. Remove any unneeded code at that time.
 
 @Injectable()
 export class ElectionsService {
@@ -318,7 +316,7 @@ export class ElectionsService {
 
   async buildRaceTargetDetails(
     data: BuildRaceTargetDetailsInput,
-  ): Promise<PrismaJson.PathToVictoryData | null> {
+  ): Promise<RaceTargetDetailsResult | null> {
     const query =
       'districtId' in data
         ? data
@@ -336,17 +334,11 @@ export class ElectionsService {
         throw new NotFoundException('No projectedTurnout found')
       }
 
-      const {
-        projectedTurnout: turnout,
-        L2DistrictType,
-        L2DistrictName,
-      } = projectedTurnout
+      const { projectedTurnout: turnout } = projectedTurnout
 
       return {
         ...this.calculateRaceTargetMetrics(turnout),
         source: P2VSource.ElectionApi,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
         p2vStatus: P2VStatus.complete,
         p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
       }

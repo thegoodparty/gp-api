@@ -6,7 +6,6 @@ import {
   deleteUser,
   generateRandomEmail,
   generateRandomName,
-  loginUser,
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { updateCampaignWithRetry } from '../../../e2e-tests/utils/request.util'
@@ -20,8 +19,15 @@ const CONTACTS_TEST_DISTRICT = {
 const CONTACTS_TEST_POSITION_ID =
   'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2'
 
+/**
+ * Campaign org slug (`campaign-${id}`) must be sent so contacts use
+ * `resolveDistrictInfoFromOrg` (position / overrideDistrict).
+ */
+let campaignOrgSlug = ''
+
 const AUTH_HEADER = (token: string) => ({
   Authorization: `Bearer ${token}`,
+  'x-organization-slug': campaignOrgSlug,
 })
 
 async function assertOk(
@@ -42,7 +48,12 @@ async function updateCampaignMine(params: {
 }) {
   const { request, authToken, data } = params
 
-  const response = await updateCampaignWithRetry(request, authToken, data)
+  const response = await updateCampaignWithRetry(
+    request,
+    authToken,
+    data,
+    campaignOrgSlug,
+  )
   await assertOk(response, 'Campaign update failed')
 }
 
@@ -63,11 +74,24 @@ async function createElectedOffice(params: {
   return payload.id
 }
 
+async function setOrganizationPosition(params: {
+  request: APIRequestContext
+  authToken: string
+}) {
+  const { request, authToken } = params
+  const response = await request.patch(`/v1/organizations/${campaignOrgSlug}`, {
+    headers: AUTH_HEADER(authToken),
+    data: { ballotReadyPositionId: CONTACTS_TEST_POSITION_ID },
+  })
+  await assertOk(response, 'Organization position update failed')
+}
+
 async function prepareCampaignAndOffice(params: {
   request: APIRequestContext
   authToken: string
 }) {
   const { request, authToken } = params
+  await setOrganizationPosition({ request, authToken })
   await updateCampaignMine({
     request,
     authToken,
@@ -75,9 +99,6 @@ async function prepareCampaignAndOffice(params: {
       details: {
         state: CONTACTS_TEST_DISTRICT.state,
         zip: '82001',
-        office: 'Other',
-        otherOffice: 'Cheyenne City Council Ward 1',
-        positionId: CONTACTS_TEST_POSITION_ID,
         electionDate: '2026-11-03',
         ballotLevel: 'CITY',
       },
@@ -85,47 +106,25 @@ async function prepareCampaignAndOffice(params: {
         source: P2VSource.ElectionApi,
         p2vStatus: P2VStatus.complete,
         winNumber: 3142,
-        districtId: CONTACTS_TEST_DISTRICT.id,
-        electionType: CONTACTS_TEST_DISTRICT.type,
-        electionLocation: CONTACTS_TEST_DISTRICT.name,
         p2vCompleteDate: '2025-09-25',
         projectedTurnout: 6282,
         voterContactGoal: 15710,
-        districtManuallySet: false,
       },
     },
   })
   return createElectedOffice({ request, authToken })
 }
 
-async function approveCampaignForStatewideDownload(params: {
-  request: APIRequestContext
-  campaignSlug: string
-}) {
-  const { request, campaignSlug } = params
-  const adminEmail = process.env.ADMIN_EMAIL
-  const adminPassword = process.env.ADMIN_PASSWORD
-
-  if (!adminEmail || !adminPassword) {
-    throw new Error(
-      'ADMIN_EMAIL and ADMIN_PASSWORD are required for statewide contacts e2e setup',
-    )
-  }
-
-  const admin = await loginUser(request, adminEmail, adminPassword)
-  const response = await updateCampaignWithRetry(request, admin.token, {
-    slug: campaignSlug,
-    canDownloadFederal: true,
-  })
-
-  await assertOk(response, 'Admin campaign approval failed')
-}
+const EO_AUTH_HEADER = (token: string, eoSlug: string) => ({
+  Authorization: `Bearer ${token}`,
+  'x-organization-slug': eoSlug,
+})
 
 test.describe('Contacts and Segments', () => {
   let authToken: string
-  let campaignSlug: string
   let testUserId: number
   let testAuthToken: string
+  let eoOrgSlug: string
 
   test.beforeEach(async ({ request }) => {
     const registerResponse = await registerUser(request, {
@@ -139,14 +138,15 @@ test.describe('Contacts and Segments', () => {
     })
 
     authToken = registerResponse.token
-    campaignSlug = registerResponse.campaign.slug
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
+    campaignOrgSlug = `campaign-${registerResponse.campaign.id}`
 
-    await prepareCampaignAndOffice({
+    const electedOfficeId = await prepareCampaignAndOffice({
       request,
       authToken,
     })
+    eoOrgSlug = `eo-${electedOfficeId}`
   })
 
   test.afterEach(async ({ request }) => {
@@ -212,7 +212,10 @@ test.describe('Contacts and Segments', () => {
         education?: { buckets?: unknown[] }
       }
     }
-    expect(stats.districtId).toBe(CONTACTS_TEST_DISTRICT.id)
+    // District id comes from election-api for CONTACTS_TEST_POSITION_ID, not the legacy People seed id.
+    expect(stats.districtId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    )
     expect(stats.totalConstituents).toBeGreaterThan(0)
     if (stats.computedAt !== undefined) {
       expect(typeof stats.computedAt).toBe('string')
@@ -229,63 +232,12 @@ test.describe('Contacts and Segments', () => {
     }
   })
 
-  test('should return statewide stats when district picker is set to State and campaign is approved', async ({
-    request,
-  }) => {
-    test.skip(
-      !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD,
-      'Requires ADMIN_EMAIL and ADMIN_PASSWORD for admin-only campaign approval',
-    )
-
-    await approveCampaignForStatewideDownload({
-      request,
-      campaignSlug,
-    })
-
-    await updateCampaignMine({
-      request,
-      authToken,
-      data: {
-        details: {
-          state: 'AL',
-          ballotLevel: 'STATE',
-          office: 'Other',
-          otherOffice: 'Alabama Governor',
-          positionId: null,
-          electionDate: '2026-11-03',
-        },
-        pathToVictory: {
-          source: P2VSource.ElectionApi,
-          p2vStatus: P2VStatus.complete,
-          districtId: 'cfa28085-cf71-6c78-7605-a24b8e2d41ab',
-          electionType: 'State',
-          electionLocation: 'AL',
-          p2vCompleteDate: '2025-09-25',
-        },
-      },
-    })
-
-    const response = await request.get(`/v1/contacts/stats`, {
-      headers: AUTH_HEADER(authToken),
-    })
-
-    expect(response.status()).toBe(HttpStatus.OK)
-    const stats = (await response.json()) as {
-      districtId: string
-      totalConstituents: number
-      buckets: Record<string, unknown>
-    }
-    expect(typeof stats.districtId).toBe('string')
-    expect(stats.totalConstituents).toBeGreaterThan(0)
-    expect(stats).toHaveProperty('buckets')
-  })
-
   test('should download non-empty contacts CSV for seeded district', async ({
     request,
   }) => {
     test.setTimeout(120_000)
     const response = await request.get(`/v1/contacts/download`, {
-      headers: AUTH_HEADER(authToken),
+      headers: EO_AUTH_HEADER(authToken, eoOrgSlug),
     })
 
     expect(response.status()).toBe(HttpStatus.OK)

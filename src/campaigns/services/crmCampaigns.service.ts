@@ -26,10 +26,6 @@ import {
   CRMCompanyPropertiesSchema,
 } from 'src/crm/schemas/CRMCompanyProperties.schema'
 import { WrapperType } from 'src/shared/types/utility.types'
-import {
-  P2V_LOCKED_STATUS,
-  P2VStatus,
-} from 'src/elections/types/pathToVictory.types'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -200,20 +196,15 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    const p2vData = pathToVictory?.data || {}
 
-    const {
-      p2vStatus,
-      p2vNotNeeded,
-      totalRegisteredVoters,
-      viability: { score } = {},
-    } = p2vData || {}
+    const p2vData = (pathToVictory?.data || {}) as PrismaJson.PathToVictoryData
+
+    const { totalRegisteredVoters, viability: { score } = {} } = p2vData || {}
 
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    const winNumber = liveMetrics?.winNumber ?? p2vData?.winNumber
-    const voterContactGoal =
-      liveMetrics?.voterContactGoal ?? p2vData?.voterContactGoal
+    const winNumber = liveMetrics?.winNumber
+    const voterContactGoal = liveMetrics?.voterContactGoal
 
     const {
       lastStepDate,
@@ -234,7 +225,6 @@ export class CrmCampaignsService {
       ballotLevel,
       state,
       pledged,
-      campaignCommittee: _campaignCommittee,
       district: candidateDistrict,
       city,
       runForOffice,
@@ -282,13 +272,6 @@ export class CrmCampaignsService {
     const proSubscriptionStatus = campaign.isPro
       ? HubSpot.ProSubStatus.ACTIVE
       : HubSpot.ProSubStatus.INACTIVE
-
-    const p2vStatusValue =
-      p2vNotNeeded || !p2vStatus
-        ? P2V_LOCKED_STATUS
-        : totalRegisteredVoters
-          ? P2VStatus.complete
-          : p2vStatus
 
     const ecanvasser = await this.ecanvasser.findByCampaignId(campaignId)
     let ecanvasserCount = 0
@@ -368,7 +351,6 @@ export class CrmCampaignsService {
         typeof score === 'number'
           ? Math.floor(score > 5 ? 5 : score)
           : undefined,
-      p2v_status: p2vStatusValue,
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,
@@ -379,7 +361,7 @@ export class CrmCampaignsService {
     const validated = CRMCompanyPropertiesSchema.transform((obj) =>
       Object.fromEntries(
         // remove undefined values, just to be safe
-        Object.entries(obj).filter(([_, v]) => v !== undefined),
+        Object.entries(obj).filter(([, v]) => v !== undefined),
       ),
     ).safeParse(fieldsToSync)
 

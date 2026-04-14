@@ -1,3 +1,5 @@
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { AdminOrM2MGuard } from '@/authentication/guards/AdminOrM2M.guard'
 import {
   BadRequestException,
   Body,
@@ -10,24 +12,25 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
+import { UserRole } from '@prisma/client'
+import { subDays, subMonths } from 'date-fns'
+import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { UsersService } from 'src/users/services/users.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import {
   AdminUserListSchema,
   DateRangeFilter,
 } from './schemas/AdminUserList.schema'
-import { subDays, subMonths } from 'date-fns'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { UserRole } from '@prisma/client'
-import { PinoLogger } from 'nestjs-pino'
 
 @Controller('admin/users')
-@Roles(UserRole.admin)
 @UsePipes(ZodValidationPipe)
 export class AdminUsersController {
   constructor(
@@ -40,6 +43,7 @@ export class AdminUsersController {
   }
 
   @Get()
+  @Roles(UserRole.admin)
   async list(@Query() { dateRange }: AdminUserListSchema) {
     if (!dateRange || dateRange === DateRangeFilter.allTime) {
       return this.usersService.findMany()
@@ -60,16 +64,43 @@ export class AdminUsersController {
   }
 
   @Get(':id')
+  @Roles(UserRole.admin)
   async get(@Param('id', ParseIntPipe) id: number) {
     return await this.usersService.findUniqueOrThrow({ where: { id } })
   }
 
   @Post()
+  @Roles(UserRole.admin)
   create(@Body() body: AdminCreateUserSchema) {
     return this.usersService.createUser(body)
   }
 
+  @Post('impersonate/:id')
+  @UseGuards(AdminOrM2MGuard)
+  async impersonate(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: IncomingRequest,
+    @Body() body: { actorClerkId?: string },
+  ) {
+    const actorClerkId = req.user?.clerkId ?? body.actorClerkId
+
+    if (!actorClerkId) {
+      throw new BadRequestException(
+        'actorClerkId is required when using M2M auth',
+      )
+    }
+
+    this.logger.info(
+      { targetUserId: id, actorClerkId, authSource: req.user ? 'user' : 'm2m' },
+      'Impersonation request received',
+    )
+
+    const user = await this.usersService.findUniqueOrThrow({ where: { id } })
+    return this.usersService.impersonateUser(user.id, actorClerkId)
+  }
+
   @Delete(':id')
+  @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })
