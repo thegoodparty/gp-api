@@ -23,7 +23,6 @@ import { orderBy } from 'lodash'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
@@ -94,7 +93,6 @@ export class PollsController {
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
     private readonly pollBiasAnalysisService: PollBiasAnalysisService,
-    private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly s3Service: S3Service,
     private readonly contactService: ContactsService,
@@ -246,17 +244,13 @@ export class PollsController {
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body() dto: PollImageUploadUrlDto,
   ) {
-    const campaign = await this.campaignService.findUnique({
-      where: { id: electedOffice.campaignId },
-    })
-
-    if (!campaign || campaign.userId !== user.id) {
+    if (electedOffice.userId !== user.id) {
       throw new ForbiddenException(
         'You do not have permission to upload images for this poll',
       )
     }
 
-    const folderPath = `poll-text-images/${campaign.id}-${campaign.slug}`
+    const folderPath = `poll-text-images/${electedOffice.id}-${electedOffice.organizationSlug}`
     const key = this.s3Service.buildKey(folderPath, dto.fileName)
     const signedUrl = await this.s3Service.getSignedUrlForUpload(
       ASSET_DOMAIN,
