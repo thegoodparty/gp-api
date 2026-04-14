@@ -11,7 +11,6 @@ import {
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -32,7 +31,6 @@ import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { ElectionsService } from 'src/elections/services/elections.service'
 import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -65,7 +63,6 @@ export class CampaignsController {
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
     private readonly slack: SlackService,
-    private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,

@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common'
 import { Campaign, Organization, User, UserRole } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { ElectionsService } from 'src/elections/services/elections.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignsController } from './campaigns.controller'
@@ -100,7 +99,6 @@ describe('CampaignsController', () => {
   let campaignsService: CampaignsService
   let planVersionsService: CampaignPlanVersionsService
   let slackService: SlackService
-  let electionsService: ElectionsService
   let organizationsService: OrganizationsService
   let analyticsService: AnalyticsService
 
@@ -130,13 +128,6 @@ describe('CampaignsController', () => {
     }
     slackService = slackServiceMock as SlackService
 
-    const electionsServiceMock: Partial<ElectionsService> = {
-      buildRaceTargetDetails: vi.fn(),
-      getPositionMatchedRaceTargetDetails: vi.fn(),
-      getDistrictId: vi.fn().mockResolvedValue(null),
-    }
-    electionsService = electionsServiceMock as ElectionsService
-
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
       findUnique: vi
@@ -159,7 +150,6 @@ describe('CampaignsController', () => {
       campaignsService,
       planVersionsService,
       slackService,
-      electionsService,
       organizationsService,
       analyticsService,
       createMockLogger(),
