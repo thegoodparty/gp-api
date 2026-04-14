@@ -873,6 +873,7 @@ describe('CampaignTasksService', () => {
       )
       expect(socialPosts).toEqual([
         {
+          id: 'rec-social-posts-2025-06-06',
           campaignId: 1,
           title: 'Plan and Schedule 2 Social Posts for the week',
           description:
@@ -889,6 +890,7 @@ describe('CampaignTasksService', () => {
           isDefaultTask: true,
         },
         {
+          id: 'rec-social-posts-2025-06-13',
           campaignId: 1,
           title: 'Plan and Schedule 2 Social Posts for the week',
           description:
@@ -923,6 +925,7 @@ describe('CampaignTasksService', () => {
       )
       expect(houseParty).toEqual([
         {
+          id: 'rec-house-party-2025-06-04',
           campaignId: 1,
           title: 'Organize a House Party with Supporters',
           description:
@@ -945,6 +948,7 @@ describe('CampaignTasksService', () => {
       )
       expect(fundraiser).toEqual([
         {
+          id: 'rec-fundraiser-2025-06-10',
           campaignId: 1,
           title: 'Organize a Fundraiser',
           description:
@@ -981,6 +985,7 @@ describe('CampaignTasksService', () => {
       )
       expect(lettersToEditor).toEqual([
         {
+          id: 'rec-letters-editor-2025-10-09',
           campaignId: 1,
           title: 'Submit 2 Letters to the Editor in support of your campaign',
           description:
