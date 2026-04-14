@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotFoundException } from '@nestjs/common'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
