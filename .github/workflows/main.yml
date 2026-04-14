@@ -280,8 +280,6 @@ jobs:
         id: run-tests
         env:
           API_BASE_URL: ${{ needs.main.outputs.service_url }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
           CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
