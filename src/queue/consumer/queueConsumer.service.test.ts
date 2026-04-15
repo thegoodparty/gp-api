@@ -3,6 +3,7 @@ import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
+import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
 import { CampaignTasksService } from '@/campaigns/tasks/services/campaignTasks.service'
 import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
@@ -205,6 +206,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       {} as never,
       analytics as unknown as AnalyticsService,
       campaignsService as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -843,6 +845,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       pollsService as never,
       {} as never,
       {} as never,
@@ -929,6 +932,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
 
 describe('QueueConsumerService - message type routing', () => {
   let service: QueueConsumerService
+  let module: TestingModule
   let mockCampaignsService: {
     model: { findUniqueOrThrow: ReturnType<typeof vi.fn> }
   }
@@ -938,12 +942,25 @@ describe('QueueConsumerService - message type routing', () => {
     mockCampaignsService = { model: { findUniqueOrThrow: vi.fn() } }
     mockSlackService = { message: vi.fn() }
 
-    const module: TestingModule = await Test.createTestingModule({
+    const mod: TestingModule = await Test.createTestingModule({
       providers: [
         QueueConsumerService,
         { provide: AiContentService, useValue: {} },
         { provide: CampaignsService, useValue: mockCampaignsService },
-        { provide: CampaignTasksService, useValue: {} },
+        {
+          provide: AiGenerationService,
+          useValue: {
+            parseCompletionResult: vi
+              .fn()
+              .mockResolvedValue({ campaignId: 123, tasks: [] }),
+          },
+        },
+        {
+          provide: CampaignTasksService,
+          useValue: {
+            addTasks: vi.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: CampaignTcrComplianceService, useValue: {} },
         { provide: ContactsService, useValue: {} },
         { provide: DomainsService, useValue: {} },
@@ -959,7 +976,7 @@ describe('QueueConsumerService - message type routing', () => {
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()
-
+    module = mod
     service = module.get(QueueConsumerService)
   })
 
@@ -1008,6 +1025,7 @@ describe('QueueConsumerService - message type routing', () => {
         data: {
           campaignId: 123,
           status: 'completed',
+          s3Key: 'results/123/test.json',
           taskCount: 10,
         },
       }),
@@ -1088,7 +1106,11 @@ describe('QueueConsumerService - message type routing', () => {
       MessageId: 'msg-plan-no-outreach',
       Body: JSON.stringify({
         type: QueueType.CAMPAIGN_PLAN_COMPLETE,
-        data: { campaignId: 456, status: 'completed' },
+        data: {
+          campaignId: 456,
+          status: 'completed',
+          s3Key: 'results/456/test.json',
+        },
       }),
     }
 
@@ -1112,6 +1134,37 @@ describe('QueueConsumerService - message type routing', () => {
       }),
     }
 
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+  })
+
+  it('discards campaignPlanComplete with permanent Prisma error instead of requeuing', async () => {
+    const campaignTasksService = module.get(CampaignTasksService)
+    const { PrismaClientKnownRequestError } = await import(
+      '@prisma/client/runtime/library'
+    )
+    vi.spyOn(campaignTasksService, 'addTasks').mockRejectedValue(
+      new PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '6.0.0',
+      }),
+    )
+
+    const message: Message = {
+      MessageId: 'msg-permanent-fail',
+      Body: JSON.stringify({
+        type: QueueType.CAMPAIGN_PLAN_COMPLETE,
+        data: {
+          campaignId: 999,
+          status: 'completed',
+          s3Key: 'results/999/test.json',
+        },
+      }),
+    }
+
+    // With withLegacyErrorSwallowing: returns true (discard, don't requeue)
+    // Without it: would throw and cause a requeue
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
