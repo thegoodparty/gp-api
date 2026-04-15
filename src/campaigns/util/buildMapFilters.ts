@@ -76,8 +76,6 @@ export function buildMapFilters(
   if (officeFilter) {
     const officeCondition = createJsonOrConditionString(officeFilter, [
       ['normalizedOffice'],
-      ['office'],
-      ['otherOffice'],
     ])
     if (officeCondition) {
       andConditions.push(officeCondition)

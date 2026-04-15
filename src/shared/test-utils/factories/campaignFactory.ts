@@ -64,7 +64,6 @@ export const campaignFactory = generateFactory<Campaign>((args) => {
       primaryElectionDate: '2024-06-05',
       geoLocation: {},
       party: 'Independent',
-      office: 'City Council',
       raceId: `race-${id}`,
       pledged: true,
       knowRun: 'yes',

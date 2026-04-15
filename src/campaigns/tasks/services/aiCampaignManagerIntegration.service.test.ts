@@ -47,7 +47,6 @@ const makeCampaign = (
     updatedAt: new Date(),
     data: { name: 'Jane Doe' },
     details: {
-      office: 'City Council',
       normalizedOffice: 'City Council',
       state: 'California',
       electionDate: '2025-11-04',
