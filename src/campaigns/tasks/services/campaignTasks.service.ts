@@ -4,6 +4,7 @@ import {
   addDays,
   differenceInCalendarDays,
   differenceInWeeks,
+  format,
   getDate,
   getDay,
   isAfter,
@@ -20,6 +21,11 @@ import {
   parseIsoDateString,
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import {
+  SlackChannel,
+  SlackMessageType,
+} from 'src/vendors/slack/slackService.types'
 import {
   CampaignTask,
   CampaignTaskType,
@@ -45,7 +51,10 @@ const FULL_WINDOW_THRESHOLD_DAYS = 56
 export class CampaignTasksService extends createPrismaBase(
   MODELS.CampaignTask,
 ) {
-  constructor(private readonly aiGenerationService: AiGenerationService) {
+  constructor(
+    private readonly aiGenerationService: AiGenerationService,
+    private readonly slackService: SlackService,
+  ) {
     super()
   }
 
@@ -306,6 +315,7 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: Campaign,
     today = startOfDay(new Date()),
   ) {
+    let created = false
     await this.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
       const existingDefaults = await tx.campaignTask.count({
@@ -324,7 +334,76 @@ export class CampaignTasksService extends createPrismaBase(
         tasksForCampaign,
       )
       await tx.campaignTask.createMany({ data: tasksToCreate })
+      created = true
     })
+
+    if (created) {
+      await this.notifySlackDefaultTasksCreated(campaign.id)
+    }
+  }
+
+  async notifySlackDefaultTasksCreated(campaignId: number) {
+    try {
+      const campaign = await this.client.campaign.findUniqueOrThrow({
+        where: { id: campaignId },
+        include: { user: true, campaignTasks: true },
+      })
+
+      const candidateName =
+        [campaign.user?.firstName, campaign.user?.lastName]
+          .filter((value): value is string => Boolean(value))
+          .join(' ') ||
+        campaign.data.name ||
+        'Unknown'
+
+      const outreachTasks = campaign.campaignTasks.filter(
+        (task) =>
+          task.flowType === CampaignTaskType.text ||
+          task.flowType === CampaignTaskType.robocall,
+      )
+
+      const taskLines = outreachTasks.map((task) => {
+        const dueDate = task.date
+          ? format(task.date, 'MMM d, yyyy')
+          : 'No date set'
+        return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
+      })
+
+      const { hubspotId } = campaign.data
+
+      const hubspotLink = hubspotId
+        ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
+        : 'N/A'
+
+      const slackBody = [
+        ':white_check_mark: *AI Campaign Plan Created*',
+        `*Candidate:* ${candidateName}`,
+        `*HubSpot ID:* ${hubspotLink}`,
+        '',
+        `*Outreach Tasks (${outreachTasks.length}):*`,
+        ...(taskLines.length > 0 ? taskLines : ['None']),
+      ].join('\n')
+
+      await this.slackService.message(
+        {
+          blocks: [
+            {
+              type: SlackMessageType.SECTION,
+              text: {
+                type: SlackMessageType.MRKDWN,
+                text: slackBody,
+              },
+            },
+          ],
+        },
+        SlackChannel.casClickupTasks,
+      )
+    } catch (error) {
+      this.logger.error(
+        { error, campaignId },
+        'Failed to send Slack notification for default tasks',
+      )
+    }
   }
 
   private orderDefaultTasksForCampaign(

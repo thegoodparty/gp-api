@@ -14,6 +14,8 @@ import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+
 vi.mock('src/shared/util/sleep.util', () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
 }))
@@ -61,6 +63,10 @@ const mockAiGeneration: Partial<AiGenerationService> = {
   triggerEventGeneration: vi.fn(),
 }
 
+const mockSlackService: Partial<SlackService> = {
+  message: vi.fn(),
+}
+
 const makeCampaign = (
   overrides: Partial<CampaignWithPathToVictory> = {},
 ): CampaignWithPathToVictory =>
@@ -104,10 +110,14 @@ describe('CampaignTasksService', () => {
   let service: CampaignTasksService
 
   beforeEach(() => {
-    service = new CampaignTasksService(mockAiGeneration as AiGenerationService)
+    service = new CampaignTasksService(
+      mockAiGeneration as AiGenerationService,
+      mockSlackService as SlackService,
+    )
     Object.defineProperty(service, '_prisma', {
       get: () => ({
         campaignTask: mockModel,
+        campaign: mockCampaignModel,
         campaignUpdateHistory: mockCampaignUpdateHistoryModel,
         $transaction: mockTransaction,
       }),
@@ -601,24 +611,85 @@ describe('CampaignTasksService', () => {
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.deleteMany).not.toHaveBeenCalled()
       expect(mockTxModel.createMany).not.toHaveBeenCalled()
+      expect(mockSlackService.message).not.toHaveBeenCalled()
     })
 
     it('creates default tasks if none exist', async () => {
       mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate', hubspotId: '12345' },
+        user: { firstName: 'Test', lastName: 'User' },
+        campaignTasks: [
+          {
+            flowType: CampaignTaskType.text,
+            title: 'Introduction Text',
+            date: new Date('2025-06-15'),
+          },
+        ],
+      })
 
       await service.generateDefaultTasks(makeCampaign())
 
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.createMany).toHaveBeenCalled()
-      const createCall = mockTxModel.createMany.mock.calls[0][0]
-      expect(createCall.data).toHaveLength(generalDefaultTasks.length)
-      expect(createCall.data[0]).toMatchObject({
-        campaignId: 1,
-        title: generalDefaultTasks[0].title,
-        isDefaultTask: true,
+      expect(mockSlackService.message).toHaveBeenCalled()
+    })
+
+    it('sends Slack with correct outreach task details', async () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate', hubspotId: '12345' },
+        user: { firstName: 'Jane', lastName: 'Doe' },
+        campaignTasks: [
+          {
+            flowType: CampaignTaskType.text,
+            title: 'Introduction Text',
+            date: new Date('2025-06-15'),
+          },
+          {
+            flowType: CampaignTaskType.robocall,
+            title: 'Persuasion Robocall',
+            date: null,
+          },
+          {
+            flowType: CampaignTaskType.education,
+            title: 'Education Task',
+            date: new Date('2025-06-20'),
+          },
+        ],
       })
+
+      await service.generateDefaultTasks(makeCampaign())
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      const slackCall = messageMock.mock.calls[0]
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      const slackBody = (slackCall[0] as any).blocks[0].text.text as string
+      expect(slackBody).toContain('Jane Doe')
+      expect(slackBody).toContain('Outreach Tasks (2)')
+      expect(slackBody).toContain('TEXT: Introduction Text')
+      expect(slackBody).toContain('ROBOCALL: Persuasion Robocall')
+      expect(slackBody).not.toContain('Education Task')
+    })
+
+    it('does not break task creation when Slack fails', async () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockRejectedValue(
+        new Error('Slack lookup failed'),
+      )
+
+      await expect(
+        service.generateDefaultTasks(makeCampaign()),
+      ).resolves.not.toThrow()
+      expect(mockTxModel.createMany).toHaveBeenCalled()
     })
   })
 
@@ -633,6 +704,12 @@ describe('CampaignTasksService', () => {
       mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate' },
+        user: { firstName: 'Test', lastName: 'User' },
+        campaignTasks: [],
+      })
     }
 
     const getCreatedTaskData = () => {
