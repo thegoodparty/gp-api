@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import { SingleBar, Presets } from 'cli-progress'
@@ -5,12 +6,13 @@ import pmap from 'p-map'
 import { clerkThrottle } from '../seed/util/clerkThrottle.util'
 import { FIXED_EMAILS } from '../seed/users'
 
-const BATCH_SIZE = 100
-
 const PRESERVE_FIXED = process.argv.includes('--preserve-fixed')
 const SKIP_DB = process.argv.includes('--skip-db')
+const { CLERK_SECRET_KEY, OTEL_SERVICE_ENVIRONMENT } = process.env
 
-const { CLERK_SECRET_KEY } = process.env
+const NUKE_CLERK =
+  process.argv.includes('--nuke-clerk-users') &&
+  OTEL_SERVICE_ENVIRONMENT !== 'prod'
 
 if (!CLERK_SECRET_KEY) {
   console.error('ERROR: CLERK_SECRET_KEY env var is required')
@@ -27,32 +29,43 @@ if (CLERK_SECRET_KEY.startsWith('sk_live_')) {
 const prisma = new PrismaClient()
 const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY })
 
-const fetchAllClerkUsers = async () => {
-  const allUsers: { id: string; email: string }[] = []
+const CLERK_PAGE_LIMIT = 100
+
+const isPreserved = (email: string): boolean =>
+  PRESERVE_FIXED && FIXED_EMAILS.has(email)
+
+const fetchAllClerkUserIds = async (): Promise<string[]> => {
+  const ids: string[] = []
   let offset = 0
 
   while (true) {
-    const batch = await clerkThrottle(() =>
+    const page = await clerkThrottle(() =>
       clerk.users.getUserList({
-        limit: BATCH_SIZE,
+        limit: CLERK_PAGE_LIMIT,
         offset,
       }),
     )
 
-    if (batch.data.length === 0) break
+    for (const user of page.data) {
+      const email = user.emailAddresses[0]?.emailAddress
+      if (!email || isPreserved(email)) continue
+      ids.push(user.id)
+    }
 
-    allUsers.push(
-      ...batch.data.map((u) => ({
-        id: u.id,
-        email: u.emailAddresses[0]?.emailAddress ?? '',
-      })),
-    )
-    offset += batch.data.length
-
-    if (batch.data.length < BATCH_SIZE) break
+    if (page.data.length < CLERK_PAGE_LIMIT) break
+    offset += CLERK_PAGE_LIMIT
   }
 
-  return allUsers
+  return ids
+}
+
+const fetchLocalClerkIds = async (): Promise<string[]> => {
+  const localUsers = await prisma.user.findMany({
+    where: { clerkId: { not: null } },
+    select: { clerkId: true, email: true },
+  })
+
+  return localUsers.filter((u) => !isPreserved(u.email)).map((u) => u.clerkId!)
 }
 
 const deleteClerkUsers = async (userIds: string[]) => {
@@ -62,9 +75,7 @@ const deleteClerkUsers = async (userIds: string[]) => {
   const bar = new SingleBar(
     {
       format:
-        'Deleting Clerk users [{bar}] {percentage}% | ' +
-        '{value}/{total} | deleted: {deleted} | ' +
-        'failed: {failed}',
+        'Deleting Clerk users [{bar}] {percentage}% | {value}/{total} | deleted: {deleted} | failed: {failed}',
       hideCursor: true,
     },
     Presets.shades_classic,
@@ -90,24 +101,19 @@ const deleteClerkUsers = async (userIds: string[]) => {
 }
 
 const main = async () => {
-  console.log('Fetching all Clerk users...')
-  const clerkUsers = await fetchAllClerkUsers()
+  const clerkIds = NUKE_CLERK
+    ? await fetchAllClerkUserIds()
+    : await fetchLocalClerkIds()
 
-  const toDelete = PRESERVE_FIXED
-    ? clerkUsers.filter((u) => !FIXED_EMAILS.has(u.email))
-    : clerkUsers
-
-  const preserved = clerkUsers.length - toDelete.length
-
+  const source = NUKE_CLERK ? 'Clerk API' : 'local DB'
   console.log(
-    `Found ${clerkUsers.length} Clerk user(s)` +
-      (PRESERVE_FIXED ? ` — preserving ${preserved} fixed` : ''),
+    `Found ${clerkIds.length} Clerk user(s) to delete (via ${source})`,
   )
 
-  if (toDelete.length > 0) {
+  if (clerkIds.length > 0) {
     console.log('Deleting Clerk users...')
-    const deleted = await deleteClerkUsers(toDelete.map((u) => u.id))
-    console.log(`Deleted ${deleted}/${toDelete.length} Clerk user(s)`)
+    const deleted = await deleteClerkUsers(clerkIds)
+    console.log(`Deleted ${deleted}/${clerkIds.length} Clerk user(s)`)
   }
 
   if (!SKIP_DB) {
