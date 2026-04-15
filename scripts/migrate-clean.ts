@@ -8,9 +8,11 @@ import { FIXED_EMAILS } from '../seed/users'
 
 const PRESERVE_FIXED = process.argv.includes('--preserve-fixed')
 const SKIP_DB = process.argv.includes('--skip-db')
-const NUKE_CLERK = process.argv.includes('--nuke-clerk-users')
+const { CLERK_SECRET_KEY, OTEL_SERVICE_ENVIRONMENT } = process.env
 
-const { CLERK_SECRET_KEY } = process.env
+const NUKE_CLERK =
+  process.argv.includes('--nuke-clerk-users') &&
+  OTEL_SERVICE_ENVIRONMENT !== 'prod'
 
 if (!CLERK_SECRET_KEY) {
   console.error('ERROR: CLERK_SECRET_KEY env var is required')
