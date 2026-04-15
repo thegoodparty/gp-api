@@ -148,6 +148,7 @@ export class AiGenerationService {
     campaignId: number,
   ): CampaignTask[] {
     return result.tasks.map((task, index) => ({
+      // SQS can deliever a message more than once. If the same message is delivered twice, we want a deterministic id.
       id: `event-${campaignId}-${index}-${result.generationTimestamp}`,
       title: task.title,
       description: task.description,
