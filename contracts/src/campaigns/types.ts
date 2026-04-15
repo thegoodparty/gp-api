@@ -215,7 +215,6 @@ export type CampaignData = {
   campaignPlan?: CampaignPlan
   hasVoterFile?: string
   campaignPlanStatus?: Record<string, CampaignPlanStatus>
-  path_to_victory_status?: string
 } | null
 
 export type CampaignAiContent = {

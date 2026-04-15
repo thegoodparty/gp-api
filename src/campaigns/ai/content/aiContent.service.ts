@@ -88,7 +88,6 @@ export class AiContentService {
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
-        pathToVictory: true,
         campaignPositions: {
           include: {
             topIssue: true,
@@ -201,7 +200,7 @@ export class AiContentService {
 
     let campaign: Campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
-      include: { pathToVictory: true, user: true },
+      include: { user: true },
     })
     let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
@@ -253,7 +252,7 @@ export class AiContentService {
       campaign =
         (await this.campaignsService.findFirst({
           where: { slug },
-          include: { pathToVictory: true, user: true },
+          include: { user: true },
         })) || campaign
       aiContent = campaign.aiContent
       let oldVersion: { date: Date; text: string } | undefined

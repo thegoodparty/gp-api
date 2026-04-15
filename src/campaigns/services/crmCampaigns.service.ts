@@ -17,7 +17,6 @@ import { UsersService } from '../../users/services/users.service'
 import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec'
 import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
-import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
 import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
@@ -43,8 +42,6 @@ export class CrmCampaignsService {
     private readonly crmUsers: WrapperType<CrmUsersService>,
     private readonly organizations: OrganizationsService,
     private readonly aiChat: AiChatService,
-    @Inject(forwardRef(() => PathToVictoryService))
-    private readonly pathToVictory: WrapperType<PathToVictoryService>,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
     private readonly ecanvasser: EcanvasserIntegrationService,
@@ -193,13 +190,6 @@ export class CrmCampaignsService {
     const aiChatCount = userId
       ? await this.aiChat.count({ where: { id: userId } })
       : 0
-    const pathToVictory = await this.pathToVictory.findFirst({
-      where: { campaignId: campaignId },
-    })
-
-    const p2vData = (pathToVictory?.data || {}) as PrismaJson.PathToVictoryData
-
-    const { totalRegisteredVoters, viability: { score } = {} } = p2vData || {}
 
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
@@ -240,13 +230,7 @@ export class CrmCampaignsService {
           campaign.organizationSlug,
         )
       : null
-    const canDownloadVoterFile = this.voterFile.canDownload(
-      {
-        ...campaign,
-        pathToVictory,
-      },
-      district,
-    )
+    const canDownloadVoterFile = this.voterFile.canDownload(campaign, district)
 
     const lastPortalVisit = formatDateForCRM(user.metaData?.lastVisited)
     const sessionCount = user.metaData?.sessionCount
@@ -346,14 +330,7 @@ export class CrmCampaignsService {
         ? HubSpot.VoterDataAdoption.UNLOCKED
         : HubSpot.VoterDataAdoption.LOCKED,
 
-      // p2v details / viability
-      automated_score:
-        typeof score === 'number'
-          ? Math.floor(score > 5 ? 5 : score)
-          : undefined,
-      totalregisteredvoters: totalRegisteredVoters
-        ? Number(totalRegisteredVoters)
-        : undefined,
+      // live race-target metrics
       votegoal: voterContactGoal ? Number(voterContactGoal) : undefined,
       win_number: winNumber ? Number(winNumber) : undefined,
     }

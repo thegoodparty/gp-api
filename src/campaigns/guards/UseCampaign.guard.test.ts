@@ -11,7 +11,6 @@ const mockCampaign = {
   id: 100,
   slug: 'my-campaign',
   userId: 1,
-  pathToVictory: { data: {} },
 } as unknown as Campaign
 
 describe('UseCampaignGuard', () => {
@@ -84,7 +83,7 @@ describe('UseCampaignGuard', () => {
       })
       expect(campaignsService.findFirst).toHaveBeenCalledWith({
         where: { organizationSlug: 'campaign-100', userId: 1 },
-        include: { pathToVictory: true },
+        include: {},
       })
       const req = ctx.switchToHttp().getRequest() as {
         campaign?: Campaign
@@ -93,7 +92,7 @@ describe('UseCampaignGuard', () => {
     })
 
     it('uses custom include when specified', async () => {
-      const include = { pathToVictory: true, user: true }
+      const include = { organization: true, user: true }
       mockMetadata({ include })
       mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(mockCampaign)
@@ -105,7 +104,7 @@ describe('UseCampaignGuard', () => {
 
       expect(campaignsService.findFirst).toHaveBeenCalledWith({
         where: { organizationSlug: 'campaign-100', userId: 1 },
-        include: { pathToVictory: true, user: true },
+        include: { organization: true, user: true },
       })
     })
 

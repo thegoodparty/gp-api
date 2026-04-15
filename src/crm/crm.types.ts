@@ -189,9 +189,7 @@ export namespace HubSpot {
     voter_files_created = 'voter_files_created',
     voter_data_adoption = 'voter_data_adoption',
 
-    // p2v details / viability
-    automated_score = 'automated_score',
-    totalregisteredvoters = 'totalregisteredvoters',
+    // live race-target metrics
     votegoal = 'votegoal',
     win_number = 'win_number',
   }

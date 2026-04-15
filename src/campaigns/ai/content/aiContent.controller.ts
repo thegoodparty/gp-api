@@ -132,7 +132,6 @@ export class AiContentController {
     const campaign = (await this.campaigns.findFirst({
       where: { slug },
       include: {
-        pathToVictory: true,
         campaignPositions: {
           include: {
             topIssue: true,

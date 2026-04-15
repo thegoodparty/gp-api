@@ -1,8 +1,8 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
 import { Readable } from 'stream'
+import { Campaign } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignWith } from '../../../campaigns/campaigns.types'
 import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import { P2P_CSV_COLUMN_MAPPINGS } from '../utils/audienceMapping.util'
@@ -12,7 +12,7 @@ vi.mock('../../../voters/voterFile/util/voterFile.util', () => ({
   typeToQuery: vi.fn().mockReturnValue('SELECT 1'),
 }))
 
-const mockCampaign: CampaignWith<'pathToVictory'> = {
+const mockCampaign: Campaign = {
   id: 1,
   userId: 1,
   slug: 'jane-doe',
@@ -38,13 +38,6 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   details: {
     state: 'CA',
     electionDate: '2026-11-03',
-  },
-  pathToVictory: {
-    id: 1,
-    campaignId: 1,
-    createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01'),
-    data: {} as PrismaJson.PathToVictoryData,
   },
 }
 

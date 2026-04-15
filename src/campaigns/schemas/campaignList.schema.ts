@@ -20,6 +20,5 @@ export class CampaignListSchema extends createZodDto(
     campaignStatus: z.enum(STATUS_FILTERS).optional(),
     generalElectionDateStart: z.string().date().optional(),
     generalElectionDateEnd: z.string().date().optional(),
-    p2vStatus: z.string().optional(),
   }),
 ) {}

@@ -107,7 +107,6 @@ export const PollExpansionEventSchema = z.object({
 export type PollExpansionEvent = z.infer<typeof PollExpansionEventSchema>
 
 export enum MessageGroup {
-  p2v = 'p2v',
   content = 'content',
   tcrCompliance = 'tcrCompliance',
   default = 'default',

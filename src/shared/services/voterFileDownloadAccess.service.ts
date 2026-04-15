@@ -1,10 +1,9 @@
-import { CampaignWith } from '@/campaigns/campaigns.types'
 import { OrgDistrict } from '@/organizations/organizations.types'
 import { IS_PROD } from '@/shared/util/appEnvironment.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
 import { Inject, OnModuleInit } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 export class VoterFileDownloadAccessService implements OnModuleInit {
@@ -17,23 +16,17 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
     this.logger.setContext(VoterFileDownloadAccessService.name)
   }
 
-  canDownload(
-    campaign?: CampaignWith<'pathToVictory'>,
-    district?: OrgDistrict | null,
-  ) {
+  canDownload(campaign?: Campaign, district?: OrgDistrict | null) {
     if (!campaign) return false
 
     const ballotLevel = campaign.details?.ballotLevel
     const hasElectionData = district?.l2Type && district?.l2Name
 
     const canDownload = Boolean(
-      // Local races (CITY, TOWNSHIP, etc.) - not required, can fall back to whole state
       (ballotLevel && ballotLevel !== 'FEDERAL' && ballotLevel !== 'STATE') ||
-        // FEDERAL/STATE races with canDownloadFederal flag
         (ballotLevel &&
           (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
           campaign.canDownloadFederal) ||
-        // FEDERAL/STATE races with district data from Organization
         hasElectionData,
     )
 
@@ -48,7 +41,7 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
   }
 
   async downloadAccessAlert(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     user: User,
     district?: OrgDistrict | null,
   ) {

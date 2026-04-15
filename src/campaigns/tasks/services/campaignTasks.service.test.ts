@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotFoundException } from '@nestjs/common'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiGenerationService } from './aiGeneration.service'
-import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
+import { Campaign, CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -61,9 +60,7 @@ const mockAiGeneration: Partial<AiGenerationService> = {
   triggerEventGeneration: vi.fn(),
 }
 
-const makeCampaign = (
-  overrides: Partial<CampaignWithPathToVictory> = {},
-): CampaignWithPathToVictory =>
+const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -76,9 +73,8 @@ const makeCampaign = (
     details: {},
     aiContent: {},
     vendorTsData: {},
-    pathToVictory: null,
     ...overrides,
-  }) as CampaignWithPathToVictory
+  }) as Campaign
 
 const makeDbTask = (overrides = {}) => ({
   id: 'task-1',

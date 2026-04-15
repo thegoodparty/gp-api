@@ -12,7 +12,6 @@ import { hashPasswordSync } from '../src/users/util/passwords.util'
 import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
-import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
 
 const PASSWORD = 'testPassword123'
@@ -49,10 +48,6 @@ async function createUserWithCampaign(
 
   await prisma.campaignPlanVersion.create({
     data: campaignPlanVersionFactory({ campaignId: campaign.id }),
-  })
-
-  await prisma.pathToVictory.create({
-    data: pathToVictoryFactory({ campaignId: campaign.id }),
   })
 
   return { user, campaign }

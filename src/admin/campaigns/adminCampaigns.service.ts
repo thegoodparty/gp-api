@@ -1,17 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { AdminP2VService } from '../services/adminP2V.service'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
-import { formatDate } from 'date-fns'
-import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
@@ -26,7 +20,6 @@ export class AdminCampaignsService {
     private readonly email: EmailService,
     private readonly users: UsersService,
     private readonly campaigns: CampaignsService,
-    private readonly adminP2V: AdminP2VService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
@@ -157,19 +150,15 @@ export class AdminCampaignsService {
   }
 
   async proNoVoterFile() {
-    const campaigns = (await this.campaigns.findMany({
+    const campaigns = await this.campaigns.findMany({
       where: {
         NOT: {
           userId: undefined,
         },
         isPro: true,
       },
-      include: {
-        pathToVictory: true,
-      },
-    })) as CampaignWith<'pathToVictory'>[]
+    })
 
-    // TODO: this check could probably be integrated into the above query
     const districtResults = await Promise.allSettled(
       campaigns.map((c) =>
         c.organizationSlug
@@ -181,200 +170,11 @@ export class AdminCampaignsService {
     return campaigns.filter(
       (campaign, i) =>
         !this.voterFileDownloadAccess.canDownload(
-          campaign as CampaignWith<'pathToVictory'>,
+          campaign,
           districtResults[i].status === 'fulfilled'
             ? districtResults[i].value
             : null,
         ),
     )
-  }
-
-  async p2vStats() {
-    // get todays date in format yyyy-mm-dd
-    const date = formatDate(new Date(), DateFormats.isoDate)
-
-    const [auto, manual, pending] = await Promise.all([
-      this.getAutoP2V(date),
-      this.getManualP2V(date),
-      this.getPendingP2V(date),
-    ])
-
-    return {
-      auto,
-      manual,
-      pending,
-      total: auto + manual + pending,
-    }
-  }
-
-  async sendVictoryEmail(id: number) {
-    const campaign = (await this.campaigns.findFirstOrThrow({
-      where: { id },
-      include: { user: true, pathToVictory: true },
-    })) as CampaignWith<'pathToVictory' | 'user'>
-
-    const { pathToVictory, user } = campaign
-
-    if (!pathToVictory) {
-      throw new BadRequestException('Path to Victory is not set.')
-    }
-    if (!user) {
-      throw new BadRequestException('Campaign has no user')
-    }
-
-    await this.adminP2V.completeP2V(user.id, pathToVictory)
-
-    return true
-  }
-
-  private async getAutoP2V(electionDate: string) {
-    return this.campaigns.count({
-      where: {
-        AND: [
-          {
-            details: {
-              path: ['electionDate'],
-              gt: electionDate,
-            },
-          },
-          {
-            details: {
-              path: ['raceId'],
-              not: Prisma.AnyNull,
-            },
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['p2vStatus'],
-                equals: P2VStatus.complete,
-              },
-            },
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['p2vNotNeeded'],
-                equals: Prisma.AnyNull,
-              },
-            },
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['source'],
-                equals: P2VSource.ElectionApi,
-              },
-            },
-          },
-        ],
-      },
-    })
-  }
-
-  private async getManualP2V(electionDate: string) {
-    return this.campaigns.count({
-      where: {
-        AND: [
-          {
-            details: {
-              path: ['electionDate'],
-              gt: electionDate,
-            },
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['p2vStatus'],
-                equals: P2VStatus.complete,
-              },
-            },
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['p2vNotNeeded'],
-                equals: Prisma.AnyNull,
-              },
-            },
-          },
-          {
-            NOT: {
-              pathToVictory: {
-                data: {
-                  path: ['source'],
-                  equals: P2VSource.ElectionApi,
-                },
-              },
-            },
-          },
-        ],
-      },
-    })
-  }
-
-  private async getPendingP2V(electionDate: string) {
-    return this.campaigns.count({
-      where: {
-        AND: [
-          {
-            details: {
-              path: ['electionDate'],
-              gt: electionDate,
-            },
-          },
-          {
-            details: {
-              path: ['pledged'],
-              equals: true,
-            },
-          },
-          {
-            OR: [
-              {
-                details: {
-                  path: ['knowRun'],
-                  equals: 'yes',
-                },
-              },
-              {
-                details: {
-                  path: ['runForOffice'],
-                  equals: 'yes',
-                },
-              },
-            ],
-          },
-          {
-            OR: [
-              {
-                pathToVictory: {
-                  data: {
-                    path: ['p2vStatus'],
-                    equals: P2VStatus.waiting,
-                  },
-                },
-              },
-              {
-                pathToVictory: {
-                  data: {
-                    path: ['p2vStatus'],
-                    equals: Prisma.AnyNull,
-                  },
-                },
-              },
-            ],
-          },
-          {
-            pathToVictory: {
-              data: {
-                path: ['p2vNotNeeded'],
-                equals: Prisma.AnyNull,
-              },
-            },
-          },
-        ],
-      },
-    })
   }
 }
