@@ -4,7 +4,6 @@ import z from 'zod'
 export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
-  GENERATE_TASKS = 'generateTasks',
   DOMAIN_EMAIL_FORWARDING = 'domainEmailForwarding',
   POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
   POLL_CREATION = 'pollCreation',
@@ -28,7 +27,6 @@ export type QueueMessage =
     }
   | { type: QueueType.POLL_CREATION; data: PollCreationEvent['data'] }
   | { type: QueueType.POLL_EXPANSION; data: PollExpansionEvent['data'] }
-  | { type: QueueType.GENERATE_TASKS; data: GenerateTasksMessage }
   | {
       type: QueueType.CAMPAIGN_PLAN_COMPLETE
       data: CampaignPlanCompleteMessage
@@ -44,23 +42,32 @@ export type TcrComplianceStatusCheckMessage = {
   tcrCompliance: TcrCompliance
 }
 
-export type GenerateTasksMessage = {
-  campaignId: number
-}
-
 export type DomainEmailForwardingMessage = {
   domainId: number
   forwardingEmailAddress: string
 }
 
-export type CampaignPlanCompleteMessage = {
-  campaignId: number
-  status: 'completed' | 'error'
-  s3Key?: string
-  taskCount?: number
-  generationTimestamp?: string
-  error?: string
-}
+export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(
+  'status',
+  [
+    z.object({
+      campaignId: z.number(),
+      status: z.literal('completed'),
+      s3Key: z.string(),
+      taskCount: z.number().optional(),
+      generationTimestamp: z.string().optional(),
+    }),
+    z.object({
+      campaignId: z.number(),
+      status: z.literal('error'),
+      error: z.string().optional(),
+    }),
+  ],
+)
+
+export type CampaignPlanCompleteMessage = z.infer<
+  typeof CampaignPlanCompleteMessageSchema
+>
 
 export const PollAnalysisCompleteEventSchema = z.object({
   type: z.literal(QueueType.POLL_ANALYSIS_COMPLETE),

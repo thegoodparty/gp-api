@@ -7,7 +7,6 @@ import {
   HttpStatus,
   MessageEvent,
   Param,
-  Post,
   Put,
   Sse,
 } from '@nestjs/common'
@@ -54,12 +53,6 @@ export class CampaignTasksController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAllTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
     await this.tasksService.deleteAllTasks(campaign.id)
-  }
-
-  @Post('generate')
-  @HttpCode(HttpStatus.ACCEPTED)
-  enqueueGenerateTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
-    return this.tasksService.enqueueGenerateTasks(campaign)
   }
 
   @Sse('generate/stream')

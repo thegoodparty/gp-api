@@ -1,9 +1,4 @@
-import {
-  BadGatewayException,
-  Injectable,
-  MessageEvent,
-  NotFoundException,
-} from '@nestjs/common'
+import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import {
   addDays,
@@ -19,15 +14,12 @@ import {
 } from 'date-fns'
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import {
   DateFormats,
   formatDate,
   parseIsoDateString,
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
-import { ProgressStreamData } from '../aiCampaignManager.types'
 import {
   CampaignTask,
   CampaignTaskType,
@@ -41,7 +33,7 @@ import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
-import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
+import { AiGenerationService } from './aiGeneration.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
@@ -53,29 +45,15 @@ const FULL_WINDOW_THRESHOLD_DAYS = 56
 export class CampaignTasksService extends createPrismaBase(
   MODELS.CampaignTask,
 ) {
-  constructor(
-    private readonly aiCampaignManagerIntegration: AiCampaignManagerIntegrationService,
-    private readonly queueProducerService: QueueProducerService,
-  ) {
+  constructor(private readonly aiGenerationService: AiGenerationService) {
     super()
   }
 
-  async enqueueGenerateTasks(
-    campaign: CampaignWithPathToVictory,
-  ): Promise<{ accepted: true }> {
-    try {
-      await this.queueProducerService.sendMessage(
-        {
-          type: QueueType.GENERATE_TASKS,
-          data: { campaignId: campaign.id },
-        },
-        MessageGroup.default,
-        { throwOnError: true },
-      )
-    } catch {
-      throw new BadGatewayException('Failed to queue task generation')
-    }
-    return { accepted: true }
+  async nonDefaultTasksExist(campaignId: number): Promise<boolean> {
+    const count = await this.model.count({
+      where: { campaignId, isDefaultTask: false },
+    })
+    return count > 0
   }
 
   async listCampaignTasks({ id: campaignId }: Campaign) {
@@ -216,22 +194,6 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateTasks(campaign: CampaignWithPathToVictory) {
-    try {
-      await this.generateDefaultTasks(campaign)
-      const generatedTasks =
-        await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
-
-      return this.saveTasks(campaign.id, generatedTasks)
-    } catch (error) {
-      this.logger.error(
-        { error, campaignId: campaign.id },
-        'AI task generation failed, saving empty task set',
-      )
-      return this.saveTasks(campaign.id, [])
-    }
-  }
-
   generateTasksStream(
     campaign: CampaignWithPathToVictory,
   ): Observable<MessageEvent> {
@@ -253,105 +215,85 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: CampaignWithPathToVictory,
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
-    await this.generateDefaultTasks(campaign)
-
-    subscriber.next({
-      data: {
-        type: 'progress',
-        progress: 0,
-        message: 'Starting AI task generation...',
-      },
-    })
-
     try {
-      const result =
-        await this.aiCampaignManagerIntegration.startOrGetCached(campaign)
+      await this.generateDefaultTasks(campaign)
 
-      if (result.cached) {
-        const savedTasks = await this.saveTasks(campaign.id, result.tasks)
+      subscriber.next({
+        data: {
+          type: 'progress',
+          progress: 0,
+          message: 'Starting task generation...',
+        },
+      })
+      const hasEventTasks = await this.nonDefaultTasksExist(campaign.id)
+      if (hasEventTasks) {
+        const tasks = await this.listCampaignTasks(campaign)
         subscriber.next({
-          data: { type: 'complete', tasks: savedTasks },
+          data: { type: 'complete', tasks },
         })
         subscriber.complete()
         return
       }
 
-      const { sessionId } = result
-      const pollIntervalMs = 5000
-      const maxWaitTimeMs = 300000
+      const triggered =
+        await this.aiGenerationService.triggerEventGeneration(campaign)
+
+      // Something bad happened, let's close the stream.
+      if (!triggered) {
+        const tasks = await this.listCampaignTasks(campaign)
+        subscriber.next({
+          data: { type: 'complete', tasks },
+        })
+        subscriber.complete()
+        return
+      }
+
+      const pollIntervalMs = 3000
+      const maxWaitTimeMs = 120000
       const startTime = Date.now()
 
       while (Date.now() - startTime < maxWaitTimeMs) {
         if (subscriber.closed) return
+        await sleep(pollIntervalMs)
 
-        const progress =
-          await this.aiCampaignManagerIntegration.getLatestProgress(sessionId)
+        const exists = await this.nonDefaultTasksExist(campaign.id)
 
-        if (!progress) {
-          await sleep(pollIntervalMs)
-          continue
+        if (exists) {
+          const tasks = await this.listCampaignTasks(campaign)
+          subscriber.next({
+            data: { type: 'complete', tasks },
+          })
+          subscriber.complete()
+          return
         }
 
-        const done = await this.handleStreamProgress(
-          progress,
-          sessionId,
-          campaign,
-          subscriber,
-        )
-        if (done) return
-
-        await sleep(pollIntervalMs)
+        subscriber.next({
+          data: { type: 'progress', progress: 0, message: 'Generating...' },
+        })
       }
 
-      throw new Error('Campaign plan generation timed out')
+      this.logger.warn(
+        { campaignId: campaign.id },
+        'campaign plan generation poll timed out',
+      )
+      const tasks = await this.listCampaignTasks(campaign)
+      subscriber.next({
+        data: { type: 'complete', tasks },
+      })
+      subscriber.complete()
     } catch (error) {
       if (subscriber.closed) return
 
       this.logger.error(
         { error, campaignId: campaign.id },
-        'AI task generation failed during stream, saving empty task set',
+        'task generation stream failed',
       )
-      const tasks = await this.saveTasks(campaign.id, [])
+      const tasks = await this.listCampaignTasks(campaign)
       subscriber.next({
         data: { type: 'complete', tasks },
       })
       subscriber.complete()
     }
-  }
-
-  private async handleStreamProgress(
-    progress: ProgressStreamData,
-    sessionId: string,
-    campaign: CampaignWithPathToVictory,
-    subscriber: Subscriber<MessageEvent>,
-  ): Promise<boolean> {
-    subscriber.next({
-      data: {
-        type: 'progress',
-        progress: progress.progress,
-        message: progress.message,
-      },
-    })
-
-    if (progress.status === 'completed') {
-      const generatedTasks =
-        await this.aiCampaignManagerIntegration.finishGeneration(
-          sessionId,
-          campaign,
-        )
-      const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
-      subscriber.next({
-        data: { type: 'complete', tasks: savedTasks },
-      })
-      subscriber.complete()
-      return true
-    }
-
-    if (progress.status === 'failed') {
-      throw new Error('Campaign plan generation failed')
-    }
-
-    return false
   }
 
   async deleteAllTasks(campaignId: number) {
@@ -377,11 +319,11 @@ export class CampaignTasksService extends createPrismaBase(
         campaign,
         today,
       )
-      await this.replaceCampaignTasksInTransaction(
-        tx,
+      const tasksToCreate = this.mapTasksToCreateData(
         campaign.id,
         tasksForCampaign,
       )
+      await tx.campaignTask.createMany({ data: tasksToCreate })
     })
   }
 
@@ -543,7 +485,6 @@ export class CampaignTasksService extends createPrismaBase(
         windowStart,
         electionDate,
       ).map((date) => ({
-        id: `${template.id}-${formatDate(date, DateFormats.isoDate)}`,
         title: template.title,
         description: template.description,
         flowType: template.flowType ?? CampaignTaskType.recurring,
@@ -639,6 +580,7 @@ export class CampaignTasksService extends createPrismaBase(
     tasks: CampaignTask[],
   ): Prisma.CampaignTaskCreateManyInput[] {
     return tasks.map((task) => ({
+      ...(task.id && { id: task.id }),
       campaignId,
       title: task.title,
       description: task.description,
@@ -655,32 +597,8 @@ export class CampaignTasksService extends createPrismaBase(
     }))
   }
 
-  private async replaceCampaignTasksInTransaction(
-    tx: Prisma.TransactionClient,
-    campaignId: number,
-    tasks: CampaignTask[],
-  ) {
+  async addTasks(campaignId: number, tasks: CampaignTask[]) {
     const tasksToCreate = this.mapTasksToCreateData(campaignId, tasks)
-    await tx.campaignTask.deleteMany({
-      where: { campaignId, isDefaultTask: false },
-    })
-    await tx.campaignTask.createMany({
-      data: tasksToCreate,
-    })
-  }
-
-  async saveTasks(campaignId: number, tasks: CampaignTask[]) {
-    await this.client.$transaction(async (tx) => {
-      await this.replaceCampaignTasksInTransaction(tx, campaignId, tasks)
-    })
-
-    return this.model.findMany({
-      where: { campaignId },
-      orderBy: [
-        { week: Prisma.SortOrder.desc },
-        { date: Prisma.SortOrder.asc },
-        { id: Prisma.SortOrder.asc },
-      ],
-    })
+    await this.model.createMany({ data: tasksToCreate, skipDuplicates: true })
   }
 }
