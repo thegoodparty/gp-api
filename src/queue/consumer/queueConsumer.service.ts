@@ -53,6 +53,7 @@ import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
+  AgentExperimentResultSchema,
   DomainEmailForwardingMessage,
   GenerateTasksMessage,
   PollAnalysisCompleteEvent,
@@ -66,10 +67,24 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
+
+import type { AgentExperimentResultData } from '../queue.types'
+
+import { ExperimentRunStatus } from '@prisma/client'
+
+const EXPERIMENT_STATUS_MAP: Record<
+  AgentExperimentResultData['status'],
+  ExperimentRunStatus
+> = {
+  success: ExperimentRunStatus.SUCCESS,
+  failed: ExperimentRunStatus.FAILED,
+  contract_violation: ExperimentRunStatus.CONTRACT_VIOLATION,
+}
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -114,6 +129,7 @@ export class QueueConsumerService {
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
     private readonly organizationsService: OrganizationsService,
+    private readonly experimentRunsService: ExperimentRunsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -305,6 +321,10 @@ export class QueueConsumerService {
         return await this.handlePollExpansion(
           pollExpansionEvent,
           message.MessageId!,
+        )
+      case QueueType.AGENT_EXPERIMENT_RESULT:
+        return await this.handleAgentExperimentResult(
+          AgentExperimentResultSchema.parse(queueMessage.data),
         )
     }
   }
@@ -914,6 +934,59 @@ export class QueueConsumerService {
       },
       isExpansion: true,
     })
+  }
+
+  private async handleAgentExperimentResult(data: AgentExperimentResultData) {
+    const run = await this.experimentRunsService.findFirst({
+      where: { runId: data.runId },
+    })
+
+    if (!run) {
+      this.logger.error({ runId: data.runId }, 'Experiment run not found for callback')
+      return true
+    }
+
+    if (run.status === 'SUCCESS' || run.status === 'FAILED' || run.status === 'CONTRACT_VIOLATION' || run.status === 'STALE') {
+      this.logger.info({ runId: data.runId }, 'Experiment run already completed, skipping')
+      return true
+    }
+
+    const status = EXPERIMENT_STATUS_MAP[data.status]
+
+    const truncatedError = data.error ? data.error.slice(0, 1000) : undefined
+
+    try {
+      await this.experimentRunsService.client.experimentRun.update({
+        where: { id: run.id, status: { in: ['PENDING', 'RUNNING'] } },
+        data: {
+          status,
+          artifactKey: data.artifactKey,
+          artifactBucket: data.artifactBucket,
+          durationSeconds: data.durationSeconds,
+          error: truncatedError,
+        },
+      })
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code: string }).code === 'P2025'
+      ) {
+        this.logger.warn(
+          { runId: data.runId },
+          'Run already transitioned by sweeper, acknowledging callback',
+        )
+        return true
+      }
+      throw error
+    }
+
+    this.logger.info(
+      { runId: data.runId, status, experimentId: data.experimentId },
+      'Updated experiment run from callback',
+    )
+
+    return true
   }
 
   private async triggerPollExecution(params: {

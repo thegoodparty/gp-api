@@ -39,6 +39,9 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
         state: 'NC',
         party: 'independent',
         office: 'Other',
+        city: 'Hendersonville',
+        county: 'Henderson',
+        isAiBetaVip: true,
       },
       didWin: true,
       isDemo: false,
@@ -67,9 +70,19 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
     },
   })
 
+  const eoOrgSlug = `eo-serve-hendersonville`
+  await prisma.organization.create({
+    data: {
+      slug: eoOrgSlug,
+      ownerId: user.id,
+      customPositionName: 'Hendersonville City Council',
+    },
+  })
+
   const electedOffice = electedOfficeFactory({
     userId: user.id,
     campaignId: campaign.id,
+    organizationSlug: eoOrgSlug,
   })
   const createdElectedOffice = await prisma.electedOffice.create({
     data: electedOffice,

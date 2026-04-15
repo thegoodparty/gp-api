@@ -25,6 +25,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import type { PollResponseJsonRow } from '../queue.types'
 import { QueueType } from '../queue.types'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { QueueConsumerService } from './queueConsumer.service'
 
 vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
@@ -242,6 +243,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
+      {} as never,
       {} as never,
       {} as never,
       createMockLogger(),
@@ -815,6 +817,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
           { provide: S3Service, useValue: {} },
           { provide: UsersService, useValue: {} },
           { provide: OrganizationsService, useValue: {} },
+          { provide: ExperimentRunsService, useValue: {} },
         ],
       }).compile()
 
@@ -1086,6 +1089,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       contactsService as never,
       s3Service as never,
       usersService as never,
+      {} as never,
       {} as never,
       createMockLogger(),
     )
