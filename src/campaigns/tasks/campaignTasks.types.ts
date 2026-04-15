@@ -28,7 +28,6 @@ export type RecurrenceRule =
     }
 
 export type RecurringTaskTemplate = {
-  id: string
   title: string
   description: string
   recurrence: RecurrenceRule

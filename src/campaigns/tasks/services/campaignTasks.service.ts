@@ -485,7 +485,6 @@ export class CampaignTasksService extends createPrismaBase(
         windowStart,
         electionDate,
       ).map((date) => ({
-        id: `${template.id}-${formatDate(date, DateFormats.isoDate)}`,
         title: template.title,
         description: template.description,
         flowType: template.flowType ?? CampaignTaskType.recurring,
