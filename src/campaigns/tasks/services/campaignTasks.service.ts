@@ -60,7 +60,7 @@ export class CampaignTasksService extends createPrismaBase(
 
   async nonDefaultTasksExist(campaignId: number): Promise<boolean> {
     const count = await this.model.count({
-      where: { campaignId, isDefaultTask: false },
+      where: { campaignId, NOT: { isDefaultTask: true } },
     })
     return count > 0
   }
@@ -226,8 +226,6 @@ export class CampaignTasksService extends createPrismaBase(
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
     try {
-      await this.generateDefaultTasks(campaign)
-
       subscriber.next({
         data: {
           type: 'progress',
@@ -235,15 +233,16 @@ export class CampaignTasksService extends createPrismaBase(
           message: 'Starting task generation...',
         },
       })
-      const hasEventTasks = await this.nonDefaultTasksExist(campaign.id)
-      if (hasEventTasks) {
-        const tasks = await this.listCampaignTasks(campaign)
+      const existingTasks = await this.listCampaignTasks(campaign)
+      if (existingTasks.length > 0) {
         subscriber.next({
-          data: { type: 'complete', tasks },
+          data: { type: 'complete', tasks: existingTasks },
         })
         subscriber.complete()
         return
       }
+
+      await this.generateDefaultTasks(campaign)
 
       const triggered =
         await this.aiGenerationService.triggerEventGeneration(campaign)

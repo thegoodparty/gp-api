@@ -114,6 +114,7 @@ describe('CampaignTasksService', () => {
   let service: CampaignTasksService
 
   beforeEach(() => {
+    vi.clearAllMocks()
     service = new CampaignTasksService(
       mockAiGeneration as AiGenerationService,
       mockSlackService as SlackService,
@@ -479,11 +480,36 @@ describe('CampaignTasksService', () => {
   })
 
   describe('generateTasksStream', () => {
+    it('skips default task generation and AI trigger when any tasks exist', async () => {
+      const existingTasks = [
+        makeDbTask({ id: 'default-1', isDefaultTask: true }),
+      ]
+
+      mockModel.findMany.mockResolvedValueOnce(existingTasks)
+
+      const observable = service.generateTasksStream(makeCampaign())
+      const events = await firstValueFrom(observable.pipe(toArray()))
+
+      const completeEvent = events.find(
+        (e) => (e.data as { type: string }).type === 'complete',
+      )
+      expect(completeEvent).toBeDefined()
+      expect((completeEvent!.data as { tasks: unknown[] }).tasks).toEqual(
+        existingTasks,
+      )
+      // generateDefaultTasks should not have been called (no transaction)
+      expect(mockTransaction).not.toHaveBeenCalled()
+      // triggerEventGeneration should not have been called
+      expect(mockAiGeneration.triggerEventGeneration).not.toHaveBeenCalled()
+    })
+
     it('returns existing tasks immediately when not triggered', async () => {
       const existingTasks = [makeDbTask({ id: 'existing-1' })]
 
+      mockModel.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(existingTasks)
       mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(existingTasks)
       vi.mocked(mockAiGeneration.triggerEventGeneration!).mockResolvedValue(
         false,
       )
@@ -503,6 +529,9 @@ describe('CampaignTasksService', () => {
     it('polls DB for plan completion and returns tasks when plan exists', async () => {
       const savedTasks = [makeDbTask()]
 
+      mockModel.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(savedTasks)
       mockTxModel.count.mockResolvedValueOnce(1)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
@@ -513,7 +542,6 @@ describe('CampaignTasksService', () => {
       vi.mocked(mockAiGeneration.triggerEventGeneration!).mockResolvedValue(
         true,
       )
-      mockModel.findMany.mockResolvedValue(savedTasks)
 
       const observable = service.generateTasksStream(makeCampaign())
       const events = await firstValueFrom(observable.pipe(toArray()))
@@ -530,8 +558,10 @@ describe('CampaignTasksService', () => {
     it('handles error during stream and returns existing tasks', async () => {
       const existingTasks = [makeDbTask({ isDefaultTask: true })]
 
+      mockModel.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(existingTasks)
       mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValue(existingTasks)
       vi.mocked(mockAiGeneration.triggerEventGeneration!).mockRejectedValue(
         new Error('Lambda trigger failed'),
       )
