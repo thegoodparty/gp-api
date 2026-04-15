@@ -59,6 +59,7 @@ interface MigrationResult {
   imported: number
   linked: number
   skipped: number
+  ghosted: number
   failed: number
   avatarsUploaded: number
   failures: {
@@ -258,11 +259,9 @@ const handleDuplicateUser = async (
         await uploadAvatar(clerkUser.id, user.avatar, result)
       }
     } else {
-      recordFailure(
-        result,
-        user,
-        email,
-        'form_identifier_exists but lookup returned empty',
+      result.ghosted++
+      console.log(
+        `  [GHOST] User #${user.id} (${email}): email claimed in Clerk but user not found`,
       )
     }
   } catch (lookupError) {
@@ -388,6 +387,7 @@ const buildSlackMessage = (
     `:link: *${result.linked.toLocaleString()}* linked (already in Clerk)`,
     `:frame_with_picture: *${result.avatarsUploaded.toLocaleString()}* avatars uploaded`,
     `:fast_forward: *${result.skipped.toLocaleString()}* skipped`,
+    `:ghost: *${result.ghosted.toLocaleString()}* ghosted (orphaned email in Clerk)`,
     `:x: *${result.failed.toLocaleString()}* failed`,
   ]
 
@@ -503,6 +503,7 @@ const main = async () => {
     imported: 0,
     linked: 0,
     skipped: 0,
+    ghosted: 0,
     failed: 0,
     avatarsUploaded: 0,
     failures: [],
@@ -528,6 +529,7 @@ const main = async () => {
   console.log(`Linked (existing in Clerk): ${result.linked}`)
   console.log(`Avatars uploaded:           ${result.avatarsUploaded}`)
   console.log(`Skipped (dry run):          ${result.skipped}`)
+  console.log(`Ghosted (orphaned email):   ${result.ghosted}`)
   console.log(`Failed:                     ${result.failed}`)
 
   if (result.failures.length > 0) {
@@ -563,6 +565,13 @@ const main = async () => {
     userLimit,
   )
   await sendSlackReport(slackMessage)
+
+  if (result.ghosted > 0) {
+    console.log()
+    console.log(
+      `NOTE: ${result.ghosted} user(s) have orphaned emails in Clerk (deleted users still claiming the email). Contact Clerk support to release them.`,
+    )
+  }
 
   if (result.failed > 0) {
     console.log()
