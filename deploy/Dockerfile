@@ -19,6 +19,7 @@ COPY prisma ./prisma
 # Copy seed and src for tsx runtime seeding (preview environments only)
 COPY seed ./seed
 COPY src ./src
+COPY scripts ./scripts
 COPY tsconfig.json ./
 
 ENV NODE_ENV=production
