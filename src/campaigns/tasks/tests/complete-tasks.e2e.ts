@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { HttpStatus } from '@nestjs/common'
 import {
   authHeaders,
   campaignOrgSlug,
@@ -43,16 +42,17 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10_000)
     try {
-      const res = await fetch(
-        `${baseUrl}${TASKS_BASE_PATH}/generate/stream`,
-        {
-          headers: { ...headers, Accept: 'text/event-stream' },
-          signal: controller.signal,
-        },
-      )
+      const res = await fetch(`${baseUrl}${TASKS_BASE_PATH}/generate/stream`, {
+        headers: { ...headers, Accept: 'text/event-stream' },
+        signal: controller.signal,
+      })
       console.log('SSE response status:', res.status)
     } catch (err) {
-      console.log('SSE fetch error:', (err as Error).name, (err as Error).message)
+      console.log(
+        'SSE fetch error:',
+        (err as Error).name,
+        (err as Error).message,
+      )
     }
     clearTimeout(timeout)
 
