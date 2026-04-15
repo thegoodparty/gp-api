@@ -8,8 +8,6 @@ import { isAxiosError } from 'axios'
 import { PinoLogger } from 'nestjs-pino'
 import { lastValueFrom } from 'rxjs'
 import { serializeError } from 'serialize-error'
-import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
@@ -23,7 +21,6 @@ import {
   RaceTargetDetailsResult,
   RaceTargetMetrics,
 } from '../types/elections.types'
-import { P2VStatus } from '../types/pathToVictory.types'
 
 @Injectable()
 export class ElectionsService {
@@ -308,7 +305,7 @@ export class ElectionsService {
       await this.slack.formattedMessage({
         message,
         error,
-        channel: SlackChannel.botPathToVictoryIssues,
+        channel: SlackChannel.botDev,
       })
       throw error
     }
@@ -336,12 +333,7 @@ export class ElectionsService {
 
       const { projectedTurnout: turnout } = projectedTurnout
 
-      return {
-        ...this.calculateRaceTargetMetrics(turnout),
-        source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
-        p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
-      }
+      return this.calculateRaceTargetMetrics(turnout)
     } catch (error) {
       const context: Record<string, string | number | undefined> =
         'districtId' in data
@@ -364,7 +356,7 @@ export class ElectionsService {
       await this.slack.formattedMessage({
         message,
         error,
-        channel: SlackChannel.botPathToVictoryIssues,
+        channel: SlackChannel.botDev,
       })
       return null
     }

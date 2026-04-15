@@ -73,7 +73,6 @@ export class AiChatController {
   @Post()
   @UseCampaign({
     include: {
-      pathToVictory: true,
       campaignPositions: {
         include: {
           topIssue: true,
@@ -106,7 +105,6 @@ export class AiChatController {
   @Put(':threadId')
   @UseCampaign({
     include: {
-      pathToVictory: true,
       campaignPositions: {
         include: {
           topIssue: true,

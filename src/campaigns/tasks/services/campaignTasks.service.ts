@@ -39,7 +39,6 @@ import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 
@@ -60,9 +59,7 @@ export class CampaignTasksService extends createPrismaBase(
     super()
   }
 
-  async enqueueGenerateTasks(
-    campaign: CampaignWithPathToVictory,
-  ): Promise<{ accepted: true }> {
+  async enqueueGenerateTasks(campaign: Campaign): Promise<{ accepted: true }> {
     try {
       await this.queueProducerService.sendMessage(
         {
@@ -216,7 +213,7 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateTasks(campaign: CampaignWithPathToVictory) {
+  async generateTasks(campaign: Campaign) {
     try {
       await this.generateDefaultTasks(campaign)
       const generatedTasks =
@@ -232,9 +229,7 @@ export class CampaignTasksService extends createPrismaBase(
     }
   }
 
-  generateTasksStream(
-    campaign: CampaignWithPathToVictory,
-  ): Observable<MessageEvent> {
+  generateTasksStream(campaign: Campaign): Observable<MessageEvent> {
     return new Observable((subscriber: Subscriber<MessageEvent>) => {
       this.runGenerationStream(campaign, subscriber).catch((error: Error) => {
         this.logger.error(
@@ -250,7 +245,7 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private async runGenerationStream(
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
     await this.generateDefaultTasks(campaign)
@@ -322,7 +317,7 @@ export class CampaignTasksService extends createPrismaBase(
   private async handleStreamProgress(
     progress: ProgressStreamData,
     sessionId: string,
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     subscriber: Subscriber<MessageEvent>,
   ): Promise<boolean> {
     subscriber.next({

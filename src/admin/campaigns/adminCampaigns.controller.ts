@@ -64,19 +64,8 @@ export class AdminCampaignsController {
     return this.campaigns.delete({ where: { id } })
   }
 
-  @Post(':id/send-victory-email')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  sendVictoryEmail(@Param('id', ParseIntPipe) id: number) {
-    return this.adminCampaigns.sendVictoryEmail(id)
-  }
-
   @Get('pro-no-voter-file')
   proCampaignsWithNoVoterFile() {
     return this.adminCampaigns.proNoVoterFile()
-  }
-
-  @Get('p2v-stats')
-  p2vStats() {
-    return this.adminCampaigns.p2vStats()
   }
 }

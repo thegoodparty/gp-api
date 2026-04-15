@@ -1,6 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -35,7 +34,7 @@ export class VoterFileService {
   }
 
   async getCsvOrCount(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     {
       type,
       countOnly,
@@ -75,7 +74,7 @@ export class VoterFileService {
 
   private async getVoterCount(
     resolvedType: VoterFileType,
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     district: OrgDistrict | null,
     customFilters?: GetVoterFileSchema['customFilters'],
   ): Promise<number> {
@@ -117,7 +116,7 @@ export class VoterFileService {
 
   private async getVoterCsv(
     resolvedType: VoterFileType,
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     district: OrgDistrict | null,
     customFilters?: GetVoterFileSchema['customFilters'],
     selectedColumns?: GetVoterFileSchema['selectedColumns'],

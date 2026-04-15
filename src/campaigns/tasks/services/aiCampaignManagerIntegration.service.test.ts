@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { AiCampaignManagerService } from './aiCampaignManager.service'
-import { Campaign, PathToVictory } from '@prisma/client'
+import { Campaign } from '@prisma/client'
 import {
   CampaignPlanResponse,
   CampaignPlanTask,
@@ -9,6 +9,7 @@ import {
 } from '../aiCampaignManager.types'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
@@ -19,6 +20,21 @@ const mockOrganizations: Partial<OrganizationsService> = {
 const mockCampaigns: Partial<CampaignsService> = {
   fetchLiveRaceTargetMetrics: vi.fn(),
 }
+
+const mockContacts: Partial<ContactsService> = {
+  getDistrictStats: vi.fn().mockResolvedValue({
+    totalConstituents: 10000,
+    totalConstituentsWithCellPhone: 7000,
+  }),
+}
+
+const mockOrgFindUnique = vi.fn().mockResolvedValue({
+  slug: 'campaign-1',
+  positionId: 'pos-1',
+  overrideDistrictId: null,
+  customPositionName: null,
+  ownerId: 1,
+})
 
 const mockModel = {
   findUnique: vi.fn(),
@@ -34,12 +50,11 @@ const mockAiManager: Partial<AiCampaignManagerService> = {
   downloadJson: vi.fn(),
 }
 
-const makeCampaign = (
-  overrides: Partial<Campaign & { pathToVictory?: PathToVictory | null }> = {},
-) =>
+const makeCampaign = (overrides: Partial<Campaign> = {}) =>
   ({
     id: 1,
     slug: 'test-campaign',
+    organizationSlug: 'campaign-1',
     userId: 123,
     isActive: true,
     isDemo: false,
@@ -54,17 +69,8 @@ const makeCampaign = (
     },
     aiContent: {},
     vendorTsData: {},
-    pathToVictory: {
-      id: 1,
-      campaignId: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      data: {
-        totalRegisteredVoters: 3000,
-      } as PrismaJson.PathToVictoryData,
-    },
     ...overrides,
-  }) as Campaign & { pathToVictory: PathToVictory | null }
+  }) as Campaign
 
 const makeAiTask = (
   overrides: Partial<CampaignPlanTask> = {},
@@ -119,9 +125,13 @@ describe('AiCampaignManagerIntegrationService', () => {
       mockAiManager as AiCampaignManagerService,
       mockOrganizations as OrganizationsService,
       mockCampaigns as CampaignsService,
+      mockContacts as ContactsService,
     )
     Object.defineProperty(service, '_prisma', {
-      get: () => ({ campaignPlan: mockModel }),
+      get: () => ({
+        campaignPlan: mockModel,
+        organization: { findUnique: mockOrgFindUnique },
+      }),
       configurable: true,
     })
     Object.defineProperty(service, 'logger', {
@@ -264,31 +274,8 @@ describe('AiCampaignManagerIntegrationService', () => {
       expect(request.total_likely_voters).toBe(1800)
     })
 
-    it('clamps seats_available to 1 when viability.seats is 0', async () => {
-      const campaign = makeCampaign({
-        pathToVictory: {
-          id: 1,
-          campaignId: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          data: {
-            winNumber: 500,
-            totalRegisteredVoters: 3000,
-            projectedTurnout: 1800,
-            viability: {
-              level: 'medium',
-              isPartisan: false,
-              isIncumbent: false,
-              isUncontested: false,
-              candidates: 2,
-              seats: 0,
-              candidatesPerSeat: 2,
-              score: 50,
-              probOfWin: 0.5,
-            },
-          },
-        } as PathToVictory,
-      })
+    it('sets seats_available to 1', async () => {
+      const campaign = makeCampaign()
       mockModel.findUnique.mockResolvedValue(null)
       vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
         session_id: 'session-1',
@@ -319,61 +306,6 @@ describe('AiCampaignManagerIntegrationService', () => {
       expect(request.seats_available).toBe(1)
     })
 
-    it('passes through valid seats value from viability data', async () => {
-      const campaign = makeCampaign({
-        pathToVictory: {
-          id: 1,
-          campaignId: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          data: {
-            winNumber: 500,
-            totalRegisteredVoters: 3000,
-            projectedTurnout: 1800,
-            viability: {
-              level: 'medium',
-              isPartisan: false,
-              isIncumbent: false,
-              isUncontested: false,
-              candidates: 5,
-              seats: 3,
-              candidatesPerSeat: 1.67,
-              score: 50,
-              probOfWin: 0.5,
-            },
-          },
-        } as PathToVictory,
-      })
-      mockModel.findUnique.mockResolvedValue(null)
-      vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
-        session_id: 'session-1',
-      })
-      vi.mocked(mockAiManager.waitForCompletion!).mockResolvedValue({
-        progress: 100,
-        status: 'completed',
-        message: 'Done',
-        logs: [],
-        timestamp: new Date().toISOString(),
-        has_pdf: false,
-        has_json: true,
-        download_links: {},
-        expires_at: null,
-        expires_at_formatted: null,
-        files_ready: { pdf: false, json: true, total: 1 },
-      })
-      vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(
-        makePlanResponse(),
-      )
-      mockModel.upsert.mockResolvedValue({})
-
-      await service.generateCampaignTasks(campaign)
-
-      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
-        .calls[0][0]
-
-      expect(request.seats_available).toBe(3)
-    })
-
     it('uses defaults when campaign data is sparse', async () => {
       vi.mocked(
         mockCampaigns.fetchLiveRaceTargetMetrics!,
@@ -381,7 +313,6 @@ describe('AiCampaignManagerIntegrationService', () => {
       const campaign = makeCampaign({
         data: {} as PrismaJson.CampaignData,
         details: {} as PrismaJson.CampaignDetails,
-        pathToVictory: null,
       })
       mockModel.findUnique.mockResolvedValue(null)
       vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
@@ -415,7 +346,8 @@ describe('AiCampaignManagerIntegrationService', () => {
         'Local Office in Unknown State',
       )
       expect(request.win_number).toBe(1000)
-      expect(request.total_likely_voters).toBe(3000)
+      // totalConstituents from district stats (10000) * 0.6
+      expect(request.total_likely_voters).toBe(6000)
     })
   })
 

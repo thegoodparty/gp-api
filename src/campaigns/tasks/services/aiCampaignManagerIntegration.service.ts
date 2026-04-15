@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
-import { Campaign, PathToVictory } from '@prisma/client'
+import { Campaign } from '@prisma/client'
 import { createHash } from 'crypto'
 import { AiCampaignManagerService } from './aiCampaignManager.service'
 import {
@@ -9,6 +9,7 @@ import {
   ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -28,12 +29,6 @@ function isCampaignPlanResponse(value: unknown): value is CampaignPlanResponse {
   )
 }
 
-type CampaignWithPathToVictory = Campaign & {
-  pathToVictory?: PathToVictory | null
-  details: PrismaJson.CampaignDetails
-  data: PrismaJson.CampaignData
-}
-
 @Injectable()
 export class AiCampaignManagerIntegrationService extends createPrismaBase(
   MODELS.CampaignPlan,
@@ -43,13 +38,13 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     private readonly organizations: OrganizationsService,
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: WrapperType<CampaignsService>,
+    @Inject(forwardRef(() => ContactsService))
+    private readonly contacts: WrapperType<ContactsService>,
   ) {
     super()
   }
 
-  async generateCampaignTasks(
-    campaign: CampaignWithPathToVictory,
-  ): Promise<CampaignTask[]> {
+  async generateCampaignTasks(campaign: Campaign): Promise<CampaignTask[]> {
     const request = await this.buildCampaignPlanRequest(campaign)
     const existingTasks = await this.checkForExistingPlanVersion(
       campaign,
@@ -79,7 +74,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   async startOrGetCached(
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
   ): Promise<
     | { cached: true; tasks: CampaignTask[] }
     | { cached: false; sessionId: string }
@@ -110,7 +105,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
   async finishGeneration(
     sessionId: string,
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
   ): Promise<CampaignTask[]> {
     const campaignPlanJson =
       await this.aiCampaignManager.downloadJson(sessionId)
@@ -120,15 +115,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private async buildCampaignPlanRequest(
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
   ): Promise<StartCampaignPlanRequest> {
-    const {
-      details,
-      data,
-      pathToVictory,
-      organizationSlug,
-      id: campaignId,
-    } = campaign
+    const details = campaign.details as PrismaJson.CampaignDetails
+    const data = campaign.data as PrismaJson.CampaignData
+    const { organizationSlug, id: campaignId } = campaign
 
     const positionName = organizationSlug
       ? await this.organizations.resolvePositionNameByOrganizationSlug(
@@ -140,16 +131,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const district = details.district ? ` - ${details.district}` : ''
     const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
-    const pathData = pathToVictory?.data as
-      | PrismaJson.PathToVictoryData
-      | undefined
-
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    const totalRegisteredVoters = this.extractNumberValue(
-      pathData?.totalRegisteredVoters,
-      5000,
-    )
+    const totalRegisteredVoters =
+      await this.fetchTotalRegisteredVoters(campaign)
     const winNumber = this.extractNumberValue(liveMetrics?.winNumber, 1000)
     const projectedTurnout = this.extractNumberValue(
       liveMetrics?.projectedTurnout,
@@ -157,13 +142,8 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     )
 
     const additionalContext = this.buildAdditionalRaceContext(campaign)
-    const incumbentStatus =
-      pathData?.viability?.isIncumbent === true ? 'Elected' : 'N/A'
-
-    const seatsAvailable =
-      pathData?.viability?.seats && pathData.viability.seats >= 1
-        ? pathData.viability.seats
-        : 1
+    const incumbentStatus = 'N/A'
+    const seatsAvailable = 1
 
     return {
       candidate_name: data.name || `Campaign ${campaignId}`,
@@ -195,6 +175,32 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return defaultValue
   }
 
+  private async fetchTotalRegisteredVoters(
+    campaign: Campaign,
+  ): Promise<number> {
+    const DEFAULT_REGISTERED_VOTERS = 5000
+
+    if (!campaign.organizationSlug) return DEFAULT_REGISTERED_VOTERS
+
+    try {
+      const org = await this.client.organization.findUnique({
+        where: { slug: campaign.organizationSlug },
+      })
+      if (!org) return DEFAULT_REGISTERED_VOTERS
+
+      const stats = await this.contacts.getDistrictStats(org)
+      return stats.totalConstituents > 0
+        ? stats.totalConstituents
+        : DEFAULT_REGISTERED_VOTERS
+    } catch (e) {
+      this.logger.warn(
+        { campaignId: campaign.id, error: e },
+        'Failed to fetch district stats for totalRegisteredVoters, using default',
+      )
+      return DEFAULT_REGISTERED_VOTERS
+    }
+  }
+
   private determineRaceType(details: PrismaJson.CampaignDetails): string {
     if (details.partisanType && typeof details.partisanType === 'string') {
       return details.partisanType.toLowerCase() === 'nonpartisan'
@@ -213,10 +219,9 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return 1
   }
 
-  private buildAdditionalRaceContext(
-    campaign: CampaignWithPathToVictory,
-  ): string {
-    const { details, data } = campaign
+  private buildAdditionalRaceContext(campaign: Campaign): string {
+    const details = campaign.details as PrismaJson.CampaignDetails
+    const data = campaign.data as PrismaJson.CampaignData
     const contextParts: string[] = []
 
     if (details.party) {
@@ -274,7 +279,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private async checkForExistingPlanVersion(
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     request: StartCampaignPlanRequest,
   ): Promise<CampaignTask[] | null> {
     const currentHash = this.generateCampaignInfoHashFromRequest(request)
@@ -357,7 +362,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
   private parseCampaignPlanToTasks(
     campaignPlanJson: CampaignPlanResponse,
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
   ): CampaignTask[] {
     const tasks: CampaignTask[] = []
 
@@ -379,7 +384,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
   private convertJsonTaskToCampaignTask(
     jsonTask: CampaignPlanTask,
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     index: number,
   ): CampaignTask {
     const weekNumber =
@@ -432,15 +437,13 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       : CampaignTaskType.education
   }
 
-  private calculateWeekFromDate(
-    dateStr: string,
-    campaign: CampaignWithPathToVictory,
-  ): number {
+  private calculateWeekFromDate(dateStr: string, campaign: Campaign): number {
     if (!dateStr) return 1
 
     try {
       const taskDate = new Date(dateStr)
-      const electionDateStr = campaign.details.electionDate
+      const details = campaign.details as PrismaJson.CampaignDetails
+      const electionDateStr = details.electionDate
 
       if (!electionDateStr) return 1
 
@@ -513,7 +516,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
   private async saveCampaignPlan(
     campaignPlanJson: CampaignPlanResponse,
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     request: StartCampaignPlanRequest,
   ): Promise<void> {
     const campaignInfoHash = this.generateCampaignInfoHashFromRequest(request)

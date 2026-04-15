@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { FastifyReply } from 'fastify'
+import { Campaign } from '@prisma/client'
 import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
 import { OrganizationsService } from '../../organizations/services/organizations.service'
@@ -23,7 +24,6 @@ import {
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
 import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
-import { CampaignWith } from '../../campaigns/campaigns.types'
 import { PinoLogger } from 'nestjs-pino'
 
 @Controller('p2p')
@@ -95,7 +95,7 @@ export class P2pController {
   @Post('phone-list')
   @UseCampaign()
   async uploadPhoneList(
-    @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
+    @ReqCampaign() campaign: Campaign,
     @Body() request: P2pPhoneListRequestSchema,
   ): Promise<P2pPhoneListResponseSchema> {
     try {

@@ -997,7 +997,6 @@ export class QueueConsumerService {
 
       const campaign = await this.campaignsService.findUniqueOrThrow({
         where: { id: message.campaignId },
-        include: { pathToVictory: true },
       })
 
       const user = await this.usersService.findUniqueOrThrow({

@@ -66,11 +66,7 @@ export type RaceTargetMetrics = {
   projectedTurnout: number
 }
 
-export type RaceTargetDetailsResult = RaceTargetMetrics & {
-  source: string
-  p2vStatus: string
-  p2vCompleteDate: string
-}
+export type RaceTargetDetailsResult = RaceTargetMetrics
 
 export enum ProjectedTurnoutSourceColumns {
   id = 'id',

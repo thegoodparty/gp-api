@@ -15,9 +15,7 @@ export class CanDownloadVoterFileGuard implements CanActivate {
       user: { id: number }
     }>()
 
-    const campaign = await this.campaignsService.findByUserId(user.id, {
-      pathToVictory: true,
-    })
+    const campaign = await this.campaignsService.findByUserId(user.id)
 
     const district = campaign?.organizationSlug
       ? await this.organizationsService.getDistrictForOrgSlug(

@@ -36,13 +36,6 @@ beforeEach(async () => {
     },
   })
 
-  await service.prisma.pathToVictory.create({
-    data: {
-      campaignId: campaign.id,
-      data: {} as PrismaJson.PathToVictoryData,
-    },
-  })
-
   const electedOfficeId = uuidv7()
   eoOrgSlug = `eo-${electedOfficeId}`
   await service.prisma.organization.create({

@@ -1,8 +1,8 @@
-import { CampaignWith } from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
+import { Campaign } from '@prisma/client'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,19 +48,17 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
   })
 
   describe('Local races - should return true immediately (race condition fix)', () => {
-    it('should return true for CITY campaigns immediately, even without pathToVictory', () => {
+    it('should return true for CITY campaigns immediately', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
       expect(mockLogger.info).not.toHaveBeenCalled()
     })
 
-    it('should return true for TOWNSHIP campaigns immediately, even without pathToVictory', () => {
+    it('should return true for TOWNSHIP campaigns immediately', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.TOWNSHIP },
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -89,7 +87,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
     it('should return true for local races even without electionType/electionLocation', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
-        pathToVictory: { data: {} },
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -98,7 +95,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -122,11 +118,10 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(service.canDownload(campaign)).toBe(true)
     })
 
-    it('should return true for FEDERAL with flag, even without pathToVictory', () => {
+    it('should return true for FEDERAL with flag without district data', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: true,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -209,7 +204,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       const campaign = createMockCampaign({
         details: {},
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(false)
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -242,32 +236,26 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
   })
 
   describe('Race condition scenarios (the original bug)', () => {
-    it('should return true for CITY immediately, simulating frontend check before SQS job completes', () => {
-      // This is the exact scenario that was failing:
-      // Frontend checks canDownload before PathToVictory SQS job populates electionType/electionLocation
+    it('should return true for CITY immediately, simulating an early frontend check', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
         canDownloadFederal: false,
-        pathToVictory: null, // SQS job hasn't run yet
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
 
-    it('should return true for TOWNSHIP immediately, simulating frontend check before SQS job completes', () => {
+    it('should return true for TOWNSHIP immediately, simulating an early frontend check', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.TOWNSHIP },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
 
-    it('should return false for FEDERAL before SQS job completes (expected behavior)', () => {
-      // FEDERAL/STATE races correctly require election data or flag
+    it('should return false for FEDERAL without district or flag (expected behavior)', () => {
       const campaign = createMockCampaign({
         details: { ballotLevel: BallotReadyPositionLevel.FEDERAL },
         canDownloadFederal: false,
-        pathToVictory: null, // SQS job hasn't run yet
       })
       expect(service.canDownload(campaign)).toBe(false)
     })
@@ -329,7 +317,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         id: 292900,
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -339,7 +326,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         id: 166673,
         details: { ballotLevel: BallotReadyPositionLevel.CITY },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -349,7 +335,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         id: 142383,
         details: { ballotLevel: BallotReadyPositionLevel.TOWNSHIP },
         canDownloadFederal: false,
-        pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
     })
@@ -361,34 +346,16 @@ function createMockCampaign(
   overrides: {
     details?: { ballotLevel?: BallotReadyPositionLevel }
     canDownloadFederal?: boolean
-    pathToVictory?: {
-      data?: PrismaJson.PathToVictoryData
-    } | null
     id?: number
     slug?: string
   } = {},
-): CampaignWith<'pathToVictory'> {
-  // Construct full PathToVictory object if data is provided
-  const pathToVictory =
-    overrides.pathToVictory === null
-      ? null
-      : overrides.pathToVictory?.data
-        ? {
-            id: 1,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            campaignId: overrides.id ?? 1,
-            data: overrides.pathToVictory.data as PrismaJson.PathToVictoryData,
-          }
-        : null
-
+): Campaign {
   return {
     id: overrides.id ?? 1,
     organizationSlug: `campaign-${overrides.id ?? 1}`,
     slug: overrides.slug ?? 'test-campaign',
     details: overrides.details ?? {},
     canDownloadFederal: overrides.canDownloadFederal ?? false,
-    pathToVictory,
     createdAt: new Date(),
     updatedAt: new Date(),
     isActive: false,
