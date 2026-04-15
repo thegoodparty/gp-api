@@ -149,8 +149,6 @@ CAMPAIGN_PLAN_LOCAL_URL=http://localhost:8089/generate
 CAMPAIGN_PLAN_RESULTS_BUCKET=campaign-plan-results-dev
 ```
 
-The local server also needs `OUTPUT_SQS_QUEUE_URL` set to your personal SQS queue (e.g. `YourName_Queue.fifo`). Each engineer should have their own dedicated queue.
-
 See `gp-ai-projects/campaign_plan_lambda/README.md` for full setup instructions including AWS credentials and SQS queue configuration.
 
 ### AWS Setup
