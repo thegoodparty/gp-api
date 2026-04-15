@@ -98,7 +98,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     )
 
     const tasks = (await listResponse.json()) as CampaignTask[]
-    testTaskId = tasks[0].id
+    testTaskId = tasks[0].id!
 
     const response = await request.put(
       `${TASKS_BASE_PATH}/complete/${testTaskId}`,
@@ -127,7 +127,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     )
 
     const tasks = (await listResponse.json()) as CampaignTask[]
-    testTaskId = tasks[0].id
+    testTaskId = tasks[0].id!
 
     await request.put(`${TASKS_BASE_PATH}/complete/${testTaskId}`, {
       headers: authHeaders(reg.token, orgSlug),
