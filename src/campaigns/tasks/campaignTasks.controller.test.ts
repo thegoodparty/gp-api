@@ -45,8 +45,6 @@ const mockTasksService: Partial<CampaignTasksService> = {
   listCampaignTasks: vi.fn(),
   completeTask: vi.fn(),
   unCompleteTask: vi.fn(),
-  enqueueGenerateTasks: vi.fn(),
-  generateTasks: vi.fn(),
 }
 
 describe('CampaignTasksController', () => {
@@ -125,21 +123,6 @@ describe('CampaignTasksController', () => {
         'task-1',
       )
       expect(result).toEqual(task)
-    })
-  })
-
-  describe('enqueueGenerateTasks', () => {
-    it('delegates to service with campaign', async () => {
-      const campaign = makeCampaign()
-      const body = { accepted: true as const }
-      vi.mocked(mockTasksService.enqueueGenerateTasks!).mockResolvedValue(body)
-
-      const result = await controller.enqueueGenerateTasks(campaign)
-
-      expect(mockTasksService.enqueueGenerateTasks).toHaveBeenCalledWith(
-        campaign,
-      )
-      expect(result).toEqual(body)
     })
   })
 })

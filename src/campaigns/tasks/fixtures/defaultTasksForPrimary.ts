@@ -4,7 +4,6 @@ import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 
 export const primaryDefaultTasks: CampaignTask[] = [
   {
-    id: 'a1c3e5d7-2b4f-6a8c-0d2e-4f6a8c0e2d4b',
     title: 'Introduction Text',
     description: 'Introduce yourself to voters',
     cta: 'Schedule',
@@ -15,7 +14,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'e3d5c7a9-4b6f-8a0c-2d4e-6f8a0c2e4d6b',
     title: 'Introduction Robocall',
     description: 'Introduce yourself to voters',
     cta: 'Request',
@@ -27,7 +25,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
   },
 
   {
-    id: 'd7e9f1a3-6b8c-0d2e-4f6a-8c0e2d4b6f8a',
     title: 'Persuasion Text',
     description: 'Build trust and persuade voters to vote for you',
     cta: 'Schedule',
@@ -38,7 +35,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'c9a1b3d5-8e0f-2a4c-6d8e-0f2a4c6d8e0b',
     title: 'Persuasion Robocall',
     description: 'Build trust and persuade voters to vote for you',
     cta: 'Request',
@@ -50,7 +46,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
   },
 
   {
-    id: 'b5c7d9e1-0a2f-4b6c-8d0e-2f4a6c8d0e2b',
     title: 'Early Voting Text',
     description: 'Encourage voters to vote early',
     cta: 'Schedule',
@@ -61,7 +56,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'a7b9c1d3-2e4f-6a8b-0c2d-4e6f8a0b2c4d',
     title: 'Primary Day Reminder Robocall',
     description: 'Get out the vote on Primary Day',
     cta: 'Request',
@@ -72,7 +66,6 @@ export const primaryDefaultTasks: CampaignTask[] = [
     isDefaultTask: true,
   },
   {
-    id: 'f1e3d5c7-8a0b-2c4d-6e8f-0a2b4c6d8e0f',
     title: 'Primary Day Reminder Text',
     description: 'Get out the vote on Primary Day',
     cta: 'Schedule',

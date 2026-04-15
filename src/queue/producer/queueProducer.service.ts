@@ -1,8 +1,14 @@
-import { Injectable } from '@nestjs/common'
-import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
+import { BadGatewayException, Injectable } from '@nestjs/common'
+import { Methods, MimeTypes } from 'http-constants-ts'
+import { createHash } from 'crypto'
+import {
+  SQSClient,
+  SQSClientConfig,
+  SendMessageCommand,
+} from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
-import { queueConfig } from '../queue.config'
+import { campaignPlanQueueConfig, queueConfig } from '../queue.config'
 import { MessageGroup, QueueMessage } from '../queue.types'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -22,11 +28,13 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
+const sqsClient = new SQSClient(config)
+
 // create simple producer. the producer in nest-sqs does not work.
 // so we use the underlying sqs-producer package
 const producer = Producer.create({
   ...queueConfig,
-  sqs: new SQSClient(config),
+  sqs: sqsClient,
 })
 
 @Injectable()
@@ -61,5 +69,67 @@ export class QueueProducerService {
         throw error
       }
     }
+  }
+
+  async sendToExternalQueue<T extends object>(
+    queueUrl: string,
+    body: T,
+    messageGroupId: string,
+  ): Promise<void> {
+    const messageBody = JSON.stringify(body)
+    const bodyHash = createHash('sha256')
+      .update(messageBody)
+      .digest('hex')
+      .substring(0, 16)
+    const deduplicationId = `${messageGroupId}-${bodyHash}`
+    try {
+      await sqsClient.send(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: messageBody,
+          MessageGroupId: messageGroupId,
+          MessageDeduplicationId: deduplicationId,
+        }),
+      )
+    } catch (error) {
+      this.logger.error({ error, queueUrl }, 'error sending to external queue')
+      throw error
+    }
+  }
+
+  async sendToCampaignPlanQueue(body: {
+    campaignId: number
+    election_date: string
+    city: string
+    state: string
+  }): Promise<void> {
+    const { localUrl, inputQueueUrl } = campaignPlanQueueConfig
+
+    // Local development/testing bypass — POST directly instead of SQS.
+    if (localUrl && process.env.NODE_ENV !== 'production') {
+      const response = await fetch(localUrl, {
+        method: Methods.POST,
+        headers: { 'Content-Type': MimeTypes.APPLICATION_JSON },
+        body: JSON.stringify(body),
+      })
+      if (!response.ok) {
+        throw new BadGatewayException(
+          `Local campaign plan server returned ${response.status}`,
+        )
+      }
+      return
+    }
+
+    if (!inputQueueUrl) {
+      throw new BadGatewayException(
+        'Campaign plan input queue URL not configured',
+      )
+    }
+
+    await this.sendToExternalQueue(
+      inputQueueUrl,
+      body,
+      `campaign-plan-${body.campaignId}`,
+    )
   }
 }

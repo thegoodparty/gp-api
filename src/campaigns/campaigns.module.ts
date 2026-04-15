@@ -1,7 +1,7 @@
 import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
-import { HttpModule } from '@nestjs/axios'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { EmailModule } from 'src/email/email.module'
 import { UsersModule } from 'src/users/users.module'
@@ -27,8 +27,7 @@ import { CampaignTasksController } from './tasks/campaignTasks.controller'
 import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
 import { LegacyCampaignTasksService } from './tasks/legacy/services/legacyCampaignTasks.service'
 import { CampaignTasksService } from './tasks/services/campaignTasks.service'
-import { AiCampaignManagerService } from './tasks/services/aiCampaignManager.service'
-import { AiCampaignManagerIntegrationService } from './tasks/services/aiCampaignManagerIntegration.service'
+import { AiGenerationService } from './tasks/services/aiGeneration.service'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
@@ -37,7 +36,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
 @Global()
 @Module({
   imports: [
-    HttpModule,
+    AwsModule,
     EmailModule,
     CampaignsAiModule,
     CrmModule,
@@ -71,8 +70,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmCampaignsService,
     CampaignTasksService,
     LegacyCampaignTasksService,
-    AiCampaignManagerService,
-    AiCampaignManagerIntegrationService,
+    AiGenerationService,
     CampaignTcrComplianceService,
     ClerkClientProvider,
   ],
@@ -82,6 +80,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmCampaignsService,
     CampaignTcrComplianceService,
     CampaignTasksService,
+    AiGenerationService,
   ],
 })
 export class CampaignsModule {}
