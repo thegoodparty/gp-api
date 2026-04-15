@@ -5,10 +5,10 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { EmailModule } from 'src/email/email.module'
 import { UsersModule } from 'src/users/users.module'
+import { ContactsModule } from 'src/contacts/contacts.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { CrmModule } from '../crm/crmModule'
-import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { EcanvasserIntegrationModule } from '../vendors/ecanvasserIntegration/ecanvasserIntegration.module'
@@ -42,7 +42,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
-    PathToVictoryModule,
+    forwardRef(() => ContactsModule),
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,

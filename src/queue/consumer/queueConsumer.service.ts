@@ -288,17 +288,11 @@ export class QueueConsumerService {
           pollExpansionEvent,
           message.MessageId!,
         )
-      // TODO: Remove prod guard and add prod queue URL + S3 bucket to deploy/index.ts when ready to launch in prod
       case QueueType.CAMPAIGN_PLAN_COMPLETE:
         this.logger.info(
           { data: queueMessage.data, messageId: message.MessageId },
           'received campaignPlanComplete message',
         )
-        // TODO: Remove prod guard and add prod queue URL + S3 bucket to deploy/index.ts when ready to launch in prod
-        if (process.env.NODE_ENV === 'production') {
-          this.logger.warn('campaign plan complete handler disabled in prod')
-          return true
-        }
         return await this.withLegacyErrorSwallowing(message, async () => {
           const campaignPlanData = CampaignPlanCompleteMessageSchema.parse(
             queueMessage.data,

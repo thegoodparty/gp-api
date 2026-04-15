@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core'
 import { Campaign } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { CampaignWith } from '../campaigns.types'
+
 import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCampaignMetadata,
@@ -44,7 +44,7 @@ export class UseCampaignGuard implements CanActivate {
       )
 
     const userId = request.user.id
-    const include = campaignInclude ?? { pathToVictory: true }
+    const include = campaignInclude ?? {}
     let campaign: Campaign | null = null
 
     const slug = request.headers['x-organization-slug']
@@ -64,9 +64,7 @@ export class UseCampaignGuard implements CanActivate {
     }
 
     if (campaign) {
-      // Prisma include query — TypeScript cannot narrow the included relations at compile time
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      request.campaign = campaign as CampaignWith<'pathToVictory'>
+      request.campaign = campaign
       return true
     } else if (continueIfNotFound === true) {
       return true

@@ -14,9 +14,7 @@ export function buildCampaignListFilters({
   campaignStatus,
   generalElectionDateStart,
   generalElectionDateEnd,
-  p2vStatus,
 }: CampaignListSchema): Prisma.CampaignWhereInput {
-  // store AND array in var for easy push access
   const andConditions: Prisma.CampaignWhereInput[] = []
 
   if (id) andConditions.push({ id })
@@ -43,11 +41,6 @@ export function buildCampaignListFilters({
   if (campaignStatus) {
     andConditions.push({
       isActive: campaignStatus === 'active',
-    })
-  }
-  if (p2vStatus) {
-    andConditions.push({
-      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
     })
   }
   if (generalElectionDateStart) {
