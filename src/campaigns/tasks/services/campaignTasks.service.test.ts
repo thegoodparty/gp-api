@@ -536,7 +536,7 @@ describe('CampaignTasksService', () => {
   })
 
   describe('addTasks', () => {
-    it('passes task id to createMany for idempotent inserts', async () => {
+    it('passes event task id to createMany for idempotent inserts', async () => {
       const tasks: CampaignTask[] = [
         {
           id: 'event-1-0-2026-04-10T00:00:00Z',
@@ -564,12 +564,12 @@ describe('CampaignTasksService', () => {
       })
     })
 
-    it('omits id when not provided (default tasks)', async () => {
+    it('includes id from task when provided', async () => {
       const tasks: CampaignTask[] = [
         {
-          id: '',
-          title: 'Default Task',
-          description: 'A default',
+          id: 'any-custom-id-123',
+          title: 'Custom Task',
+          description: 'A task with custom id',
           cta: 'Get started',
           flowType: CampaignTaskType.education,
           week: 12,
@@ -579,8 +579,16 @@ describe('CampaignTasksService', () => {
 
       await service.addTasks(1, tasks)
 
-      const createCall = mockModel.createMany.mock.calls[0][0]
-      expect(createCall.data[0]).not.toHaveProperty('id')
+      expect(mockModel.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            id: 'any-custom-id-123',
+            campaignId: 1,
+            title: 'Custom Task',
+          }),
+        ],
+        skipDuplicates: true,
+      })
     })
   })
 

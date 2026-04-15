@@ -2,7 +2,7 @@ export { CampaignTaskType } from '@prisma/client'
 import type { CampaignTaskType } from '@prisma/client'
 
 export type CampaignTask = {
-  id: string
+  id?: string
   title: string
   description: string
   cta?: string
