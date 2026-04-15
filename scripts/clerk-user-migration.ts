@@ -10,7 +10,7 @@ const ADVISORY_LOCK_ID = createHash('md5')
   .update('clerk-user-migration')
   .digest()
   .readInt32BE(0)
-const MAX_RETRIES = 3
+const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 10_000
 const POLL_INTERVAL_MS = 10_000
 const DEV_QA_USER_LIMIT = 1000
@@ -161,13 +161,13 @@ const getClerkErrorMessage = (error: unknown): string => {
 }
 
 const withRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       return await fn()
     } catch (error) {
-      if (isRateLimited(error) && attempt < MAX_RETRIES) {
+      if (isRateLimited(error) && attempt < MAX_ATTEMPTS - 1) {
         console.log(
-          `  Rate limited. Waiting 10s (retry ${attempt + 1}/${MAX_RETRIES})...`,
+          `  Rate limited. Waiting 10s (retry ${attempt + 1}/${MAX_ATTEMPTS})...`,
         )
         await sleep(RETRY_DELAY_MS)
         continue
