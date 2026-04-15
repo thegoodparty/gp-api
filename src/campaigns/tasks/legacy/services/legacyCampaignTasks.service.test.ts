@@ -97,12 +97,12 @@ describe('LegacyCampaignTasksService', () => {
       const result = service.listCampaignTasks(campaign, currentDate)
 
       const completedTask = result.find(
-        (t: { id: string }) => t.id === firstWeek4Task.id,
+        (t: { id?: string }) => t.id === firstWeek4Task.id,
       )
       expect(completedTask).toHaveProperty('completed', true)
 
       const otherTasks = result.filter(
-        (t: { id: string }) => t.id !== firstWeek4Task.id,
+        (t: { id?: string }) => t.id !== firstWeek4Task.id,
       )
       for (const task of otherTasks) {
         expect(task).toHaveProperty('completed', false)
@@ -113,7 +113,7 @@ describe('LegacyCampaignTasksService', () => {
   describe('completeTask', () => {
     it('adds taskId to completedTaskIds and returns task', async () => {
       const campaign = makeCampaign()
-      const taskId = STATIC_CAMPAIGN_TASKS[0].id
+      const taskId = STATIC_CAMPAIGN_TASKS[0].id!
       vi.mocked(mockCampaignsService.update!).mockResolvedValue(
         makeCampaign({ completedTaskIds: [taskId] }),
       )
@@ -129,7 +129,7 @@ describe('LegacyCampaignTasksService', () => {
     })
 
     it('deduplicates taskIds when completing', async () => {
-      const taskId = STATIC_CAMPAIGN_TASKS[0].id
+      const taskId = STATIC_CAMPAIGN_TASKS[0].id!
       const campaign = makeCampaign({ completedTaskIds: [taskId] })
       vi.mocked(mockCampaignsService.update!).mockResolvedValue(
         makeCampaign({ completedTaskIds: [taskId] }),
@@ -146,7 +146,7 @@ describe('LegacyCampaignTasksService', () => {
 
   describe('unCompleteTask', () => {
     it('removes taskId from completedTaskIds and returns task', async () => {
-      const taskId = STATIC_CAMPAIGN_TASKS[0].id
+      const taskId = STATIC_CAMPAIGN_TASKS[0].id!
       const campaign = makeCampaign({ completedTaskIds: [taskId] })
       vi.mocked(mockCampaignsService.update!).mockResolvedValue(
         makeCampaign({ completedTaskIds: [] }),

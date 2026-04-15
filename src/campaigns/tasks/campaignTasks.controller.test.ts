@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTasksController } from './campaignTasks.controller'
 import { CampaignTasksService } from './services/campaignTasks.service'
-import { CampaignTaskType, CampaignUpdateHistoryType } from '@prisma/client'
-import { CampaignWithPathToVictory } from '../campaigns.types'
+import {
+  Campaign,
+  CampaignTaskType,
+  CampaignUpdateHistoryType,
+} from '@prisma/client'
 
-const makeCampaign = (): CampaignWithPathToVictory =>
+const makeCampaign = (): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -17,8 +20,7 @@ const makeCampaign = (): CampaignWithPathToVictory =>
     details: {},
     aiContent: {},
     vendorTsData: {},
-    pathToVictory: null,
-  }) as CampaignWithPathToVictory
+  }) as Campaign
 
 const makeDbTask = (overrides = {}) => ({
   id: 'task-1',
@@ -45,8 +47,6 @@ const mockTasksService: Partial<CampaignTasksService> = {
   listCampaignTasks: vi.fn(),
   completeTask: vi.fn(),
   unCompleteTask: vi.fn(),
-  enqueueGenerateTasks: vi.fn(),
-  generateTasks: vi.fn(),
 }
 
 describe('CampaignTasksController', () => {
@@ -125,21 +125,6 @@ describe('CampaignTasksController', () => {
         'task-1',
       )
       expect(result).toEqual(task)
-    })
-  })
-
-  describe('enqueueGenerateTasks', () => {
-    it('delegates to service with campaign', async () => {
-      const campaign = makeCampaign()
-      const body = { accepted: true as const }
-      vi.mocked(mockTasksService.enqueueGenerateTasks!).mockResolvedValue(body)
-
-      const result = await controller.enqueueGenerateTasks(campaign)
-
-      expect(mockTasksService.enqueueGenerateTasks).toHaveBeenCalledWith(
-        campaign,
-      )
-      expect(result).toEqual(body)
     })
   })
 })

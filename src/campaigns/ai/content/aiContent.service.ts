@@ -90,7 +90,6 @@ export class AiContentService {
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
-        pathToVictory: true,
         campaignPositions: {
           include: {
             topIssue: true,
@@ -210,7 +209,7 @@ export class AiContentService {
 
     let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
-      include: { pathToVictory: true, user: true },
+      include: { user: true },
     })
     if (campaign.user) {
       campaign.user = await this.clerkEnricher.enrichUser(campaign.user)
@@ -265,7 +264,7 @@ export class AiContentService {
       campaign =
         (await this.campaignsService.findFirst({
           where: { slug },
-          include: { pathToVictory: true, user: true },
+          include: { user: true },
         })) || campaign
       if (campaign.user) {
         campaign.user = await this.clerkEnricher.enrichUser(campaign.user)

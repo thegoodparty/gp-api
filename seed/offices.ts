@@ -1,8 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { electedOfficeFactory } from './factories/electedOffice.factory'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
-import { P2VStatus } from '../src/elections/types/pathToVictory.types'
-import { P2VSource } from '../src/pathToVictory/types/pathToVictory.types'
 
 export default async function seedOffices(email: string, prisma: PrismaClient) {
   const user = await prisma.user.findUnique({
@@ -41,19 +39,6 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
       isDemo: false,
       isActive: true,
       isVerified: true,
-    },
-  })
-
-  // update pathToVictory data to match the office above
-
-  await prisma.pathToVictory.update({
-    where: { campaignId: campaign.id },
-    data: {
-      data: {
-        source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
-        p2vCompleteDate: '2025-09-25',
-      } satisfies PrismaJson.PathToVictoryData,
     },
   })
 

@@ -18,7 +18,6 @@ import {
 import { Campaign, Organization, User, UserRole } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -57,13 +56,12 @@ export class VoterFileController {
 
   @Get()
   @UseCampaign({
-    include: { pathToVictory: true },
     continueIfNotFound: true,
   })
   @UseGuards(CanDownloadVoterFileGuard)
   async getVoterFile(
     @ReqUser() user: User,
-    @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
+    @ReqCampaign() campaign: Campaign,
     @Query() { slug, ...query }: GetVoterFileSchema,
   ) {
     if (typeof slug === 'string' && campaign?.slug !== slug) {
@@ -75,7 +73,6 @@ export class VoterFileController {
 
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
-        include: { pathToVictory: true },
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
@@ -133,10 +130,10 @@ export class VoterFileController {
   }
 
   @Get('can-download')
-  @UseCampaign({ include: { pathToVictory: true }, continueIfNotFound: true })
+  @UseCampaign({ continueIfNotFound: true })
   async canDownload(
     @ReqCampaign()
-    campaign?: CampaignWith<'pathToVictory'>,
+    campaign?: Campaign,
   ) {
     const district = campaign?.organizationSlug
       ? await this.organizationsService.getDistrictForOrgSlug(

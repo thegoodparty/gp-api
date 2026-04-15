@@ -11,7 +11,6 @@ import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
-import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
 import { ClerkSeedUser, ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
@@ -31,14 +30,6 @@ type CampaignUpdateHistory = {
   quantity: number
 }
 
-type FakeP2V = {
-  id: number
-  createdAt: Date
-  updatedAt: Date
-  campaignId: number
-  data: PrismaJson.PathToVictoryData
-}
-
 type PendingClerkSync = {
   localUserId: number
   userData: ClerkSeedUser
@@ -48,7 +39,6 @@ export default async function seedCampaigns(
   prisma: PrismaClient,
   existingUsers: User[],
 ) {
-  const fakeP2Vs: FakeP2V[] = []
   const fakeUpdateHistory: CampaignUpdateHistory[] = []
   const campaignIds: number[] = []
   const pendingClerkSyncs: PendingClerkSync[] = []
@@ -57,36 +47,30 @@ export default async function seedCampaigns(
 
   for (let i = 0; i < loopLength; i++) {
     if (i < FIXED_CAMPAIGNS.length) {
-      const result = await createCampaignAndUser(
+      const { campaignId, updateHistory } = await createCampaignAndUser(
         existingUsers,
         prisma,
         pendingClerkSyncs,
         FIXED_CAMPAIGNS[i],
       )
 
-      campaignIds.push(result.campaignId)
-      fakeP2Vs.push(result.p2V)
-      fakeUpdateHistory.push(...result.updateHistory)
+      campaignIds.push(campaignId)
+      fakeUpdateHistory.push(...updateHistory)
     }
     if (i < NUM_GENERATED_CAMPAIGNS) {
-      const result = await createCampaignAndUser(
+      const { campaignId, updateHistory } = await createCampaignAndUser(
         existingUsers,
         prisma,
         pendingClerkSyncs,
       )
 
-      campaignIds.push(result.campaignId)
-      fakeP2Vs.push(result.p2V)
-      fakeUpdateHistory.push(...result.updateHistory)
+      campaignIds.push(campaignId)
+      fakeUpdateHistory.push(...updateHistory)
     }
   }
 
   await prisma.campaignUpdateHistory.createMany({
     data: fakeUpdateHistory,
-    skipDuplicates: true,
-  })
-  await prisma.pathToVictory.createMany({
-    data: fakeP2Vs,
     skipDuplicates: true,
   })
 
@@ -108,7 +92,6 @@ async function createCampaignAndUser(
   fixedData?: Partial<Campaign>,
 ): Promise<{
   campaignId: number
-  p2V: FakeP2V
   updateHistory: CampaignUpdateHistory[]
 }> {
   const user = await handleUserCreation(
@@ -154,7 +137,6 @@ async function createCampaignAndUser(
 
   return {
     campaignId: campaign.id,
-    p2V: pathToVictoryFactory({ campaignId: campaign.id }),
     updateHistory: createCampaignUpdateHistory(campaign, user),
   }
 }

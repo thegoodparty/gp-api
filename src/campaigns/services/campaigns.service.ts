@@ -235,7 +235,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const {
       data,
       details,
-      pathToVictory,
       aiContent,
       formattedAddress,
       placeId,
@@ -252,12 +251,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         //  https://goodparty.atlassian.net/browse/WEB-4384
         const campaign = await tx.campaign.findFirst({
           where: { id },
-          include: { pathToVictory: true },
         })
 
         if (!campaign) return false
 
-        // Handle data and details JSON fields
         const campaignUpdateData: Prisma.CampaignUpdateInput = {
           ...scalarFields,
         }
@@ -317,39 +314,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           })
         }
 
-        await tx.campaign.update({
-          where: { id: campaign.id },
-          data: campaignUpdateData,
-        })
-
-        // Handle pathToVictory relation separately if needed
-        if (objectNotEmpty(pathToVictory)) {
-          if (campaign.pathToVictory) {
-            await tx.pathToVictory.update({
-              where: { id: campaign.pathToVictory.id },
-              data: {
-                data: deepMerge(
-                  (campaign.pathToVictory.data as object) || {},
-                  pathToVictory,
-                ),
-              },
-            })
-          } else {
-            await tx.pathToVictory.create({
-              data: {
-                campaignId: campaign.id,
-                data: pathToVictory,
-              },
-            })
-          }
-        }
-
-        // Return the updated campaign with pathToVictory included
         // TODO: Also should be .findUniqueOrThrow
         //  https://goodparty.atlassian.net/browse/WEB-4384
-        return tx.campaign.findFirst({
+        return tx.campaign.update({
           where: { id: campaign.id },
-          include: { pathToVictory: true },
+          data: campaignUpdateData,
         })
       },
       {

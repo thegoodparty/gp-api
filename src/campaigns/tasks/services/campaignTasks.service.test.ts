@@ -1,17 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BadGatewayException, NotFoundException } from '@nestjs/common'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
-import { CampaignTaskType } from '../campaignTasks.types'
+import { NotFoundException } from '@nestjs/common'
+import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
-import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
-import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { CampaignUpdateHistoryType, Prisma } from '@prisma/client'
-import { MessageGroup, QueueType } from 'src/queue/queue.types'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { AiGenerationService } from './aiGeneration.service'
+import { Campaign, CampaignUpdateHistoryType, Prisma } from '@prisma/client'
 import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
-import { CampaignTask } from '../campaignTasks.types'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
@@ -34,6 +30,7 @@ const mockModel = {
   findFirst: vi.fn(),
   update: vi.fn(),
   createMany: vi.fn(),
+  count: vi.fn(),
 }
 
 const mockCampaignUpdateHistoryModel = {
@@ -59,20 +56,11 @@ const mockTransaction = vi.fn(
   },
 )
 
-const mockAiIntegration: Partial<AiCampaignManagerIntegrationService> = {
-  generateCampaignTasks: vi.fn(),
-  startOrGetCached: vi.fn(),
-  getLatestProgress: vi.fn(),
-  finishGeneration: vi.fn(),
+const mockAiGeneration: Partial<AiGenerationService> = {
+  triggerEventGeneration: vi.fn(),
 }
 
-const mockQueueProducer: Partial<QueueProducerService> = {
-  sendMessage: vi.fn(),
-}
-
-const makeCampaign = (
-  overrides: Partial<CampaignWithPathToVictory> = {},
-): CampaignWithPathToVictory =>
+const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -85,9 +73,8 @@ const makeCampaign = (
     details: {},
     aiContent: {},
     vendorTsData: {},
-    pathToVictory: null,
     ...overrides,
-  }) as CampaignWithPathToVictory
+  }) as Campaign
 
 const makeDbTask = (overrides = {}) => ({
   id: 'task-1',
@@ -113,10 +100,7 @@ describe('CampaignTasksService', () => {
   let service: CampaignTasksService
 
   beforeEach(() => {
-    service = new CampaignTasksService(
-      mockAiIntegration as AiCampaignManagerIntegrationService,
-      mockQueueProducer as QueueProducerService,
-    )
+    service = new CampaignTasksService(mockAiGeneration as AiGenerationService)
     Object.defineProperty(service, '_prisma', {
       get: () => ({
         campaignTask: mockModel,
@@ -476,180 +460,45 @@ describe('CampaignTasksService', () => {
     })
   })
 
-  describe('enqueueGenerateTasks', () => {
-    it('queues GENERATE_TASKS and returns accepted', async () => {
-      vi.mocked(mockQueueProducer.sendMessage!).mockResolvedValue(undefined)
-
-      const result = await service.enqueueGenerateTasks(makeCampaign())
-
-      expect(mockQueueProducer.sendMessage).toHaveBeenCalledWith(
-        {
-          type: QueueType.GENERATE_TASKS,
-          data: { campaignId: 1 },
-        },
-        MessageGroup.default,
-        { throwOnError: true },
-      )
-      expect(result).toEqual({ accepted: true })
-    })
-
-    it('throws BadGatewayException when queue send fails', async () => {
-      vi.mocked(mockQueueProducer.sendMessage!).mockRejectedValue(
-        new Error('SQS down'),
-      )
-
-      await expect(
-        service.enqueueGenerateTasks(makeCampaign()),
-      ).rejects.toThrow(BadGatewayException)
-    })
-  })
-
-  describe('generateTasks', () => {
-    it('calls generateDefaultTasks, then AI integration, then saveTasks', async () => {
-      const aiTasks: CampaignTask[] = [
-        {
-          id: 'ai-1',
-          title: 'AI Task',
-          description: 'Generated',
-          cta: 'Go',
-          flowType: CampaignTaskType.socialMedia,
-          week: 3,
-        },
-      ]
-      const savedTasks = [makeDbTask()]
-
-      mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(savedTasks)
-      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockTxModel.createMany.mockResolvedValue({ count: 1 })
-      vi.mocked(mockAiIntegration.generateCampaignTasks!).mockResolvedValue(
-        aiTasks,
-      )
-
-      const result = await service.generateTasks(makeCampaign())
-
-      expect(mockAiIntegration.generateCampaignTasks).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 1, slug: 'test-campaign' }),
-      )
-      expect(mockTransaction).toHaveBeenCalled()
-      expect(result).toEqual(savedTasks)
-    })
-
-    it('falls back to empty tasks on AI failure', async () => {
-      const savedTasks = [makeDbTask({ isDefaultTask: true })]
-
-      mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(savedTasks)
-      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockTxModel.createMany.mockResolvedValue({ count: 0 })
-      vi.mocked(mockAiIntegration.generateCampaignTasks!).mockRejectedValue(
-        new Error('AI service unavailable'),
-      )
-
-      const result = await service.generateTasks(makeCampaign())
-
-      expect(mockTxModel.deleteMany).toHaveBeenCalledWith({
-        where: { campaignId: 1, isDefaultTask: false },
-      })
-      expect(mockTxModel.createMany).toHaveBeenCalledWith({ data: [] })
-      expect(result).toEqual(savedTasks)
-    })
-  })
-
   describe('generateTasksStream', () => {
-    it('returns Observable that streams progress and completion for cached result', async () => {
-      const cachedTasks: CampaignTask[] = [
-        {
-          id: 'cached-1',
-          title: 'Cached',
-          description: 'Cached task',
-          cta: 'Go',
-          flowType: CampaignTaskType.education,
-          week: 3,
-        },
-      ]
-      const savedTasks = [makeDbTask({ id: 'saved-1' })]
+    it('returns existing tasks immediately when not triggered', async () => {
+      const existingTasks = [makeDbTask({ id: 'existing-1' })]
 
       mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(savedTasks)
-      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockTxModel.createMany.mockResolvedValue({ count: 1 })
-      vi.mocked(mockAiIntegration.startOrGetCached!).mockResolvedValue({
-        cached: true,
-        tasks: cachedTasks,
-      })
+      mockModel.findMany.mockResolvedValueOnce(existingTasks)
+      vi.mocked(mockAiGeneration.triggerEventGeneration!).mockResolvedValue(
+        false,
+      )
 
       const observable = service.generateTasksStream(makeCampaign())
       const events = await firstValueFrom(observable.pipe(toArray()))
 
-      expect(events.length).toBeGreaterThanOrEqual(2)
-      expect(events[0].data).toEqual({
-        type: 'progress',
-        progress: 0,
-        message: 'Starting AI task generation...',
-      })
       const completeEvent = events.find(
         (e) => (e.data as { type: string }).type === 'complete',
       )
       expect(completeEvent).toBeDefined()
       expect((completeEvent!.data as { tasks: unknown[] }).tasks).toEqual(
-        savedTasks,
+        existingTasks,
       )
     })
 
-    it('checks subscriber.closed during polling', async () => {
+    it('polls DB for plan completion and returns tasks when plan exists', async () => {
       const savedTasks = [makeDbTask()]
-      const generatedTasks: CampaignTask[] = [
-        {
-          id: 'gen-1',
-          title: 'Generated',
-          description: 'A task',
-          cta: 'Go',
-          flowType: CampaignTaskType.education,
-          week: 2,
-        },
-      ]
 
       mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(savedTasks)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
-      vi.mocked(mockAiIntegration.startOrGetCached!).mockResolvedValue({
-        cached: false,
-        sessionId: 'session-123',
-      })
-      vi.mocked(mockAiIntegration.getLatestProgress!)
-        .mockResolvedValueOnce({
-          progress: 50,
-          status: 'processing',
-          message: 'Working...',
-        } as Awaited<
-          ReturnType<AiCampaignManagerIntegrationService['getLatestProgress']>
-        >)
-        .mockResolvedValueOnce({
-          progress: 100,
-          status: 'completed',
-          message: 'Done',
-        } as Awaited<
-          ReturnType<AiCampaignManagerIntegrationService['getLatestProgress']>
-        >)
-      vi.mocked(mockAiIntegration.finishGeneration!).mockResolvedValue(
-        generatedTasks,
+      mockModel.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1)
+      vi.mocked(mockAiGeneration.triggerEventGeneration!).mockResolvedValue(
+        true,
       )
+      mockModel.findMany.mockResolvedValue(savedTasks)
 
       const observable = service.generateTasksStream(makeCampaign())
       const events = await firstValueFrom(observable.pipe(toArray()))
-
-      const progressEvents = events.filter(
-        (e) => (e.data as { type: string }).type === 'progress',
-      )
-      expect(progressEvents.length).toBeGreaterThanOrEqual(2)
-
-      expect(
-        progressEvents.some(
-          (e) => (e.data as { progress: number }).progress === 50,
-        ),
-      ).toBe(true)
 
       const completeEvent = events.find(
         (e) => (e.data as { type: string }).type === 'complete',
@@ -660,15 +509,13 @@ describe('CampaignTasksService', () => {
       )
     })
 
-    it('handles error during stream and falls back to empty tasks', async () => {
-      const savedTasks = [makeDbTask({ isDefaultTask: true })]
+    it('handles error during stream and returns existing tasks', async () => {
+      const existingTasks = [makeDbTask({ isDefaultTask: true })]
 
       mockTxModel.count.mockResolvedValueOnce(1)
-      mockModel.findMany.mockResolvedValueOnce(savedTasks)
-      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockTxModel.createMany.mockResolvedValue({ count: 0 })
-      vi.mocked(mockAiIntegration.startOrGetCached!).mockRejectedValue(
-        new Error('AI service down'),
+      mockModel.findMany.mockResolvedValue(existingTasks)
+      vi.mocked(mockAiGeneration.triggerEventGeneration!).mockRejectedValue(
+        new Error('Lambda trigger failed'),
       )
 
       const observable = service.generateTasksStream(makeCampaign())
@@ -679,8 +526,65 @@ describe('CampaignTasksService', () => {
       )
       expect(completeEvent).toBeDefined()
       expect((completeEvent!.data as { tasks: unknown[] }).tasks).toEqual(
-        savedTasks,
+        existingTasks,
       )
+    })
+  })
+
+  describe('addTasks', () => {
+    it('passes event task id to createMany for idempotent inserts', async () => {
+      const tasks: CampaignTask[] = [
+        {
+          id: 'event-1-0-2026-04-10T00:00:00Z',
+          title: 'Town Hall',
+          description: 'Meet voters',
+          cta: 'Attend event',
+          flowType: CampaignTaskType.events,
+          week: 10,
+          date: '2026-08-15',
+        },
+      ]
+      mockModel.createMany.mockResolvedValue({ count: 1 })
+
+      await service.addTasks(1, tasks)
+
+      expect(mockModel.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            id: 'event-1-0-2026-04-10T00:00:00Z',
+            campaignId: 1,
+            title: 'Town Hall',
+          }),
+        ],
+        skipDuplicates: true,
+      })
+    })
+
+    it('includes id from task when provided', async () => {
+      const tasks: CampaignTask[] = [
+        {
+          id: 'any-custom-id-123',
+          title: 'Custom Task',
+          description: 'A task with custom id',
+          cta: 'Get started',
+          flowType: CampaignTaskType.education,
+          week: 12,
+        },
+      ]
+      mockModel.createMany.mockResolvedValue({ count: 1 })
+
+      await service.addTasks(1, tasks)
+
+      expect(mockModel.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            id: 'any-custom-id-123',
+            campaignId: 1,
+            title: 'Custom Task',
+          }),
+        ],
+        skipDuplicates: true,
+      })
     })
   })
 
@@ -1199,93 +1103,6 @@ describe('CampaignTasksService', () => {
 
       const { recurring } = splitByRecurring(getCreatedTaskData())
       expect(recurring).toHaveLength(0)
-    })
-  })
-
-  describe('saveTasks', () => {
-    it('uses transaction to delete non-default and create new tasks', async () => {
-      const tasks: CampaignTask[] = [
-        {
-          id: 'new-1',
-          title: 'New Task',
-          description: 'Description',
-          cta: 'CTA',
-          flowType: CampaignTaskType.text,
-          week: 2,
-          proRequired: true,
-          date: '2025-11-01',
-        },
-      ]
-      mockTxModel.deleteMany.mockResolvedValue({ count: 1 })
-      mockTxModel.createMany.mockResolvedValue({ count: 1 })
-      mockModel.findMany.mockResolvedValue([makeDbTask()])
-
-      const result = await service.saveTasks(1, tasks)
-
-      expect(mockTransaction).toHaveBeenCalled()
-      expect(mockTxModel.deleteMany).toHaveBeenCalledWith({
-        where: { campaignId: 1, isDefaultTask: false },
-      })
-      expect(mockTxModel.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            campaignId: 1,
-            title: 'New Task',
-            description: 'Description',
-            cta: 'CTA',
-            flowType: CampaignTaskType.text,
-            week: 2,
-            proRequired: true,
-            date: startOfDay(parseIsoDateString('2025-11-01')),
-            completed: false,
-            isDefaultTask: false,
-          }),
-        ],
-      })
-      expect(mockModel.findMany).toHaveBeenCalledWith({
-        where: { campaignId: 1 },
-        orderBy: [
-          { week: Prisma.SortOrder.desc },
-          { date: Prisma.SortOrder.asc },
-          { id: Prisma.SortOrder.asc },
-        ],
-      })
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: 'task-1', campaignId: 1 }),
-        ]),
-      )
-    })
-
-    it('handles tasks without optional fields', async () => {
-      const tasks: CampaignTask[] = [
-        {
-          id: 'min-1',
-          title: 'Minimal Task',
-          description: 'Desc',
-          cta: 'Go',
-          flowType: CampaignTaskType.education,
-          week: 1,
-        },
-      ]
-      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockTxModel.createMany.mockResolvedValue({ count: 1 })
-      mockModel.findMany.mockResolvedValue([])
-
-      await service.saveTasks(1, tasks)
-
-      expect(mockTxModel.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            date: null,
-            link: undefined,
-            proRequired: false,
-            deadline: undefined,
-            defaultAiTemplateId: undefined,
-            isDefaultTask: false,
-          }),
-        ],
-      })
     })
   })
 })

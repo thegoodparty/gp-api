@@ -1,6 +1,6 @@
 import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { HttpModule } from '@nestjs/axios'
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
@@ -12,7 +12,7 @@ import { ContactsService } from './services/contacts.service'
   imports: [
     ClerkModule,
     HttpModule,
-    CampaignsModule,
+    forwardRef(() => CampaignsModule),
     VotersModule,
     ElectionsModule,
     OrganizationsModule,
