@@ -132,6 +132,27 @@ You can run the tests in the Postman desktop app or you can run them using the P
 
 (This will eventually be automated to run in a npm/npx script to automatically fetch the collection and environment keys for you)
 
+### Campaign Event Generation (Local)
+
+To test the campaign event generation Lambda locally, run the local server in `gp-ai-projects`:
+
+```bash
+cd /gp-ai-projects
+source .venv/bin/activate
+python campaign_plan_lambda/local_server.py
+```
+
+Then add to your gp-api `.env`:
+
+```
+CAMPAIGN_PLAN_LOCAL_URL=http://localhost:8089/generate
+CAMPAIGN_PLAN_RESULTS_BUCKET=campaign-plan-results-dev
+```
+
+The local server also needs `OUTPUT_SQS_QUEUE_URL` set to your personal SQS queue (e.g. `YourName_Queue.fifo`). Each engineer should have their own dedicated queue.
+
+See `gp-ai-projects/campaign_plan_lambda/README.md` for full setup instructions including AWS credentials and SQS queue configuration.
+
 ### AWS Setup
 
 To set up your AWS CLI locally, run the following script:
