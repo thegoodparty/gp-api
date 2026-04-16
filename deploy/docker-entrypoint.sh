@@ -42,10 +42,12 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     if [ "$P3009_RESOLVED" = "false" ] \
       && echo "$DEPLOY_OUTPUT" | grep -q "P3009"; then
       echo "⚠️ Failed migration detected (P3009). Resolving..."
-      npx prisma migrate resolve \
+      if npx prisma migrate resolve \
         --applied 20260414144530_take_new_migration_from_dev \
-        --schema=prisma/schema 2>&1 && P3009_RESOLVED=true
-      continue
+        --schema=prisma/schema 2>&1; then
+        P3009_RESOLVED=true
+        continue
+      fi
     fi
 
     RETRY_COUNT=$((RETRY_COUNT + 1))
