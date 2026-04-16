@@ -4,6 +4,17 @@ import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
 export const MIN_PASS_LENGTH = 8
 export const MAX_PASS_LENGTH = 64
 
+// Matches the bcrypt modular-crypt format: `$2a$`/`$2b$`/`$2y$` prefix
+// followed by a 2-digit cost, `$`, a 22-char salt, and a 31-char digest
+// (56 chars after the prefix, 60 total). See:
+// https://en.wikipedia.org/wiki/Bcrypt#Description
+const BCRYPT_HASH_REGEX = /^\$2[aby]\$.{56}$/
+
+export const ensureBcryptHash = (password: string): string =>
+  BCRYPT_HASH_REGEX.test(password)
+    ? password
+    : hashSync(password.trim(), genSaltSync())
+
 const isValidPassword = (
   password: string,
   minLength: number = MIN_PASS_LENGTH,

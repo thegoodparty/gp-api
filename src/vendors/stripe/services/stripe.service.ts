@@ -247,65 +247,6 @@ export class StripeService {
     return customer.id
   }
 
-  async fetchCustomerIdByEmail(email: string): Promise<string | null> {
-    try {
-      const customers = await this.stripe.customers.list({ email, limit: 1 })
-      const first = customers.data[0]
-      return first ? first.id : null
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error(e, `Failed to list customers by email ${email}`)
-        throw new BadGatewayException(
-          `Failed to query Stripe customers by email ${email}`,
-          e.message,
-        )
-      }
-      throw e
-    }
-  }
-
-  async listActiveSubscriptionCustomerEmails(): Promise<string[]> {
-    const emails = new Set<string>()
-    let startingAfter: string | undefined = undefined
-    try {
-      do {
-        const response: Stripe.ApiList<Stripe.Subscription> =
-          await this.stripe.subscriptions.list({
-            status: 'active',
-            limit: 100,
-            expand: ['data.customer'],
-            starting_after: startingAfter,
-          })
-
-        for (const subscription of response.data) {
-          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const customer = subscription.customer as Stripe.Customer
-          const email = customer?.email
-          if (email) {
-            emails.add(email.toLowerCase())
-          }
-        }
-
-        const last =
-          response.data.length > 0
-            ? response.data[response.data.length - 1]
-            : undefined
-        startingAfter = response.has_more && last ? last.id : undefined
-      } while (startingAfter)
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error(e, 'Failed to list active subscriptions')
-        throw new BadGatewayException(
-          'Failed to list active subscriptions from Stripe',
-          e.message,
-        )
-      }
-      throw e
-    }
-    return Array.from(emails)
-  }
-
   async retrieveSubscription(subscriptionId: string) {
     try {
       return await this.stripe.subscriptions.retrieve(subscriptionId)

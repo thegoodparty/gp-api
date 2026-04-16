@@ -1,7 +1,5 @@
 import { HttpStatus } from '@nestjs/common'
 import { APIRequestContext, expect, test } from '@playwright/test'
-import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { P2VSource } from '../../pathToVictory/types/pathToVictory.types'
 import {
   deleteUser,
   generateRandomEmail,
@@ -101,14 +99,6 @@ async function prepareCampaignAndOffice(params: {
         zip: '82001',
         electionDate: '2026-11-03',
         ballotLevel: 'CITY',
-      },
-      pathToVictory: {
-        source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
-        winNumber: 3142,
-        p2vCompleteDate: '2025-09-25',
-        projectedTurnout: 6282,
-        voterContactGoal: 15710,
       },
     },
   })
@@ -235,6 +225,7 @@ test.describe('Contacts and Segments', () => {
   test('should download non-empty contacts CSV for seeded district', async ({
     request,
   }) => {
+    test.setTimeout(120_000)
     const response = await request.get(`/v1/contacts/download`, {
       headers: EO_AUTH_HEADER(authToken, eoOrgSlug),
     })

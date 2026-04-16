@@ -49,7 +49,6 @@ type GetChatToolCompletionArgs = {
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
   include: {
-    pathToVictory: true
     campaignPositions: {
       include: {
         topIssue: true
@@ -382,7 +381,7 @@ export class AiService {
       const replacements: PromptReplacement[] = [
         ...this.buildCampaignReplacements(campaign),
         ...(await this.buildOfficeReplacement(campaign)),
-        ...this.buildPathToVictoryReplacements(campaign, liveMetrics),
+        ...this.buildLiveMetricsReplacements(liveMetrics),
         ...this.buildUpdateHistoryReplacement(prompt, campaign),
         ...this.buildAiContentReplacements(campaign),
       ]
@@ -471,47 +470,16 @@ export class AiService {
     return [{ find: 'office', replace: office }]
   }
 
-  private buildPathToVictoryReplacements(
-    campaign: PromptReplaceCampaign,
+  private buildLiveMetricsReplacements(
     liveMetrics?: RaceTargetMetrics | null,
   ): PromptReplacement[] {
-    const ptv = campaign.pathToVictory
-    if (!ptv) return []
-
-    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const data = ptv.data as Record<string, string | number>
+    if (!liveMetrics) return []
 
     return [
-      { find: 'pathToVictory', replace: JSON.stringify(ptv.data) },
-      {
-        find: 'projectedTurnout',
-        replace: liveMetrics?.projectedTurnout,
-      },
-      { find: 'totalRegisteredVoters', replace: data.totalRegisteredVoters },
-      {
-        find: 'winNumber',
-        replace: liveMetrics?.winNumber,
-      },
-      { find: 'republicans', replace: data.republicans },
-      { find: 'democrats', replace: data.democrats },
-      { find: 'indies', replace: data.indies },
-      { find: 'averageTurnout', replace: data.averageTurnout },
-      { find: 'allAvailVoters', replace: data.allAvailVoters },
-      { find: 'availVotersTo35', replace: data.availVotersTo35 },
-      { find: 'women', replace: data.women },
-      { find: 'men', replace: data.men },
-      { find: 'africanAmerican', replace: data.africanAmerican },
-      { find: 'white', replace: data.white },
-      { find: 'asian', replace: data.asian },
-      { find: 'hispanic', replace: data.hispanic },
-      {
-        find: 'voteGoal',
-        replace: liveMetrics?.voterContactGoal ?? data.voteGoal,
-      },
-      { find: 'voterProjection', replace: data.voterProjection },
-      { find: 'budgetLow', replace: data.budgetLow },
-      { find: 'budgetHigh', replace: data.budgetHigh },
+      { find: 'projectedTurnout', replace: liveMetrics.projectedTurnout },
+      { find: 'winNumber', replace: liveMetrics.winNumber },
+      { find: 'voteGoal', replace: liveMetrics.voterContactGoal },
+      { find: 'voterContactGoal', replace: liveMetrics.voterContactGoal },
     ]
   }
 

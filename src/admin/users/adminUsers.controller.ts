@@ -1,3 +1,5 @@
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { AdminOrM2MGuard } from '@/authentication/guards/AdminOrM2M.guard'
 import {
   BadRequestException,
   Body,
@@ -10,33 +12,30 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
+import { UserRole } from '@prisma/client'
+import { subDays, subMonths } from 'date-fns'
+import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { UsersService } from 'src/users/services/users.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import {
   AdminUserListSchema,
   DateRangeFilter,
 } from './schemas/AdminUserList.schema'
-import { subDays, subMonths } from 'date-fns'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
-import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
-import { AuthenticationService } from 'src/authentication/authentication.service'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { ReadUserOutputSchema } from '@goodparty_org/contracts'
-import { UserRole } from '@prisma/client'
-import { PinoLogger } from 'nestjs-pino'
 
 @Controller('admin/users')
-@Roles(UserRole.admin)
 @UsePipes(ZodValidationPipe)
 export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
-    private readonly authService: AuthenticationService,
     private readonly slack: SlackService,
     private readonly logger: PinoLogger,
   ) {
@@ -44,6 +43,7 @@ export class AdminUsersController {
   }
 
   @Get()
+  @Roles(UserRole.admin)
   async list(@Query() { dateRange }: AdminUserListSchema) {
     if (!dateRange || dateRange === DateRangeFilter.allTime) {
       return this.usersService.findMany()
@@ -64,34 +64,43 @@ export class AdminUsersController {
   }
 
   @Get(':id')
+  @Roles(UserRole.admin)
   async get(@Param('id', ParseIntPipe) id: number) {
     return await this.usersService.findUniqueOrThrow({ where: { id } })
   }
 
   @Post()
+  @Roles(UserRole.admin)
   create(@Body() body: AdminCreateUserSchema) {
     return this.usersService.createUser(body)
   }
 
-  @Post('impersonate')
-  @HttpCode(HttpStatus.OK)
-  async impersonate(@Body() { email }: AdminImpersonateSchema) {
-    const user = await this.usersService.findUserByEmail(email)
+  @Post('impersonate/:id')
+  @UseGuards(AdminOrM2MGuard)
+  async impersonate(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: IncomingRequest,
+    @Body() body: { actorClerkId?: string },
+  ) {
+    const actorClerkId = req.user?.clerkId ?? body.actorClerkId
 
-    if (!user) {
-      throw new BadRequestException('Invalid user')
+    if (!actorClerkId) {
+      throw new BadRequestException(
+        'actorClerkId is required when using M2M auth',
+      )
     }
 
-    const token = await this.authService.generateAuthToken({
-      email: user.email,
-      sub: user.id,
-      impersonating: true,
-    })
+    this.logger.info(
+      { targetUserId: id, actorClerkId, authSource: req.user ? 'user' : 'm2m' },
+      'Impersonation request received',
+    )
 
-    return { user: ReadUserOutputSchema.parse(user), token }
+    const user = await this.usersService.findUniqueOrThrow({ where: { id } })
+    return this.usersService.impersonateUser(user.id, actorClerkId)
   }
 
   @Delete(':id')
+  @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })

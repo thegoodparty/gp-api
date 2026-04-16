@@ -11,10 +11,8 @@ model ElectedOffice {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // temporary relationship to campaign
-  // goal would be to move away from the hard link to campaign, but is necessary for now
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: NoAction)
-  campaignId Int      @map("campaign_id")
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: NoAction)
+  campaignId Int?      @map("campaign_id")
 
   polls                  Poll[]
   pollIndividualMessages PollIndividualMessage[]

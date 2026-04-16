@@ -15,6 +15,7 @@ import {
   QueueType,
 } from '../../../queue/queue.types'
 import { PinoLogger } from 'nestjs-pino'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 @Injectable()
 export class AiContentService {
@@ -24,6 +25,7 @@ export class AiContentService {
     private readonly aiService: AiService,
     private readonly slack: SlackService,
     private readonly queue: QueueProducerService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiContentService.name)
@@ -88,7 +90,6 @@ export class AiContentService {
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
-        pathToVictory: true,
         campaignPositions: {
           include: {
             topIssue: true,
@@ -103,6 +104,13 @@ export class AiContentService {
     if (!campaignWithRelations) {
       throw new NotFoundException(`Campaign not found: ${campaign.id}`)
     }
+
+    if (campaignWithRelations.user) {
+      campaignWithRelations.user = await this.clerkEnricher.enrichUser(
+        campaignWithRelations.user,
+      )
+    }
+
     const liveMetrics = await this.campaignsService.fetchLiveRaceTargetMetrics(
       campaignWithRelations,
     )
@@ -199,10 +207,13 @@ export class AiContentService {
   }) {
     const { slug, key, regenerate } = message
 
-    let campaign: Campaign = await this.campaignsService.findFirstOrThrow({
+    let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
-      include: { pathToVictory: true, user: true },
+      include: { user: true },
     })
+    if (campaign.user) {
+      campaign.user = await this.clerkEnricher.enrichUser(campaign.user)
+    }
     let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
       aiContent.generationStatus?.[key] || {}
@@ -253,8 +264,11 @@ export class AiContentService {
       campaign =
         (await this.campaignsService.findFirst({
           where: { slug },
-          include: { pathToVictory: true, user: true },
+          include: { user: true },
         })) || campaign
+      if (campaign.user) {
+        campaign.user = await this.clerkEnricher.enrichUser(campaign.user)
+      }
       aiContent = campaign.aiContent
       let oldVersion: { date: Date; text: string } | undefined
       if (chatResponse && chatResponse !== '') {
