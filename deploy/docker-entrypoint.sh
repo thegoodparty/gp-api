@@ -31,33 +31,32 @@ P3009_RESOLVED=false
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   echo "Attempting database connection (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
 
-  if DEPLOY_OUTPUT=$(npx prisma migrate deploy --schema=prisma/schema 2>&1); then
-    echo "$DEPLOY_OUTPUT"
+  DEPLOY_OUTPUT=$(npx prisma migrate deploy --schema=prisma/schema 2>&1)
+  DEPLOY_EXIT=$?
+  echo "$DEPLOY_OUTPUT"
+
+  if [ $DEPLOY_EXIT -eq 0 ]; then
     echo "✅ Migrations completed successfully."
     break
+  fi
+
+  # TODO: Remove this P3009 block once the failed migration is resolved
+  if [ "$P3009_RESOLVED" = "false" ] \
+    && echo "$DEPLOY_OUTPUT" | grep -q "P3009"; then
+    echo "⚠️ Failed migration detected (P3009). Resolving..."
+    npx prisma migrate resolve \
+      --applied 20260414144530_take_new_migration_from_dev \
+      --schema=prisma/schema 2>&1 && P3009_RESOLVED=true
+    continue
+  fi
+
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    echo "⏳ Database not ready yet. Retrying in 10s..."
+    sleep 10
   else
-    echo "$DEPLOY_OUTPUT"
-
-    # TODO: Remove this P3009 block once the failed migration is resolved
-    if [ "$P3009_RESOLVED" = "false" ] \
-      && echo "$DEPLOY_OUTPUT" | grep -q "P3009"; then
-      echo "⚠️ Failed migration detected (P3009). Resolving..."
-      if npx prisma migrate resolve \
-        --applied 20260414144530_take_new_migration_from_dev \
-        --schema=prisma/schema 2>&1; then
-        P3009_RESOLVED=true
-        continue
-      fi
-    fi
-
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-      echo "⏳ Database not ready yet. Retrying in 10s..."
-      sleep 10
-    else
-      echo "❌ ERROR: Failed to connect to database after $MAX_RETRIES attempts."
-      exit 1
-    fi
+    echo "❌ ERROR: Failed to connect to database after $MAX_RETRIES attempts."
+    exit 1
   fi
 done
 
@@ -129,3 +128,4 @@ else
   # For non-preview environments, start normally
   exec node -r ./dist/otel.js dist/main
 fi
+
