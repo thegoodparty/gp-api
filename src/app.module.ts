@@ -1,12 +1,9 @@
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
-import { JwtAuthStrategy } from '@/authentication/auth-strategies/JwtAuth.strategy'
 import { AuthenticationModule } from '@/authentication/authentication.module'
-import { ClerkM2MAuthGuard } from '@/authentication/guards/ClerkM2MAuth.guard'
-import { JwtAuthGuard } from '@/authentication/guards/JwtAuth.guard'
+import { SessionGuard } from '@/authentication/guards/Session.guard'
 import { ImpersonationInterceptor } from '@/analytics/interceptors/Impersonation.interceptor'
 import { AdminAuditInterceptor } from '@/authentication/interceptors/AdminAudit.interceptor'
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { CampaignsModule } from '@/campaigns/campaigns.module'
 import { CommunityIssuesModule } from '@/communityIssues/communityIssues.module'
 import { ContactEngagementModule } from '@/contactEngagement/contactEngagement.module'
@@ -92,11 +89,11 @@ import { loggerModule } from './observability/logging/logger-module'
     SessionsService,
     {
       provide: APP_GUARD,
-      useClass: ClerkM2MAuthGuard,
+      useClass: SessionGuard,
     },
     {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      provide: APP_INTERCEPTOR,
+      useClass: ImpersonationInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,
@@ -110,8 +107,6 @@ import { loggerModule } from './observability/logging/logger-module'
       provide: APP_INTERCEPTOR,
       useClass: BlockedStateInterceptor,
     },
-    JwtAuthStrategy,
-    ClerkClientProvider,
   ],
 })
 export class AppModule {}

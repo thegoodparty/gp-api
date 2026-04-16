@@ -1,5 +1,5 @@
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { ElectionsModule } from 'src/elections/elections.module'
@@ -39,6 +39,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     AwsModule,
     EmailModule,
     CampaignsAiModule,
+    ClerkModule,
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
@@ -72,7 +73,6 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     LegacyCampaignTasksService,
     AiGenerationService,
     CampaignTcrComplianceService,
-    ClerkClientProvider,
   ],
   exports: [
     CampaignsService,
