@@ -11,7 +11,7 @@ import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 

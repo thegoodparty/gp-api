@@ -10,7 +10,7 @@ import {
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
 
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const STRIPE_SECRET_KEY = requireEnv('STRIPE_SECRET_KEY')
 const WEBAPP_ROOT_URL = requireEnv('WEBAPP_ROOT_URL')
