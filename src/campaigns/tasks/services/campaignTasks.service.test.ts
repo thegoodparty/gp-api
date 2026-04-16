@@ -569,6 +569,7 @@ describe('CampaignTasksService', () => {
           cta: 'Get started',
           flowType: CampaignTaskType.education,
           week: 12,
+          date: '2026-06-01',
         },
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
