@@ -5,6 +5,7 @@ import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
 import { CampaignTasksService } from '@/campaigns/tasks/services/campaignTasks.service'
+import { WeeklyTasksDigestHandlerService } from '@/campaigns/tasks/services/weeklyTasksDigestHandler.service'
 import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
@@ -215,6 +216,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
+      {} as never,
       {} as never,
       {} as never,
       createMockLogger(),
@@ -853,6 +855,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       s3Service as never,
       usersService as never,
       {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -972,6 +975,10 @@ describe('QueueConsumerService - message type routing', () => {
         { provide: SlackService, useValue: mockSlackService },
         { provide: UsersService, useValue: {} },
         { provide: AnalyticsService, useValue: {} },
+        {
+          provide: WeeklyTasksDigestHandlerService,
+          useValue: { handleWeeklyTasksDigest: vi.fn() },
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()
@@ -1031,6 +1038,56 @@ describe('QueueConsumerService - message type routing', () => {
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
+  })
+
+  it('routes weeklyTasksDigest messages to the handler', async () => {
+    const handler = module.get(WeeklyTasksDigestHandlerService)
+    const handleSpy = vi
+      .spyOn(handler, 'handleWeeklyTasksDigest')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-digest-ok',
+      Body: JSON.stringify({
+        type: QueueType.WEEKLY_TASKS_DIGEST,
+        data: {
+          windowStart: '2026-04-20T00:00:00.000Z',
+          windowEnd: '2026-04-27T00:00:00.000Z',
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).toHaveBeenCalledOnce()
+    expect(handleSpy).toHaveBeenCalledWith({
+      windowStart: '2026-04-20T00:00:00.000Z',
+      windowEnd: '2026-04-27T00:00:00.000Z',
+    })
+  })
+
+  it('rejects weeklyTasksDigest messages with invalid payload and does not call handler', async () => {
+    const handler = module.get(WeeklyTasksDigestHandlerService)
+    const handleSpy = vi
+      .spyOn(handler, 'handleWeeklyTasksDigest')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-digest-invalid',
+      Body: JSON.stringify({
+        type: QueueType.WEEKLY_TASKS_DIGEST,
+        data: {
+          windowStart: 'not-a-date',
+        },
+      }),
+    }
+
+    // withLegacyErrorSwallowing catches the Zod parse failure and returns true
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).not.toHaveBeenCalled()
   })
 
   it('discards campaignPlanComplete with permanent Prisma error instead of requeuing', async () => {

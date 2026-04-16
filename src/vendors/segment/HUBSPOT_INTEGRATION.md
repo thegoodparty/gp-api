@@ -1,6 +1,6 @@
 # Segment → HubSpot Integration
 
-This document describes how Segment events flow from the API to HubSpot and trigger workflows that update user compliance status.
+This document describes how Segment events flow from the API to HubSpot and trigger workflows that update contact/company fields.
 
 ## Overview
 
@@ -35,6 +35,48 @@ The compliance flow tracks user progress through these stages:
 | `Voter Outreach - 10DLC Compliance PIN Submitted` | Ops - Set 10 DLC Compliance Status to Compliance PIN Submitted | Compliance Pending | `CampaignTcrComplianceController.submitCampaignVerifyPIN()` |
 | `Voter Outreach - 10DLC Compliance Completed` | Ops - Set 10 DLC Compliance Status to 10 DLC Compliance Complete | Compliant | `QueueConsumerService.handleTcrComplianceCheckMessage()` |
 
+## Weekly Tasks Digest Flow
+
+A cron job (`WeeklyTasksDigestService`) fires every Sunday at 11 PM Central Time and sends a `WEEKLY_TASKS_DIGEST` message to the SQS queue. The consumer (`WeeklyTasksDigestHandlerService`) processes all campaigns with a future election date and fires a Segment event per campaign with up to 5 upcoming tasks due Monday through Sunday of the coming week.
+
+The event populates the `win_campaign_plan` fields on the HubSpot contact, which a HubSpot workflow uses to send weekly digest emails.
+
+| Event Name | HubSpot Contact Fields | Fired From |
+|-----------|----------------------|------------|
+| `Campaign Plan - Weekly Tasks Digest` | `plan_tasks_completed`, `plan_total_tasks`, `task_name_1`-`5`, `task_description_1`-`5`, `task_type_1`-`5`, `task_due_date_1`-`5`, `task_week_number_1`-`5` | `WeeklyTasksDigestHandlerService` (via SQS queue) |
+
+Rules:
+- Campaigns with a past election date are skipped
+- Campaigns with fewer than 3 incomplete tasks are skipped (stale data prevents HubSpot from sending the email)
+- Outreach tasks (`text`, `robocall`, `doorKnocking`, `phoneBanking`) are prioritized
+- Task due dates are sent as date-only strings (`yyyy-MM-dd`)
+
+Test script: `scripts/test-weekly-tasks-digest-event.ts`
+
+### Manual Recovery (if the cron fails)
+
+The cron enqueues the window in the SQS message itself, so manual triggering just means sending that same message shape by hand. Do this when the Sunday-night cron didn't fire (or the consumer was down) and you want to backfill HubSpot for the current week.
+
+1. Compute the window in UTC:
+   - `windowStart` = the Monday you want to cover, at `00:00:00.000Z`
+   - `windowEnd` = the following Monday, at `00:00:00.000Z`
+   - (Example for the week of April 20, 2026: `2026-04-20T00:00:00.000Z` → `2026-04-27T00:00:00.000Z`)
+
+2. Send this message body to the gp-api FIFO SQS queue (via AWS Console or CLI):
+   ```json
+   {
+     "type": "weeklyTasksDigest",
+     "data": {
+       "windowStart": "2026-04-20T00:00:00.000Z",
+       "windowEnd": "2026-04-27T00:00:00.000Z"
+     }
+   }
+   ```
+   - `MessageGroupId`: `gp-queue-weeklyTasksDigest`
+   - `MessageDeduplicationId`: anything unique (e.g. `manual-<timestamp>`)
+
+3. The consumer will query all campaigns, fire Segment events, and refresh the HubSpot contact fields. HubSpot's 5-day staleness check applies to whether the digest email sends — a manual recovery within ~5 days of the intended run should still trigger emails.
+
 ## Event Definitions
 
 File: `src/vendors/segment/segment.types.ts`
@@ -45,6 +87,7 @@ EVENTS.CandidateWebsite.PurchasedDomain     // 'Candidate Website - Purchased do
 EVENTS.Outreach.ComplianceFormSubmitted      // 'Voter Outreach - 10DLC Compliance Form Submitted'
 EVENTS.Outreach.CompliancePinSubmitted       // 'Voter Outreach - 10DLC Compliance PIN Submitted'
 EVENTS.Outreach.ComplianceCompleted          // 'Voter Outreach - 10DLC Compliance Completed'
+EVENTS.CampaignPlan.WeeklyTasksDigest       // 'Campaign Plan - Weekly Tasks Digest'
 ```
 
 ## Segment Configuration

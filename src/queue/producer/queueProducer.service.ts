@@ -45,19 +45,17 @@ export class QueueProducerService {
   async sendMessage(
     msg: QueueMessage,
     group: MessageGroup | string = MessageGroup.default,
-    options: { throwOnError?: boolean } = {},
+    options: { throwOnError?: boolean; deduplicationId?: string } = {},
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body: any = JSON.stringify(msg)
+    const body = JSON.stringify(msg)
 
     const uuid = Math.random().toString(36).substring(2, 12)
+    const deduplicationId = options.deduplicationId ?? uuid
 
     const message: Message = {
       id: uuid,
-      // Type narrowing from nullable/union — runtime context guarantees string but type is broader
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      body: body as string,
-      deduplicationId: uuid,
+      body,
+      deduplicationId,
       groupId: `gp-queue-${group}`,
     }
 
