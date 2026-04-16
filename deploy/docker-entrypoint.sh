@@ -127,4 +127,3 @@ else
   # For non-preview environments, start normally
   exec node -r ./dist/otel.js dist/main
 fi
-
