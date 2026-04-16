@@ -161,7 +161,7 @@ async function handleUserCreation(
         localUserId: user.id,
         userData: {
           email: user.email,
-          password: userData.password,
+          passwordDigest: userData.password,
           firstName: user.firstName,
           lastName: user.lastName,
         },

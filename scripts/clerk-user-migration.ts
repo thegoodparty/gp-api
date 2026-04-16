@@ -4,7 +4,7 @@ import { Prisma, PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import { HttpStatus } from '@nestjs/common'
 import { intervalToDuration } from 'date-fns'
-import { genSaltSync, hashSync } from 'bcrypt'
+import { ensureBcryptHash } from '../src/users/util/passwords.util'
 
 const ADVISORY_LOCK_ID = createHash('md5')
   .update('clerk-user-migration')
@@ -108,15 +108,8 @@ const HAS_CLERK_ID = {
   clerkId: { not: null },
 } satisfies Prisma.UserWhereInput
 
-const BCRYPT_HASH_REGEX = /^\$2[aby]\$.{56}$/
-
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
-
-const ensureBcryptHash = (password: string): string =>
-  BCRYPT_HASH_REGEX.test(password)
-    ? password
-    : hashSync(password.trim(), genSaltSync())
 
 const formatDuration = (ms: number): string => {
   const { minutes = 0, seconds = 0 } = intervalToDuration({

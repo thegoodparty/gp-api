@@ -2,7 +2,10 @@ import { Prisma, PrismaClient, User, UserRole } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
 import { userFactory } from './factories/user.factory'
-import { hashPasswordSync } from '../src/users/util/passwords.util'
+import {
+  ensureBcryptHash,
+  hashPasswordSync,
+} from '../src/users/util/passwords.util'
 import { clerkThrottle } from './util/clerkThrottle.util'
 
 const NUM_USERS = 20
@@ -62,14 +65,9 @@ const USER_W_NO_CAMPAIGN = {
   hasPassword: true,
 }
 
-const FIXED_PLAINTEXT_PASSWORDS: Record<string, string> = {
-  [SALES_USER.email]: SALES_PASSWORD,
-  [SERVE_USER.email]: SERVE_PASSWORD,
-  [USER_W_NO_CAMPAIGN.email]: VISITOR_PASSWORD,
-}
 export interface ClerkSeedUser {
   email: string
-  password: string
+  passwordDigest: string
   firstName: string
   lastName: string
 }
@@ -93,10 +91,11 @@ export const ensureClerkUser = async (
     const clerkUser = await clerkThrottle(() =>
       clerk.users.createUser({
         emailAddress: [userData.email],
-        password: userData.password,
+        passwordDigest: ensureBcryptHash(userData.passwordDigest),
+        passwordHasher: 'bcrypt' as const,
+        skipPasswordChecks: true,
         firstName: userData.firstName,
         lastName: userData.lastName,
-        skipPasswordChecks: true,
         skipLegalChecks: true,
         externalId: String(localUserId),
       }),
@@ -196,28 +195,22 @@ export default async function seedUsers(prisma: PrismaClient) {
 
   await ensureClerkUser(prisma, adminUser.id, {
     email: ADMIN_EMAIL,
-    password: ADMIN_PASSWORD,
+    passwordDigest: adminUser.password!,
     firstName: ADMIN_FIRST_NAME,
     lastName: ADMIN_LAST_NAME,
   })
 
   await ensureClerkUser(prisma, candidateUser.id, {
     email: CANDIDATE_EMAIL,
-    password: CANDIDATE_PASSWORD,
+    passwordDigest: candidateUser.password!,
     firstName: 'Test',
     lastName: 'Candidate',
   })
 
   const fakeUsers = new Array(NUM_USERS)
-  const plaintextPasswords = new Map<string, string>()
 
   for (let i = 0; i < NUM_USERS; i++) {
-    const generated = userFactory(FIXED_USERS[i])
-    fakeUsers[i] = generated
-    plaintextPasswords.set(
-      generated.email,
-      FIXED_PLAINTEXT_PASSWORDS[generated.email] ?? generated.password,
-    )
+    fakeUsers[i] = userFactory(FIXED_USERS[i])
   }
 
   const createdUsers = await prisma.user.createManyAndReturn({
@@ -230,13 +223,11 @@ export default async function seedUsers(prisma: PrismaClient) {
   )
 
   await pmap(
-    createdUsers.filter(
-      (u) => plaintextPasswords.get(u.email) && u.firstName && u.lastName,
-    ),
+    createdUsers.filter((u) => u.password && u.firstName && u.lastName),
     (user) =>
       ensureClerkUser(prisma, user.id, {
         email: user.email,
-        password: plaintextPasswords.get(user.email)!,
+        passwordDigest: user.password!,
         firstName: user.firstName!,
         lastName: user.lastName!,
       }),
