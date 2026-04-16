@@ -77,7 +77,6 @@ const CampaignDetailsSchema = z
   .partial()
   .passthrough()
 
-// TODO: make schemas data, pathToVictory, aiContent
 export const updateCampaignBodySchema = CampaignSchema.pick({
   slug: true,
   data: true,
@@ -89,7 +88,6 @@ export const updateCampaignBodySchema = CampaignSchema.pick({
   .partial()
   .extend({
     details: CampaignDetailsSchema.optional(),
-    pathToVictory: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
 

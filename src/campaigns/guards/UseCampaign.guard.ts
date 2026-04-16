@@ -5,14 +5,18 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { Campaign } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { CampaignWith } from '../campaigns.types'
+
 import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCampaignMetadata,
 } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+
+const isUser = (value: object): value is User =>
+  'clerkId' in value && 'email' in value
 
 /**
  * Guard that resolves a Campaign and attaches it to the request.
@@ -25,6 +29,7 @@ export class UseCampaignGuard implements CanActivate {
   constructor(
     private campaignsService: CampaignsService,
     private reflector: Reflector,
+    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(UseCampaignGuard.name)
@@ -44,7 +49,7 @@ export class UseCampaignGuard implements CanActivate {
       )
 
     const userId = request.user.id
-    const include = campaignInclude ?? { pathToVictory: true }
+    const include = campaignInclude ?? {}
     let campaign: Campaign | null = null
 
     const slug = request.headers['x-organization-slug']
@@ -64,9 +69,18 @@ export class UseCampaignGuard implements CanActivate {
     }
 
     if (campaign) {
-      // Prisma include query — TypeScript cannot narrow the included relations at compile time
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      request.campaign = campaign as CampaignWith<'pathToVictory'>
+      if (
+        include &&
+        'user' in include &&
+        'user' in campaign &&
+        typeof campaign.user === 'object' &&
+        campaign.user !== null &&
+        isUser(campaign.user)
+      ) {
+        const enriched = await this.clerkEnricher.enrichUser(campaign.user)
+        Object.assign(campaign, { user: enriched })
+      }
+      request.campaign = campaign
       return true
     } else if (continueIfNotFound === true) {
       return true

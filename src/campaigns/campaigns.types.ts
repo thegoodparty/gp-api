@@ -23,24 +23,12 @@ export type CampaignListResponse = Prisma.CampaignGetPayload<{
         metaData: true
       }
     }
-    pathToVictory: {
-      select: {
-        data: true
-      }
-    }
-  }
-}>
-
-export type CampaignWithPathToVictory = Prisma.CampaignGetPayload<{
-  include: {
-    pathToVictory: true
   }
 }>
 
 export interface UpdateCampaignFieldsInput {
   data?: Record<string, unknown>
   details?: Record<string, unknown>
-  pathToVictory?: Record<string, unknown>
   aiContent?: Record<string, unknown>
   formattedAddress?: string | null
   placeId?: string | null

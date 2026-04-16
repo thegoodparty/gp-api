@@ -122,9 +122,7 @@ export class PaymentEventsService {
         'No user found with given subscription customerId',
       )
     }
-    const campaign = await this.campaignsService.findByUserId(user.id, {
-      pathToVictory: true,
-    })
+    const campaign = await this.campaignsService.findByUserId(user.id)
     if (!campaign) {
       throw new BadGatewayException(
         'No campaign found associated with given customerId',
@@ -236,9 +234,7 @@ export class PaymentEventsService {
         'No user found with given checkout session userId',
       )
     }
-    const campaign = await this.campaignsService.findByUserId(user.id, {
-      pathToVictory: true,
-    })
+    const campaign = await this.campaignsService.findByUserId(user.id)
     if (!campaign) {
       throw new BadRequestException('No campaign found for user')
     }

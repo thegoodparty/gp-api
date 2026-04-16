@@ -36,7 +36,6 @@ describe('ContactsService', () => {
       get: ReturnType<typeof vi.fn>
     }
     let mockVoterFileFilterService: {
-      findByIdAndCampaignId: ReturnType<typeof vi.fn>
       findByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     }
     let mockElectionsService: {
@@ -55,7 +54,6 @@ describe('ContactsService', () => {
         get: vi.fn(),
       }
       mockVoterFileFilterService = {
-        findByIdAndCampaignId: vi.fn().mockResolvedValue(null),
         findByIdAndOrganizationSlug: vi.fn().mockResolvedValue(null),
       }
       mockElectionsService = {

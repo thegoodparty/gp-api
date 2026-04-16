@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
@@ -8,7 +8,6 @@ export class VoterFileFilterService extends createPrismaBase(
   MODELS.VoterFileFilter,
 ) {
   async create(
-    campaignId: number | undefined,
     organizationSlug: string,
     data: Omit<
       Prisma.VoterFileFilterCreateInput,
@@ -17,7 +16,6 @@ export class VoterFileFilterService extends createPrismaBase(
   ) {
     return this.model.create({
       data: {
-        campaignId,
         organizationSlug,
         ...data,
       },
@@ -47,22 +45,6 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
-  findByCampaignId(campaignId: number): Promise<VoterFileFilter[]> {
-    return this.model.findMany({
-      where: { campaignId },
-      orderBy: { name: 'asc' },
-    })
-  }
-
-  findByIdAndCampaignId(
-    id: number,
-    campaignId: number,
-  ): Promise<VoterFileFilter | null> {
-    return this.findFirst({
-      where: { id, campaignId },
-    })
-  }
-
   findByIdAndOrganizationSlug(
     id: number,
     organizationSlug: string,
@@ -83,32 +65,12 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
-  updateByIdAndCampaignId(
-    id: number,
-    campaignId: number,
-    data: UpdateVoterFileFilterSchema,
-  ): Promise<VoterFileFilter> {
-    return this.model.update({
-      where: { id, campaignId },
-      data,
-    })
-  }
-
   deleteByIdAndOrganizationSlug(
     id: number,
     organizationSlug: string,
   ): Promise<VoterFileFilter> {
     return this.model.delete({
       where: { id, organizationSlug },
-    })
-  }
-
-  deleteByIdAndCampaignId(
-    id: number,
-    campaignId: number,
-  ): Promise<VoterFileFilter> {
-    return this.model.delete({
-      where: { id, campaignId },
     })
   }
 
@@ -166,6 +128,18 @@ export class VoterFileFilterService extends createPrismaBase(
       ...(age50Plus === true ? { age_50_plus: age50Plus } : {}),
       ...(genderMale === true ? { gender_male: genderMale } : {}),
       ...(genderFemale === true ? { gender_female: genderFemale } : {}),
+    }
+  }
+
+  async filterAccessCheck(organizationSlug: string): Promise<void> {
+    if (organizationSlug.startsWith('campaign-')) {
+      const campaign = await this._prisma.campaign.findFirst({
+        where: { organizationSlug },
+      })
+
+      if (!campaign?.isPro) {
+        throw new BadRequestException('Campaign is not pro')
+      }
     }
   }
 }

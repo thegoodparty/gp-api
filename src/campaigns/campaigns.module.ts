@@ -1,14 +1,14 @@
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
-import { HttpModule } from '@nestjs/axios'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { EmailModule } from 'src/email/email.module'
 import { UsersModule } from 'src/users/users.module'
+import { ContactsModule } from 'src/contacts/contacts.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { CrmModule } from '../crm/crmModule'
-import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { EcanvasserIntegrationModule } from '../vendors/ecanvasserIntegration/ecanvasserIntegration.module'
@@ -27,8 +27,7 @@ import { CampaignTasksController } from './tasks/campaignTasks.controller'
 import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
 import { LegacyCampaignTasksService } from './tasks/legacy/services/legacyCampaignTasks.service'
 import { CampaignTasksService } from './tasks/services/campaignTasks.service'
-import { AiCampaignManagerService } from './tasks/services/aiCampaignManager.service'
-import { AiCampaignManagerIntegrationService } from './tasks/services/aiCampaignManagerIntegration.service'
+import { AiGenerationService } from './tasks/services/aiGeneration.service'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
@@ -37,13 +36,14 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
 @Global()
 @Module({
   imports: [
-    HttpModule,
+    AwsModule,
     EmailModule,
     CampaignsAiModule,
+    ClerkModule,
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
-    PathToVictoryModule,
+    forwardRef(() => ContactsModule),
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,
@@ -71,10 +71,8 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmCampaignsService,
     CampaignTasksService,
     LegacyCampaignTasksService,
-    AiCampaignManagerService,
-    AiCampaignManagerIntegrationService,
+    AiGenerationService,
     CampaignTcrComplianceService,
-    ClerkClientProvider,
   ],
   exports: [
     CampaignsService,
@@ -82,6 +80,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmCampaignsService,
     CampaignTcrComplianceService,
     CampaignTasksService,
+    AiGenerationService,
   ],
 })
 export class CampaignsModule {}

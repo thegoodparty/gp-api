@@ -13,7 +13,7 @@ import {
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -23,6 +23,7 @@ import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { AiGenerationService } from 'src/campaigns/tasks/services/aiGeneration.service'
 import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
 import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
@@ -51,8 +52,8 @@ import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
   CampaignPlanCompleteMessage,
+  CampaignPlanCompleteMessageSchema,
   DomainEmailForwardingMessage,
-  GenerateTasksMessage,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -62,13 +63,13 @@ import {
   PollClusterAnalysisJsonSchema,
   QueueMessage,
   QueueType,
+  SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
-import { isTestUser } from '@/users/util/users.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -101,6 +102,7 @@ export class QueueConsumerService {
     private readonly slackService: SlackService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
+    private readonly aiGenerationService: AiGenerationService,
     private readonly campaignTasksService: CampaignTasksService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly domainsService: DomainsService,
@@ -115,6 +117,49 @@ export class QueueConsumerService {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
+  }
+
+  private logConsumerError = (
+    eventName: SqsConsumerErrorEventName,
+    error: Error,
+    message: Message | Message[] | undefined,
+  ) => {
+    this.logger.error(
+      { error: serializeError(error), message },
+      `SQS consumer ${eventName}`,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.ERROR,
+  )
+  onError(error: Error, message: Message | Message[] | undefined) {
+    this.logConsumerError(SqsConsumerErrorEventName.ERROR, error, message)
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.PROCESSING_ERROR,
+  )
+  onProcessingError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.PROCESSING_ERROR,
+      error,
+      message,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.TIMEOUT_ERROR,
+  )
+  onTimeoutError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.TIMEOUT_ERROR,
+      error,
+      message,
+    )
   }
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -263,12 +308,6 @@ export class QueueConsumerService {
           }
           return true
         })
-      case QueueType.GENERATE_TASKS:
-        this.logger.info('received generateTasks message')
-        return await this.withLegacyErrorSwallowing(message, async () => {
-          await this.handleGenerateTasksMessage(queueMessage.data)
-          return true
-        })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.info('received tcrComplianceStatusCheck message')
         return await this.withLegacyErrorSwallowing(message, () =>
@@ -303,9 +342,16 @@ export class QueueConsumerService {
           { data: queueMessage.data, messageId: message.MessageId },
           'received campaignPlanComplete message',
         )
-        return await this.withLegacyErrorSwallowing(message, () =>
-          this.notifySlackCampaignPlanCreated(queueMessage.data),
-        )
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const campaignPlanData = CampaignPlanCompleteMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.handleCampaignPlanComplete(campaignPlanData)
+          await this.withLegacyErrorSwallowing(message, () =>
+            this.notifySlackCampaignPlanCreated(campaignPlanData),
+          )
+          return true
+        })
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
@@ -479,9 +525,8 @@ export class QueueConsumerService {
       this.logger.info('Poll not found, ignoring event')
       return
     }
-    const { poll, organization, campaign } = data
+    const { poll, office, organization } = data
     const { electedOfficeId } = poll
-    const { userId: campaignUserId } = campaign
 
     if (!electedOfficeId) {
       throw new InternalServerErrorException(
@@ -668,23 +713,21 @@ export class QueueConsumerService {
     })
 
     let district: OrgDistrict | null = null
-    if (campaign.organizationSlug) {
-      try {
-        district = await this.organizationsService.getDistrictForOrgSlug(
-          campaign.organizationSlug,
-        )
-      } catch (e) {
-        this.logger.warn(
-          { e },
-          'Failed to fetch district for analytics, defaulting to null',
-        )
-      }
+    try {
+      district = await this.organizationsService.getDistrictForOrgSlug(
+        organization.slug,
+      )
+    } catch (e) {
+      this.logger.warn(
+        { e },
+        'Failed to fetch district for analytics, defaulting to null',
+      )
     }
 
     await Promise.all([
-      this.analytics.identify(campaignUserId, { pollcount: pollCount }),
+      this.analytics.identify(office.userId, { pollcount: pollCount }),
       this.analytics.track(
-        campaignUserId,
+        office.userId,
         EVENTS.Polls.ResultsSynthesisCompleted,
         {
           pollId,
@@ -759,10 +802,10 @@ export class QueueConsumerService {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
       return
     }
-    const { poll, organization, campaign } = data
+    const { poll, office, organization } = data
 
     const user = await this.usersService.findUnique({
-      where: { id: campaign.userId },
+      where: { id: office.userId },
     })
     this.logger.info(`${params.pollId} Fetched sample and user`)
 
@@ -892,16 +935,7 @@ export class QueueConsumerService {
       return
     }
 
-    const campaign = await this.campaignsService.findUnique({
-      where: { id: office.campaignId },
-      include: { pathToVictory: true },
-    })
-
-    if (!campaign) {
-      this.logger.info('No campaign found, ignoring event')
-      return
-    }
-    return { poll, office, organization, campaign }
+    return { poll, office, organization }
   }
 
   async findMappedPersonIdsForCellPhones(params: {
@@ -1003,48 +1037,33 @@ export class QueueConsumerService {
     return true
   }
 
-  private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
-    try {
-      this.logger.info(`Generating tasks for campaign ${message.campaignId}`)
-
-      const campaign = await this.campaignsService.findUniqueOrThrow({
-        where: { id: message.campaignId },
-        include: { pathToVictory: true },
-      })
-
-      const user = await this.usersService.findUniqueOrThrow({
-        where: { id: campaign.userId },
-      })
-
-      if (isTestUser({ email: user.email })) {
-        this.logger.info(`Skipping task generation for test user ${user.email}`)
-        return
-      }
-
-      await this.campaignTasksService.generateTasks(campaign)
-
-      this.logger.info(
-        `Successfully generated tasks for campaign ${message.campaignId}`,
+  private async handleCampaignPlanComplete(
+    data: CampaignPlanCompleteMessage,
+  ): Promise<boolean> {
+    if (data.status === 'error') {
+      this.logger.warn(
+        { campaignId: data.campaignId, error: data.error },
+        'campaign plan generation failed',
       )
-    } catch (error) {
-      if (isAxiosError(error)) {
-        this.logger.error(
-          {
-            campaignId: message.campaignId,
-            status: error.response?.status,
-            body: JSON.stringify(error.response?.data),
-            message: error.message,
-          },
-          `Failed to generate tasks for campaign ${message.campaignId}`,
-        )
-      } else {
-        const errorMsg = error instanceof Error ? error.message : String(error)
-        this.logger.error(
-          { error: errorMsg, campaignId: message.campaignId },
-          `Failed to generate tasks for campaign ${message.campaignId}`,
-        )
-      }
-      throw error
+      return true
+    }
+
+    try {
+      const { campaignId: resultCampaignId, tasks } =
+        await this.aiGenerationService.parseCompletionResult(data)
+      await this.campaignTasksService.addTasks(resultCampaignId, tasks)
+      this.logger.info(
+        { campaignId: resultCampaignId, taskCount: tasks.length },
+        'campaign plan tasks saved',
+      )
+      return true
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      this.logger.error(
+        { campaignId: data.campaignId, error: errorMsg },
+        'failed to process campaign plan completion',
+      )
+      throw err
     }
   }
 }

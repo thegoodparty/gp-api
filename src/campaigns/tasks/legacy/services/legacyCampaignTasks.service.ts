@@ -33,7 +33,7 @@ export class LegacyCampaignTasksService {
     const tasks = this.getListOfTasks(weekNumber)
     return tasks.map((task) => ({
       ...task,
-      completed: Boolean(completedTaskIds.includes(task.id)),
+      completed: Boolean(task.id && completedTaskIds.includes(task.id)),
     }))
   }
 

@@ -27,7 +27,6 @@ model Campaign {
   /// [CampaignAiContent]
   aiContent                Json                    @default("{}") @map("ai_content") @db.JsonB
   vendorTsData             Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
-  pathToVictory            PathToVictory?
   campaignUpdateHistory    CampaignUpdateHistory[]
   user                     User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId                   Int                     @map("user_id")
@@ -42,7 +41,6 @@ model Campaign {
   freeTextsOfferRedeemedAt DateTime?               @map("free_texts_offer_redeemed_at")
   ScheduledMessage         ScheduledMessage[]
   tcrCompliance            TcrCompliance?
-  voterFileFilters         VoterFileFilter[]
   website                  Website?
   outreach                 Outreach[]
   communityIssue           CommunityIssue[]

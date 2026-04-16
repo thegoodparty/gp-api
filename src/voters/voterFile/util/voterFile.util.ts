@@ -1,4 +1,4 @@
-import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { Campaign } from '@prisma/client'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
@@ -35,7 +35,7 @@ if (
 export function typeToQuery(
   logger: PinoLogger,
   type: VoterFileType,
-  campaign: CampaignWith<'pathToVictory'>,
+  campaign: Campaign,
   district: OrgDistrict | null,
   customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
   justCount?: boolean,
@@ -69,7 +69,7 @@ export function typeToQuery(
       `Missing L2 data for campaign ${campaign.id}. l2ColumnName: ${l2ColumnName}, l2ColumnValue: ${l2ColumnValue}`,
     )
     throw new Error(
-      'L2 data is required to generate voter file. Please ensure the campaign has been processed by PathToVictory and contains electionType and electionLocation data.',
+      'L2 data is required to generate voter file. Ensure the organization has district data (election type and location) for this race.',
     )
   }
 

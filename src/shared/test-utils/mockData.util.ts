@@ -1,23 +1,25 @@
 import { Campaign, User, UserRole } from '@prisma/client'
 
-export const createMockUser = (overrides?: Partial<User>): User => ({
-  id: 7,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  firstName: 'Test',
-  lastName: 'User',
-  name: 'Test User',
-  avatar: null,
-  password: null,
-  hasPassword: false,
-  email: 'test@example.com',
-  phone: '5555555555',
-  zip: '12345',
-  metaData: null,
-  passwordResetToken: null,
-  roles: [UserRole.candidate],
-  ...overrides,
-})
+export const createMockUser = (overrides?: Partial<User>): User =>
+  ({
+    id: 7,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    firstName: 'Test',
+    lastName: 'User',
+    name: 'Test User',
+    avatar: null,
+    password: null,
+    hasPassword: false,
+    email: 'test@example.com',
+    phone: '5555555555',
+    zip: '12345',
+    metaData: null,
+    clerkId: null,
+    passwordResetToken: null,
+    roles: [UserRole.candidate],
+    ...overrides,
+  }) as User
 
 export const createMockCampaign = (
   overrides?: Partial<Campaign>,

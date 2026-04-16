@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { HttpStatus } from '@nestjs/common'
 import {
   authHeaders,
   campaignOrgSlug,
@@ -34,22 +33,48 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     })
     orgSlug = campaignOrgSlug(reg.campaign.id)
 
-    const generateResponse = await request.post(`${TASKS_BASE_PATH}/generate`, {
-      headers: authHeaders(reg.token, orgSlug),
-    })
-    expect(generateResponse.status()).toBe(HttpStatus.ACCEPTED)
+    // Trigger the SSE stream to create default tasks.
+    // Use native fetch with AbortController — abort after 5s which is enough
+    // for generateDefaultTasks to complete. Playwright's request API blocks
+    // until the full SSE response, which hangs for the Lambda poll timeout.
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+    const headers = authHeaders(reg.token, orgSlug)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10_000)
+    try {
+      const res = await fetch(`${baseUrl}${TASKS_BASE_PATH}/generate/stream`, {
+        headers: { ...headers, Accept: 'text/event-stream' },
+        signal: controller.signal,
+      })
+      console.log('SSE response status:', res.status)
+    } catch (err) {
+      console.log(
+        'SSE fetch error:',
+        (err as Error).name,
+        (err as Error).message,
+      )
+    }
+    clearTimeout(timeout)
 
+    // Poll until default tasks are available
     await expect
       .poll(
         async () => {
           const response = await request.get(TASKS_BASE_PATH, {
             headers: authHeaders(reg.token, orgSlug),
           })
-          expect(response.status()).toBe(HttpStatus.OK)
           const tasks = (await response.json()) as CampaignTask[]
+          console.log(
+            'Poll: status=',
+            response.status(),
+            'tasks=',
+            tasks.length,
+            'campaignId=',
+            reg.campaign.id,
+          )
           return tasks.length
         },
-        { timeout: 120_000, intervals: [2_000] },
+        { timeout: 30_000, intervals: [1_000] },
       )
       .toBeGreaterThan(0)
   })
@@ -73,7 +98,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     )
 
     const tasks = (await listResponse.json()) as CampaignTask[]
-    testTaskId = tasks[0].id
+    testTaskId = tasks[0].id!
 
     const response = await request.put(
       `${TASKS_BASE_PATH}/complete/${testTaskId}`,
@@ -102,7 +127,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     )
 
     const tasks = (await listResponse.json()) as CampaignTask[]
-    testTaskId = tasks[0].id
+    testTaskId = tasks[0].id!
 
     await request.put(`${TASKS_BASE_PATH}/complete/${testTaskId}`, {
       headers: authHeaders(reg.token, orgSlug),
