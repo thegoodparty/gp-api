@@ -229,7 +229,7 @@ describe('ElectedOfficeController', () => {
 
     it('creates elected office when organization has no positionId', async () => {
       await service.prisma.organization.update({
-        where: { slug: campaign.organizationSlug },
+        where: { slug: campaign.organizationSlug ?? undefined },
         data: { positionId: null },
       })
 
