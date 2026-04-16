@@ -29,7 +29,11 @@ RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   echo "Attempting database connection (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
 
-  if npx prisma migrate deploy --schema=prisma/schema 2>&1; then
+  # TODO: Remove resolve once the failed migration is marked as resolved/applied
+  if npx prisma migrate resolve \
+    --applied 20260414144530_take_new_migration_from_dev \
+    --schema=prisma/schema 2>&1 \
+  && npx prisma migrate deploy --schema=prisma/schema 2>&1; then
     echo "✅ Migrations completed successfully."
     break
   else
