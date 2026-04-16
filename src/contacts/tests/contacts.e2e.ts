@@ -225,7 +225,6 @@ test.describe('Contacts and Segments', () => {
   test('should download non-empty contacts CSV for seeded district', async ({
     request,
   }) => {
-    test.setTimeout(120_000)
     const response = await request.get(`/v1/contacts/download`, {
       headers: EO_AUTH_HEADER(authToken, eoOrgSlug),
     })

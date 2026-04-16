@@ -13,7 +13,7 @@ import {
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -63,7 +63,6 @@ import {
   PollClusterAnalysisJsonSchema,
   QueueMessage,
   QueueType,
-  SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
@@ -117,49 +116,6 @@ export class QueueConsumerService {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
-  }
-
-  private logConsumerError = (
-    eventName: SqsConsumerErrorEventName,
-    error: Error,
-    message: Message | Message[] | undefined,
-  ) => {
-    this.logger.error(
-      { error: serializeError(error), message },
-      `SQS consumer ${eventName}`,
-    )
-  }
-
-  @SqsConsumerEventHandler(
-    process.env.SQS_QUEUE || '',
-    SqsConsumerErrorEventName.ERROR,
-  )
-  onError(error: Error, message: Message | Message[] | undefined) {
-    this.logConsumerError(SqsConsumerErrorEventName.ERROR, error, message)
-  }
-
-  @SqsConsumerEventHandler(
-    process.env.SQS_QUEUE || '',
-    SqsConsumerErrorEventName.PROCESSING_ERROR,
-  )
-  onProcessingError(error: Error, message: Message) {
-    this.logConsumerError(
-      SqsConsumerErrorEventName.PROCESSING_ERROR,
-      error,
-      message,
-    )
-  }
-
-  @SqsConsumerEventHandler(
-    process.env.SQS_QUEUE || '',
-    SqsConsumerErrorEventName.TIMEOUT_ERROR,
-  )
-  onTimeoutError(error: Error, message: Message) {
-    this.logConsumerError(
-      SqsConsumerErrorEventName.TIMEOUT_ERROR,
-      error,
-      message,
-    )
   }
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)

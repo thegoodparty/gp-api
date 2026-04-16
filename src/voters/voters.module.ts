@@ -1,6 +1,5 @@
 import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
-import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { FilesModule } from 'src/files/files.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { OutreachModule } from 'src/outreach/outreach.module'
@@ -16,7 +15,6 @@ import { VoterFileService } from './voterFile/voterFile.service'
 
 @Module({
   imports: [
-    ClerkModule,
     FilesModule,
     HttpModule,
     OrganizationsModule,

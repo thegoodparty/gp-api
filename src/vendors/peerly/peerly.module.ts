@@ -2,7 +2,6 @@ import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from 'src/ai/ai.module'
-import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { CampaignsModule } from '../../campaigns/campaigns.module'
 import { OutreachModule } from '../../outreach/outreach.module'
@@ -21,7 +20,6 @@ import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 
 @Module({
   imports: [
-    ClerkModule,
     HttpModule,
     JwtModule,
     AiModule,

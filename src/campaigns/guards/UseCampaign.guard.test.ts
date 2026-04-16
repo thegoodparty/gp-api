@@ -1,4 +1,3 @@
-import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -63,7 +62,6 @@ describe('UseCampaignGuard', () => {
     guard = new UseCampaignGuard(
       campaignsService,
       reflector,
-      createMockClerkEnricher(),
       createMockLogger(),
     )
   })

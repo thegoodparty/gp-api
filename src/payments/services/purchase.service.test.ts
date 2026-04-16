@@ -87,7 +87,6 @@ describe('PurchaseService', () => {
     roles: [],
     metaData: null,
     passwordResetToken: null,
-    clerkId: null,
   }
 
   const mockCampaign: Campaign = {

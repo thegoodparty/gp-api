@@ -1,8 +1,5 @@
 import { useTestService } from '@/test-service'
-import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
-import { ClerkClient } from '@clerk/backend'
-import { BadGatewayException, BadRequestException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { UsersService } from './users.service'
 
 const service = useTestService()
@@ -176,97 +173,6 @@ describe('UsersService', () => {
       await expect(
         usersService.findUserByResetToken('tests@goodparty.org', 'wrong-token'),
       ).rejects.toThrow()
-    })
-  })
-
-  describe('impersonateUser', () => {
-    let clerkClient: ClerkClient
-
-    beforeEach(() => {
-      clerkClient = service.app.get<ClerkClient>(CLERK_CLIENT_PROVIDER_TOKEN)
-    })
-
-    it('returns an actor token when the target user has a clerkId', async () => {
-      vi.spyOn(clerkClient.actorTokens, 'create').mockResolvedValue({
-        token: 'actor_token_abc',
-      } as Awaited<ReturnType<typeof clerkClient.actorTokens.create>>)
-
-      const result = await usersService.impersonateUser(
-        service.user.id,
-        'user_actor_clerk_id',
-      )
-
-      expect(result).toEqual({ token: 'actor_token_abc' })
-      expect(clerkClient.actorTokens.create).toHaveBeenCalledWith({
-        userId: service.user.clerkId,
-        actor: { sub: 'user_actor_clerk_id' },
-        expiresInSeconds: 3600,
-      })
-    })
-
-    it('throws BadRequestException when target user has no clerkId', async () => {
-      const userWithoutClerkId = await service.prisma.user.create({
-        data: {
-          email: 'noclerk@example.com',
-          firstName: 'No',
-          lastName: 'Clerk',
-          clerkId: null,
-        },
-      })
-
-      await expect(
-        usersService.impersonateUser(
-          userWithoutClerkId.id,
-          'user_actor_clerk_id',
-        ),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('throws BadRequestException with message when user has no clerkId', async () => {
-      const userWithoutClerkId = await service.prisma.user.create({
-        data: {
-          email: 'noclerk2@example.com',
-          firstName: 'No',
-          lastName: 'Clerk',
-          clerkId: null,
-        },
-      })
-
-      await expect(
-        usersService.impersonateUser(userWithoutClerkId.id, 'actor_id'),
-      ).rejects.toThrow('User does not have an associated Clerk ID')
-    })
-
-    it('throws BadGatewayException when Clerk API call fails', async () => {
-      vi.spyOn(clerkClient.actorTokens, 'create').mockRejectedValue(
-        new Error('Clerk API unavailable'),
-      )
-
-      await expect(
-        usersService.impersonateUser(service.user.id, 'user_actor_clerk_id'),
-      ).rejects.toThrow(BadGatewayException)
-    })
-
-    it('throws BadGatewayException with message when Clerk API call fails', async () => {
-      vi.spyOn(clerkClient.actorTokens, 'create').mockRejectedValue(
-        new Error('Network error'),
-      )
-
-      await expect(
-        usersService.impersonateUser(service.user.id, 'user_actor_clerk_id'),
-      ).rejects.toThrow('Failed to create impersonation token')
-    })
-
-    it('throws BadGatewayException when Clerk returns no token', async () => {
-      vi.spyOn(clerkClient.actorTokens, 'create').mockResolvedValue({
-        token: null,
-      } as unknown as Awaited<
-        ReturnType<typeof clerkClient.actorTokens.create>
-      >)
-
-      await expect(
-        usersService.impersonateUser(service.user.id, 'user_actor_clerk_id'),
-      ).rejects.toThrow(BadGatewayException)
     })
   })
 })
