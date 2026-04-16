@@ -18,7 +18,6 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { AnalyticsModule } from 'src/analytics/analytics.module'
-import { ClerkModule } from '@/vendors/clerk/clerk.module'
 
 @Module({
   imports: [
@@ -30,7 +29,6 @@ import { ClerkModule } from '@/vendors/clerk/clerk.module'
     PaymentsModule,
     UsersModule,
     StripeModule,
-    ClerkModule,
     forwardRef(() => CampaignsModule),
     QueueProducerModule,
     AnalyticsModule,

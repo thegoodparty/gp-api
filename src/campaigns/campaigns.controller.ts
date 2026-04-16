@@ -27,7 +27,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -37,6 +37,7 @@ import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { CampaignListSchema } from './schemas/campaignList.schema'
 import {
   CreateCampaignSchema,
   SetDistrictDTO,
@@ -46,6 +47,7 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith } from './campaigns.types'
+import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -66,6 +68,28 @@ export class CampaignsController {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
+  }
+
+  //TODO: remove this when we start using the admin portal.
+  @Roles(UserRole.admin)
+  @Get()
+  findAll(@Query() query: CampaignListSchema) {
+    let where: Prisma.CampaignWhereInput = {}
+    if (Object.values(query).some((value) => !!value)) {
+      where = buildCampaignListFilters(query)
+    }
+    const include = {
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email: true,
+          metaData: true,
+        },
+      },
+    }
+    return this.campaigns.findMany({ where, include })
   }
 
   @Get('mine')

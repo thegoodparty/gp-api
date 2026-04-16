@@ -44,38 +44,6 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   fi
 done
 
-if [ -z "$CLERK_SECRET_KEY" ] || [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
-  echo "ERROR: CLERK_SECRET_KEY or CLERK_PUBLISHABLE_KEY is not set."
-  exit 1
-fi
-
-case "$CLERK_SECRET_KEY" in
-  sk_live_*)
-    if [ "$OTEL_SERVICE_ENVIRONMENT" != "prod" ]; then
-      echo "ERROR: Production Clerk key (sk_live_*) used in non-prod environment ($OTEL_SERVICE_ENVIRONMENT)."
-      exit 1
-    fi
-    ;;
-  sk_test_*)
-    if [ "$OTEL_SERVICE_ENVIRONMENT" = "prod" ]; then
-      echo "ERROR: Development Clerk key (sk_test_*) used in prod environment."
-      exit 1
-    fi
-    ;;
-  *)
-    echo "ERROR: CLERK_SECRET_KEY has unrecognized prefix."
-    exit 1
-    ;;
-esac
-
-echo "Running Clerk user migration..."
-if npx tsx scripts/clerk-user-migration.ts; then
-  echo "Clerk user migration completed successfully."
-else
-  echo "ERROR: Clerk user migration failed with exit code $?."
-  exit 1
-fi
-
 if [ "$IS_PREVIEW" = "true" ]; then
   echo "Preview environment detected. Running seed..."
   if npx tsx seed/seed.ts; then

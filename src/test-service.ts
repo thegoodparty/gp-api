@@ -1,4 +1,3 @@
-import { UnauthorizedException } from '@nestjs/common'
 import { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { User } from '@prisma/client'
 import {
@@ -11,16 +10,10 @@ import { sync as glob } from 'fast-glob'
 import { readFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
 import { Client } from 'pg'
-import { afterAll, beforeAll, beforeEach, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { bootstrap } from './app'
-import {
-  AUTH_PROVIDER_TOKEN,
-  AuthProvider,
-} from './authentication/interfaces/auth-provider.interface'
 import './configrc'
 import { PrismaService } from './prisma/prisma.service'
-
-const TEST_CLERK_ID = 'user_test_123'
 
 export type TestServiceContext = {
   /** A client targeting the test service. */
@@ -105,18 +98,6 @@ export const useTestService = (): TestServiceContext => {
     // Create NestJS application using the same bootstrap function as production
     app = await bootstrap({ loggingEnabled: false })
 
-    const authProvider = app.get<AuthProvider>(AUTH_PROVIDER_TOKEN)
-    vi.spyOn(authProvider, 'verifySessionToken').mockImplementation(
-      async (token: string) => {
-        const decoded = jwt.verify(token, process.env.AUTH_SECRET!)
-        const sub = typeof decoded === 'object' ? decoded.sub : undefined
-        if (!sub) {
-          throw new UnauthorizedException('Invalid test token')
-        }
-        return { externalUserId: sub }
-      },
-    )
-
     // Start the application on a random available port
     await app.listen({ port: 0, host: '127.0.0.1' })
 
@@ -141,7 +122,7 @@ export const useTestService = (): TestServiceContext => {
     client.interceptors.request.use((config) => {
       if (!config.headers.Authorization) {
         const authToken = jwt.sign(
-          { sub: TEST_CLERK_ID, email: user.email },
+          { sub: user.id, email: user.email },
           process.env.AUTH_SECRET!,
           { expiresIn: '1h' },
         )
@@ -172,7 +153,6 @@ export const useTestService = (): TestServiceContext => {
     user = await prisma.user.create({
       data: {
         id: 123,
-        clerkId: TEST_CLERK_ID,
         email: 'tests@goodparty.org',
         firstName: 'Johnny',
         lastName: 'Goodparty',

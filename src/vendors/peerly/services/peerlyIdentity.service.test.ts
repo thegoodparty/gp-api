@@ -43,8 +43,6 @@ const createMockUser = (overrides: Partial<User> = {}): User => {
     password: null,
     hasPassword: false,
     roles: [],
-    passwordResetToken: null,
-    clerkId: null,
     ...overrides,
   })
 }

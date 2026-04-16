@@ -115,7 +115,7 @@ test.describe('Websites - Domains', () => {
     result.suggestions.forEach((suggestion) => {
       if (suggestion.price !== undefined) {
         expect(typeof suggestion.price).toBe('number')
-        expect(suggestion.price).toBeGreaterThanOrEqual(0)
+        expect(suggestion.price).toBeGreaterThan(0)
       }
     })
   })

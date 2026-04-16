@@ -32,7 +32,6 @@ import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from '../../../vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -44,7 +43,6 @@ export class AiContentController {
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
     private readonly analytics: AnalyticsService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiContentController.name)
@@ -147,10 +145,6 @@ export class AiContentController {
 
     if (!campaign) {
       throw new BadRequestException('No campaign found')
-    }
-
-    if (campaign.user) {
-      campaign.user = await this.clerkEnricher.enrichUser(campaign.user)
     }
 
     const { candidateJson, systemPrompt } =

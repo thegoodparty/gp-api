@@ -212,12 +212,4 @@ module.exports = defineConfig([
     },
   },
   globalIgnores(['**/generated/', '**/dist/']),
-  {
-    files: ['scripts/**/*.ts'],
-    languageOptions: {
-      parserOptions: {
-        project: 'tsconfig.scripts.json',
-      },
-    },
-  },
 ])

@@ -1,6 +1,5 @@
 import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
-import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { AiModule } from 'src/ai/ai.module'
 import { EmailModule } from 'src/email/email.module'
 import { PurchaseType } from 'src/payments/purchase.types'
@@ -15,7 +14,6 @@ import { OutreachPurchaseHandlerService } from './services/outreachPurchase.serv
 
 @Module({
   imports: [
-    ClerkModule,
     HttpModule,
     EmailModule,
     FilesModule,

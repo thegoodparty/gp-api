@@ -15,7 +15,6 @@ import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service
 import { WrapperType } from 'src/shared/types/utility.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
@@ -30,7 +29,6 @@ export class EcanvasserIntegrationService extends createPrismaBase(
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: WrapperType<CrmCampaignsService>,
     private slack: SlackService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
   ) {
     super()
   }
@@ -316,7 +314,6 @@ export class EcanvasserIntegrationService extends createPrismaBase(
             id: true,
             user: {
               select: {
-                clerkId: true,
                 email: true,
               },
             },
@@ -327,17 +324,6 @@ export class EcanvasserIntegrationService extends createPrismaBase(
         interactions: true,
       },
     })
-
-    const users = ecanvassers
-      .map((e) => e.campaign?.user)
-      .filter((u): u is NonNullable<typeof u> => u != null)
-    const enriched = await this.clerkEnricher.enrichUsers(users)
-    let idx = 0
-    for (const ecanvasser of ecanvassers) {
-      if (ecanvasser.campaign?.user) {
-        ecanvasser.campaign.user = enriched[idx++]
-      }
-    }
 
     return ecanvassers.map((ecanvasser) => ({
       contacts: ecanvasser.contacts.length,

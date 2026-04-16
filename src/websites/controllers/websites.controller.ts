@@ -36,7 +36,6 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -46,7 +45,6 @@ const WEBSITE_CONTENT_INCLUDES = {
       details: true,
       user: {
         select: {
-          clerkId: true,
           firstName: true,
           lastName: true,
         },
@@ -65,7 +63,6 @@ export class WebsitesController {
     private readonly siteViews: WebsiteViewsService,
     private readonly campaigns: CampaignsService,
     private readonly analytics: AnalyticsService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(WebsitesController.name)
@@ -278,12 +275,6 @@ export class WebsitesController {
       throw new ForbiddenException()
     }
 
-    if (website.campaign?.user) {
-      website.campaign.user = await this.clerkEnricher.enrichUser(
-        website.campaign.user,
-      )
-    }
-
     return website
   }
 
@@ -321,18 +312,6 @@ export class WebsitesController {
   @Get('by-domain/:domain')
   @PublicAccess()
   async getWebsiteByDomain(@Param('domain') domain: string) {
-    const { websiteId } = await this.websites.client.domain.findUniqueOrThrow({
-      where: { name: domain },
-    })
-    const website = await this.websites.findUnique({
-      where: { id: websiteId },
-      include: WEBSITE_CONTENT_INCLUDES,
-    })
-    if (website?.campaign?.user) {
-      website.campaign.user = await this.clerkEnricher.enrichUser(
-        website.campaign.user,
-      )
-    }
-    return website
+    return this.websites.findByDomainName(domain, WEBSITE_CONTENT_INCLUDES)
   }
 }

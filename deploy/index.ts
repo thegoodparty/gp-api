@@ -372,7 +372,7 @@ export = async () => {
         // prod: 'campaign-plan-results-prod',
         prod: '',
       }),
-      SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
+      SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,

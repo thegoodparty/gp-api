@@ -10,13 +10,11 @@ export const retryIf = <Result>(
 ): Promise<Result> =>
   retry(async (bail, attempt) => {
     try {
-      return await fn(bail, attempt)
+      const result = await fn(bail, attempt)
+      return result
     } catch (error) {
-      if (!shouldRetry(error) && error && typeof error === 'object') {
-        Object.defineProperty(error, 'bail', {
-          value: true,
-          configurable: true,
-        })
+      if (!shouldRetry(error)) {
+        bail(error)
       }
       throw error
     }
