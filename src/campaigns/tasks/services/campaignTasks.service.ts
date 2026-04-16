@@ -655,7 +655,15 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async addTasks(campaignId: number, tasks: CampaignTask[]) {
-    const tasksToCreate = this.mapTasksToCreateData(campaignId, tasks)
+    const campaign = await this.client.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+      select: { details: true },
+    })
+    const electionDate = (campaign.details as PrismaJson.CampaignDetails)
+      ?.electionDate
+    const paradeTasks = this.buildParadeAwarenessTasks(tasks, electionDate)
+    const allTasks = [...tasks, ...paradeTasks]
+    const tasksToCreate = this.mapTasksToCreateData(campaignId, allTasks)
     await this.model.createMany({
       data: tasksToCreate,
       skipDuplicates: true,

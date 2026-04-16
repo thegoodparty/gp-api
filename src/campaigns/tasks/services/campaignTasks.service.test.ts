@@ -105,6 +105,7 @@ describe('CampaignTasksService', () => {
       get: () => ({
         campaignTask: mockModel,
         campaignUpdateHistory: mockCampaignUpdateHistoryModel,
+        campaign: mockCampaignModel,
         $transaction: mockTransaction,
       }),
       configurable: true,
@@ -532,6 +533,12 @@ describe('CampaignTasksService', () => {
   })
 
   describe('addTasks', () => {
+    beforeEach(() => {
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        details: { electionDate: '2026-11-03' },
+      })
+    })
+
     it('passes event task id to createMany for idempotent inserts', async () => {
       const tasks: CampaignTask[] = [
         {
@@ -585,6 +592,36 @@ describe('CampaignTasksService', () => {
         ],
         skipDuplicates: true,
       })
+    })
+
+    it('appends parade awareness tasks from AI tasks', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-01-05'))
+
+      const tasks: CampaignTask[] = [
+        {
+          id: 'event-1',
+          title: '4th of July Parade',
+          description: 'March in the parade',
+          week: 4,
+          date: '2026-07-04',
+        },
+      ]
+      mockModel.createMany.mockResolvedValue({ count: 2 })
+
+      await service.addTasks(1, tasks)
+
+      const createCall = mockModel.createMany.mock.calls[0][0]
+      expect(createCall.data).toHaveLength(2)
+      expect(createCall.data[1]).toEqual(
+        expect.objectContaining({
+          title: 'Contact Parade Organizers for 4th of July Parade',
+          description: 'Get signed up to march in the parade',
+          flowType: CampaignTaskType.awareness,
+        }),
+      )
+
+      vi.useRealTimers()
     })
   })
 
