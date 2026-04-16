@@ -91,6 +91,7 @@ import { loggerModule } from './observability/logging/logger-module'
       provide: APP_GUARD,
       useClass: SessionGuard,
     },
+    // TODO: https://goodparty.clickup.com/t/90132012119/ENG-7349
     {
       provide: APP_INTERCEPTOR,
       useClass: ImpersonationInterceptor,
