@@ -10,26 +10,26 @@ import {
   Put,
   Sse,
 } from '@nestjs/common'
+import { Campaign } from '@prisma/client'
 import { Observable } from 'rxjs'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
-import { CampaignWithPathToVictory } from '../campaigns.types'
 import { completeTaskBodySchema } from './schemas/completeTaskBody.schema'
 
 @Controller('campaigns/tasks')
-@UseCampaign({ include: { pathToVictory: true } })
+@UseCampaign()
 export class CampaignTasksController {
   constructor(private readonly tasksService: CampaignTasksService) {}
 
   @Get()
-  listCampaignTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+  listCampaignTasks(@ReqCampaign() campaign: Campaign) {
     return this.tasksService.listCampaignTasks(campaign)
   }
 
   @Put('complete/:id')
   async completeTask(
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: Campaign,
     @Param('id') id: string,
     @Body() body?: Record<string, unknown>,
   ) {
@@ -42,7 +42,7 @@ export class CampaignTasksController {
 
   @Delete('complete/:id')
   async unCompleteTask(
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: Campaign,
     @Param('id') id: string,
   ) {
     return this.tasksService.unCompleteTask(campaign, id)
@@ -51,13 +51,13 @@ export class CampaignTasksController {
   // TODO: This is a temporary endpoint to delete all tasks for a campaign for testing purposes
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteAllTasks(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+  async deleteAllTasks(@ReqCampaign() campaign: Campaign) {
     await this.tasksService.deleteAllTasks(campaign.id)
   }
 
   @Sse('generate/stream')
   generateTasksStream(
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqCampaign() campaign: Campaign,
   ): Observable<MessageEvent> {
     return this.tasksService.generateTasksStream(campaign)
   }

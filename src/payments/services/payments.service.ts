@@ -83,8 +83,8 @@ export class PaymentsService {
     return { session: { id: sessionId }, user }
   }
 
-  async updateMissingCustomerId(email: string) {
-    const user = await this.usersService.findUserByEmail(email)
+  async updateMissingCustomerId(userId: number) {
+    const user = await this.usersService.findUser({ id: userId })
     if (!user) {
       return null
     }
@@ -93,14 +93,27 @@ export class PaymentsService {
       return null
     }
 
+    const meta = user.metaData
+    const rawSessionId =
+      meta !== null &&
+      typeof meta === 'object' &&
+      !Array.isArray(meta) &&
+      'checkoutSessionId' in meta
+        ? meta.checkoutSessionId
+        : undefined
+    const checkoutSessionId =
+      typeof rawSessionId === 'string' && rawSessionId !== ''
+        ? rawSessionId
+        : null
+    if (!checkoutSessionId) {
+      return null
+    }
+
     this.logger.info(`userId: ${user.id} missing customerId`)
 
-    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const checkoutSessionId = user.metaData?.checkoutSessionId as string
-    const customerId = checkoutSessionId
-      ? await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
-      : await this.stripe.fetchCustomerIdByEmail(user.email)
+    const customerId =
+      await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
+
     if (!customerId) {
       return null
     }
@@ -108,7 +121,7 @@ export class PaymentsService {
       `Successfully retrieved customerId ${customerId} for user ${user.id}`,
     )
 
-    await this.usersService.patchUserMetaData(user!.id, {
+    await this.usersService.patchUserMetaData(user.id, {
       customerId,
       checkoutSessionId: null,
     })
@@ -117,28 +130,31 @@ export class PaymentsService {
 
   @Timeout(0)
   private async backfillMissingCustomerIdsOnBoot() {
-    const emails = await this.stripe.listActiveSubscriptionCustomerEmails()
-    for (const email of emails) {
+    const users = await this.usersService.findMany({
+      where: {
+        metaData: {
+          path: ['checkoutSessionId'],
+          not: Prisma.AnyNull,
+        },
+      },
+      select: { id: true, metaData: true },
+    })
+
+    for (const user of users) {
+      if (user.metaData?.customerId) continue
       try {
-        const user = await this.usersService.findUserByEmail(email)
-        if (!user) {
-          continue
-        }
-        if (user.metaData?.customerId) {
-          continue
-        }
-        await this.updateMissingCustomerId(email)
+        await this.updateMissingCustomerId(user.id)
       } catch (e) {
-        this.logger.error({ e }, `Failed backfill for ${email}`)
+        this.logger.error({ e }, `Failed backfill for userId ${user.id}`)
       }
     }
   }
 
   async fixMissingCustomerIds() {
     const results: {
-      success: string[]
-      failed: { email: string; error: string }[]
-      skipped: string[]
+      success: number[]
+      failed: { userId: number; error: string }[]
+      skipped: number[]
     } = {
       success: [],
       failed: [],
@@ -153,38 +169,30 @@ export class PaymentsService {
         },
       },
       select: {
-        email: true,
         id: true,
         metaData: true,
       },
       take: 50,
     })
 
-    // Filter to only users without customerId
-    const users = batch.filter((user) => {
-      // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const metadata = user.metaData as {
-        customerId?: string
-        checkoutSessionId?: string
-      } | null
-      return !metadata?.customerId
-    })
+    const users = batch.filter((user) => !user.metaData?.customerId)
 
     for (const dbUser of users) {
-      const { email } = dbUser
       try {
-        const user = await this.updateMissingCustomerId(email)
+        const user = await this.updateMissingCustomerId(dbUser.id)
         if (!user) {
-          results.skipped.push(email)
+          results.skipped.push(dbUser.id)
           continue
         }
-        results.success.push(user.email)
+        results.success.push(user.id)
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error'
-        results.failed.push({ email, error: errorMessage })
-        this.logger.error({ error }, `Failed for ${email}:`)
+        results.failed.push({
+          userId: dbUser.id,
+          error: errorMessage,
+        })
+        this.logger.error({ error }, `Failed for userId ${dbUser.id}:`)
       }
     }
 

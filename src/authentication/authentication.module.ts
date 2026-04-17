@@ -1,14 +1,11 @@
 import { Logger, Module } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
-import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthenticationController } from './authentication.controller'
-import { JwtAuthStrategy } from './auth-strategies/JwtAuth.strategy'
 import { APP_GUARD } from '@nestjs/core'
 import { RolesGuard } from './guards/Roles.guard'
-import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
-import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 
 const JWT_EXPIRATION = '1y'
 
@@ -22,16 +19,13 @@ if (!process.env.AUTH_SECRET) {
 @Module({
   providers: [
     AuthenticationService,
-    LocalStrategy,
-    SocialLoginStrategy,
-    JwtAuthStrategy,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
   ],
   imports: [
-    PassportModule,
+    ClerkModule,
     JwtModule.register({
       global: true,
       secret: process.env.AUTH_SECRET,
@@ -39,7 +33,7 @@ if (!process.env.AUTH_SECRET) {
     }),
     EmailModule,
   ],
-  exports: [AuthenticationService, JwtModule],
+  exports: [AuthenticationService, JwtModule, ClerkModule],
   controllers: [AuthenticationController],
 })
 export class AuthenticationModule {}

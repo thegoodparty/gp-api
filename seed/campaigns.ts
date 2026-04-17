@@ -5,14 +5,16 @@ import {
   PrismaClient,
   User,
 } from '@prisma/client'
+import pmap from 'p-map'
 import { buildSlug } from '../src/shared/util/slug.util'
 import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
-import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { userFactory } from './factories/user.factory'
+import { ClerkSeedUser, ensureClerkUser } from './users'
 import fixedCampaigns from './fixedCampaigns.json'
+
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
@@ -28,42 +30,41 @@ type CampaignUpdateHistory = {
   quantity: number
 }
 
-type FakeP2V = {
-  id: number
-  createdAt: Date
-  updatedAt: Date
-  campaignId: number
-  data: PrismaJson.PathToVictoryData
+type PendingClerkSync = {
+  localUserId: number
+  userData: ClerkSeedUser
 }
 
 export default async function seedCampaigns(
   prisma: PrismaClient,
   existingUsers: User[],
 ) {
-  const fakeP2Vs: FakeP2V[] = []
   const fakeUpdateHistory: CampaignUpdateHistory[] = []
   const campaignIds: number[] = []
+  const pendingClerkSyncs: PendingClerkSync[] = []
 
   const loopLength = Math.max(FIXED_CAMPAIGNS.length, NUM_GENERATED_CAMPAIGNS)
 
   for (let i = 0; i < loopLength; i++) {
     if (i < FIXED_CAMPAIGNS.length) {
-      const { campaignId, p2V, updateHistory } = await createCampaignAndUser(
+      const { campaignId, updateHistory } = await createCampaignAndUser(
         existingUsers,
         prisma,
+        pendingClerkSyncs,
         FIXED_CAMPAIGNS[i],
       )
 
       campaignIds.push(campaignId)
-      fakeP2Vs.push(p2V)
       fakeUpdateHistory.push(...updateHistory)
     }
     if (i < NUM_GENERATED_CAMPAIGNS) {
-      const creationData = await createCampaignAndUser(existingUsers, prisma)
-      const { campaignId, p2V, updateHistory } = creationData
+      const { campaignId, updateHistory } = await createCampaignAndUser(
+        existingUsers,
+        prisma,
+        pendingClerkSyncs,
+      )
 
       campaignIds.push(campaignId)
-      fakeP2Vs.push(p2V)
       fakeUpdateHistory.push(...updateHistory)
     }
   }
@@ -72,10 +73,12 @@ export default async function seedCampaigns(
     data: fakeUpdateHistory,
     skipDuplicates: true,
   })
-  await prisma.pathToVictory.createMany({
-    data: fakeP2Vs,
-    skipDuplicates: true,
-  })
+
+  if (pendingClerkSyncs.length > 0) {
+    await pmap(pendingClerkSyncs, ({ localUserId, userData }) =>
+      ensureClerkUser(prisma, localUserId, userData),
+    )
+  }
 
   console.log(`Created ${campaignIds.length} campaigns`)
 
@@ -85,21 +88,27 @@ export default async function seedCampaigns(
 async function createCampaignAndUser(
   existingUsers: User[],
   prisma: PrismaClient,
+  pendingClerkSyncs: PendingClerkSync[],
   fixedData?: Partial<Campaign>,
 ): Promise<{
   campaignId: number
-  p2V: FakeP2V
   updateHistory: CampaignUpdateHistory[]
 }> {
-  const user = await handleUserCreation(prisma, existingUsers)
+  const user = await handleUserCreation(
+    prisma,
+    existingUsers,
+    pendingClerkSyncs,
+  )
   const campaignData = campaignFactory({
     userId: user.id,
     slug: buildSlug(getUserFullName(user)),
     ...(fixedData || {}),
   })
 
-  await prisma.organization.create({
-    data: {
+  await prisma.organization.upsert({
+    where: { slug: campaignData.organizationSlug },
+    update: {},
+    create: {
       slug: campaignData.organizationSlug,
       ownerId: user.id,
     },
@@ -109,14 +118,25 @@ async function createCampaignAndUser(
     data: campaignData,
   })
 
-  // create a campaign plan version
+  const canonicalSlug = `campaign-${campaign.id}`
+  await prisma.organization.create({
+    data: { slug: canonicalSlug, ownerId: user.id },
+  })
+  await prisma.campaign.update({
+    where: { id: campaign.id },
+    data: { organizationSlug: canonicalSlug },
+  })
+  await prisma.organization.delete({
+    where: { slug: campaignData.organizationSlug },
+  })
+  campaign.organizationSlug = canonicalSlug
+
   await prisma.campaignPlanVersion.create({
     data: campaignPlanVersionFactory({ campaignId: campaign.id }),
   })
 
   return {
     campaignId: campaign.id,
-    p2V: pathToVictoryFactory({ campaignId: campaign.id }),
     updateHistory: createCampaignUpdateHistory(campaign, user),
   }
 }
@@ -124,6 +144,7 @@ async function createCampaignAndUser(
 async function handleUserCreation(
   prisma: PrismaClient,
   existingUsers: User[],
+  pendingClerkSyncs: PendingClerkSync[],
 ): Promise<User> {
   let user = existingUsers.shift()
   if (!user) {
@@ -135,6 +156,17 @@ async function handleUserCreation(
           userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
       },
     })
+    if (user.firstName && user.lastName && userData.password) {
+      pendingClerkSyncs.push({
+        localUserId: user.id,
+        userData: {
+          email: user.email,
+          passwordDigest: userData.password,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      })
+    }
   }
   return user
 }

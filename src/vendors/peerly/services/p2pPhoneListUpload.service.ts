@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Readable } from 'stream'
-import { CampaignWith } from '../../../campaigns/campaigns.types'
+import { Campaign } from '@prisma/client'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { OrgDistrict } from '../../../organizations/organizations.types'
 import {
@@ -31,7 +31,7 @@ export class P2pPhoneListUploadService {
   }
 
   async uploadPhoneList(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     request: P2pPhoneListRequestSchema,
     district: OrgDistrict | null,
   ): Promise<{ token: string; listName: string }> {
@@ -97,7 +97,7 @@ export class P2pPhoneListUploadService {
   }
 
   private async generatePhoneListCsvStream(
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: Campaign,
     district: OrgDistrict | null,
     filters: CustomFilter[],
   ): Promise<Buffer> {

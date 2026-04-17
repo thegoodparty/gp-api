@@ -67,14 +67,7 @@ export const CRMCompanyPropertiesSchema = z
       z.literal('Locked'),
     ]),
 
-    // p2v details / viability
-    [HS_PROPS.automated_score]: z
-      .number()
-      .int()
-      .min(0)
-      .max(5)
-      .transform(String),
-    [HS_PROPS.totalregisteredvoters]: intSchema,
+    // live race-target metrics
     [HS_PROPS.votegoal]: intSchema,
     [HS_PROPS.win_number]: intSchema,
   })

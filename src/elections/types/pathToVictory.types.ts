@@ -1,6 +1,0 @@
-export enum P2VStatus {
-  complete = 'Complete',
-  waiting = 'Waiting',
-  failed = 'Failed',
-  districtMatched = 'DistrictMatched',
-}

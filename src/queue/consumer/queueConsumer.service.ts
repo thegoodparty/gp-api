@@ -13,7 +13,7 @@ import {
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -63,6 +63,7 @@ import {
   PollClusterAnalysisJsonSchema,
   QueueMessage,
   QueueType,
+  SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
@@ -116,6 +117,49 @@ export class QueueConsumerService {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
+  }
+
+  private logConsumerError = (
+    eventName: SqsConsumerErrorEventName,
+    error: Error,
+    message: Message | Message[] | undefined,
+  ) => {
+    this.logger.error(
+      { error: serializeError(error), message },
+      `SQS consumer ${eventName}`,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.ERROR,
+  )
+  onError(error: Error, message: Message | Message[] | undefined) {
+    this.logConsumerError(SqsConsumerErrorEventName.ERROR, error, message)
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.PROCESSING_ERROR,
+  )
+  onProcessingError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.PROCESSING_ERROR,
+      error,
+      message,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.TIMEOUT_ERROR,
+  )
+  onTimeoutError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.TIMEOUT_ERROR,
+      error,
+      message,
+    )
   }
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -293,17 +337,11 @@ export class QueueConsumerService {
           pollExpansionEvent,
           message.MessageId!,
         )
-      // TODO: Remove prod guard and add prod queue URL + S3 bucket to deploy/index.ts when ready to launch in prod
       case QueueType.CAMPAIGN_PLAN_COMPLETE:
         this.logger.info(
           { data: queueMessage.data, messageId: message.MessageId },
           'received campaignPlanComplete message',
         )
-        // TODO: Remove prod guard and add prod queue URL + S3 bucket to deploy/index.ts when ready to launch in prod
-        if (process.env.NODE_ENV === 'production') {
-          this.logger.warn('campaign plan complete handler disabled in prod')
-          return true
-        }
         return await this.withLegacyErrorSwallowing(message, async () => {
           const campaignPlanData = CampaignPlanCompleteMessageSchema.parse(
             queueMessage.data,

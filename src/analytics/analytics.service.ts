@@ -10,7 +10,7 @@ import {
 import { WrapperType } from '../shared/types/utility.types'
 import { UsersService } from '../users/services/users.service'
 import { PinoLogger } from 'nestjs-pino'
-import { getImpersonationContext } from './impersonation-context'
+import { getImpersonationContext } from '@/analytics/impersonation-context'
 
 @Injectable()
 export class AnalyticsService {

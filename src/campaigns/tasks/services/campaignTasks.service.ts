@@ -31,7 +31,6 @@ import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
-import { CampaignWithPathToVictory } from '../../campaigns.types'
 import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiGenerationService } from './aiGeneration.service'
 
@@ -194,9 +193,7 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  generateTasksStream(
-    campaign: CampaignWithPathToVictory,
-  ): Observable<MessageEvent> {
+  generateTasksStream(campaign: Campaign): Observable<MessageEvent> {
     return new Observable((subscriber: Subscriber<MessageEvent>) => {
       this.runGenerationStream(campaign, subscriber).catch((error: Error) => {
         this.logger.error(
@@ -212,7 +209,7 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private async runGenerationStream(
-    campaign: CampaignWithPathToVictory,
+    campaign: Campaign,
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
     try {
