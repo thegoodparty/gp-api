@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
@@ -7,6 +8,11 @@ import {
   VoterFileType,
 } from '../voterFile.types'
 import { PinoLogger } from 'nestjs-pino'
+
+export const MISSING_L2_DISTRICT_DATA_ERROR_CODE = 'MISSING_L2_DISTRICT_DATA'
+
+export const MISSING_L2_DISTRICT_DATA_USER_MESSAGE =
+  'Voter data is not available for your selected office. The district record is missing L2 location data. Please contact support to resolve this.'
 
 const VOTER_FILE_LATEST_EVEN_YEAR = Number(
   process.env.VOTER_FILE_LATEST_EVEN_YEAR,
@@ -66,11 +72,22 @@ export function typeToQuery(
 
   if (!isStatewideOffice && (!l2ColumnName || !l2ColumnValue)) {
     logger.warn(
-      `Missing L2 data for campaign ${campaign.id}. l2ColumnName: ${l2ColumnName}, l2ColumnValue: ${l2ColumnValue}`,
+      {
+        campaignId: campaign.id,
+        organizationSlug: campaign.organizationSlug,
+        ballotLevel: campaign.details?.ballotLevel,
+        districtId: district?.id,
+        l2Type: l2ColumnName,
+        l2Name: l2ColumnValue,
+        errorCode: MISSING_L2_DISTRICT_DATA_ERROR_CODE,
+      },
+      'Missing L2 district data for voter file query',
     )
-    throw new Error(
-      'L2 data is required to generate voter file. Ensure the organization has district data (election type and location) for this race.',
-    )
+    throw new BadRequestException({
+      statusCode: 400,
+      message: MISSING_L2_DISTRICT_DATA_USER_MESSAGE,
+      errorCode: MISSING_L2_DISTRICT_DATA_ERROR_CODE,
+    })
   }
 
   if (l2ColumnName && l2ColumnValue && !isStatewideOffice) {
