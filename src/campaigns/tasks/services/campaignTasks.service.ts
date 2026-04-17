@@ -615,7 +615,7 @@ export class CampaignTasksService extends createPrismaBase(
 
       return [
         {
-          id: `aw-parade-${task.id}`,
+          id: `aw-parade-${task.id ?? crypto.randomUUID()}`,
           title: `Contact Parade Organizers for ${task.title}`,
           description: 'Get signed up to march in the parade',
           flowType: CampaignTaskType.awareness,
@@ -654,13 +654,12 @@ export class CampaignTasksService extends createPrismaBase(
     }))
   }
 
-  async addTasks(campaignId: number, tasks: CampaignTask[]) {
+  async addEventTasks(campaignId: number, tasks: CampaignTask[]) {
     const campaign = await this.client.campaign.findUniqueOrThrow({
       where: { id: campaignId },
       select: { details: true },
     })
-    const electionDate = (campaign.details as PrismaJson.CampaignDetails)
-      ?.electionDate
+    const electionDate = campaign.details?.electionDate
     const paradeTasks = this.buildParadeAwarenessTasks(tasks, electionDate)
     const allTasks = [...tasks, ...paradeTasks]
     const tasksToCreate = this.mapTasksToCreateData(campaignId, allTasks)

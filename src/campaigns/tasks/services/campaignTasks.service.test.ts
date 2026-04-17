@@ -553,7 +553,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -580,7 +580,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -609,7 +609,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 2 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       const createCall = mockModel.createMany.mock.calls[0][0]
       expect(createCall.data).toHaveLength(2)
