@@ -18,6 +18,7 @@ import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-en
 
 export type FriendlyOrganization = {
   slug: string
+  createdAt: Date
   hasDistrictOverride: boolean
   customPositionName: string | null
   position: {
@@ -446,6 +447,7 @@ export class OrganizationsService extends createPrismaBase(
 
     return {
       slug: org.slug,
+      createdAt: org.createdAt,
       hasDistrictOverride: !!org.overrideDistrictId,
       customPositionName: org.customPositionName,
       position: position

@@ -24,6 +24,7 @@ import { OrgDistrict } from './organizations.types'
 
 type APIOrganization = {
   slug: string
+  createdAt: string
   name: string | null
   positionName: string | null
   position: null | { id: string; state: string; brPositionId: string }
@@ -35,6 +36,7 @@ type APIOrganization = {
 const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   const result: APIOrganization = {
     slug: org.slug,
+    createdAt: org.createdAt.toISOString(),
     name: null,
     positionName: org.customPositionName ?? org.position?.name ?? null,
     position: null,
