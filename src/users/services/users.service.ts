@@ -346,10 +346,22 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         )
       }
     }
-    return this.model.delete({
-      where: {
-        id,
-      },
+    await this.client.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id } })
+
+      if (user?.clerkId) {
+        try {
+          await this.clerkClient.users.deleteUser(user.clerkId)
+        } catch (error) {
+          this.logger.error(
+            { error },
+            `Failed to delete Clerk user ${user.clerkId} during account deletion`,
+          )
+          throw new BadGatewayException(
+            `Failed to delete Clerk user during account deletion`,
+          )
+        }
+      }
     })
   }
 
