@@ -1049,7 +1049,7 @@ export class QueueConsumerService {
     try {
       const { campaignId: resultCampaignId, tasks } =
         await this.aiGenerationService.parseCompletionResult(data)
-      await this.campaignTasksService.addTasks(resultCampaignId, tasks)
+      await this.campaignTasksService.addEventTasks(resultCampaignId, tasks)
       this.logger.info(
         { campaignId: resultCampaignId, taskCount: tasks.length },
         'campaign plan tasks saved',

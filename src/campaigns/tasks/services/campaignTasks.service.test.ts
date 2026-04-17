@@ -105,6 +105,7 @@ describe('CampaignTasksService', () => {
       get: () => ({
         campaignTask: mockModel,
         campaignUpdateHistory: mockCampaignUpdateHistoryModel,
+        campaign: mockCampaignModel,
         $transaction: mockTransaction,
       }),
       configurable: true,
@@ -532,6 +533,12 @@ describe('CampaignTasksService', () => {
   })
 
   describe('addTasks', () => {
+    beforeEach(() => {
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        details: { electionDate: '2026-11-03' },
+      })
+    })
+
     it('passes event task id to createMany for idempotent inserts', async () => {
       const tasks: CampaignTask[] = [
         {
@@ -546,7 +553,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -574,7 +581,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -586,6 +593,36 @@ describe('CampaignTasksService', () => {
         ],
         skipDuplicates: true,
       })
+    })
+
+    it('appends parade awareness tasks from AI tasks', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-01-05'))
+
+      const tasks: CampaignTask[] = [
+        {
+          id: 'event-1',
+          title: '4th of July Parade',
+          description: 'March in the parade',
+          week: 4,
+          date: '2026-07-04',
+        },
+      ]
+      mockModel.createMany.mockResolvedValue({ count: 2 })
+
+      await service.addEventTasks(1, tasks)
+
+      const createCall = mockModel.createMany.mock.calls[0][0]
+      expect(createCall.data).toHaveLength(2)
+      expect(createCall.data[1]).toEqual(
+        expect.objectContaining({
+          title: 'Contact Parade Organizers for 4th of July Parade',
+          description: 'Get signed up to march in the parade',
+          flowType: CampaignTaskType.awareness,
+        }),
+      )
+
+      vi.useRealTimers()
     })
   })
 
@@ -635,6 +672,7 @@ describe('CampaignTasksService', () => {
     const getCreatedTaskData = () => {
       const call = mockTxModel.createMany.mock.calls[0][0] as {
         data: {
+          id: string
           title: string
           description: string
           cta: string | null
@@ -1120,6 +1158,206 @@ describe('CampaignTasksService', () => {
 
       const { recurring } = splitByRecurring(getCreatedTaskData())
       expect(recurring).toHaveLength(0)
+    })
+  })
+
+  describe('buildParadeAwarenessTasks', () => {
+    const today = startOfDay(parseIsoDateString('2026-01-05'))
+    const electionDate = '2026-11-03'
+
+    const makeAiTask = (
+      overrides: Partial<CampaignTask> = {},
+    ): CampaignTask => ({
+      id: 'ai-task-1',
+      title: 'Some Task',
+      description: 'Some description',
+      week: 4,
+      date: '2026-03-15',
+      ...overrides,
+    })
+
+    it('creates an awareness task for a parade event in the title', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for 4th of July Parade',
+      )
+      expect(result[0].description).toBe('Get signed up to march in the parade')
+      expect(result[0].flowType).toBe(CampaignTaskType.awareness)
+      expect(result[0].date).toBe('2026-06-01')
+      expect(result[0].week).toBe(23)
+      expect(result[0].isDefaultTask).toBe(false)
+    })
+
+    it('detects parade in the description (case-insensitive)', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'event-1',
+          title: 'Community March Event',
+          description: 'Join the local PARADE and wave to supporters',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for Community March Event',
+      )
+    })
+
+    it('skips parade events less than 4 weeks out', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-soon',
+          title: 'Parade Tomorrow',
+          date: '2026-01-20',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks without a date', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-no-date',
+          title: 'Some Parade',
+          date: undefined,
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips non-parade tasks', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'normal-task',
+          title: 'Door Knocking',
+          description: 'Go knock on doors',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('handles multiple parade events', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: 'Memorial Day Parade',
+          date: '2026-05-25',
+        }),
+        makeAiTask({
+          id: 'parade-2',
+          title: 'Independence Day Parade',
+          date: '2026-07-04',
+        }),
+        makeAiTask({
+          id: 'normal',
+          title: 'Phone Banking',
+          date: '2026-06-01',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(2)
+      expect(result[0].id).toBe('aw-parade-parade-1')
+      expect(result[1].id).toBe('aw-parade-parade-2')
+    })
+
+    it('returns empty when no election date is provided', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, undefined, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks with malformed dates', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-bad',
+          title: 'Bad Parade',
+          date: 'not-a-date',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips when derived monday is before today', () => {
+      const laterToday = startOfDay(parseIsoDateString('2026-06-05'))
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        laterToday,
+      )
+
+      expect(result).toHaveLength(0)
     })
   })
 })
