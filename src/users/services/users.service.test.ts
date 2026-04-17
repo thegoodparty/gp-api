@@ -269,4 +269,77 @@ describe('UsersService', () => {
       ).rejects.toThrow(BadGatewayException)
     })
   })
+
+  describe('deleteUser', () => {
+    let clerkClient: ClerkClient
+
+    beforeEach(() => {
+      clerkClient = service.app.get<ClerkClient>(CLERK_CLIENT_PROVIDER_TOKEN)
+    })
+
+    it('deletes the DB record and calls clerkClient.users.deleteUser when user has a clerkId', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'delete-me@example.com',
+          clerkId: 'clerk_delete_test_id',
+        },
+      })
+      vi.spyOn(clerkClient.users, 'deleteUser').mockResolvedValue(
+        {} as Awaited<ReturnType<typeof clerkClient.users.deleteUser>>,
+      )
+
+      await usersService.deleteUser(targetUser.id)
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).toBeNull()
+      expect(clerkClient.users.deleteUser).toHaveBeenCalledWith(
+        'clerk_delete_test_id',
+      )
+    })
+
+    it('deletes the DB record and skips Clerk when user has no clerkId', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'no-clerk@example.com',
+          clerkId: null,
+        },
+      })
+      const deleteUserSpy = vi
+        .spyOn(clerkClient.users, 'deleteUser')
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof clerkClient.users.deleteUser>>,
+        )
+
+      await usersService.deleteUser(targetUser.id)
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).toBeNull()
+      expect(deleteUserSpy).not.toHaveBeenCalled()
+    })
+
+    it('rolls back DB delete and throws BadGatewayException when Clerk deleteUser fails', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'clerk-fail@example.com',
+          clerkId: 'clerk_fail_id',
+        },
+      })
+      vi.spyOn(clerkClient.users, 'deleteUser').mockRejectedValue(
+        new Error('Clerk API error'),
+      )
+
+      await expect(usersService.deleteUser(targetUser.id)).rejects.toThrow(
+        BadGatewayException,
+      )
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).not.toBeNull()
+    })
+  })
 })
