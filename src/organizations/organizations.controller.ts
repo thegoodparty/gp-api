@@ -1,3 +1,5 @@
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
+import { Roles } from '@/authentication/decorators/Roles.decorator'
 import {
   Body,
   Controller,
@@ -7,20 +9,18 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { ZodValidationPipe } from 'nestjs-zod'
-import {
-  OrganizationsService,
-  FriendlyOrganization,
-} from './services/organizations.service'
-import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { User, UserRole } from '@prisma/client'
+import { pick } from 'es-toolkit'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { OrgDistrict } from './organizations.types'
 import {
   AdminListOrganizationsDto,
   PatchOrganizationDto,
 } from './schemas/organization.schema'
-import { Roles } from '@/authentication/decorators/Roles.decorator'
-import { pick } from 'es-toolkit'
-import { OrgDistrict } from './organizations.types'
+import {
+  FriendlyOrganization,
+  OrganizationsService,
+} from './services/organizations.service'
 
 type APIOrganization = {
   slug: string
@@ -108,6 +108,19 @@ export class OrganizationsController {
       updates,
     )
 
+    return toAPIOrganization(org)
+  }
+
+  @Patch('/admin/:slug')
+  @Roles(UserRole.admin)
+  async adminPatchOrganization(
+    @Param('slug') slug: string,
+    @Body() updates: PatchOrganizationDto,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.adminPatchOrganization(
+      slug,
+      updates,
+    )
     return toAPIOrganization(org)
   }
 

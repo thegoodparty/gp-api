@@ -96,6 +96,45 @@ export class OrganizationsService extends createPrismaBase(
     return this.makeFriendly(org)
   }
 
+  async adminPatchOrganization(slug: string, updates: PatchOrganizationDto) {
+    const raw = await this.model.findUnique({
+      where: { slug },
+      include: { campaign: true, electedOffice: true },
+    })
+    if (!raw) {
+      throw new NotFoundException('Organization not found')
+    }
+    const org = await this.makeFriendly(raw)
+
+    let position: { id: string } | null = org.position
+
+    if ('ballotReadyPositionId' in updates) {
+      if (updates.ballotReadyPositionId === null) {
+        position = null
+      } else if (updates.ballotReadyPositionId) {
+        position = await this.electionsService.getPositionByBallotReadyId(
+          updates.ballotReadyPositionId,
+          { includeDistrict: true },
+        )
+        if (!position) {
+          throw new BadRequestException('Position not found')
+        }
+      }
+    }
+
+    const updated = await this.client.organization.update({
+      where: { slug },
+      data: {
+        positionId: position?.id ?? null,
+        overrideDistrictId: updates.overrideDistrictId,
+        customPositionName: updates.customPositionName,
+      },
+      include: { campaign: true, electedOffice: true },
+    })
+
+    return this.makeFriendly(updated)
+  }
+
   async patchOrganization(
     userId: number,
     slug: string,
