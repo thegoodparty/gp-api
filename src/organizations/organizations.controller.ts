@@ -30,6 +30,7 @@ type APIOrganization = {
   district: null | OrgDistrict
   electedOfficeId: string | null
   campaignId: number | null
+  electionDate: string | null
 }
 
 const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
@@ -41,6 +42,7 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
     district: null,
     electedOfficeId: null,
     campaignId: null,
+    electionDate: null,
   }
 
   result.position = org.position
@@ -63,8 +65,10 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
     result.name = result.positionName
   } else {
     result.campaignId = parseInt(org.slug.replace('campaign-', ''))
-    const electionYear = org.campaign?.details.electionDate?.split('-').at(0)
+    const electionDate = org.campaign?.details.electionDate ?? null
+    const electionYear = electionDate?.split('-').at(0)
     result.name = [electionYear, 'Campaign'].filter(Boolean).join(' ')
+    result.electionDate = electionDate
   }
   return result
 }
