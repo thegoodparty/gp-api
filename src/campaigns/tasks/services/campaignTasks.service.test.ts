@@ -84,7 +84,7 @@ const makeDbTask = (overrides = {}) => ({
   cta: 'Do it',
   flowType: CampaignTaskType.education,
   week: 4,
-  date: null,
+  date: new Date('2026-06-01'),
   link: null,
   proRequired: false,
   isDefaultTask: false,
@@ -569,6 +569,7 @@ describe('CampaignTasksService', () => {
           cta: 'Get started',
           flowType: CampaignTaskType.education,
           week: 12,
+          date: '2026-06-01',
         },
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
@@ -661,7 +662,7 @@ describe('CampaignTasksService', () => {
       nonRecurring: tasks.filter((t) => !recurringTitles.has(t.title)),
     })
 
-    it('uses general tasks without dates when details is empty', async () => {
+    it('distributes general tasks with dates when details is empty', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
@@ -669,7 +670,23 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       expect(tasks).toHaveLength(generalDefaultTasks.length)
       expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
-      expect(tasks[0].date).toBeNull()
+      expect(tasks[0].date).toBeInstanceOf(Date)
+    })
+
+    it('distributes general tasks when details is null', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: null as unknown as CampaignWithPathToVictory['details'],
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
     it('distributes general tasks when only general date is future', async () => {

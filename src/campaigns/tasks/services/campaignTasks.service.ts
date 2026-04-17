@@ -22,6 +22,7 @@ import {
 import { sleep } from 'src/shared/util/sleep.util'
 import {
   CampaignTask,
+  CampaignTaskTemplate,
   CampaignTaskType,
   DayOfWeek,
   RecurrenceRule,
@@ -329,7 +330,13 @@ export class CampaignTasksService extends createPrismaBase(
     today: Date,
   ): CampaignTask[] {
     const { details } = campaign
-    if (!details) return generalDefaultTasks
+    if (!details) {
+      return this.distributeTasksOverWindow(
+        generalDefaultTasks,
+        today,
+        addDays(today, MAX_TASK_WINDOW_DAYS),
+      )
+    }
 
     const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
     const generalDate = this.hasFutureDate(details.electionDate, today)
@@ -396,7 +403,13 @@ export class CampaignTasksService extends createPrismaBase(
 
     const hasAnyElectionDate =
       details.primaryElectionDate || details.electionDate
-    return hasAnyElectionDate ? [] : generalDefaultTasks
+    return hasAnyElectionDate
+      ? []
+      : this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          today,
+          addDays(today, MAX_TASK_WINDOW_DAYS),
+        )
   }
 
   private hasFutureDate(
@@ -409,7 +422,7 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private distributeTasksOverWindow(
-    tasks: CampaignTask[],
+    tasks: CampaignTaskTemplate[],
     windowStart: Date,
     endDate: Date,
   ): CampaignTask[] {
@@ -447,15 +460,15 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
-    return [...tasks].sort((a, b) => {
-      const dateA = a.date ? parseIsoDateString(a.date).getTime() : 0
-      const dateB = b.date ? parseIsoDateString(b.date).getTime() : 0
-      return dateA - dateB
-    })
+    return [...tasks].sort(
+      (a, b) =>
+        parseIsoDateString(a.date).getTime() -
+        parseIsoDateString(b.date).getTime(),
+    )
   }
 
   private computeAwarenessTasks(
-    tasks: CampaignTask[],
+    tasks: CampaignTaskTemplate[],
     electionDate: Date,
     today: Date,
   ): CampaignTask[] {
@@ -584,7 +597,7 @@ export class CampaignTasksService extends createPrismaBase(
       cta: task.cta ?? null,
       flowType: task.flowType ?? null,
       week: task.week,
-      date: task.date ? startOfDay(parseIsoDateString(task.date)) : null,
+      date: startOfDay(parseIsoDateString(task.date)),
       link: task.link,
       proRequired: task.proRequired || false,
       deadline: task.deadline,

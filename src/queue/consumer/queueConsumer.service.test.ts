@@ -1007,7 +1007,7 @@ describe('QueueConsumerService - message type routing', () => {
           flowType: CampaignTaskType.text,
           isDefaultTask: true,
           title: 'Introduction Text',
-          date: null,
+          date: new Date('2026-04-01'),
         },
         {
           flowType: CampaignTaskType.doorKnocking,
@@ -1097,7 +1097,7 @@ describe('QueueConsumerService - message type routing', () => {
           flowType: CampaignTaskType.text,
           isDefaultTask: true,
           title: 'Introduction Text',
-          date: null,
+          date: new Date('2026-04-01'),
         },
       ],
     })
