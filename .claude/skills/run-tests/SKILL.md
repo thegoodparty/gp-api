@@ -27,10 +27,12 @@ npm run verify    # lint + tsc --noEmit + vitest run — same as CI gate
 
 For tests in `*.e2e.test.ts` or any test using `useTestService()`:
 
+Call `useTestService()` at the top level of the file, not inside `beforeEach`.
+
 ```ts
 import { useTestService } from '@/test-service'
 
-const service = useTestService()    // top-level, NOT inside beforeEach
+const service = useTestService()
 
 it('creates a campaign', async () => {
   const result = await service.client.post('/v1/campaigns', {...})
@@ -44,12 +46,16 @@ Local Postgres / Docker must be running for these. If they fail with "connection
 
 ## Unit tests — two patterns
 
+Direct instantiation (preferred for controllers):
+
 ```ts
-// 1. Direct instantiation (preferred for controllers)
 const mockService: Partial<ThingsService> = { findMany: vi.fn() }
 const controller = new ThingsController(mockService as ThingsService)
+```
 
-// 2. Test.createTestingModule (when DI graph is needed)
+`Test.createTestingModule` (when the DI graph is needed):
+
+```ts
 const module = await Test.createTestingModule({
   providers: [{ provide: PrismaService, useValue: mockPrisma }, ThingsService],
 }).compile()

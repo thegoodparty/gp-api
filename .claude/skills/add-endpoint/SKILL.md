@@ -9,15 +9,23 @@ Reference module: `src/users/`. Conventions enforced by `.cursor/rules/rules.mdc
 
 ## 1. Locate or create the feature module
 
+Layout:
+
+- `<feature>.module.ts` — NestJS module
+- `<feature>.controller.ts` — HTTP only, no business logic
+- `services/<feature>.service.ts` — extends `createPrismaBase(MODELS.X)`
+- `schemas/<action><Entity>.schema.ts` — Zod input + response schemas
+- `<feature>.test.ts` — Vitest file (must be `*.test.ts`, not `.spec.ts`)
+
 ```
 src/<feature>/
 ├── <feature>.module.ts
-├── <feature>.controller.ts        # HTTP only — no business logic
+├── <feature>.controller.ts
 ├── services/
-│   └── <feature>.service.ts       # extends createPrismaBase(MODELS.X)
+│   └── <feature>.service.ts
 ├── schemas/
-│   └── <action><Entity>.schema.ts # Zod input + response
-└── <feature>.test.ts              # Vitest, *.test.ts (NOT .spec.ts)
+│   └── <action><Entity>.schema.ts
+└── <feature>.test.ts
 ```
 
 If the feature doesn't exist yet, create the folder and module, then register it in the parent module's `imports`.
@@ -26,12 +34,13 @@ If the feature doesn't exist yet, create the folder and module, then register it
 
 `src/<feature>/schemas/<action><Entity>.schema.ts`:
 
+Never call `.passthrough()` on request schemas — unknown keys must be stripped.
+
 ```ts
 import { z } from 'zod'
 
 export const CreateThingSchema = z.object({
   name: z.string().min(1),
-  // never .passthrough() — strip unknown keys
 })
 
 export type CreateThingInput = z.infer<typeof CreateThingSchema>
@@ -45,6 +54,8 @@ export const ThingResponseSchema = z.object({
 
 ## 3. Service: extend PrismaBase if backed by a Prisma model
 
+Inherited members: `this.model`, `this.client`, `this.logger`, `this.findMany`, `this.findFirst`, `this.count`, `this.optimisticLockingUpdate`.
+
 ```ts
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
@@ -54,9 +65,6 @@ export class ThingsService extends createPrismaBase(MODELS.Thing) {
   constructor() {
     super()
   }
-
-  // this.model, this.client, this.logger, this.findMany, this.findFirst,
-  // this.count, this.optimisticLockingUpdate are inherited.
 }
 ```
 
