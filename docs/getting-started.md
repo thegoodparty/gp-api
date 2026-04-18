@@ -37,8 +37,8 @@ API boots on `:3000`. Swagger is at `http://localhost:3000/api`.
 ## Related docs
 
 - `CLAUDE.md` — the canonical agent/contributor guide (kept short, commands first)
+- `docs/writing-tests.md` — testing patterns and when to reach for each
 - `docs/observability.md` — Grafana alerts, Loki, Tempo
 - `docs/debugging.md` — reproducing bugs with `useTestService`
 - `docs/contracts.md` — working with `@goodparty_org/contracts`
 - `docs/team-setup.md` — deeper setup (nvm, npm ci flags, IDE config)
-- `docs/postman-testing.md` — Postman workflow

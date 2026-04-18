@@ -35,6 +35,7 @@ npm run infra deploy <env>     # deploy via Pulumi
 | ---------------------------- | ------------------------------------------------ |
 | Adding an endpoint           | `docs/architecture.md` § Module shape            |
 | Touching contracts           | `docs/contracts.md`                              |
+| Writing or fixing a test     | `docs/writing-tests.md`                          |
 | Adding/debugging an alert    | `docs/observability.md`                          |
 | Reproducing a reported bug   | `docs/debugging.md`                              |
 | First-time setup             | `docs/getting-started.md` + `docs/team-setup.md` |
@@ -103,40 +104,11 @@ One queue, switch on `QueueType` enum. Producer in `src/queue/producer/`, consum
 - Framework: **Vitest** with SWC (required for NestJS decorator metadata)
 - Test file pattern: `*.test.ts` only (NOT `.spec.ts`)
 - Loads `.env.test`; `clearMocks: true`
+- Every test is a unit test. There is no separate integration or e2e tier.
 
-### Integration: `useTestService()`
+Three patterns, in increasing cost: direct instantiation, `Test.createTestingModule`, and `useTestService()` (boots the real app against a Postgres container). Reach for `useTestService()` when the test's value depends on Postgres, Prisma, or the full request pipeline doing real work — not as a fallback when mocking gets hard.
 
-`src/test-service.ts` spins a real Postgres container, runs migrations, bootstraps the full app, and provides an authed Axios client.
-
-```ts
-const service = useTestService()
-
-it('creates a campaign', async () => {
-  const result = await service.client.post('/v1/campaigns', { ... })
-  expect(result.status).toBe(201)
-})
-```
-
-Each suite gets a unique DB; tables are truncated between tests. Default test user id is `123`.
-
-### Unit
-
-Two patterns:
-
-```ts
-// Direct instantiation (preferred for controllers)
-const mockService: Partial<CampaignsService> = { findMany: vi.fn() }
-controller = new CampaignsController(mockService as CampaignsService, ...)
-
-// Test.createTestingModule (when DI is needed)
-const module = await Test.createTestingModule({
-  providers: [{ provide: PrismaService, useValue: mockPrisma }, CampaignsService],
-}).compile()
-```
-
-Override PrismaBase internals via `Object.defineProperty(service, '_prisma', { get: () => mockClient })`.
-
-Use `createMockLogger()` from `src/shared/test-utils/mockLogger.util.ts`.
+Full guide and worked examples: `docs/writing-tests.md`.
 
 ## AI code review (`ai-rules/`)
 

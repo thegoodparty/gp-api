@@ -547,9 +547,6 @@ ENFORCEMENT:
 - Keep controllers focused on HTTP concerns and business logic
 - Keep services focused on data operations
 
-
-E2E testing patterns: see docs/e2e-testing.md.
-
 ## Rule 27: Lint and Format Gate Before Committing
 
 CRITICAL REQUIREMENT:
