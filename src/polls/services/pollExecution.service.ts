@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import {
   Campaign,
   Organization,
-  PathToVictory,
   Poll,
   PollIndividualMessageSender,
   Prisma,
@@ -32,7 +31,7 @@ type PollWithOrganization = {
   poll: Poll
   office: { id: string; campaignId: number }
   organization: Organization
-  campaign: Campaign & { pathToVictory: PathToVictory | null }
+  campaign: Campaign
 }
 
 @Injectable()
@@ -90,7 +89,6 @@ export class PollExecutionService {
       )
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
-        campaign,
         organization,
       )
       this.logger.log(
@@ -217,16 +215,25 @@ export class PollExecutionService {
       return
     }
 
+    if (!office.campaignId) {
+      this.logger.log('Elected office has no campaign, ignoring event')
+      return
+    }
+
     const campaign = await this.campaignsService.findUnique({
       where: { id: office.campaignId },
-      include: { pathToVictory: true },
     })
 
     if (!campaign) {
       this.logger.log('No campaign found, ignoring event')
       return
     }
-    return { poll, office, organization, campaign }
+    return {
+      poll,
+      office: { id: office.id, campaignId: office.campaignId },
+      organization,
+      campaign,
+    }
   }
 
   csvEscape(value: string | number | null | undefined): string {
@@ -238,12 +245,7 @@ export class PollExecutionService {
   }
 
   buildCsvFromContacts(people: PersonOutput[]): string {
-    const headers: (keyof PersonOutput)[] = [
-      'id',
-      'firstName',
-      'lastName',
-      'cellPhone',
-    ]
+    const headers = ['id', 'firstName', 'lastName', 'cellPhone'] as const
     const lines = [headers.join(',')]
     for (const person of people) {
       const row = headers.map((key) => this.csvEscape(person?.[key] ?? ''))

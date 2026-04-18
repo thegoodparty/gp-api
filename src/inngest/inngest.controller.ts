@@ -23,9 +23,13 @@ export class InngestController {
   @All()
   async handleInngest(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
     this.logger.debug(`Inngest request: ${req.method} ${req.url}`)
+    // inngest/fastify typings declare a narrower Querystring than FastifyRequest's default;
+    // the runtime contract is the same so this bridge cast is safe.
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
     return this.handler(
       req as Parameters<typeof this.handler>[0],
       res as Parameters<typeof this.handler>[1],
     )
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
   }
 }

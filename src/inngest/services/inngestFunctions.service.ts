@@ -78,7 +78,6 @@ export class InngestFunctionsService {
             const sample =
               await this.pollExecutionService.contactsService.sampleContacts(
                 { size: poll.targetAudienceSize },
-                campaign,
                 organization,
               )
             this.logger.log(
