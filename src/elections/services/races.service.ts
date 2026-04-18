@@ -323,7 +323,7 @@ export class RacesService {
       // and a more accurate electionLevel
       this.logger.debug({ slug }, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
-        const geoData = await this.resolveMtfcc(mtfcc, geoId)
+        const geoData = await this.resolveMtfcc(geoId, mtfcc)
         this.logger.debug({ slug, geoData }, 'geoData')
 
         const pickedCity = extractCityFromGeoData(geoData)

@@ -958,7 +958,7 @@ describe('QueueConsumerService - message type routing', () => {
         {
           provide: CampaignTasksService,
           useValue: {
-            addTasks: vi.fn().mockResolvedValue(undefined),
+            addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
         { provide: CampaignTcrComplianceService, useValue: {} },
