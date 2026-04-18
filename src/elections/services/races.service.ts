@@ -6,7 +6,6 @@ import {
 import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
-import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
 import {
   CITY_PROMPT,
   COUNTY_PROMPT,
@@ -17,6 +16,10 @@ import {
 import { RacesByZipSchema } from '../schemas/RacesByZip.schema'
 import { RaceNode, RacesByIdNode } from '../types/ballotReady.types'
 import { GeoData } from '../types/elections.types'
+import {
+  censusRowToGeoData,
+  extractCityFromGeoData,
+} from '../util/geoData.util'
 import { parseRaces } from '../util/parseRaces.util'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
@@ -130,6 +133,12 @@ export class RacesService {
         )
       }
 
+      try {
+        await this.attachCitiesToRaces(elections)
+      } catch (e) {
+        this.logger.error({ e }, 'failed to attach cities to races')
+      }
+
       const totalTime = Date.now() - startTime
       this.logger.debug(
         `Completed: ${iterationCount} iterations, ${elections.length} elections in ${totalTime}ms`,
@@ -139,6 +148,53 @@ export class RacesService {
     } catch (e) {
       this.logger.error({ e }, 'error at getRacesByZip')
       throw new InternalServerErrorException('Error getting races by zipcode')
+    }
+  }
+
+  private normalizeGeoId(geoId?: string | null): string | null {
+    if (!geoId) return null
+    const parsed = parseInt(geoId, 10)
+    if (Number.isNaN(parsed)) return null
+    return parsed.toString()
+  }
+
+  private raceCensusKey(
+    race: RaceNode,
+  ): { key: string; mtfcc: string; geoId: string } | null {
+    const mtfcc = race?.position?.mtfcc
+    const geoId = this.normalizeGeoId(race?.position?.geoId)
+    if (!mtfcc || !geoId) return null
+    return { key: `${mtfcc}|${geoId}`, mtfcc, geoId }
+  }
+
+  private async attachCitiesToRaces(elections: RaceNode[]): Promise<void> {
+    const lookups = new Map<string, { mtfcc: string; geoId: string }>()
+    for (const race of elections) {
+      const pair = this.raceCensusKey(race)
+      if (pair) {
+        lookups.set(pair.key, { mtfcc: pair.mtfcc, geoId: pair.geoId })
+      }
+    }
+    if (lookups.size === 0) return
+
+    const censusRows = await this.censusEntities.findMany({
+      where: {
+        OR: Array.from(lookups.values()),
+      },
+    })
+
+    const cityByKey = new Map<string, string>()
+    for (const row of censusRows) {
+      const key = `${row.mtfcc}|${row.geoId}`
+      if (cityByKey.has(key)) continue
+      const city = extractCityFromGeoData(censusRowToGeoData(row))
+      if (city) cityByKey.set(key, city)
+    }
+
+    for (const race of elections) {
+      const pair = this.raceCensusKey(race)
+      const city = pair && cityByKey.get(pair.key)
+      if (city) race.city = city
     }
   }
 
@@ -171,49 +227,15 @@ export class RacesService {
   }
 
   private async resolveMtfcc(geoId: string, mtfcc: string) {
-    let geoData: GeoData | undefined
-    // geoId is a string that an start with 0, so we need remove that 0
-    if (geoId) {
-      geoId = parseInt(geoId, 10).toString()
-    }
-    if (mtfcc && geoId) {
-      const census = await this.censusEntities.findFirst({
-        where: {
-          geoId,
-          mtfcc,
-        },
-      })
-      if (census) {
-        geoData = {
-          name: census.name,
-          type: census.mtfccType,
-        }
-
-        // todo: this can be improved for county recognition
-        // and other types of entities (school board, etc)
-        if (census.mtfccType === MTFCC_TYPES.CITY) {
-          geoData.city = census.name
-        } else if (census.mtfccType === MTFCC_TYPES.COUNTY) {
-          // todo: strip County from name.
-          geoData.county = census.name
-        } else if (census.mtfccType === MTFCC_TYPES.STATE) {
-          geoData.state = census.name
-        } else if (census.mtfccType === MTFCC_TYPES.COUNTY_SUBDIVISION) {
-          if (census.name.toLowerCase().includes(GEO_TYPES.TOWNSHIP)) {
-            geoData.township = census.name
-          } else if (census.name.toLowerCase().includes(GEO_TYPES.TOWN)) {
-            geoData.town = census.name
-          } else if (census.name.toLowerCase().includes(GEO_TYPES.CITY)) {
-            geoData.city = census.name
-          } else if (census.name.toLowerCase().includes(GEO_TYPES.VILLAGE)) {
-            geoData.village = census.name
-          } else if (census.name.toLowerCase().includes(GEO_TYPES.BOROUGH)) {
-            geoData.borough = census.name
-          }
-        }
-      }
-    }
-    return geoData
+    const normalizedGeoId = this.normalizeGeoId(geoId)
+    if (!mtfcc || !normalizedGeoId) return undefined
+    const census = await this.censusEntities.findFirst({
+      where: {
+        geoId: normalizedGeoId,
+        mtfcc,
+      },
+    })
+    return census ? censusRowToGeoData(census) : undefined
   }
 
   // todo: split this function into smaller functions
@@ -303,53 +325,32 @@ export class RacesService {
       if (mtfcc && geoId) {
         const geoData = await this.resolveMtfcc(mtfcc, geoId)
         this.logger.debug({ slug, geoData }, 'geoData')
-        if (geoData?.city) {
-          city = geoData.city as string
-          if (electionLevel !== 'city') {
-            electionLevel = 'city'
-          }
+
+        const pickedCity = extractCityFromGeoData(geoData)
+        if (pickedCity) city = pickedCity
+
+        if (geoData?.city && electionLevel !== 'city') {
+          electionLevel = 'city'
         }
-        if (geoData?.county) {
-          if (electionLevel !== 'county') {
-            county = geoData.county as string
-            electionLevel = 'county'
-          }
+        if (geoData?.county && electionLevel !== 'county') {
+          county = geoData.county
+          electionLevel = 'county'
         }
-        if (geoData?.state) {
-          if (electionLevel !== 'state') {
-            electionLevel = 'state'
-          }
+        if (geoData?.state && electionLevel !== 'state') {
+          electionLevel = 'state'
         }
         // TODO: electionLevel='local' could cause issues upstream
         // so we are leaving electionLevel as city for now.
-        if (geoData?.township) {
-          city = geoData.township as string
-          // electionLevel = 'local';
-          electionLevel = 'city'
-        }
-        if (geoData?.town) {
-          city = geoData.town as string
-          // electionLevel = 'local';
-          electionLevel = 'city'
-        }
-        if (geoData?.village) {
-          city = geoData.village as string
-          // electionLevel = 'local';
-          electionLevel = 'city'
-        }
-        if (geoData?.borough) {
-          city = geoData.borough as string
-          // electionLevel = 'local';
+        if (
+          geoData?.township ||
+          geoData?.town ||
+          geoData?.village ||
+          geoData?.borough
+        ) {
           electionLevel = 'city'
         }
       }
 
-      if (city && city !== '') {
-        city = city.replace(/ CCD$/, '')
-        city = city.replace(/ City$/, '')
-        // Note: we don't remove Town/Township/Village/Borough
-        // because we want to keep that info for ai column matching.
-      }
       if (county && county !== '') {
         county = county.replace(/ County$/, '')
       }
