@@ -33,6 +33,7 @@ import Stripe from 'stripe'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
@@ -304,7 +305,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     return updatedUser
   }
 
-  async deleteUser(id: number) {
+  async deleteUser(id: number, initiatedByUserId: number) {
     const user = await this.model.findUnique({
       where: { id },
       include: { campaigns: true },
@@ -368,6 +369,27 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         }
       }
     })
+
+    await this.trackUserDeletion(id, initiatedByUserId, user)
+  }
+
+  private async trackUserDeletion(
+    id: number,
+    initiatedByUserId: number,
+    user: Prisma.UserGetPayload<{ include: { campaigns: true } }> | null,
+  ) {
+    const isSelf = initiatedByUserId === id
+    try {
+      await this.analytics.track(id, EVENTS.Account.UserDeleted, {
+        email: user?.email,
+        clerkId: user?.clerkId,
+        hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
+        initiatedBy: isSelf ? 'self' : 'admin',
+        ...(!isSelf && { initiatedByUserId }),
+      })
+    } catch (error) {
+      this.logger.error({ error }, 'Failed to track user deletion event')
+    }
   }
 
   async impersonateUser(userId: number, actorClerkId: string) {

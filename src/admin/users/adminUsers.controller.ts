@@ -20,6 +20,7 @@ import { UserRole } from '@prisma/client'
 import { subDays, subMonths } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { UsersService } from 'src/users/services/users.service'
@@ -102,11 +103,14 @@ export class AdminUsersController {
   @Delete(':id')
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id', ParseIntPipe) id: number) {
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqUser() reqUser: { id: number },
+  ) {
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })
 
     await this.campaignsService.deleteAll({ where: { userId: user.id } })
-    await this.usersService.deleteUser(user.id)
+    await this.usersService.deleteUser(user.id, reqUser.id)
 
     return true
   }
