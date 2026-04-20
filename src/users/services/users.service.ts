@@ -317,36 +317,6 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     const subscriptionId = (campaign?.details as { subscriptionId?: string })
       ?.subscriptionId
 
-    if (subscriptionId) {
-      try {
-        await this.stripeService.cancelSubscription(subscriptionId)
-      } catch (error) {
-        if (
-          error instanceof BadGatewayException &&
-          error.cause instanceof Stripe.errors.StripeError
-        ) {
-          const stripeError = error.cause
-          this.logger.error(
-            {
-              data: {
-                code: stripeError.code,
-                type: stripeError.type,
-                statusCode: stripeError.statusCode,
-              },
-            },
-            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} `,
-          )
-        } else {
-          this.logger.error(
-            { error },
-            `Unexpected error canceling subscription ${subscriptionId}`,
-          )
-        }
-        throw new BadGatewayException(
-          `Failed to cancel subscription before user deletion`,
-        )
-      }
-    }
     await this.client.$transaction(async (tx) => {
       await tx.user.delete({ where: { id } })
       this.logger.info({ userId: id }, 'User deleted from database')
@@ -370,6 +340,34 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       }
     })
 
+    if (subscriptionId) {
+      try {
+        await this.stripeService.cancelSubscription(subscriptionId)
+      } catch (error) {
+        if (
+          error instanceof BadGatewayException &&
+          error.cause instanceof Stripe.errors.StripeError
+        ) {
+          const stripeError = error.cause
+          this.logger.error(
+            {
+              data: {
+                code: stripeError.code,
+                type: stripeError.type,
+                statusCode: stripeError.statusCode,
+              },
+            },
+            `Failed to cancel subscription ${subscriptionId} after user deletion: ${stripeError.message}`,
+          )
+        } else {
+          this.logger.error(
+            { error },
+            `Unexpected error canceling subscription ${subscriptionId} after user deletion`,
+          )
+        }
+      }
+    }
+
     await this.trackUserDeletion(id, initiatedByUserId, user)
   }
 
@@ -379,14 +377,25 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     user: Prisma.UserGetPayload<{ include: { campaigns: true } }> | null,
   ) {
     const isSelf = initiatedByUserId === id
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const metaData = user?.metaData as PrismaJson.UserMetaData | null
+    const userContext = {
+      email: user?.email,
+      hubspotId: metaData?.hubspotId as string | undefined,
+    }
     try {
-      await this.analytics.track(id, EVENTS.Account.UserDeleted, {
-        email: user?.email,
-        clerkId: user?.clerkId,
-        hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
-        initiatedBy: isSelf ? 'self' : 'admin',
-        ...(!isSelf && { initiatedByUserId }),
-      })
+      await this.analytics.track(
+        id,
+        EVENTS.Account.UserDeleted,
+        {
+          clerkId: user?.clerkId,
+          hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
+          initiatedBy: isSelf ? 'self' : 'admin',
+          ...(!isSelf && { initiatedByUserId }),
+        },
+        userContext,
+      )
     } catch (error) {
       this.logger.error({ error }, 'Failed to track user deletion event')
     }

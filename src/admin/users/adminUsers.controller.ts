@@ -22,7 +22,6 @@ import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { UsersService } from 'src/users/services/users.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
@@ -36,7 +35,6 @@ import {
 export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly campaignsService: CampaignsService,
     private readonly slack: SlackService,
     private readonly logger: PinoLogger,
   ) {
@@ -109,7 +107,6 @@ export class AdminUsersController {
   ) {
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })
 
-    await this.campaignsService.deleteAll({ where: { userId: user.id } })
     await this.usersService.deleteUser(user.id, reqUser.id)
 
     return true
