@@ -57,13 +57,17 @@ export class P2pPhoneListUploadService {
         filters,
       )
     } catch (error) {
+      if (error instanceof HttpException) {
+        this.logger.warn(
+          { error },
+          `CSV generation rejected for campaign ${campaign.id} (HttpException passthrough)`,
+        )
+        throw error
+      }
       this.logger.error(
         { error },
         `Failed to generate CSV buffer for campaign ${campaign.id}:`,
       )
-      if (error instanceof HttpException) {
-        throw error
-      }
       throw new BadRequestException(
         'Failed to generate voter data for phone list',
       )
