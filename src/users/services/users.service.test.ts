@@ -363,7 +363,9 @@ describe('UsersService', () => {
       })
       const trackSpy = vi
         .spyOn(analyticsService, 'track')
-        .mockResolvedValue({} as Awaited<ReturnType<typeof analyticsService.track>>)
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
 
       await usersService.deleteUser(targetUser.id, targetUser.id)
 
@@ -384,7 +386,9 @@ describe('UsersService', () => {
       })
       const trackSpy = vi
         .spyOn(analyticsService, 'track')
-        .mockResolvedValue({} as Awaited<ReturnType<typeof analyticsService.track>>)
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
 
       await usersService.deleteUser(targetUser.id, service.user.id)
 
@@ -411,7 +415,9 @@ describe('UsersService', () => {
       )
       const trackSpy = vi
         .spyOn(analyticsService, 'track')
-        .mockResolvedValue({} as Awaited<ReturnType<typeof analyticsService.track>>)
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
 
       await expect(
         usersService.deleteUser(targetUser.id, service.user.id),

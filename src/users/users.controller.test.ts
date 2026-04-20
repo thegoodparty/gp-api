@@ -420,9 +420,9 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(
-        controller.delete({ id: userId }, mockUser),
-      ).rejects.toThrow(PrismaClientKnownRequestError)
+      await expect(controller.delete({ id: userId }, mockUser)).rejects.toThrow(
+        PrismaClientKnownRequestError,
+      )
     })
 
     it('rethrows non-Prisma errors', async () => {
@@ -430,9 +430,9 @@ describe('UsersController', () => {
         new Error('DB connection lost'),
       )
 
-      await expect(
-        controller.delete({ id: userId }, mockUser),
-      ).rejects.toThrow('DB connection lost')
+      await expect(controller.delete({ id: userId }, mockUser)).rejects.toThrow(
+        'DB connection lost',
+      )
     })
   })
 
