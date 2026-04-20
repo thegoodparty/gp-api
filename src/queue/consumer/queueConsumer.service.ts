@@ -996,7 +996,7 @@ export class QueueConsumerService {
     )
 
     const taskLines = outreachTasks.map((task) => {
-      const dueDate = format(task.date, 'MMM d, yyyy')
+      const dueDate = task.date ? format(task.date, 'MMM d, yyyy') : 'TBD'
       return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
     })
 

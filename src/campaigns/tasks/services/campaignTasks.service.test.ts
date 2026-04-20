@@ -60,7 +60,15 @@ const mockAiGeneration: Partial<AiGenerationService> = {
   triggerEventGeneration: vi.fn(),
 }
 
-const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
+type CampaignOverrides = Partial<
+  Omit<Campaign, 'details' | 'data' | 'aiContent'>
+> & {
+  details?: Campaign['details'] | null
+  data?: Campaign['data'] | null
+  aiContent?: Campaign['aiContent'] | null
+}
+
+const makeCampaign = (overrides: CampaignOverrides = {}): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -716,7 +724,7 @@ describe('CampaignTasksService', () => {
 
       await service.generateDefaultTasks(
         makeCampaign({
-          details: null as unknown as CampaignWithPathToVictory['details'],
+          details: null,
         }),
         TODAY,
       )
