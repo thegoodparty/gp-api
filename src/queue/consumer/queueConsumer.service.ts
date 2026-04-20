@@ -48,6 +48,7 @@ import { DomainsService } from '../../websites/services/domains.service'
 import {
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
+  AgentExperimentResultSchema,
   DomainEmailForwardingMessage,
   WeeklyTasksDigestMessageSchema,
   PollAnalysisCompleteEvent,
@@ -62,11 +63,16 @@ import {
   SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { WeeklyTasksDigestHandlerService } from '../../campaigns/tasks/services/weeklyTasksDigestHandler.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
+
+import type { AgentExperimentResultData } from '../queue.types'
+
+import { ExperimentRunStatus } from '@prisma/client'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -112,6 +118,7 @@ export class QueueConsumerService {
     private readonly usersService: UsersService,
     private readonly organizationsService: OrganizationsService,
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
+    private readonly experimentRunsService: ExperimentRunsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -260,7 +267,7 @@ export class QueueConsumerService {
   //  misinterpreted by other modules/services.
   //
   //  https://goodparty.atlassian.net/browse/WEB-4518
-  async processMessage(message: Message) {
+  async processMessage(message: Message): Promise<boolean> {
     if (!message || !message.Body) {
       return true // Delete invalid messages from queue
     }
@@ -358,6 +365,10 @@ export class QueueConsumerService {
           )
           return true
         })
+      case QueueType.AGENT_EXPERIMENT_RESULT:
+        return await this.handleAgentExperimentResult(
+          AgentExperimentResultSchema.parse(queueMessage.data),
+        )
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
@@ -523,13 +534,15 @@ export class QueueConsumerService {
     return true
   }
 
-  private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
+  private async handlePollAnalysisComplete(
+    event: PollAnalysisCompleteEvent,
+  ): Promise<boolean> {
     const { pollId, totalResponses, responsesLocation, issues } = event.data
     this.logger.info(`Handling poll analysis complete event for poll ${pollId}`)
     const data = await this.getPollAndOrganization(pollId)
     if (!data) {
       this.logger.info('Poll not found, ignoring event')
-      return
+      return true
     }
     const { poll, office, organization } = data
     const { electedOfficeId } = poll
@@ -553,7 +566,7 @@ export class QueueConsumerService {
         },
         'Poll is not in expected state, ignoring event',
       )
-      return
+      return true
     }
 
     const constituency = await this.contactsService.findContacts(
@@ -797,16 +810,64 @@ export class QueueConsumerService {
     })
   }
 
+  private async handleAgentExperimentResult(data: AgentExperimentResultData) {
+    const run = await this.experimentRunsService.findUnique({
+      where: { runId: data.runId },
+    })
+
+    if (!run) {
+      this.logger.error({ data }, 'Experiment run not found')
+      return true
+    }
+
+    if (run.status !== ExperimentRunStatus.RUNNING) {
+      this.logger.info(
+        { runId: data.runId },
+        'Experiment run already completed, skipping',
+      )
+      return true
+    }
+
+    const updatedRun = await this.experimentRunsService.optimisticLockingUpdate(
+      { where: { runId: data.runId } },
+      async (run) => {
+        if (run.status !== ExperimentRunStatus.RUNNING) {
+          this.logger.info(
+            { runId: data.runId },
+            'Experiment run already completed, skipping',
+          )
+          throw new Error('Experiment run already completed')
+        }
+        run.status = {
+          success: ExperimentRunStatus.COMPLETED,
+          failed: ExperimentRunStatus.FAILED,
+          contract_violation: ExperimentRunStatus.FAILED,
+        }[data.status]
+        run.artifactKey = data.artifactKey ?? null
+        run.artifactBucket = data.artifactBucket ?? null
+        run.durationSeconds = data.durationSeconds ?? null
+        run.error = data.error?.slice(0, 1000) ?? null
+        return run
+      },
+    )
+
+    this.logger.info(
+      { updatedRun, data },
+      'Updated experiment run from queue event',
+    )
+    return true
+  }
+
   private async triggerPollExecution(params: {
     pollId: string
     messageId: string
     sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
     isExpansion: boolean
-  }) {
+  }): Promise<boolean> {
     const data = await this.getPollAndOrganization(params.pollId)
     if (!data) {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
-      return
+      return true
     }
     const { poll, office, organization } = data
 
@@ -817,7 +878,7 @@ export class QueueConsumerService {
 
     if (!user) {
       this.logger.info(`${params.pollId} User not found, ignoring event`)
-      return
+      return true
     }
 
     const bucket = process.env.TEVYN_POLL_CSVS_BUCKET

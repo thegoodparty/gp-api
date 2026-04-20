@@ -372,6 +372,13 @@ export = async () => {
         // prod: 'campaign-plan-results-prod',
         prod: '',
       }),
+      AGENT_DISPATCH_QUEUE_NAME: select({
+        // Preview intentionally omitted — dispatch fails at runtime with a log
+        preview: '',
+        dev: 'agent-dispatch-dev.fifo',
+        qa: 'agent-dispatch-qa.fifo',
+        prod: 'agent-dispatch-prod.fifo',
+      }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
