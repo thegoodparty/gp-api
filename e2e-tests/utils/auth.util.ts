@@ -1,6 +1,75 @@
 import { APIRequestContext } from '@playwright/test'
 import { faker } from '@faker-js/faker'
 import { HttpStatus } from '@nestjs/common'
+import { createClerkClient } from '@clerk/backend'
+import { ClerkAPIResponseError } from '@clerk/shared/error'
+
+let _clerkClient: ReturnType<typeof createClerkClient> | null = null
+
+const clerkUserIds = new Map<number, string>()
+const clerkUserIdCache = new Map<string, string>()
+
+const getClerkClient = () => {
+  if (!_clerkClient) {
+    const secretKey = process.env.CLERK_SECRET_KEY
+    if (!secretKey) {
+      throw new Error('CLERK_SECRET_KEY env var is required')
+    }
+    _clerkClient = createClerkClient({ secretKey })
+  }
+  return _clerkClient
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  maxRetries = 5,
+): Promise<T> => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const isRateLimit =
+        err instanceof ClerkAPIResponseError && err.status === 429
+      if (!isRateLimit || attempt === maxRetries) throw err
+      const delay = 200 * 4 ** attempt + Math.random() * 100
+      await sleep(delay)
+    }
+  }
+  throw new Error('withRetry: unreachable')
+}
+
+const getSessionToken = async (clerkUserId: string): Promise<string> =>
+  withRetry(async () => {
+    const clerk = getClerkClient()
+    const session = await clerk.sessions.createSession({
+      userId: clerkUserId,
+    })
+    const { jwt } = await clerk.sessions.getToken(session.id, '')
+    if (!jwt) {
+      throw new Error(`Failed to get session token for ${clerkUserId}`)
+    }
+    return jwt
+  })
+
+const getClerkUserIdByEmail = async (email: string): Promise<string> => {
+  const cached = clerkUserIdCache.get(email)
+  if (cached) return cached
+
+  return withRetry(async () => {
+    const clerk = getClerkClient()
+    const users = await clerk.users.getUserList({
+      emailAddress: [email],
+    })
+    if (users.data.length === 0) {
+      throw new Error(`No Clerk user found for email: ${email}`)
+    }
+    const id = users.data[0].id
+    clerkUserIdCache.set(email, id)
+    return id
+  })
+}
 
 export interface LoginResponse {
   token: string
@@ -41,30 +110,39 @@ interface CampaignResponse {
   slug: string
 }
 
+const fetchUserMe = async (
+  request: APIRequestContext,
+  token: string,
+  label: string,
+): Promise<LoginResponse['user']> => {
+  const headers = { Authorization: `Bearer ${token}` }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await request.get('/v1/users/me', {
+      headers,
+    })
+    if (res.ok()) return (await res.json()) as LoginResponse['user']
+    if (attempt === 4) {
+      throw new Error(`${label}: ${res.status()} ${await res.text()}`)
+    }
+    await sleep(200 * 4 ** attempt)
+  }
+  throw new Error(`${label}: all attempts exhausted`)
+}
+
 export async function loginUser(
   request: APIRequestContext,
   email: string,
   password: string,
 ): Promise<LoginResponse> {
   if (!email || !password) {
-    throw new Error(
-      `Email and password are required for login: email: ${email}, password: ${password}`,
-    )
-  }
-  const response = await request.post('/v1/authentication/login', {
-    data: {
-      email,
-      password,
-    },
-  })
-
-  if (!response.ok()) {
-    throw new Error(
-      `Login failed: ${response.status()} ${await response.text()}`,
-    )
+    throw new Error(`Email and password are required for login: email=${email}`)
   }
 
-  return await response.json()
+  const clerkUserId = await getClerkUserIdByEmail(email)
+  const token = await getSessionToken(clerkUserId)
+  const user = await fetchUserMe(request, token, 'Login failed')
+
+  return { token, user }
 }
 
 export async function registerUser(
@@ -79,25 +157,28 @@ export async function registerUser(
     signUpMode: 'candidate' | 'volunteer'
   },
 ): Promise<RegisterResponse> {
-  const response = await request.post('/v1/authentication/register', {
-    data: userData,
-  })
+  const clerkUser = await withRetry(() =>
+    getClerkClient().users.createUser({
+      emailAddress: [userData.email],
+      password: userData.password,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      skipPasswordChecks: true,
+    }),
+  )
 
-  if (!response.ok()) {
-    throw new Error(
-      `Registration failed: ${response.status()} ${await response.text()}`,
-    )
+  const token = await getSessionToken(clerkUser.id)
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
   }
 
-  const body = (await response.json()) as Omit<RegisterResponse, 'campaign'>
+  const user = await fetchUserMe(request, token, 'User provisioning failed')
+
+  clerkUserIds.set(user.id, clerkUser.id)
 
   const campaignResponse = await request.post('/v1/campaigns', {
-    headers: {
-      Authorization: `Bearer ${body.token}`,
-    },
-    data: {
-      details: { zip: userData.zip },
-    },
+    headers: authHeaders,
+    data: { details: { zip: userData.zip } },
   })
 
   if (!campaignResponse.ok()) {
@@ -108,7 +189,7 @@ export async function registerUser(
 
   const campaign = (await campaignResponse.json()) as CampaignResponse
 
-  return { ...body, campaign }
+  return { token, user, campaign }
 }
 
 export async function deleteUser(
@@ -116,6 +197,16 @@ export async function deleteUser(
   userId: number,
   authToken: string,
 ): Promise<void> {
+  const clerkUserId = clerkUserIds.get(userId)
+  if (clerkUserId) {
+    try {
+      await withRetry(() => getClerkClient().users.deleteUser(clerkUserId))
+    } catch {
+      // Clerk deletion is best-effort during cleanup
+    }
+    clerkUserIds.delete(userId)
+  }
+
   const response = await request.delete(`/v1/users/${userId}`, {
     headers: {
       Authorization: `Bearer ${authToken}`,

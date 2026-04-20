@@ -23,7 +23,6 @@ export interface TrackingProperties {
   sessionCount?: number
   createdByAdmin?: boolean
   aiContentCount?: number
-  p2vStatus?: string
   electionDateStr?: string
   primaryElectionDateStr?: string
   filingPeriodsStartMonth?: string

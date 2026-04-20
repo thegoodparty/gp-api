@@ -1,9 +1,3 @@
-import { Campaign, PathToVictory } from '@prisma/client'
-
-export type CampaignWithPathToVictory = Campaign & {
-  pathToVictory?: PathToVictory | null
-}
-
 export type DistrictStatsBucket = {
   label: string
   count: number
