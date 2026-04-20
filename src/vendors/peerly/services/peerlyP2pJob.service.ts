@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
+import { formatISO } from 'date-fns'
 import { Headers } from 'http-constants-ts'
 import { Readable } from 'stream'
 import { PinoLogger } from 'nestjs-pino'
@@ -74,7 +75,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       const dateOnly = scheduledDate?.slice(0, 10)
 
       const targetDate = dateOnly || 'no-date'
-      const createdAt = new Date().toISOString()
+      const createdAt = formatISO(new Date())
       const scheduleName = `GP P2P - Campaign ${campaignId} - ${targetDate} - ${createdAt}`
       scheduleId =
         await this.peerlyScheduleService.createSchedule(scheduleName)

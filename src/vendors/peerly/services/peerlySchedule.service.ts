@@ -6,7 +6,7 @@ import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { CreateScheduleResponseDto } from '../schemas/peerlySchedule.schema'
 
-const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 
 @Injectable()
 export class PeerlyScheduleService extends PeerlyBaseConfig {

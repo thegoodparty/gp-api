@@ -29,9 +29,7 @@ describe('PeerlyScheduleService', () => {
   beforeEach(async () => {
     mockHttpService = {
       post: vi.fn().mockResolvedValue({ data: mockScheduleResponse }),
-      validateResponse: vi
-        .fn()
-        .mockImplementation((_data, _dto, _ctx) => _data),
+      validateResponse: vi.fn().mockImplementation((_data) => _data),
     }
     mockErrorHandling = {
       handleApiError: vi.fn().mockImplementation(() => {
