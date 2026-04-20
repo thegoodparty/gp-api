@@ -54,7 +54,7 @@ interface TaskRow {
   description: string
   flow_type: string | null
   week: number
-  date: string | null
+  date: string
   completed: boolean
 }
 

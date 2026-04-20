@@ -24,7 +24,7 @@ interface DigestRow {
   title: string
   description: string
   flow_type: CampaignTaskType | null
-  date: Date | null
+  date: Date
   week: number
 }
 
@@ -32,7 +32,7 @@ interface TopTaskRow {
   title: string
   description: string
   flow_type: CampaignTaskType | null
-  date: Date | null
+  date: Date
   week: number
 }
 
