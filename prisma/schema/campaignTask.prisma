@@ -20,7 +20,7 @@ model CampaignTask {
   cta                 String?
   flowType            CampaignTaskType? @map("flow_type")
   week                Int
-  date                DateTime?
+  date                DateTime
   link                String?
   proRequired         Boolean?         @default(false) @map("pro_required")
   isDefaultTask       Boolean?         @default(false) @map("is_default_task")

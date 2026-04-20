@@ -957,7 +957,7 @@ describe('QueueConsumerService - message type routing', () => {
         {
           provide: CampaignTasksService,
           useValue: {
-            addTasks: vi.fn().mockResolvedValue(undefined),
+            addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
         { provide: CampaignTcrComplianceService, useValue: {} },
@@ -1038,7 +1038,7 @@ describe('QueueConsumerService - message type routing', () => {
     const { PrismaClientKnownRequestError } = await import(
       '@prisma/client/runtime/library'
     )
-    vi.spyOn(campaignTasksService, 'addTasks').mockRejectedValue(
+    vi.spyOn(campaignTasksService, 'addEventTasks').mockRejectedValue(
       new PrismaClientKnownRequestError('Record not found', {
         code: 'P2025',
         clientVersion: '6.0.0',

@@ -29,6 +29,7 @@ export interface RaceNode {
   filingPeriods: FilingPeriod[]
   election: RacesByZipcodeElection | BDElection
   position: RacesByZipcodePosition
+  city?: string | null
 }
 
 export interface RacesByZipcodeElection
@@ -58,6 +59,8 @@ export type RacesByZipcodePosition = Pick<
   | 'subAreaName'
   | 'subAreaValue'
   | 'electionFrequencies'
+  | 'geoId'
+  | 'mtfcc'
 >
 
 // -----------------------------
