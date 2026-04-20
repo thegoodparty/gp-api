@@ -1,12 +1,4 @@
-import {
-  DateArg,
-  endOfDay,
-  format,
-  parse,
-  startOfDay,
-  subDays,
-  subWeeks,
-} from 'date-fns'
+import { DateArg, endOfDay, format, parse, startOfDay, subDays } from 'date-fns'
 
 export const toDateOnlyString = (d?: Date | null) => {
   return d ? d.toISOString().slice(0, 10) : undefined
@@ -33,17 +25,6 @@ export const getMidnightForDate = (date: Date) =>
 
 export const parseIsoDateString = (dateString: string) =>
   parse(dateString, DateFormats.isoDate, new Date())
-
-export const isValidIsoDate = (value: string): boolean => {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const parsed = parseIsoDateString(value)
-  return !isNaN(parsed.getTime())
-}
-
-export const dateFromWeeksBefore = (
-  referenceDate: Date,
-  weeks: number,
-): string => formatDate(subWeeks(referenceDate, weeks), DateFormats.isoDate)
 
 export const getDateRangeWithDefaults = (
   startDate?: Date,
