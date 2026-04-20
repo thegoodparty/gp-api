@@ -250,6 +250,9 @@ export class WeeklyTasksDigestHandlerService extends createPrismaBase(
         await this.analytics.track(
           group.userId,
           EVENTS.CampaignPlan.WeeklyTasksDigest,
+          // The spread widens our strict WeeklyDigestProperties type to match
+          // analytics.track's `Record<string, unknown>` signature. See WEB-4530
+          // for the TODO to make the track signature generic.
           { ...properties },
         )
 

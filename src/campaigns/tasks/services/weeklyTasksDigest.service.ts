@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
+import { addDays, nextMonday } from 'date-fns'
+import { toZonedTime } from 'date-fns-tz'
 import { PinoLogger } from 'nestjs-pino'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
@@ -10,28 +12,18 @@ const CENTRAL_TIMEZONE = 'America/Chicago'
 // filter Monday-through-Sunday of the upcoming week, we need windowStart and
 // windowEnd to be UTC midnight of the calendar date, regardless of DST.
 function nextMondayUtcMidnight(now: Date, timeZone: string): Date {
-  // Format the current instant in the target timezone as parts — this gives us
-  // the calendar day the user is currently in.
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now)
-
-  const year = Number(parts.find((p) => p.type === 'year')?.value)
-  const month = Number(parts.find((p) => p.type === 'month')?.value)
-  const day = Number(parts.find((p) => p.type === 'day')?.value)
-
-  // Use the Central calendar day/month/year to find the weekday, regardless of
-  // server timezone. getUTCDay() returns 0=Sun..6=Sat from pure date math,
-  // no locale parsing.
-  const weekdayIndex = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
-
-  const daysUntilMonday = (1 - weekdayIndex + 7) % 7 || 7
-
-  return new Date(Date.UTC(year, month - 1, day + daysUntilMonday))
+  // Shift the current instant into the target timezone so nextMonday() picks
+  // the right calendar Monday (e.g. Sunday 11pm Central is still "Sunday" in
+  // Central, but "Monday" in UTC — we want Central's view).
+  const nowInZone = toZonedTime(now, timeZone)
+  const monday = nextMonday(nowInZone)
+  // Reconstruct as UTC midnight of that calendar date so the window aligns
+  // with how tasks are stored (naive timestamps at midnight UTC).
+  return new Date(
+    Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate()),
+  )
 }
+
 
 @Injectable()
 export class WeeklyTasksDigestService {
@@ -49,8 +41,7 @@ export class WeeklyTasksDigestService {
   })
   async triggerWeeklyDigest() {
     const windowStart = nextMondayUtcMidnight(new Date(), CENTRAL_TIMEZONE)
-    const windowEnd = new Date(windowStart)
-    windowEnd.setUTCDate(windowEnd.getUTCDate() + 7)
+    const windowEnd = addDays(windowStart, 7)
 
     this.logger.info(
       { windowStart, windowEnd },
