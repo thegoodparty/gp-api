@@ -189,7 +189,7 @@ export class WeeklyTasksDigestHandlerService extends createPrismaBase(
           COUNT(*) FILTER (WHERE t.completed = false)::int AS incomplete_count
         FROM campaign c
         JOIN campaign_task t ON t.campaign_id = c.id
-        WHERE c.details->>'electionDate' IS NOT NULL
+        WHERE c.details->>'electionDate' ~ '^\\d{4}-\\d{2}-\\d{2}'
           AND (c.details->>'electionDate')::date > NOW()::date
           AND t.date >= ${windowStart}
           AND t.date < ${windowEnd}

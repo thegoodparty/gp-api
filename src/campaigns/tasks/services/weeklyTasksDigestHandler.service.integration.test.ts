@@ -21,7 +21,6 @@ function getTrackSpy(): TrackSpy {
 
 async function makeCampaign(opts: {
   electionDate?: string | null
-  userIdOffset?: number
 } = {}) {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   const user = await service.prisma.user.create({
@@ -37,11 +36,14 @@ async function makeCampaign(opts: {
       ownerId: user.id,
     },
   })
-  const details = opts.electionDate
-    ? { electionDate: opts.electionDate }
-    : opts.electionDate === null
+  // `null` = omit the key entirely; any string (including '') = use as-is;
+  // `undefined` (not provided) = use the default future election date.
+  const details =
+    opts.electionDate === null
       ? {}
-      : { electionDate: FUTURE_ELECTION }
+      : opts.electionDate !== undefined
+        ? { electionDate: opts.electionDate }
+        : { electionDate: FUTURE_ELECTION }
   return service.prisma.campaign.create({
     data: {
       userId: user.id,
@@ -104,6 +106,31 @@ describe('WeeklyTasksDigestHandlerService integration', () => {
       })
 
       expect(trackSpy).not.toHaveBeenCalled()
+    })
+
+    it('skips (does not crash) when electionDate is an empty string or malformed', async () => {
+      const emptyCampaign = await makeCampaign({ electionDate: '' })
+      const malformedCampaign = await makeCampaign({ electionDate: 'TBD' })
+      const validCampaign = await makeCampaign()
+      for (let i = 0; i < 5; i++) await makeTask(emptyCampaign.id)
+      for (let i = 0; i < 5; i++) await makeTask(malformedCampaign.id)
+      for (let i = 0; i < 3; i++) await makeTask(validCampaign.id)
+
+      const trackSpy = getTrackSpy()
+
+      const handler = service.app.get(WeeklyTasksDigestHandlerService)
+      await handler.handleWeeklyTasksDigest({
+        windowStart: WINDOW_START,
+        windowEnd: WINDOW_END,
+      })
+
+      // The valid campaign still fires; the bad rows are silently filtered by the SQL regex.
+      expect(trackSpy).toHaveBeenCalledOnce()
+      expect(trackSpy).toHaveBeenCalledWith(
+        validCampaign.userId,
+        expect.any(String),
+        expect.any(Object),
+      )
     })
 
     it('excludes campaigns with fewer than 3 incomplete tasks in window', async () => {
