@@ -1,5 +1,5 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { BadGatewayException } from '@nestjs/common'
+import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { FastifyReply } from 'fastify'
 import { Campaign } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -248,6 +248,21 @@ describe('P2pController', () => {
       ).rejects.toMatchObject({
         message: 'Failed to upload phone list.',
       })
+    })
+
+    it('preserves HttpException from the service (e.g. MISSING_L2_DISTRICT_DATA)', async () => {
+      const structured = new BadRequestException({
+        statusCode: 400,
+        message: 'Voter data is not available for your selected office.',
+        errorCode: 'MISSING_L2_DISTRICT_DATA',
+      })
+      vi.mocked(
+        mockP2pPhoneListUploadService.uploadPhoneList,
+      ).mockRejectedValue(structured)
+
+      await expect(
+        controller.uploadPhoneList(mockCampaign, { name: 'My List' }),
+      ).rejects.toBe(structured)
     })
   })
 })
