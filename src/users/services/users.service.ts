@@ -348,10 +348,15 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     }
     await this.client.$transaction(async (tx) => {
       await tx.user.delete({ where: { id } })
+      this.logger.info({ userId: id }, 'User deleted from database')
 
       if (user?.clerkId) {
         try {
           await this.clerkClient.users.deleteUser(user.clerkId)
+          this.logger.info(
+            { userId: id, clerkId: user.clerkId },
+            'User deleted from Clerk',
+          )
         } catch (error) {
           this.logger.error(
             { error },

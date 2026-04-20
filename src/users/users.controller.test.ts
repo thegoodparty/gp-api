@@ -394,7 +394,7 @@ describe('UsersController', () => {
 
   describe('delete', () => {
     it('deletes the user by id', async () => {
-      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(mockUser)
+      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(undefined)
 
       await controller.delete({ id: userId })
 
