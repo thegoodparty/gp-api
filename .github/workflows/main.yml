@@ -117,6 +117,12 @@ jobs:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Symlink changeset config for changesets/action
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        run: ln -s contracts/.changeset .changeset
+
       - name: Create Release PR or Publish contracts
         if: >-
           github.ref_name == 'master'
