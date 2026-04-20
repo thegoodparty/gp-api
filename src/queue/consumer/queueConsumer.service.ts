@@ -6,7 +6,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import {
-  CampaignTaskType,
   Poll,
   PollIndividualMessageSender,
   Prisma,
@@ -39,10 +38,6 @@ import { OrganizationsService } from 'src/organizations/services/organizations.s
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import {
-  SlackChannel,
-  SlackMessageType,
-} from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
 import { normalizePhoneNumber } from '../../shared/util/strings.util'
@@ -347,9 +342,6 @@ export class QueueConsumerService {
             queueMessage.data,
           )
           await this.handleCampaignPlanComplete(campaignPlanData)
-          await this.withLegacyErrorSwallowing(message, () =>
-            this.notifySlackCampaignPlanCreated(campaignPlanData),
-          )
           return true
         })
       default:
@@ -963,76 +955,6 @@ export class QueueConsumerService {
       cellPhonesToPeopleIds.set(normalizePhoneNumber(personCellPhone), personId)
     }
     return cellPhonesToPeopleIds
-  }
-
-  private async notifySlackCampaignPlanCreated(
-    message: CampaignPlanCompleteMessage,
-  ) {
-    if (message.status === 'error') {
-      this.logger.error(
-        { campaignId: message.campaignId, error: message.error },
-        'Campaign plan generation failed',
-      )
-      return true
-    }
-
-    const campaign = await this.campaignsService.model.findUniqueOrThrow({
-      where: { id: message.campaignId },
-      include: { user: true, campaignTasks: true },
-    })
-
-    const candidateName =
-      [campaign.user?.firstName, campaign.user?.lastName]
-        .filter((value): value is string => Boolean(value))
-        .join(' ') ||
-      campaign.data.name ||
-      'Unknown'
-
-    const outreachTasks = campaign.campaignTasks.filter(
-      (task) =>
-        !task.isDefaultTask &&
-        (task.flowType === CampaignTaskType.text ||
-          task.flowType === CampaignTaskType.robocall),
-    )
-
-    const taskLines = outreachTasks.map((task) => {
-      const dueDate = task.date ? format(task.date, 'MMM d, yyyy') : 'TBD'
-      return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
-    })
-
-    const { hubspotId } = campaign.data
-
-    const hubspotLink = hubspotId
-      ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
-      : 'N/A'
-
-    const slackBody = [
-      ':white_check_mark: *AI Campaign Plan Created*',
-      `*Candidate:* ${candidateName}`,
-      `*Email:* ${campaign.user?.email ?? 'N/A'}`,
-      `*Phone:* ${campaign.user?.phone ?? 'N/A'}`,
-      `*HubSpot ID:* ${hubspotLink}`,
-      '',
-      `*AI Text & Robocall Campaigns (${outreachTasks.length}):*`,
-      ...(taskLines.length > 0 ? taskLines : ['None']),
-    ].join('\n')
-
-    await this.slackService.message(
-      {
-        blocks: [
-          {
-            type: SlackMessageType.SECTION,
-            text: {
-              type: SlackMessageType.MRKDWN,
-              text: slackBody,
-            },
-          },
-        ],
-      },
-      SlackChannel.casClickupTasks,
-    )
-
-    return true
   }
 
   private async handleCampaignPlanComplete(
