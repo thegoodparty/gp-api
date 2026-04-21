@@ -383,14 +383,10 @@ export class CampaignTasksService extends createPrismaBase(
 
       const { hubspotId } = campaign.data
 
-      const hubspotLink = hubspotId
-        ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
-        : 'N/A'
-
       const slackBody = [
         ':white_check_mark: *AI Campaign Plan Created*',
-        `*Candidate:* ${candidateName}`,
-        `*HubSpot ID:* ${hubspotLink}`,
+        `Candidate: ${candidateName}`,
+        `HubSpot ID: ${hubspotId ?? 'N/A'}`,
         '',
         `*Outreach Tasks (${outreachTasks.length}):*`,
         ...(taskLines.length > 0 ? taskLines : ['None']),
@@ -422,24 +418,69 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: Campaign,
     today: Date,
   ): CampaignTask[] {
+    if (this.hasExpiredElectionOnly(campaign, today)) {
+      return []
+    }
+    const baseTasks = this.buildBaseDefaultTasks(campaign, today)
+    const electionDate = this.resolveElectionDate(campaign, today)
+    return this.sortTasksByDate([
+      ...baseTasks,
+      this.buildCampaignFinanceAwarenessTask(today, electionDate),
+      ...this.buildSignupAwarenessTasks(today, electionDate),
+      ...this.buildElectionDayAwarenessTasks(campaign, today),
+    ])
+  }
+
+  private buildElectionDayAwarenessTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
+    const { details } = campaign
+    if (!details) return []
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    const referenceDate = generalDate ?? primaryDate
+    if (!referenceDate) return []
+    const tasks: CampaignTask[] = []
+    if (primaryDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          primaryElectionDayAwarenessTask,
+          primaryDate,
+          referenceDate,
+        ),
+      )
+    }
+    if (generalDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          generalElectionDayAwarenessTask,
+          generalDate,
+          referenceDate,
+        ),
+      )
+    }
+    return tasks
+  }
+
+  private buildBaseDefaultTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
     const { details } = campaign
     if (!details) {
-      return this.sortTasksByDate([
-        ...this.distributeTasksOverWindow(
-          generalDefaultTasks,
-          today,
-          addDays(today, MAX_TASK_WINDOW_DAYS),
-        ),
-        this.buildCampaignFinanceAwarenessTask(today, null),
-        ...this.buildSignupAwarenessTasks(today, null),
-      ])
+      return this.distributeTasksOverWindow(
+        generalDefaultTasks,
+        today,
+        addDays(today, MAX_TASK_WINDOW_DAYS),
+      )
     }
 
     const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
     const generalDate = this.hasFutureDate(details.electionDate, today)
 
     if (primaryDate && generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -460,23 +501,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-        this.buildCampaignFinanceAwarenessTask(today, generalDate),
-        ...this.buildSignupAwarenessTasks(today, generalDate),
-        this.buildElectionDayAwarenessTask(
-          primaryElectionDayAwarenessTask,
-          primaryDate,
-          generalDate,
-        ),
-        this.buildElectionDayAwarenessTask(
-          generalElectionDayAwarenessTask,
-          generalDate,
-          generalDate,
-        ),
-      ])
+      ]
     }
 
     if (primaryDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -487,18 +516,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           primaryDate,
         ),
-        this.buildCampaignFinanceAwarenessTask(today, primaryDate),
-        ...this.buildSignupAwarenessTasks(today, primaryDate),
-        this.buildElectionDayAwarenessTask(
-          primaryElectionDayAwarenessTask,
-          primaryDate,
-          primaryDate,
-        ),
-      ])
+      ]
     }
 
     if (generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           generalDefaultTasks,
           today,
@@ -514,29 +536,34 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-        this.buildCampaignFinanceAwarenessTask(today, generalDate),
-        ...this.buildSignupAwarenessTasks(today, generalDate),
-        this.buildElectionDayAwarenessTask(
-          generalElectionDayAwarenessTask,
-          generalDate,
-          generalDate,
-        ),
-      ])
+      ]
     }
 
-    const hasAnyElectionDate =
-      details.primaryElectionDate || details.electionDate
-    return hasAnyElectionDate
-      ? []
-      : this.sortTasksByDate([
-          ...this.distributeTasksOverWindow(
-            generalDefaultTasks,
-            today,
-            addDays(today, MAX_TASK_WINDOW_DAYS),
-          ),
-          this.buildCampaignFinanceAwarenessTask(today, null),
-          ...this.buildSignupAwarenessTasks(today, null),
-        ])
+    return this.distributeTasksOverWindow(
+      generalDefaultTasks,
+      today,
+      addDays(today, MAX_TASK_WINDOW_DAYS),
+    )
+  }
+
+  private resolveElectionDate(campaign: Campaign, today: Date): Date | null {
+    const { details } = campaign
+    if (!details) return null
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return generalDate ?? primaryDate ?? null
+  }
+
+  private hasExpiredElectionOnly(campaign: Campaign, today: Date): boolean {
+    const { details } = campaign
+    if (!details) return false
+    const hasAnyElectionDate = Boolean(
+      details.primaryElectionDate || details.electionDate,
+    )
+    if (!hasAnyElectionDate) return false
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return !primaryDate && !generalDate
   }
 
   private hasFutureDate(
