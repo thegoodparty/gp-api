@@ -25,6 +25,28 @@ export const designMaterialsAwarenessTask: Omit<CampaignTaskTemplate, 'week'> =
     isDefaultTask: true,
   }
 
+export const primaryElectionDayAwarenessTask: Omit<
+  CampaignTaskTemplate,
+  'week'
+> = {
+  title: 'Primary Election Day',
+  description:
+    'Today is Election Day! Get out and vote, and make sure your supporters do too. Good luck!',
+  flowType: CampaignTaskType.awareness,
+  isDefaultTask: true,
+}
+
+export const generalElectionDayAwarenessTask: Omit<
+  CampaignTaskTemplate,
+  'week'
+> = {
+  title: 'General Election Day',
+  description:
+    'Today is Election Day! Get out and vote, and make sure your supporters do too. Good luck!',
+  flowType: CampaignTaskType.awareness,
+  isDefaultTask: true,
+}
+
 export const generalAwarenessTasks: CampaignTaskTemplate[] = [
   {
     title: 'Reach 10% of your Voter Contact Goal',

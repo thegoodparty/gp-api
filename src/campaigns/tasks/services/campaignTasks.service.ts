@@ -38,7 +38,9 @@ import {
   campaignFinanceAwarenessTask,
   designMaterialsAwarenessTask,
   generalAwarenessTasks,
+  generalElectionDayAwarenessTask,
   metaVerifiedAwarenessTask,
+  primaryElectionDayAwarenessTask,
 } from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
@@ -425,7 +427,40 @@ export class CampaignTasksService extends createPrismaBase(
       ...baseTasks,
       this.buildCampaignFinanceAwarenessTask(today, electionDate),
       ...this.buildSignupAwarenessTasks(today, electionDate),
+      ...this.buildElectionDayAwarenessTasks(campaign, today),
     ])
+  }
+
+  private buildElectionDayAwarenessTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
+    const { details } = campaign
+    if (!details) return []
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    const referenceDate = generalDate ?? primaryDate
+    if (!referenceDate) return []
+    const tasks: CampaignTask[] = []
+    if (primaryDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          primaryElectionDayAwarenessTask,
+          primaryDate,
+          referenceDate,
+        ),
+      )
+    }
+    if (generalDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          generalElectionDayAwarenessTask,
+          generalDate,
+          referenceDate,
+        ),
+      )
+    }
+    return tasks
   }
 
   private buildBaseDefaultTasks(
@@ -649,6 +684,20 @@ export class CampaignTasksService extends createPrismaBase(
       buildTask(metaVerifiedAwarenessTask, wednesday),
       buildTask(designMaterialsAwarenessTask, thursday),
     ]
+  }
+
+  private buildElectionDayAwarenessTask(
+    template: Omit<CampaignTaskTemplate, 'week'>,
+    electionDayDate: Date,
+    referenceElectionDate: Date,
+  ): CampaignTask {
+    return {
+      ...template,
+      week: differenceInWeeks(referenceElectionDate, electionDayDate, {
+        roundingMethod: 'ceil',
+      }),
+      date: formatDate(electionDayDate, DateFormats.isoDate),
+    }
   }
 
   private computeRecurringTasks(

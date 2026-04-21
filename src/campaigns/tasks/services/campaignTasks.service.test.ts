@@ -771,6 +771,16 @@ describe('CampaignTasksService', () => {
     const PAST_PRIMARY = '2024-03-01'
     const PAST_GENERAL = '2024-11-04'
 
+    const CAMPAIGN_FINANCE_AWARENESS_COUNT = 1
+    const SIGNUP_AWARENESS_COUNT = 2
+    const ELECTION_DAY_AWARENESS_COUNT_PER_DATE = 1
+    const SIGNUP_WEEK_AWARENESS_COUNT =
+      CAMPAIGN_FINANCE_AWARENESS_COUNT + SIGNUP_AWARENESS_COUNT
+    const SIGNUP_WEEK_AWARENESS_PLUS_ONE_ELECTION_DAY =
+      SIGNUP_WEEK_AWARENESS_COUNT + ELECTION_DAY_AWARENESS_COUNT_PER_DATE
+    const SIGNUP_WEEK_AWARENESS_PLUS_TWO_ELECTION_DAYS =
+      SIGNUP_WEEK_AWARENESS_COUNT + 2 * ELECTION_DAY_AWARENESS_COUNT_PER_DATE
+
     const setupForCreation = () => {
       mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
@@ -820,7 +830,9 @@ describe('CampaignTasksService', () => {
       await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length + 3)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + SIGNUP_WEEK_AWARENESS_COUNT,
+      )
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -835,7 +847,9 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length + 3)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length + SIGNUP_WEEK_AWARENESS_COUNT,
+      )
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -852,7 +866,9 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length + 3,
+        generalDefaultTasks.length +
+          generalAwarenessTasks.length +
+          SIGNUP_WEEK_AWARENESS_PLUS_ONE_ELECTION_DAY,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -873,7 +889,10 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 3)
+      expect(nonRecurring).toHaveLength(
+        primaryDefaultTasks.length +
+          SIGNUP_WEEK_AWARENESS_PLUS_ONE_ELECTION_DAY,
+      )
       expect(recurring).toHaveLength(85)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
@@ -898,7 +917,7 @@ describe('CampaignTasksService', () => {
         primaryDefaultTasks.length +
           generalDefaultTasks.length +
           generalAwarenessTasks.length +
-          3,
+          SIGNUP_WEEK_AWARENESS_PLUS_TWO_ELECTION_DAYS,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -952,7 +971,9 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length + 3,
+        generalDefaultTasks.length +
+          generalAwarenessTasks.length +
+          SIGNUP_WEEK_AWARENESS_PLUS_ONE_ELECTION_DAY,
       )
       expect(recurring).toHaveLength(169)
     })
@@ -972,7 +993,10 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 3)
+      expect(nonRecurring).toHaveLength(
+        primaryDefaultTasks.length +
+          SIGNUP_WEEK_AWARENESS_PLUS_ONE_ELECTION_DAY,
+      )
       expect(recurring).toHaveLength(85)
     })
 
@@ -1125,6 +1149,110 @@ describe('CampaignTasksService', () => {
       expect(tasks.find((t) => t.title === 'Design materials')).toBeUndefined()
     })
 
+    it('includes a General Election Day awareness task on the general election date', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+        TODAY,
+      )
+
+      const electionDayTasks = getCreatedTaskData().filter(
+        (t) => t.title === 'General Election Day',
+      )
+      expect(electionDayTasks).toHaveLength(1)
+      const [electionDayTask] = electionDayTasks
+      expect(electionDayTask.flowType).toBe(CampaignTaskType.awareness)
+      expect(electionDayTask.isDefaultTask).toBe(true)
+      expect(electionDayTask.week).toBe(0)
+      expect(electionDayTask.date).toEqual(
+        startOfDay(parseIsoDateString(FUTURE_GENERAL)),
+      )
+    })
+
+    it('includes a Primary Election Day awareness task on the primary election date when only primary is future', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { primaryElectionDate: FUTURE_PRIMARY },
+        }),
+        TODAY,
+      )
+
+      const electionDayTasks = getCreatedTaskData().filter(
+        (t) => t.title === 'Primary Election Day',
+      )
+      expect(electionDayTasks).toHaveLength(1)
+      expect(electionDayTasks[0].date).toEqual(
+        startOfDay(parseIsoDateString(FUTURE_PRIMARY)),
+      )
+    })
+
+    it('includes Election Day awareness tasks on both primary and general election dates', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: FUTURE_PRIMARY,
+            electionDate: FUTURE_GENERAL,
+          },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      const primaryDay = tasks.find((t) => t.title === 'Primary Election Day')
+      const generalDay = tasks.find((t) => t.title === 'General Election Day')
+      expect(primaryDay).toBeDefined()
+      expect(primaryDay!.date).toEqual(
+        startOfDay(parseIsoDateString(FUTURE_PRIMARY)),
+      )
+      expect(generalDay).toBeDefined()
+      expect(generalDay!.date).toEqual(
+        startOfDay(parseIsoDateString(FUTURE_GENERAL)),
+      )
+    })
+
+    it('does not include any Election Day awareness task when no election date is set', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
+
+      const tasks = getCreatedTaskData()
+      expect(
+        tasks.find((t) => t.title === 'Primary Election Day'),
+      ).toBeUndefined()
+      expect(
+        tasks.find((t) => t.title === 'General Election Day'),
+      ).toBeUndefined()
+    })
+
+    it('does not include any Election Day awareness task when both election dates are past', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: PAST_PRIMARY,
+            electionDate: PAST_GENERAL,
+          },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(
+        tasks.find((t) => t.title === 'Primary Election Day'),
+      ).toBeUndefined()
+      expect(
+        tasks.find((t) => t.title === 'General Election Day'),
+      ).toBeUndefined()
+    })
+
     it('assigns dates in chronological order', async () => {
       setupForCreation()
 
@@ -1170,7 +1298,11 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
+      expect(tasks).toHaveLength(
+        generalDefaultTasks.length +
+          CAMPAIGN_FINANCE_AWARENESS_COUNT +
+          ELECTION_DAY_AWARENESS_COUNT_PER_DATE,
+      )
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
       expect(tasks[tasks.length - 1].date).toBeInstanceOf(Date)
