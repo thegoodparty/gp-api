@@ -97,7 +97,12 @@ export class VoterFileController {
   async scheduleOutreachCampaign(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
-    @Body() { outreachId, audienceRequest }: ScheduleOutreachCampaignSchema,
+    @Body()
+    {
+      outreachId,
+      audienceRequest,
+      campaignPlanDueDate,
+    }: ScheduleOutreachCampaignSchema,
   ) {
     const outreach = await this.outreachService.model.findFirst({
       where: { id: outreachId, campaignId: campaign.id },
@@ -114,6 +119,7 @@ export class VoterFileController {
       campaign,
       outreach,
       audienceRequest,
+      campaignPlanDueDate,
     )
   }
 

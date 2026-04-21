@@ -412,6 +412,7 @@ export interface CreateJobParams {
   didNpaSubset?: string[]
   identityId?: string
   scheduledDate?: string
+  scheduleId: number
 }
 
 export type PeerlyRecoveryInfo = Record<string, string | number | undefined>

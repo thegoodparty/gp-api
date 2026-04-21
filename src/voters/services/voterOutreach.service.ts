@@ -37,6 +37,7 @@ export interface OutreachSlackBlocksConfiguration {
   formattedAudience?: AudienceSlackBlock[]
   audienceRequest?: string
   peerlyJobUrl?: string
+  campaignPlanDueDate?: string
 }
 
 export type Audience = {
@@ -114,6 +115,7 @@ export class VoterOutreachService {
     campaign: Campaign,
     outreach: OutreachWithVoterFileFilter,
     audienceRequest?: string,
+    campaignPlanDueDate?: string,
   ) {
     const { aiContent = {} } = campaign
     const audience =
@@ -152,6 +154,7 @@ export class VoterOutreachService {
       formattedAudience: this.formatAudienceFiltersForSlack(audience),
       audienceRequest,
       peerlyJobUrl,
+      campaignPlanDueDate,
     })
 
     // this is sent to hubspot on update
@@ -183,6 +186,7 @@ export class VoterOutreachService {
     formattedAudience = [],
     audienceRequest = '',
     peerlyJobUrl,
+    campaignPlanDueDate,
   }: OutreachSlackBlocksConfiguration) {
     return await this.slack.message(
       buildSlackBlocks({
@@ -202,6 +206,7 @@ export class VoterOutreachService {
         formattedAudience,
         audienceRequest,
         peerlyJobUrl,
+        campaignPlanDueDate,
       }),
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
