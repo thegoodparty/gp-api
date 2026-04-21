@@ -19,9 +19,11 @@ function getTrackSpy(): TrackSpy {
   return vi.spyOn(analytics, 'track').mockResolvedValue({} as never)
 }
 
-async function makeCampaign(opts: {
-  electionDate?: string | null
-} = {}) {
+async function makeCampaign(
+  opts: {
+    electionDate?: string | null
+  } = {},
+) {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   const user = await service.prisma.user.create({
     data: {

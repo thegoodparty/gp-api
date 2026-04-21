@@ -24,7 +24,6 @@ function nextMondayUtcMidnight(now: Date, timeZone: string): Date {
   )
 }
 
-
 @Injectable()
 export class WeeklyTasksDigestService {
   constructor(
