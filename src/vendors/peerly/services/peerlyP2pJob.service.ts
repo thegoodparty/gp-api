@@ -77,8 +77,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       const targetDate = dateOnly || 'no-date'
       const createdAt = formatISO(new Date())
       const scheduleName = `GP P2P - Campaign ${campaignId} - ${targetDate} - ${createdAt}`
-      scheduleId =
-        await this.peerlyScheduleService.createSchedule(scheduleName)
+      scheduleId = await this.peerlyScheduleService.createSchedule(scheduleName)
 
       this.logger.info('Creating P2P job')
       jobId = await this.createJob({
