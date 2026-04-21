@@ -492,7 +492,6 @@ describe('CampaignsController', () => {
         slug: OVERRIDE_SLUG,
         details: {
           city: 'Springfield',
-          office: 'Mayor',
           electionDate: '2025-11-04',
           party: 'Independent',
           pledged: true,
@@ -504,7 +503,6 @@ describe('CampaignsController', () => {
         {
           details: {
             city: 'Springfield',
-            office: 'Mayor',
             electionDate: '2025-11-04',
             party: 'Independent',
             pledged: true,

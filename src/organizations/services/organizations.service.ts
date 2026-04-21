@@ -50,14 +50,6 @@ export class OrganizationsService extends createPrismaBase(
     return `eo-${electedOfficeId}`
   }
 
-  static resolveCustomPositionName(
-    office?: string,
-    otherOffice?: string,
-  ): string | null {
-    const resolved = office === 'Other' ? otherOffice : office
-    return resolved || null
-  }
-
   async resolvePositionNameByOrganizationSlug(
     organizationSlug: string,
   ): Promise<string | null> {
