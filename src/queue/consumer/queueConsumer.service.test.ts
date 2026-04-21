@@ -11,7 +11,6 @@ import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.ser
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { PollIssuesService } from '@/polls/services/pollIssues.service'
-import { CampaignTaskType } from '@prisma/client'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
@@ -958,7 +957,7 @@ describe('QueueConsumerService - message type routing', () => {
         {
           provide: CampaignTasksService,
           useValue: {
-            addTasks: vi.fn().mockResolvedValue(undefined),
+            addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
         { provide: CampaignTcrComplianceService, useValue: {} },
@@ -980,44 +979,7 @@ describe('QueueConsumerService - message type routing', () => {
     service = module.get(QueueConsumerService)
   })
 
-  it('sends Slack notification on campaignPlanComplete', async () => {
-    mockCampaignsService.model.findUniqueOrThrow.mockResolvedValue({
-      id: 123,
-      data: { hubspotId: 'hs-456' },
-      user: {
-        firstName: 'Jane',
-        lastName: 'Doe',
-        email: 'jane@example.com',
-        phone: '555-1234',
-      },
-      campaignTasks: [
-        {
-          flowType: CampaignTaskType.text,
-          isDefaultTask: false,
-          title: 'Text Blast 1',
-          date: new Date('2026-05-01'),
-        },
-        {
-          flowType: CampaignTaskType.robocall,
-          isDefaultTask: false,
-          title: 'Robocall Wave',
-          date: new Date('2026-06-15'),
-        },
-        {
-          flowType: CampaignTaskType.text,
-          isDefaultTask: true,
-          title: 'Introduction Text',
-          date: null,
-        },
-        {
-          flowType: CampaignTaskType.doorKnocking,
-          isDefaultTask: false,
-          title: 'Door Knock',
-          date: new Date('2026-05-10'),
-        },
-      ],
-    })
-
+  it('processes campaignPlanComplete and calls handleCampaignPlanComplete', async () => {
     const message: Message = {
       MessageId: 'msg-plan-complete',
       Body: JSON.stringify({
@@ -1034,26 +996,7 @@ describe('QueueConsumerService - message type routing', () => {
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
-    expect(mockCampaignsService.model.findUniqueOrThrow).toHaveBeenCalledWith({
-      where: { id: 123 },
-      include: { user: true, campaignTasks: true },
-    })
-    expect(mockSlackService.message).toHaveBeenCalledOnce()
-
-    const slackArgs = mockSlackService.message.mock.calls[0]
-    const slackText = slackArgs[0].blocks[0].text.text
-    expect(slackText).toContain('AI Campaign Plan Created')
-    expect(slackText).toContain('Jane Doe')
-    expect(slackText).toContain('jane@example.com')
-    expect(slackText).toContain('555-1234')
-    expect(slackText).toContain('hs-456')
-    expect(slackText).toContain('TEXT')
-    expect(slackText).toContain('Text Blast 1')
-    expect(slackText).toContain('ROBOCALL')
-    expect(slackText).toContain('Robocall Wave')
-    expect(slackText).not.toContain('Introduction Text')
-    expect(slackText).not.toContain('Door Knock')
-    expect(slackArgs[1]).toBe('cas-clickup-tasks')
+    expect(mockSlackService.message).not.toHaveBeenCalled()
   })
 
   it('skips Slack notification on campaignPlanComplete error status', async () => {
@@ -1076,55 +1019,6 @@ describe('QueueConsumerService - message type routing', () => {
     expect(mockSlackService.message).not.toHaveBeenCalled()
   })
 
-  it('handles campaignPlanComplete with no outreach tasks', async () => {
-    mockCampaignsService.model.findUniqueOrThrow.mockResolvedValue({
-      id: 456,
-      data: {},
-      user: {
-        firstName: 'John',
-        lastName: null,
-        email: 'john@example.com',
-        phone: null,
-      },
-      campaignTasks: [
-        {
-          flowType: CampaignTaskType.doorKnocking,
-          isDefaultTask: false,
-          title: 'Door Knock',
-          date: new Date('2026-05-10'),
-        },
-        {
-          flowType: CampaignTaskType.text,
-          isDefaultTask: true,
-          title: 'Introduction Text',
-          date: null,
-        },
-      ],
-    })
-
-    const message: Message = {
-      MessageId: 'msg-plan-no-outreach',
-      Body: JSON.stringify({
-        type: QueueType.CAMPAIGN_PLAN_COMPLETE,
-        data: {
-          campaignId: 456,
-          status: 'completed',
-          s3Key: 'results/456/test.json',
-        },
-      }),
-    }
-
-    const result = await service.processMessage(message)
-
-    expect(result).toBe(true)
-    expect(mockSlackService.message).toHaveBeenCalledOnce()
-    const slackText =
-      mockSlackService.message.mock.calls[0][0].blocks[0].text.text
-    expect(slackText).toContain('John')
-    expect(slackText).toContain('N/A')
-    expect(slackText).toContain('None')
-  })
-
   it('acknowledges unknown message types via default branch', async () => {
     const message: Message = {
       MessageId: 'msg-unknown',
@@ -1144,7 +1038,7 @@ describe('QueueConsumerService - message type routing', () => {
     const { PrismaClientKnownRequestError } = await import(
       '@prisma/client/runtime/library'
     )
-    vi.spyOn(campaignTasksService, 'addTasks').mockRejectedValue(
+    vi.spyOn(campaignTasksService, 'addEventTasks').mockRejectedValue(
       new PrismaClientKnownRequestError('Record not found', {
         code: 'P2025',
         clientVersion: '6.0.0',

@@ -13,6 +13,8 @@ import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+
 vi.mock('src/shared/util/sleep.util', () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
 }))
@@ -60,7 +62,19 @@ const mockAiGeneration: Partial<AiGenerationService> = {
   triggerEventGeneration: vi.fn(),
 }
 
-const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
+const mockSlackService: Partial<SlackService> = {
+  message: vi.fn(),
+}
+
+type CampaignOverrides = Partial<
+  Omit<Campaign, 'details' | 'data' | 'aiContent'>
+> & {
+  details?: Campaign['details'] | null
+  data?: Campaign['data'] | null
+  aiContent?: Campaign['aiContent'] | null
+}
+
+const makeCampaign = (overrides: CampaignOverrides = {}): Campaign =>
   ({
     id: 1,
     slug: 'test-campaign',
@@ -84,7 +98,7 @@ const makeDbTask = (overrides = {}) => ({
   cta: 'Do it',
   flowType: CampaignTaskType.education,
   week: 4,
-  date: null,
+  date: new Date('2026-06-01'),
   link: null,
   proRequired: false,
   isDefaultTask: false,
@@ -100,10 +114,14 @@ describe('CampaignTasksService', () => {
   let service: CampaignTasksService
 
   beforeEach(() => {
-    service = new CampaignTasksService(mockAiGeneration as AiGenerationService)
+    service = new CampaignTasksService(
+      mockAiGeneration as AiGenerationService,
+      mockSlackService as SlackService,
+    )
     Object.defineProperty(service, '_prisma', {
       get: () => ({
         campaignTask: mockModel,
+        campaign: mockCampaignModel,
         campaignUpdateHistory: mockCampaignUpdateHistoryModel,
         $transaction: mockTransaction,
       }),
@@ -532,6 +550,12 @@ describe('CampaignTasksService', () => {
   })
 
   describe('addTasks', () => {
+    beforeEach(() => {
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        details: { electionDate: '2026-11-03' },
+      })
+    })
+
     it('passes event task id to createMany for idempotent inserts', async () => {
       const tasks: CampaignTask[] = [
         {
@@ -546,7 +570,7 @@ describe('CampaignTasksService', () => {
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -569,11 +593,12 @@ describe('CampaignTasksService', () => {
           cta: 'Get started',
           flowType: CampaignTaskType.education,
           week: 12,
+          date: '2026-06-01',
         },
       ]
       mockModel.createMany.mockResolvedValue({ count: 1 })
 
-      await service.addTasks(1, tasks)
+      await service.addEventTasks(1, tasks)
 
       expect(mockModel.createMany).toHaveBeenCalledWith({
         data: [
@@ -586,6 +611,36 @@ describe('CampaignTasksService', () => {
         skipDuplicates: true,
       })
     })
+
+    it('appends parade awareness tasks from AI tasks', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-01-05'))
+
+      const tasks: CampaignTask[] = [
+        {
+          id: 'event-1',
+          title: '4th of July Parade',
+          description: 'March in the parade',
+          week: 4,
+          date: '2026-07-04',
+        },
+      ]
+      mockModel.createMany.mockResolvedValue({ count: 2 })
+
+      await service.addEventTasks(1, tasks)
+
+      const createCall = mockModel.createMany.mock.calls[0][0]
+      expect(createCall.data).toHaveLength(2)
+      expect(createCall.data[1]).toEqual(
+        expect.objectContaining({
+          title: 'Contact Parade Organizers for 4th of July Parade',
+          description: 'Get signed up to march in the parade',
+          flowType: CampaignTaskType.awareness,
+        }),
+      )
+
+      vi.useRealTimers()
+    })
   })
 
   describe('generateDefaultTasks', () => {
@@ -597,24 +652,85 @@ describe('CampaignTasksService', () => {
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.deleteMany).not.toHaveBeenCalled()
       expect(mockTxModel.createMany).not.toHaveBeenCalled()
+      expect(mockSlackService.message).not.toHaveBeenCalled()
     })
 
     it('creates default tasks if none exist', async () => {
       mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate', hubspotId: '12345' },
+        user: { firstName: 'Test', lastName: 'User' },
+        campaignTasks: [
+          {
+            flowType: CampaignTaskType.text,
+            title: 'Introduction Text',
+            date: new Date('2025-06-15'),
+          },
+        ],
+      })
 
       await service.generateDefaultTasks(makeCampaign())
 
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.createMany).toHaveBeenCalled()
-      const createCall = mockTxModel.createMany.mock.calls[0][0]
-      expect(createCall.data).toHaveLength(generalDefaultTasks.length)
-      expect(createCall.data[0]).toMatchObject({
-        campaignId: 1,
-        title: generalDefaultTasks[0].title,
-        isDefaultTask: true,
+      expect(mockSlackService.message).toHaveBeenCalled()
+    })
+
+    it('sends Slack with correct outreach task details', async () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate', hubspotId: '12345' },
+        user: { firstName: 'Jane', lastName: 'Doe' },
+        campaignTasks: [
+          {
+            flowType: CampaignTaskType.text,
+            title: 'Introduction Text',
+            date: new Date('2025-06-15'),
+          },
+          {
+            flowType: CampaignTaskType.robocall,
+            title: 'Persuasion Robocall',
+            date: null,
+          },
+          {
+            flowType: CampaignTaskType.education,
+            title: 'Education Task',
+            date: new Date('2025-06-20'),
+          },
+        ],
       })
+
+      await service.generateDefaultTasks(makeCampaign())
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      const slackCall = messageMock.mock.calls[0]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const slackBody = (slackCall[0] as any).blocks[0].text.text as string
+      expect(slackBody).toContain('Jane Doe')
+      expect(slackBody).toContain('Outreach Tasks (2)')
+      expect(slackBody).toContain('TEXT: Introduction Text')
+      expect(slackBody).toContain('ROBOCALL: Persuasion Robocall')
+      expect(slackBody).not.toContain('Education Task')
+    })
+
+    it('does not break task creation when Slack fails', async () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockRejectedValue(
+        new Error('Slack lookup failed'),
+      )
+
+      await expect(
+        service.generateDefaultTasks(makeCampaign()),
+      ).resolves.not.toThrow()
+      expect(mockTxModel.createMany).toHaveBeenCalled()
     })
   })
 
@@ -629,11 +745,18 @@ describe('CampaignTasksService', () => {
       mockTxModel.count.mockResolvedValueOnce(0)
       mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
       mockTxModel.createMany.mockResolvedValue({ count: 1 })
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue({
+        id: 1,
+        data: { name: 'Test Candidate' },
+        user: { firstName: 'Test', lastName: 'User' },
+        campaignTasks: [],
+      })
     }
 
     const getCreatedTaskData = () => {
       const call = mockTxModel.createMany.mock.calls[0][0] as {
         data: {
+          id: string
           title: string
           description: string
           cta: string | null
@@ -661,7 +784,7 @@ describe('CampaignTasksService', () => {
       nonRecurring: tasks.filter((t) => !recurringTitles.has(t.title)),
     })
 
-    it('uses general tasks without dates when details is empty', async () => {
+    it('distributes general tasks with dates when details is empty', async () => {
       setupForCreation()
 
       await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
@@ -669,7 +792,23 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       expect(tasks).toHaveLength(generalDefaultTasks.length)
       expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
-      expect(tasks[0].date).toBeNull()
+      expect(tasks[0].date).toBeInstanceOf(Date)
+    })
+
+    it('distributes general tasks when details is null', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: null,
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
     it('distributes general tasks when only general date is future', async () => {
@@ -1103,6 +1242,206 @@ describe('CampaignTasksService', () => {
 
       const { recurring } = splitByRecurring(getCreatedTaskData())
       expect(recurring).toHaveLength(0)
+    })
+  })
+
+  describe('buildParadeAwarenessTasks', () => {
+    const today = startOfDay(parseIsoDateString('2026-01-05'))
+    const electionDate = '2026-11-03'
+
+    const makeAiTask = (
+      overrides: Partial<CampaignTask> = {},
+    ): CampaignTask => ({
+      id: 'ai-task-1',
+      title: 'Some Task',
+      description: 'Some description',
+      week: 4,
+      date: '2026-03-15',
+      ...overrides,
+    })
+
+    it('creates an awareness task for a parade event in the title', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for 4th of July Parade',
+      )
+      expect(result[0].description).toBe('Get signed up to march in the parade')
+      expect(result[0].flowType).toBe(CampaignTaskType.awareness)
+      expect(result[0].date).toBe('2026-06-01')
+      expect(result[0].week).toBe(23)
+      expect(result[0].isDefaultTask).toBe(false)
+    })
+
+    it('detects parade in the description (case-insensitive)', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'event-1',
+          title: 'Community March Event',
+          description: 'Join the local PARADE and wave to supporters',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe(
+        'Contact Parade Organizers for Community March Event',
+      )
+    })
+
+    it('skips parade events less than 4 weeks out', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-soon',
+          title: 'Parade Tomorrow',
+          date: '2026-01-20',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks without a date', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-no-date',
+          title: 'Some Parade',
+          date: undefined,
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips non-parade tasks', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'normal-task',
+          title: 'Door Knocking',
+          description: 'Go knock on doors',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('handles multiple parade events', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: 'Memorial Day Parade',
+          date: '2026-05-25',
+        }),
+        makeAiTask({
+          id: 'parade-2',
+          title: 'Independence Day Parade',
+          date: '2026-07-04',
+        }),
+        makeAiTask({
+          id: 'normal',
+          title: 'Phone Banking',
+          date: '2026-06-01',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(2)
+      expect(result[0].id).toBe('aw-parade-parade-1')
+      expect(result[1].id).toBe('aw-parade-parade-2')
+    })
+
+    it('returns empty when no election date is provided', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(tasks, undefined, today)
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips tasks with malformed dates', () => {
+      const tasks = [
+        makeAiTask({
+          id: 'parade-bad',
+          title: 'Bad Parade',
+          date: 'not-a-date',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        today,
+      )
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('skips when derived monday is before today', () => {
+      const laterToday = startOfDay(parseIsoDateString('2026-06-05'))
+      const tasks = [
+        makeAiTask({
+          id: 'parade-1',
+          title: '4th of July Parade',
+          date: '2026-07-04',
+        }),
+      ]
+
+      const result = service.buildParadeAwarenessTasks(
+        tasks,
+        electionDate,
+        laterToday,
+      )
+
+      expect(result).toHaveLength(0)
     })
   })
 })

@@ -30,7 +30,7 @@ const makeDbTask = (overrides = {}) => ({
   cta: 'Do it',
   flowType: CampaignTaskType.education,
   week: 4,
-  date: null,
+  date: new Date('2026-06-01'),
   link: null,
   proRequired: false,
   isDefaultTask: false,

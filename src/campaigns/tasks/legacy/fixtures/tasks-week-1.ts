@@ -1,6 +1,9 @@
-import { CampaignTask, CampaignTaskType } from '../../campaignTasks.types'
+import {
+  CampaignTaskTemplate,
+  CampaignTaskType,
+} from '../../campaignTasks.types'
 
-const tasksWeek1: CampaignTask[] = [
+const tasksWeek1: CampaignTaskTemplate[] = [
   {
     id: '41b8b290-7e50-4d5a-8c9f-b8e17b253cde',
     title: 'Schedule your election day reminder text message',
