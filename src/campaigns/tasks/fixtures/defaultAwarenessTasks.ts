@@ -1,5 +1,14 @@
 import { CampaignTaskTemplate, CampaignTaskType } from '../campaignTasks.types'
 
+export const campaignFinanceAwarenessTask: Omit<CampaignTaskTemplate, 'week'> =
+  {
+    title: 'Add your campaign finance deadlines to your calendar',
+    description:
+      "Most campaigns have statutory requirements about when you have to submit your campaign finance report. Add those dates to your campaign calendar to ensure you don't miss the deadlines!",
+    flowType: CampaignTaskType.awareness,
+    isDefaultTask: true,
+  }
+
 export const generalAwarenessTasks: CampaignTaskTemplate[] = [
   {
     title: 'Reach 10% of your Voter Contact Goal',

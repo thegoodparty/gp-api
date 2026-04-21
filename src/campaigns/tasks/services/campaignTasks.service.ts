@@ -34,7 +34,10 @@ import {
   RecurrenceRule,
   RecurringTaskTemplate,
 } from '../campaignTasks.types'
-import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import {
+  campaignFinanceAwarenessTask,
+  generalAwarenessTasks,
+} from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
@@ -410,6 +413,21 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: Campaign,
     today: Date,
   ): CampaignTask[] {
+    if (this.hasExpiredElectionOnly(campaign, today)) {
+      return []
+    }
+    const baseTasks = this.buildBaseDefaultTasks(campaign, today)
+    const electionDate = this.resolveElectionDate(campaign, today)
+    return this.sortTasksByDate([
+      ...baseTasks,
+      this.buildCampaignFinanceAwarenessTask(today, electionDate),
+    ])
+  }
+
+  private buildBaseDefaultTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
     const { details } = campaign
     if (!details) {
       return this.distributeTasksOverWindow(
@@ -423,7 +441,7 @@ export class CampaignTasksService extends createPrismaBase(
     const generalDate = this.hasFutureDate(details.electionDate, today)
 
     if (primaryDate && generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -444,11 +462,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-      ])
+      ]
     }
 
     if (primaryDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -459,11 +477,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           primaryDate,
         ),
-      ])
+      ]
     }
 
     if (generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           generalDefaultTasks,
           today,
@@ -479,18 +497,34 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-      ])
+      ]
     }
 
-    const hasAnyElectionDate =
-      details.primaryElectionDate || details.electionDate
-    return hasAnyElectionDate
-      ? []
-      : this.distributeTasksOverWindow(
-          generalDefaultTasks,
-          today,
-          addDays(today, MAX_TASK_WINDOW_DAYS),
-        )
+    return this.distributeTasksOverWindow(
+      generalDefaultTasks,
+      today,
+      addDays(today, MAX_TASK_WINDOW_DAYS),
+    )
+  }
+
+  private resolveElectionDate(campaign: Campaign, today: Date): Date | null {
+    const { details } = campaign
+    if (!details) return null
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return generalDate ?? primaryDate ?? null
+  }
+
+  private hasExpiredElectionOnly(campaign: Campaign, today: Date): boolean {
+    const { details } = campaign
+    if (!details) return false
+    const hasAnyElectionDate = Boolean(
+      details.primaryElectionDate || details.electionDate,
+    )
+    if (!hasAnyElectionDate) return false
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return !primaryDate && !generalDate
   }
 
   private hasFutureDate(
@@ -563,6 +597,21 @@ export class CampaignTasksService extends createPrismaBase(
         }
       })
       .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
+  private buildCampaignFinanceAwarenessTask(
+    today: Date,
+    electionDate: Date | null,
+  ): CampaignTask {
+    const saturday = addDays(startOfWeek(today), 6)
+    const week = electionDate
+      ? differenceInWeeks(electionDate, saturday, { roundingMethod: 'ceil' })
+      : 0
+    return {
+      ...campaignFinanceAwarenessTask,
+      week,
+      date: formatDate(saturday, DateFormats.isoDate),
+    }
   }
 
   private computeRecurringTasks(
