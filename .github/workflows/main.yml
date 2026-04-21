@@ -21,6 +21,20 @@ jobs:
     concurrency:
       group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
       cancel-in-progress: false
+    services:
+      shadow-db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U prisma"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
     outputs:
       environment: ${{ steps.context.outputs.environment }}
       service_url: ${{ steps.pulumi.outputs.service_url }}
@@ -51,6 +65,14 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
+
+      - name: Check Prisma schema is in sync with migrations
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/schema/migrations \
+            --to-schema-datamodel ./prisma/schema \
+            --shadow-database-url "postgresql://prisma:prisma@localhost:5432/shadow" \
+            --exit-code
 
       # Validation
       - run: npm run generate
