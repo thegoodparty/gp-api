@@ -36,7 +36,9 @@ import {
 } from '../campaignTasks.types'
 import {
   campaignFinanceAwarenessTask,
+  designMaterialsAwarenessTask,
   generalAwarenessTasks,
+  metaVerifiedAwarenessTask,
 } from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
@@ -49,6 +51,7 @@ const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
 const MAX_TASK_WINDOW_DAYS = 49
 const SHORTENED_WINDOW_BUFFER_DAYS = 7
 const FULL_WINDOW_THRESHOLD_DAYS = 56
+const SIGNUP_AWARENESS_MIN_DAYS_TO_ELECTION = 42
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -421,6 +424,7 @@ export class CampaignTasksService extends createPrismaBase(
     return this.sortTasksByDate([
       ...baseTasks,
       this.buildCampaignFinanceAwarenessTask(today, electionDate),
+      ...this.buildSignupAwarenessTasks(today, electionDate),
     ])
   }
 
@@ -612,6 +616,39 @@ export class CampaignTasksService extends createPrismaBase(
       week,
       date: formatDate(saturday, DateFormats.isoDate),
     }
+  }
+
+  private buildSignupAwarenessTasks(
+    today: Date,
+    electionDate: Date | null,
+  ): CampaignTask[] {
+    if (
+      electionDate &&
+      differenceInCalendarDays(electionDate, today) <
+        SIGNUP_AWARENESS_MIN_DAYS_TO_ELECTION
+    ) {
+      return []
+    }
+
+    const startOfNextWeek = addDays(startOfWeek(today), 7)
+    const wednesday = addDays(startOfNextWeek, 3)
+    const thursday = addDays(startOfNextWeek, 4)
+
+    const buildTask = (
+      template: Omit<CampaignTaskTemplate, 'week'>,
+      date: Date,
+    ): CampaignTask => ({
+      ...template,
+      week: electionDate
+        ? differenceInWeeks(electionDate, date, { roundingMethod: 'ceil' })
+        : 0,
+      date: formatDate(date, DateFormats.isoDate),
+    })
+
+    return [
+      buildTask(metaVerifiedAwarenessTask, wednesday),
+      buildTask(designMaterialsAwarenessTask, thursday),
+    ]
   }
 
   private computeRecurringTasks(

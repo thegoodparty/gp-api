@@ -9,6 +9,22 @@ export const campaignFinanceAwarenessTask: Omit<CampaignTaskTemplate, 'week'> =
     isDefaultTask: true,
   }
 
+export const metaVerifiedAwarenessTask: Omit<CampaignTaskTemplate, 'week'> = {
+  title: 'Get Meta verified',
+  description: 'Get identity verified on Meta to run advertising on FB and IG.',
+  flowType: CampaignTaskType.awareness,
+  isDefaultTask: true,
+}
+
+export const designMaterialsAwarenessTask: Omit<CampaignTaskTemplate, 'week'> =
+  {
+    title: 'Design materials',
+    description:
+      'Design materials such as yard signs, door hangers, palm cards, etc.',
+    flowType: CampaignTaskType.awareness,
+    isDefaultTask: true,
+  }
+
 export const generalAwarenessTasks: CampaignTaskTemplate[] = [
   {
     title: 'Reach 10% of your Voter Contact Goal',

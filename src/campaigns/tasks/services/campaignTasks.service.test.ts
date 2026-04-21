@@ -820,7 +820,7 @@ describe('CampaignTasksService', () => {
       await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
+      expect(tasks).toHaveLength(generalDefaultTasks.length + 3)
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -835,7 +835,7 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
+      expect(tasks).toHaveLength(generalDefaultTasks.length + 3)
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -852,7 +852,7 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length + 1,
+        generalDefaultTasks.length + generalAwarenessTasks.length + 3,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -873,7 +873,7 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 1)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 3)
       expect(recurring).toHaveLength(85)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
@@ -898,7 +898,7 @@ describe('CampaignTasksService', () => {
         primaryDefaultTasks.length +
           generalDefaultTasks.length +
           generalAwarenessTasks.length +
-          1,
+          3,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -952,7 +952,7 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length + 1,
+        generalDefaultTasks.length + generalAwarenessTasks.length + 3,
       )
       expect(recurring).toHaveLength(169)
     })
@@ -972,7 +972,7 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 1)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 3)
       expect(recurring).toHaveLength(85)
     })
 
@@ -1033,6 +1033,96 @@ describe('CampaignTasksService', () => {
           t.title === 'Add your campaign finance deadlines to your calendar',
       )
       expect(financeTasks).toHaveLength(0)
+    })
+
+    it('includes the Meta and design materials awareness tasks on Wed/Thu of the week after signup', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      const meta = tasks.find((t) => t.title === 'Get Meta verified')
+      const design = tasks.find((t) => t.title === 'Design materials')
+
+      expect(meta).toBeDefined()
+      expect(meta!.flowType).toBe(CampaignTaskType.awareness)
+      expect(meta!.isDefaultTask).toBe(true)
+      expect(meta!.date).toEqual(startOfDay(parseIsoDateString('2025-06-11')))
+
+      expect(design).toBeDefined()
+      expect(design!.flowType).toBe(CampaignTaskType.awareness)
+      expect(design!.isDefaultTask).toBe(true)
+      expect(design!.date).toEqual(startOfDay(parseIsoDateString('2025-06-12')))
+    })
+
+    it('includes the Meta and design materials awareness tasks when no election date is set', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
+
+      const tasks = getCreatedTaskData()
+      const meta = tasks.find((t) => t.title === 'Get Meta verified')
+      const design = tasks.find((t) => t.title === 'Design materials')
+
+      expect(meta).toBeDefined()
+      expect(meta!.week).toBe(0)
+      expect(meta!.date).toEqual(startOfDay(parseIsoDateString('2025-06-11')))
+      expect(design).toBeDefined()
+      expect(design!.week).toBe(0)
+      expect(design!.date).toEqual(startOfDay(parseIsoDateString('2025-06-12')))
+    })
+
+    it('omits the Meta and design materials awareness tasks when the election is less than 42 days away', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: '2025-07-12' },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks.find((t) => t.title === 'Get Meta verified')).toBeUndefined()
+      expect(tasks.find((t) => t.title === 'Design materials')).toBeUndefined()
+    })
+
+    it('includes the Meta and design materials awareness tasks when the election is exactly 42 days away', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: '2025-07-13' },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks.find((t) => t.title === 'Get Meta verified')).toBeDefined()
+      expect(tasks.find((t) => t.title === 'Design materials')).toBeDefined()
+    })
+
+    it('does not include the Meta and design materials awareness tasks when both election dates are past', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: PAST_PRIMARY,
+            electionDate: PAST_GENERAL,
+          },
+        }),
+        TODAY,
+      )
+
+      const tasks = getCreatedTaskData()
+      expect(tasks.find((t) => t.title === 'Get Meta verified')).toBeUndefined()
+      expect(tasks.find((t) => t.title === 'Design materials')).toBeUndefined()
     })
 
     it('assigns dates in chronological order', async () => {
