@@ -49,4 +49,12 @@ describe('Segment → HubSpot Event Names', () => {
       )
     })
   })
+
+  describe('Campaign Plan Events', () => {
+    it('should have the correct WeeklyTasksDigest event name for HubSpot', () => {
+      expect(EVENTS.CampaignPlan.WeeklyTasksDigest).toBe(
+        'Campaign Plan - Weekly Tasks Digest',
+      )
+    })
+  })
 })

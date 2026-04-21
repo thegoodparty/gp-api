@@ -49,6 +49,7 @@ import {
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
   DomainEmailForwardingMessage,
+  WeeklyTasksDigestMessageSchema,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -62,6 +63,7 @@ import {
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { WeeklyTasksDigestHandlerService } from '../../campaigns/tasks/services/weeklyTasksDigestHandler.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
@@ -109,6 +111,7 @@ export class QueueConsumerService {
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
     private readonly organizationsService: OrganizationsService,
+    private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -342,6 +345,17 @@ export class QueueConsumerService {
             queueMessage.data,
           )
           await this.handleCampaignPlanComplete(campaignPlanData)
+          return true
+        })
+      case QueueType.WEEKLY_TASKS_DIGEST:
+        this.logger.info('received weeklyTasksDigest message')
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const digestData = WeeklyTasksDigestMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.weeklyTasksDigestHandler.handleWeeklyTasksDigest(
+            digestData,
+          )
           return true
         })
       default:

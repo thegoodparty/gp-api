@@ -9,6 +9,7 @@ export enum QueueType {
   POLL_CREATION = 'pollCreation',
   POLL_EXPANSION = 'pollExpansion',
   CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
+  WEEKLY_TASKS_DIGEST = 'weeklyTasksDigest',
 }
 
 export type QueueMessage =
@@ -30,6 +31,10 @@ export type QueueMessage =
   | {
       type: QueueType.CAMPAIGN_PLAN_COMPLETE
       data: CampaignPlanCompleteMessage
+    }
+  | {
+      type: QueueType.WEEKLY_TASKS_DIGEST
+      data: WeeklyTasksDigestMessage
     }
 
 export type GenerateAiContentMessageData = {
@@ -112,12 +117,22 @@ export enum SqsConsumerErrorEventName {
   TIMEOUT_ERROR = 'timeout_error',
 }
 
+export const WeeklyTasksDigestMessageSchema = z.object({
+  windowStart: z.string().datetime(),
+  windowEnd: z.string().datetime(),
+})
+
+export type WeeklyTasksDigestMessage = z.infer<
+  typeof WeeklyTasksDigestMessageSchema
+>
+
 export enum MessageGroup {
   content = 'content',
   tcrCompliance = 'tcrCompliance',
   default = 'default',
   domainEmailRedirect = 'domainEmailRedirect',
   polls = 'polls',
+  weeklyTasksDigest = 'weeklyTasksDigest',
 }
 
 const PollResponseJsonRowSchema = z.object({
