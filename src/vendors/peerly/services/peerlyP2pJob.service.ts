@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
+import { formatISO } from 'date-fns'
 import { Headers } from 'http-constants-ts'
 import { Readable } from 'stream'
 import { PinoLogger } from 'nestjs-pino'
@@ -10,6 +11,7 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyMediaService } from './peerlyMedia.service'
+import { PeerlyScheduleService } from './peerlySchedule.service'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { CreateJobParams, PeerlyJob } from '../peerly.types'
 
@@ -36,6 +38,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
     private readonly peerlyMediaService: PeerlyMediaService,
+    private readonly peerlyScheduleService: PeerlyScheduleService,
     private readonly peerlyHttpService: PeerlyHttpService,
     private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
   ) {
@@ -54,6 +57,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     scheduledDate,
   }: CreateP2pJobParams): Promise<string> {
     let jobId: string | undefined
+    let scheduleId: number | undefined
 
     try {
       this.logger.info('Creating media for P2P job')
@@ -69,6 +73,11 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
 
       // extract date portion directly from ISO string to preserve the user's intended date
       const dateOnly = scheduledDate?.slice(0, 10)
+
+      const targetDate = dateOnly || 'no-date'
+      const createdAt = formatISO(new Date())
+      const scheduleName = `GP P2P - Campaign ${campaignId} - ${targetDate} - ${createdAt}`
+      scheduleId = await this.peerlyScheduleService.createSchedule(scheduleName)
 
       this.logger.info('Creating P2P job')
       jobId = await this.createJob({
@@ -89,11 +98,12 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
         didNpaSubset,
         identityId,
         scheduledDate: dateOnly,
+        scheduleId,
       })
       this.logger.info(`Job created with ID: ${jobId}`)
 
       this.logger.info(`Assigning list ${listId} to job ${jobId}`)
-      await this.assignListToJob(jobId, listId, { campaignId })
+      await this.assignListToJob(jobId, listId, { campaignId, scheduleId })
       this.logger.info('List assigned successfully')
 
       this.logger.info(
@@ -108,7 +118,10 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       if (isListAssignmentFailure) {
         throw error
       }
-      this.logger.error({ error }, P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
+      this.logger.error(
+        { error, scheduleId },
+        P2P_ERROR_MESSAGES.JOB_CREATION_FAILED,
+      )
       throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
@@ -150,6 +163,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     didNpaSubset = [],
     identityId,
     scheduledDate,
+    scheduleId,
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
@@ -160,7 +174,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       did_state: didState,
       ...(didNpaSubset.length > 0 && { did_npa_subset: didNpaSubset }),
       can_use_mms: hasMms,
-      schedule_id: this.scheduleId,
+      schedule_id: scheduleId,
       ...(identityId && { identity_id: identityId }),
       ...(scheduledDate && {
         start_date: scheduledDate,
@@ -213,7 +227,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   private async assignListToJob(
     jobId: string,
     listId: number,
-    context?: { campaignId?: number },
+    context?: { campaignId?: number; scheduleId?: number },
   ): Promise<void> {
     try {
       await this.peerlyHttpService.post(`/1to1/jobs/${jobId}/assignlist`, {
@@ -229,6 +243,9 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
             listId,
             ...(context?.campaignId != null && {
               campaignId: context.campaignId,
+            }),
+            ...(context?.scheduleId != null && {
+              scheduleId: context.scheduleId,
             }),
           },
         },

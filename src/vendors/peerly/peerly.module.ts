@@ -18,6 +18,7 @@ import { PeerlyIdentityService } from './services/peerlyIdentity.service'
 import { PeerlyMediaService } from './services/peerlyMedia.service'
 import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
+import { PeerlyScheduleService } from './services/peerlySchedule.service'
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
     PeerlyIdentityService,
     PeerlyPhoneListService,
     PeerlyMediaService,
+    PeerlyScheduleService,
     P2pPhoneListUploadService,
     PeerlyP2pJobService,
   ],
