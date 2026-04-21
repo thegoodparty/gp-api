@@ -34,5 +34,6 @@ model CampaignTask {
 
   @@index([campaignId])
   @@index([campaignId, completed])
+  @@index([date])
   @@map("campaign_task")
 }

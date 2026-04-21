@@ -23,5 +23,12 @@ export const P2P_PHONE_LIST_MAP = {
   zip: 6,
 } as const
 
+export const P2P_SCHEDULE_DEFAULTS = {
+  START_TIME: '09:00:00',
+  END_TIME: '21:00:00',
+  TIMEZONE: 'LOCAL',
+  IS_GLOBAL: 1,
+} as const
+
 export const P2P_DNC_SCRUBBING = 0
 export const P2P_DNC_SUPPRESS_INITIALS = 'GE' // GoodParty Engineering Peerly user
