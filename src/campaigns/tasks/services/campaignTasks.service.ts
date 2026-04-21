@@ -375,14 +375,10 @@ export class CampaignTasksService extends createPrismaBase(
 
       const { hubspotId } = campaign.data
 
-      const hubspotLink = hubspotId
-        ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
-        : 'N/A'
-
       const slackBody = [
         ':white_check_mark: *AI Campaign Plan Created*',
-        `*Candidate:* ${candidateName}`,
-        `*HubSpot ID:* ${hubspotLink}`,
+        `Candidate: ${candidateName}`,
+        `HubSpot ID: ${hubspotId ?? 'N/A'}`,
         '',
         `*Outreach Tasks (${outreachTasks.length}):*`,
         ...(taskLines.length > 0 ? taskLines : ['None']),
