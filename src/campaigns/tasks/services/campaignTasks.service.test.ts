@@ -820,8 +820,7 @@ describe('CampaignTasksService', () => {
       await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -836,8 +835,7 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
-      expect(tasks[0].title).toBe(generalDefaultTasks[0].title)
+      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
       expect(tasks[0].date).toBeInstanceOf(Date)
     })
 
@@ -854,7 +852,7 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length,
+        generalDefaultTasks.length + generalAwarenessTasks.length + 1,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -875,8 +873,7 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
-      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 1)
       expect(recurring).toHaveLength(85)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
@@ -900,7 +897,8 @@ describe('CampaignTasksService', () => {
       expect(nonRecurring).toHaveLength(
         primaryDefaultTasks.length +
           generalDefaultTasks.length +
-          generalAwarenessTasks.length,
+          generalAwarenessTasks.length +
+          1,
       )
       expect(recurring).toHaveLength(169)
       expect(tasks[0].date).toBeInstanceOf(Date)
@@ -954,7 +952,7 @@ describe('CampaignTasksService', () => {
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
       expect(nonRecurring).toHaveLength(
-        generalDefaultTasks.length + generalAwarenessTasks.length,
+        generalDefaultTasks.length + generalAwarenessTasks.length + 1,
       )
       expect(recurring).toHaveLength(169)
     })
@@ -974,9 +972,67 @@ describe('CampaignTasksService', () => {
 
       const tasks = getCreatedTaskData()
       const { nonRecurring, recurring } = splitByRecurring(tasks)
-      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length)
-      expect(nonRecurring[0].title).toBe(primaryDefaultTasks[0].title)
+      expect(nonRecurring).toHaveLength(primaryDefaultTasks.length + 1)
       expect(recurring).toHaveLength(85)
+    })
+
+    it('includes the campaign finance awareness task on the Saturday of the signup week', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: { electionDate: FUTURE_GENERAL },
+        }),
+        TODAY,
+      )
+
+      const financeTasks = getCreatedTaskData().filter(
+        (t) =>
+          t.title === 'Add your campaign finance deadlines to your calendar',
+      )
+      expect(financeTasks).toHaveLength(1)
+      const [financeTask] = financeTasks
+      expect(financeTask.flowType).toBe(CampaignTaskType.awareness)
+      expect(financeTask.isDefaultTask).toBe(true)
+      expect(financeTask.date).toEqual(
+        startOfDay(parseIsoDateString('2025-06-07')),
+      )
+    })
+
+    it('includes the campaign finance awareness task when no election date is set', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(makeCampaign({ details: {} }), TODAY)
+
+      const financeTasks = getCreatedTaskData().filter(
+        (t) =>
+          t.title === 'Add your campaign finance deadlines to your calendar',
+      )
+      expect(financeTasks).toHaveLength(1)
+      expect(financeTasks[0].week).toBe(0)
+      expect(financeTasks[0].date).toEqual(
+        startOfDay(parseIsoDateString('2025-06-07')),
+      )
+    })
+
+    it('does not include the campaign finance awareness task when both election dates are past', async () => {
+      setupForCreation()
+
+      await service.generateDefaultTasks(
+        makeCampaign({
+          details: {
+            primaryElectionDate: PAST_PRIMARY,
+            electionDate: PAST_GENERAL,
+          },
+        }),
+        TODAY,
+      )
+
+      const financeTasks = getCreatedTaskData().filter(
+        (t) =>
+          t.title === 'Add your campaign finance deadlines to your calendar',
+      )
+      expect(financeTasks).toHaveLength(0)
     })
 
     it('assigns dates in chronological order', async () => {
@@ -1024,7 +1080,7 @@ describe('CampaignTasksService', () => {
       )
 
       const tasks = getCreatedTaskData()
-      expect(tasks).toHaveLength(generalDefaultTasks.length)
+      expect(tasks).toHaveLength(generalDefaultTasks.length + 1)
       expect(tasks[0].date).toBeInstanceOf(Date)
       expect(tasks[0].isDefaultTask).toBe(true)
       expect(tasks[tasks.length - 1].date).toBeInstanceOf(Date)

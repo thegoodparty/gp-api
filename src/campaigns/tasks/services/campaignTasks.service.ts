@@ -34,7 +34,10 @@ import {
   RecurrenceRule,
   RecurringTaskTemplate,
 } from '../campaignTasks.types'
-import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import {
+  campaignFinanceAwarenessTask,
+  generalAwarenessTasks,
+} from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
@@ -416,11 +419,14 @@ export class CampaignTasksService extends createPrismaBase(
   ): CampaignTask[] {
     const { details } = campaign
     if (!details) {
-      return this.distributeTasksOverWindow(
-        generalDefaultTasks,
-        today,
-        addDays(today, MAX_TASK_WINDOW_DAYS),
-      )
+      return this.sortTasksByDate([
+        ...this.distributeTasksOverWindow(
+          generalDefaultTasks,
+          today,
+          addDays(today, MAX_TASK_WINDOW_DAYS),
+        ),
+        this.buildCampaignFinanceAwarenessTask(today, null),
+      ])
     }
 
     const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
@@ -448,6 +454,7 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
+        this.buildCampaignFinanceAwarenessTask(today, generalDate),
       ])
     }
 
@@ -463,6 +470,7 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           primaryDate,
         ),
+        this.buildCampaignFinanceAwarenessTask(today, primaryDate),
       ])
     }
 
@@ -483,6 +491,7 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
+        this.buildCampaignFinanceAwarenessTask(today, generalDate),
       ])
     }
 
@@ -490,11 +499,14 @@ export class CampaignTasksService extends createPrismaBase(
       details.primaryElectionDate || details.electionDate
     return hasAnyElectionDate
       ? []
-      : this.distributeTasksOverWindow(
-          generalDefaultTasks,
-          today,
-          addDays(today, MAX_TASK_WINDOW_DAYS),
-        )
+      : this.sortTasksByDate([
+          ...this.distributeTasksOverWindow(
+            generalDefaultTasks,
+            today,
+            addDays(today, MAX_TASK_WINDOW_DAYS),
+          ),
+          this.buildCampaignFinanceAwarenessTask(today, null),
+        ])
   }
 
   private hasFutureDate(
@@ -567,6 +579,21 @@ export class CampaignTasksService extends createPrismaBase(
         }
       })
       .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
+  private buildCampaignFinanceAwarenessTask(
+    today: Date,
+    electionDate: Date | null,
+  ): CampaignTask {
+    const saturday = addDays(startOfWeek(today), 6)
+    const week = electionDate
+      ? differenceInWeeks(electionDate, saturday, { roundingMethod: 'ceil' })
+      : 0
+    return {
+      ...campaignFinanceAwarenessTask,
+      week,
+      date: formatDate(saturday, DateFormats.isoDate),
+    }
   }
 
   private computeRecurringTasks(
