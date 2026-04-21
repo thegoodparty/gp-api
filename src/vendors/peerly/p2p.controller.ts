@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   HttpStatus,
   Param,
   Post,
@@ -112,6 +113,9 @@ export class P2pController {
 
       return { token }
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error
+      }
       this.logger.error({ error }, 'Failed to upload phone list')
       throw new BadGatewayException('Failed to upload phone list.')
     }
