@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common'
+import { ConflictException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
@@ -83,8 +83,8 @@ export function typeToQuery(
       },
       'Missing L2 district data for voter file query',
     )
-    throw new BadRequestException({
-      statusCode: 400,
+    throw new ConflictException({
+      statusCode: 409,
       message: MISSING_L2_DISTRICT_DATA_USER_MESSAGE,
       errorCode: MISSING_L2_DISTRICT_DATA_ERROR_CODE,
     })
