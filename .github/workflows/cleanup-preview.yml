@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   schedule:
     # Run every 3 hours
-    - cron: "0 */3 * * *"
+    - cron: '0 */3 * * *'
 
 jobs:
   discover-stale-stacks:
@@ -34,7 +34,7 @@ jobs:
       - name: Install Pulumi CLI
         uses: pulumi/actions@v6
         with:
-          pulumi-version: "^3"
+          pulumi-version: '^3'
 
       - run: npm ci
 
@@ -75,7 +75,7 @@ jobs:
       - name: Install Pulumi CLI
         uses: pulumi/actions@v6
         with:
-          pulumi-version: "^3"
+          pulumi-version: '^3'
 
       - run: npm ci
 
@@ -124,6 +124,46 @@ jobs:
             --query 'tasks[0].containers[0].exitCode' \
             --output text 2>/dev/null || echo "unknown")
           echo "Clerk cleanup task exit code: $EXIT_CODE"
+
+      - name: Drain ECS tasks and empty preview buckets
+        run: |
+          STACK_NAME="${{ matrix.stack }}"
+          PR_NUM="${STACK_NAME#gp-api-pr-}"
+          CLUSTER="gp-pr-${PR_NUM}-fargateCluster"
+
+          # Scale services to 0 and stop any running tasks so pulumi destroy can
+          # delete the cluster without hitting ClusterContainsTasksException.
+          CLUSTER_STATUS=$(aws ecs describe-clusters --clusters "$CLUSTER" --query 'clusters[0].status' --output text 2>/dev/null || echo "MISSING")
+          if [ "$CLUSTER_STATUS" = "ACTIVE" ]; then
+            SERVICE_ARNS=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns[]' --output text 2>/dev/null || true)
+            for SERVICE in $SERVICE_ARNS; do
+              echo "Scaling $SERVICE to 0"
+              aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count 0 --no-cli-pager >/dev/null || true
+            done
+
+            TASK_ARNS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status RUNNING --query 'taskArns[]' --output text 2>/dev/null || true)
+            if [ -n "$TASK_ARNS" ]; then
+              echo "Stopping active tasks in $CLUSTER: $TASK_ARNS"
+              for TASK in $TASK_ARNS; do
+                aws ecs stop-task --cluster "$CLUSTER" --task "$TASK" --reason "cleanup-preview" --no-cli-pager >/dev/null || true
+              done
+              echo "Waiting for tasks to stop..."
+              aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks $TASK_ARNS || true
+            fi
+          else
+            echo "Cluster $CLUSTER status=$CLUSTER_STATUS — skipping task drain"
+          fi
+
+          # Preview-scoped buckets have forceDestroy=false in Pulumi (intentional for
+          # prod), so empty them here to avoid BucketNotEmpty on destroy.
+          for BUCKET in "tevyn-poll-csvs-pr-${PR_NUM}" "zip-to-area-code-mappings-pr-${PR_NUM}"; do
+            if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+              echo "Emptying $BUCKET"
+              aws s3 rm "s3://$BUCKET" --recursive --only-show-errors || true
+            else
+              echo "Bucket $BUCKET not found — skipping"
+            fi
+          done
 
       - name: Destroy Stack
         working-directory: ./deploy
