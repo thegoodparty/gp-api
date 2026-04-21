@@ -6,14 +6,13 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import {
-  CampaignTaskType,
   Poll,
   PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -39,10 +38,6 @@ import { OrganizationsService } from 'src/organizations/services/organizations.s
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import {
-  SlackChannel,
-  SlackMessageType,
-} from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
 import { normalizePhoneNumber } from '../../shared/util/strings.util'
@@ -54,6 +49,7 @@ import {
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
   DomainEmailForwardingMessage,
+  WeeklyTasksDigestMessageSchema,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -63,9 +59,11 @@ import {
   PollClusterAnalysisJsonSchema,
   QueueMessage,
   QueueType,
+  SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { WeeklyTasksDigestHandlerService } from '../../campaigns/tasks/services/weeklyTasksDigestHandler.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
 import { OrgDistrict } from '@/organizations/organizations.types'
@@ -113,9 +111,53 @@ export class QueueConsumerService {
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
     private readonly organizationsService: OrganizationsService,
+    private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
+  }
+
+  private logConsumerError = (
+    eventName: SqsConsumerErrorEventName,
+    error: Error,
+    message: Message | Message[] | undefined,
+  ) => {
+    this.logger.error(
+      { error: serializeError(error), message },
+      `SQS consumer ${eventName}`,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.ERROR,
+  )
+  onError(error: Error, message: Message | Message[] | undefined) {
+    this.logConsumerError(SqsConsumerErrorEventName.ERROR, error, message)
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.PROCESSING_ERROR,
+  )
+  onProcessingError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.PROCESSING_ERROR,
+      error,
+      message,
+    )
+  }
+
+  @SqsConsumerEventHandler(
+    process.env.SQS_QUEUE || '',
+    SqsConsumerErrorEventName.TIMEOUT_ERROR,
+  )
+  onTimeoutError(error: Error, message: Message) {
+    this.logConsumerError(
+      SqsConsumerErrorEventName.TIMEOUT_ERROR,
+      error,
+      message,
+    )
   }
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -303,8 +345,16 @@ export class QueueConsumerService {
             queueMessage.data,
           )
           await this.handleCampaignPlanComplete(campaignPlanData)
-          await this.withLegacyErrorSwallowing(message, () =>
-            this.notifySlackCampaignPlanCreated(campaignPlanData),
+          return true
+        })
+      case QueueType.WEEKLY_TASKS_DIGEST:
+        this.logger.info('received weeklyTasksDigest message')
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const digestData = WeeklyTasksDigestMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.weeklyTasksDigestHandler.handleWeeklyTasksDigest(
+            digestData,
           )
           return true
         })
@@ -921,78 +971,6 @@ export class QueueConsumerService {
     return cellPhonesToPeopleIds
   }
 
-  private async notifySlackCampaignPlanCreated(
-    message: CampaignPlanCompleteMessage,
-  ) {
-    if (message.status === 'error') {
-      this.logger.error(
-        { campaignId: message.campaignId, error: message.error },
-        'Campaign plan generation failed',
-      )
-      return true
-    }
-
-    const campaign = await this.campaignsService.model.findUniqueOrThrow({
-      where: { id: message.campaignId },
-      include: { user: true, campaignTasks: true },
-    })
-
-    const candidateName =
-      [campaign.user?.firstName, campaign.user?.lastName]
-        .filter((value): value is string => Boolean(value))
-        .join(' ') ||
-      campaign.data.name ||
-      'Unknown'
-
-    const outreachTasks = campaign.campaignTasks.filter(
-      (task) =>
-        !task.isDefaultTask &&
-        (task.flowType === CampaignTaskType.text ||
-          task.flowType === CampaignTaskType.robocall),
-    )
-
-    const taskLines = outreachTasks.map((task) => {
-      const dueDate = task.date
-        ? format(task.date, 'MMM d, yyyy')
-        : 'No date set'
-      return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
-    })
-
-    const { hubspotId } = campaign.data
-
-    const hubspotLink = hubspotId
-      ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
-      : 'N/A'
-
-    const slackBody = [
-      ':white_check_mark: *AI Campaign Plan Created*',
-      `*Candidate:* ${candidateName}`,
-      `*Email:* ${campaign.user?.email ?? 'N/A'}`,
-      `*Phone:* ${campaign.user?.phone ?? 'N/A'}`,
-      `*HubSpot ID:* ${hubspotLink}`,
-      '',
-      `*AI Text & Robocall Campaigns (${outreachTasks.length}):*`,
-      ...(taskLines.length > 0 ? taskLines : ['None']),
-    ].join('\n')
-
-    await this.slackService.message(
-      {
-        blocks: [
-          {
-            type: SlackMessageType.SECTION,
-            text: {
-              type: SlackMessageType.MRKDWN,
-              text: slackBody,
-            },
-          },
-        ],
-      },
-      SlackChannel.casClickupTasks,
-    )
-
-    return true
-  }
-
   private async handleCampaignPlanComplete(
     data: CampaignPlanCompleteMessage,
   ): Promise<boolean> {
@@ -1007,7 +985,7 @@ export class QueueConsumerService {
     try {
       const { campaignId: resultCampaignId, tasks } =
         await this.aiGenerationService.parseCompletionResult(data)
-      await this.campaignTasksService.addTasks(resultCampaignId, tasks)
+      await this.campaignTasksService.addEventTasks(resultCampaignId, tasks)
       this.logger.info(
         { campaignId: resultCampaignId, taskCount: tasks.length },
         'campaign plan tasks saved',

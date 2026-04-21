@@ -225,7 +225,13 @@ describe('VoterFileController', () => {
       })
       expect(
         mockVoterOutreachService.scheduleOutreachCampaign,
-      ).toHaveBeenCalledWith(mockUser, baseCampaign, mockOutreach, 'all voters')
+      ).toHaveBeenCalledWith(
+        mockUser,
+        baseCampaign,
+        mockOutreach,
+        'all voters',
+        undefined,
+      )
       expect(result).toEqual({ success: true })
     })
 

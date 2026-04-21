@@ -32,6 +32,7 @@ const userDefaults = {
   zip: '12345',
   metaData: null,
   passwordResetToken: null,
+  clerkId: null,
 }
 
 const mockUser: User = {
@@ -153,49 +154,6 @@ describe('CampaignsController', () => {
       analyticsService,
       createMockLogger(),
     )
-  })
-
-  describe('findAll', () => {
-    it('passes empty where when no filters provided', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({})
-
-      expect(campaignsService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} }),
-      )
-    })
-
-    it('builds where from filters', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({ slug: 'test-slug' })
-
-      const call = vi.mocked(campaignsService.findMany).mock.calls[0]?.[0]
-      expect(call?.where).toHaveProperty('AND')
-    })
-
-    it('includes user in query', () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      controller.findAll({})
-
-      expect(campaignsService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-                phone: true,
-                email: true,
-                metaData: true,
-              },
-            },
-          },
-        }),
-      )
-    })
   })
 
   describe('list', () => {

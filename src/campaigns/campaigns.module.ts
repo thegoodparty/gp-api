@@ -1,5 +1,5 @@
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { ElectionsModule } from 'src/elections/elections.module'
@@ -30,6 +30,8 @@ import { CampaignTasksService } from './tasks/services/campaignTasks.service'
 import { AiGenerationService } from './tasks/services/aiGeneration.service'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
+import { WeeklyTasksDigestService } from './tasks/services/weeklyTasksDigest.service'
+import { WeeklyTasksDigestHandlerService } from './tasks/services/weeklyTasksDigestHandler.service'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 
@@ -39,6 +41,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     AwsModule,
     EmailModule,
     CampaignsAiModule,
+    ClerkModule,
     CrmModule,
     ElectionsModule,
     OrganizationsModule,
@@ -72,7 +75,8 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     LegacyCampaignTasksService,
     AiGenerationService,
     CampaignTcrComplianceService,
-    ClerkClientProvider,
+    WeeklyTasksDigestService,
+    WeeklyTasksDigestHandlerService,
   ],
   exports: [
     CampaignsService,
@@ -81,6 +85,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignTcrComplianceService,
     CampaignTasksService,
     AiGenerationService,
+    WeeklyTasksDigestHandlerService,
   ],
 })
 export class CampaignsModule {}

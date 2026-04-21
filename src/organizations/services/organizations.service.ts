@@ -14,6 +14,7 @@ import {
 } from '../schemas/organization.schema'
 
 import { OrgDistrict } from '../organizations.types'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 export type FriendlyOrganization = {
   slug: string
@@ -34,7 +35,10 @@ export type FriendlyOrganization = {
 export class OrganizationsService extends createPrismaBase(
   MODELS.Organization,
 ) {
-  constructor(private readonly electionsService: ElectionsService) {
+  constructor(
+    private readonly electionsService: ElectionsService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
+  ) {
     super()
   }
 
@@ -140,6 +144,17 @@ export class OrganizationsService extends createPrismaBase(
       // This is important to prevent the query from scanning the whole table.
       take: 25,
     })
+
+    const owners = organizations
+      .map((o) => o.owner)
+      .filter((o): o is NonNullable<typeof o> => o != null)
+    const enrichedOwners = await this.clerkEnricher.enrichUsers(owners)
+    let idx = 0
+    for (const org of organizations) {
+      if (org.owner) {
+        org.owner = enrichedOwners[idx++]
+      }
+    }
 
     return pmap(
       organizations,
@@ -326,11 +341,16 @@ export class OrganizationsService extends createPrismaBase(
    * Extracts a clean city name from an L2DistrictName string.
    *
    * Handles known patterns:
-   *   "Fayetteville Ward 4"      → "Fayetteville"
-   *   "Kyle District 3"          → "Kyle"
-   *   "City of Kyle"             → "Kyle"
-   *   "Town of Chapel Hill"      → "Chapel Hill"
-   *   "Fayetteville"             → "Fayetteville"  (already clean)
+   *   "Fayetteville Ward 4"          → "Fayetteville"
+   *   "Kyle District 3"              → "Kyle"
+   *   "City of Kyle"                 → "Kyle"
+   *   "Town of Chapel Hill"          → "Chapel Hill"
+   *   "Fayetteville"                 → "Fayetteville"  (already clean)
+   *   "Pocatello City (Est.)"        → "Pocatello"
+   *   "North Port City (Est.)"       → "North Port"
+   *   "West Mifflin Boro"            → "West Mifflin"
+   *   "Alvin City Cncl D"            → "Alvin"
+   *   "Dubuque City Ward 3"          → "Dubuque"
    *
    * Returns null if the result is empty or looks like a non-city name.
    */
@@ -340,6 +360,14 @@ export class OrganizationsService extends createPrismaBase(
     // Strip leading "City of", "Town of", "Village of", "Borough of"
     name = name.replace(/^(City|Town|Village|Borough|Township)\s+of\s+/i, '')
 
+    // Strip trailing parenthetical qualifiers: "(Est.)", "(Ind.)", "(Pt.)", etc.
+    name = name.replace(/\s*\([^)]*\)\.?\s*$/i, '')
+
+    // Strip trailing abbreviated council/district suffixes before ward/district stripping:
+    // "Cncl D", "Cncl Dist", "Council D", "Council Dist"
+    name = name.replace(/\s+Cncl\s*(D(ist)?\.?)?\s*$/i, '')
+    name = name.replace(/\s+Council\s+D(ist)?\.?\s*$/i, '')
+
     // Strip trailing ward/district/precinct suffixes: "Ward 4", "District 3", "Precinct 2A"
     name = name.replace(
       /\s+(Ward|District|Precinct|Division|At-Large)\s*[\w-]*$/i,
@@ -347,7 +375,8 @@ export class OrganizationsService extends createPrismaBase(
     )
 
     // Strip trailing municipality type: "Johnstown City" → "Johnstown"
-    name = name.replace(/\s+(City|Town|Village|Borough|Township)$/i, '')
+    // Includes "Boro" as a short form of "Borough"
+    name = name.replace(/\s+(City|Town|Village|Borough|Boro|Township)$/i, '')
 
     name = name.trim()
 

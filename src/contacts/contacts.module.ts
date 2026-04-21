@@ -1,3 +1,4 @@
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
@@ -9,6 +10,7 @@ import { ContactsService } from './services/contacts.service'
 
 @Module({
   imports: [
+    ClerkModule,
     HttpModule,
     forwardRef(() => CampaignsModule),
     VotersModule,

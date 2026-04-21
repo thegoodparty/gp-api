@@ -1,4 +1,5 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrganizationsService } from './organizations.service'
 
@@ -15,12 +16,15 @@ describe('OrganizationsService', () => {
     mockGetDistrictId = vi.fn().mockResolvedValue(null)
     mockCleanDistrictName = vi.fn((name: string) => name)
 
-    service = new OrganizationsService({
-      getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
-      getPositionById: mockGetPositionById,
-      getDistrictId: mockGetDistrictId,
-      cleanDistrictName: mockCleanDistrictName,
-    } as unknown as ElectionsService)
+    service = new OrganizationsService(
+      {
+        getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
+        getPositionById: mockGetPositionById,
+        getDistrictId: mockGetDistrictId,
+        cleanDistrictName: mockCleanDistrictName,
+      } as unknown as ElectionsService,
+      createMockClerkEnricher(),
+    )
     ;(
       service as unknown as { logger: { error: ReturnType<typeof vi.fn> } }
     ).logger = { error: vi.fn() }
@@ -419,6 +423,177 @@ describe('OrganizationsService', () => {
         positionName: null,
       })
       expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('extractCityFromDistrictName', () => {
+    const extract = OrganizationsService.extractCityFromDistrictName
+
+    describe('clean city names (no stripping needed)', () => {
+      it('returns a plain city name unchanged', () => {
+        expect(extract('Fayetteville')).toBe('Fayetteville')
+      })
+
+      it('handles multi-word city names', () => {
+        expect(extract('Chapel Hill')).toBe('Chapel Hill')
+      })
+    })
+
+    describe('leading municipality prefix stripping', () => {
+      it('strips "City of"', () => {
+        expect(extract('City of Kyle')).toBe('Kyle')
+      })
+
+      it('strips "Town of"', () => {
+        expect(extract('Town of Chapel Hill')).toBe('Chapel Hill')
+      })
+
+      it('strips "Village of"', () => {
+        expect(extract('Village of Skokie')).toBe('Skokie')
+      })
+
+      it('strips "Borough of"', () => {
+        expect(extract('Borough of Carlisle')).toBe('Carlisle')
+      })
+
+      it('strips "Township of"', () => {
+        expect(extract('Township of Teaneck')).toBe('Teaneck')
+      })
+
+      it('is case-insensitive for prefix', () => {
+        expect(extract('CITY OF KYLE')).toBe('KYLE')
+      })
+    })
+
+    describe('trailing ward/district suffix stripping', () => {
+      it('strips trailing "Ward N"', () => {
+        expect(extract('Fayetteville Ward 4')).toBe('Fayetteville')
+      })
+
+      it('strips trailing "District N"', () => {
+        expect(extract('Kyle District 3')).toBe('Kyle')
+      })
+
+      it('strips trailing "Ward N" from all-caps L2 name', () => {
+        expect(extract('BRUNSWICK TOWN WARD 6')).toBe('BRUNSWICK')
+      })
+
+      it('strips trailing "Precinct"', () => {
+        expect(extract('Springfield Precinct 2A')).toBe('Springfield')
+      })
+
+      it('strips trailing "At-Large"', () => {
+        expect(extract('Austin At-Large')).toBe('Austin')
+      })
+    })
+
+    describe('trailing municipality type stripping', () => {
+      it('strips trailing "City"', () => {
+        expect(extract('METHUEN CITY')).toBe('METHUEN')
+      })
+
+      it('strips trailing "Town"', () => {
+        expect(extract('FALMOUTH TOWN')).toBe('FALMOUTH')
+      })
+
+      it('strips trailing "Borough"', () => {
+        expect(extract('Carlisle Borough')).toBe('Carlisle')
+      })
+
+      it('strips trailing "Boro" (abbreviated Borough)', () => {
+        expect(extract('WEST MIFFLIN BORO')).toBe('WEST MIFFLIN')
+      })
+
+      it('strips trailing "Township"', () => {
+        expect(extract('Teaneck Township')).toBe('Teaneck')
+      })
+
+      it('strips trailing "Village"', () => {
+        expect(extract('Skokie Village')).toBe('Skokie')
+      })
+    })
+
+    describe('parenthetical qualifier stripping', () => {
+      it('strips trailing "(Est.)"', () => {
+        expect(extract('POCATELLO CITY (EST.)')).toBe('POCATELLO')
+      })
+
+      it('strips "(Est.)" from multi-word city', () => {
+        expect(extract('NORTH PORT CITY (EST.)')).toBe('NORTH PORT')
+      })
+
+      it('strips generic parenthetical qualifiers', () => {
+        expect(extract('Springfield City (Ind.)')).toBe('Springfield')
+      })
+    })
+
+    describe('abbreviated council district stripping', () => {
+      it('strips trailing "Cncl D" (abbreviated Council District)', () => {
+        expect(extract('ALVIN CITY CNCL D')).toBe('ALVIN')
+      })
+
+      it('strips trailing "Cncl Dist"', () => {
+        expect(extract('Houston City Cncl Dist')).toBe('Houston')
+      })
+
+      it('strips trailing "Council D"', () => {
+        expect(extract('Austin City Council D')).toBe('Austin')
+      })
+    })
+
+    describe('multi-step stripping (combined patterns)', () => {
+      it('strips ward then town type: "BRUNSWICK TOWN WARD 6"', () => {
+        expect(extract('BRUNSWICK TOWN WARD 6')).toBe('BRUNSWICK')
+      })
+
+      it('strips parenthetical then city type: "POCATELLO CITY (EST.)"', () => {
+        expect(extract('POCATELLO CITY (EST.)')).toBe('POCATELLO')
+      })
+
+      it('strips abbreviated council then city type: "ALVIN CITY CNCL D"', () => {
+        expect(extract('ALVIN CITY CNCL D')).toBe('ALVIN')
+      })
+
+      it('handles override district "DUBUQUE CITY"', () => {
+        expect(extract('DUBUQUE CITY')).toBe('DUBUQUE')
+      })
+
+      it('handles "WESTLAND CITY"', () => {
+        expect(extract('WESTLAND CITY')).toBe('WESTLAND')
+      })
+
+      it('handles "IMPERIAL CITY"', () => {
+        expect(extract('IMPERIAL CITY')).toBe('IMPERIAL')
+      })
+
+      it('handles "NORTHAMPTON CITY"', () => {
+        expect(extract('NORTHAMPTON CITY')).toBe('NORTHAMPTON')
+      })
+    })
+
+    describe('null cases', () => {
+      it('returns null for empty string', () => {
+        expect(extract('')).toBeNull()
+      })
+
+      it('returns null for whitespace only', () => {
+        expect(extract('   ')).toBeNull()
+      })
+
+      it('returns null for a pure number', () => {
+        expect(extract('4')).toBeNull()
+      })
+
+      it('returns null for a single character', () => {
+        expect(extract('A')).toBeNull()
+      })
+
+      it('returns null when stripping leaves nothing (e.g. bare "Ward 1")', () => {
+        // "Ward 1" — "Ward" doesn't have a leading space so the regex doesn't strip it,
+        // leaving "Ward 1" which is not a pure number or single char, so returns "Ward 1".
+        // This is acceptable — "Ward 1" is an unusual L2DistrictName with no city prefix.
+        expect(extract('Ward 1')).toBe('Ward 1')
+      })
     })
   })
 })

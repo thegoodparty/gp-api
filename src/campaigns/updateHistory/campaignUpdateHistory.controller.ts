@@ -21,6 +21,7 @@ import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
+import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 
 @Controller('campaigns/mine/update-history')
 @UsePipes(ZodValidationPipe)
@@ -28,6 +29,7 @@ export class CampaignUpdateHistoryController {
   constructor(
     private readonly campaigns: CampaignsService,
     private readonly updateHistory: CampaignUpdateHistoryService,
+    private readonly clerkEnricher: ClerkUserEnricherService,
   ) {}
 
   @Get()
@@ -47,6 +49,7 @@ export class CampaignUpdateHistoryController {
       include: {
         user: {
           select: {
+            clerkId: true,
             firstName: true,
             lastName: true,
             name: true,
@@ -55,6 +58,17 @@ export class CampaignUpdateHistoryController {
         },
       },
     })
+
+    const users = updateHistory
+      .map((u) => u.user)
+      .filter((u): u is NonNullable<typeof u> => u != null)
+    const enriched = await this.clerkEnricher.enrichUsers(users)
+    let idx = 0
+    for (const update of updateHistory) {
+      if (update.user) {
+        update.user = enriched[idx++]
+      }
+    }
 
     return updateHistory.map((update) => ({
       ...update,

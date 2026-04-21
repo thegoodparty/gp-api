@@ -21,6 +21,20 @@ jobs:
     concurrency:
       group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
       cancel-in-progress: false
+    services:
+      shadow-db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U prisma"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
     outputs:
       environment: ${{ steps.context.outputs.environment }}
       service_url: ${{ steps.pulumi.outputs.service_url }}
@@ -48,9 +62,17 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          registry-url: "https://registry.npmjs.org"
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
+
+      - name: Check Prisma schema is in sync with migrations
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/schema/migrations \
+            --to-schema-datamodel ./prisma/schema \
+            --shadow-database-url "postgresql://prisma:prisma@localhost:5432/shadow" \
+            --exit-code
 
       # Validation
       - run: npm run generate
@@ -67,8 +89,8 @@ jobs:
       - name: Setup Node 24 for npm publish
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: RC version contracts
         if: >-
@@ -117,6 +139,12 @@ jobs:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Symlink changeset config for changesets/action
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        run: ln -s contracts/.changeset .changeset
+
       - name: Create Release PR or Publish contracts
         if: >-
           github.ref_name == 'master'
@@ -125,7 +153,7 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: npx changeset publish
-          title: "chore: release @goodparty_org/contracts"
+          title: 'chore: release @goodparty_org/contracts'
           cwd: contracts
           createGithubReleases: false
         env:
@@ -195,7 +223,7 @@ jobs:
       - name: Install Pulumi
         uses: pulumi/actions@v6
         with:
-          pulumi-version: "^3"
+          pulumi-version: '^3'
 
       - name: Run Pulumi Deploy
         id: pulumi
@@ -206,6 +234,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
           CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           npm run infra deploy ${{ steps.context.outputs.environment }}
           cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
@@ -218,8 +247,8 @@ jobs:
         id: find-comment
         with:
           issue-number: ${{ github.event.number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "Preview Environment"
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Preview Environment'
 
       - name: Post PR comment
         if: github.event_name == 'pull_request' && steps.find-comment.outputs.comment-id == '' && steps.pulumi.outputs.service_url != ''
@@ -280,6 +309,8 @@ jobs:
         id: run-tests
         env:
           API_BASE_URL: ${{ needs.main.outputs.service_url }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
           CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
