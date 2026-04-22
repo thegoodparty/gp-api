@@ -200,11 +200,28 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get(':id')
-  @ResponseSchema(ReadCampaignOutputSchema)
   async findById(@Param() { id }: IdParamSchema) {
-    return this.campaigns.findUniqueOrThrow({
+    const campaign = await this.campaigns.findUniqueOrThrow({
       where: { id },
+      include: {
+        organization: {
+          select: {
+            customPositionName: true,
+            positionId: true,
+          },
+        },
+      },
     })
+
+    const [{ positionName }, liveMetrics] = await Promise.all([
+      this.organizations.resolvePositionContext({
+        customPositionName: campaign.organization?.customPositionName,
+        positionId: campaign.organization?.positionId,
+      }),
+      this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+    ])
+
+    return { ...campaign, positionName, raceTargetMetrics: liveMetrics }
   }
 
   @UseGuards(M2MOnly)

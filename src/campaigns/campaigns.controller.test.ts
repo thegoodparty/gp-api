@@ -590,7 +590,7 @@ describe('CampaignsController', () => {
   })
 
   describe('findById (M2M GET :id)', () => {
-    it('returns campaign parsed through ReadCampaignOutputSchema', async () => {
+    it('returns campaign enriched with positionName and raceTargetMetrics', async () => {
       vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
         mockCampaign,
       )
@@ -599,8 +599,18 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: mockCampaign.id },
+        include: {
+          organization: {
+            select: {
+              customPositionName: true,
+              positionId: true,
+            },
+          },
+        },
       })
       expect(result).toHaveProperty('id', mockCampaign.id)
+      expect(result).toHaveProperty('positionName')
+      expect(result).toHaveProperty('raceTargetMetrics')
     })
 
     it('throws when campaign does not exist', async () => {
