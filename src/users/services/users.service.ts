@@ -188,12 +188,12 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           : []),
         ...(signUpMode
           ? [
-            {
-              name: 'facilitated_signup',
-              value:
-                signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
-            },
-          ]
+              {
+                name: 'facilitated_signup',
+                value:
+                  signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
+              },
+            ]
           : []),
       ],
       'registerPage',
@@ -393,9 +393,17 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     }
 
     try {
-      await this.analytics.track(id, trackingEvent, trackingProperties, userContext)
+      await this.analytics.track(
+        id,
+        trackingEvent,
+        trackingProperties,
+        userContext,
+      )
     } catch (error) {
-      this.logger.error({ error, trackingEvent, trackingProperties }, 'Failed to track user deletion event')
+      this.logger.error(
+        { error, trackingEvent, trackingProperties },
+        'Failed to track user deletion event',
+      )
     }
   }
 
@@ -483,19 +491,19 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     const where: Prisma.UserWhereInput = {
       ...(firstName
         ? {
-          firstName: {
-            contains: firstName,
-            mode: Prisma.QueryMode.insensitive,
-          },
-        }
+            firstName: {
+              contains: firstName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
         : {}),
       ...(lastName
         ? {
-          lastName: {
-            contains: lastName,
-            mode: Prisma.QueryMode.insensitive,
-          },
-        }
+            lastName: {
+              contains: lastName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
         : {}),
       ...(email
         ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
