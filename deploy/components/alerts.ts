@@ -28,16 +28,6 @@ export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   },
 }
 
-const tempoExploreLink = (query: string) => {
-  const panes = JSON.stringify({
-    a: {
-      datasource: 'grafanacloud-traces',
-      queries: [{ query, refId: 'A' }],
-    },
-  })
-  return `https://goodparty.grafana.net/explore?schemaVersion=1&panes=${encodeURIComponent(panes)}&from=now-1h&to=now`
-}
-
 export const GLOBAL_ALERTS: Alert[] = [
   // ------ Global Shared Alerts ------ //
   {
@@ -73,20 +63,6 @@ export const GLOBAL_ALERTS: Alert[] = [
     for: '2m',
     message:
       'Synthetic monitoring probes are failing against the health endpoint — the service may be unreachable externally.',
-  },
-  {
-    slug: 'slow-prisma-connections',
-    name: 'Slow Prisma connection acquisitions',
-    type: 'metric',
-    expr: 'sum(increase(prisma_connection_slow_total{service_name="gp-api", deployment_environment_name="$ENV"}[2m]))',
-    threshold: 10,
-    for: '2m',
-    message: [
-      'More than 10 Prisma connections took over 150ms to acquire in a 2-minute window.',
-      'This indicates database connection pool pressure. Multiple requests are waiting to acquire a Postgres connection from the pool.',
-      `<${tempoExploreLink('{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "prod" && duration > 150ms }')}|View slow connection traces in Grafana Explore>`,
-      'Check for traffic bursts, long-running transactions, or connection leaks. Consider increasing the connection pool limit if this recurs.',
-    ].join('\n\n'),
   },
   // ------ Serve Alerts ------ //
   {
