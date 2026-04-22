@@ -22,6 +22,7 @@ const testUser = {
 const baseCampaign = {
   id: 100,
   userId: 42,
+  organizationSlug: 'acme-for-mayor',
   details: {
     state: 'CA',
     district: '12',
@@ -74,7 +75,7 @@ describe('CandidateExperimentsService', () => {
       dispatch: vi.fn().mockResolvedValue({
         runId: 'new-run',
         experimentId: 'test_exp',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'dispatched',
       }),
     }
@@ -94,8 +95,8 @@ describe('CandidateExperimentsService', () => {
   describe('getMyRuns', () => {
     it('returns experiment runs for the user campaign', async () => {
       const runs = [
-        { runId: 'r1', candidateId: '100', status: 'SUCCESS' },
-        { runId: 'r2', candidateId: '100', status: 'PENDING' },
+        { runId: 'r1', organizationSlug: 'acme-for-mayor', status: 'SUCCESS' },
+        { runId: 'r2', organizationSlug: 'acme-for-mayor', status: 'PENDING' },
       ]
       experimentRunsService.findMany.mockResolvedValue(runs)
 
@@ -106,7 +107,7 @@ describe('CandidateExperimentsService', () => {
         include: { pathToVictory: true, topIssues: true, electedOffices: true },
       })
       expect(experimentRunsService.findMany).toHaveBeenCalledWith({
-        where: { candidateId: '100' },
+        where: { organizationSlug: 'acme-for-mayor' },
         orderBy: { createdAt: 'desc' },
       })
       expect(result).toEqual(runs)
@@ -130,7 +131,7 @@ describe('CandidateExperimentsService', () => {
 
       expect(dispatchService.dispatch).toHaveBeenCalledWith({
         experimentId: 'voter_targeting',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         params: {
           state: 'CA',
           l2DistrictType: 'State_House_District',
@@ -150,7 +151,7 @@ describe('CandidateExperimentsService', () => {
       expect(result).toEqual({
         runId: 'new-run',
         experimentId: 'test_exp',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'dispatched',
       })
     })
@@ -276,7 +277,7 @@ describe('CandidateExperimentsService', () => {
       const districtIntelRun = {
         runId: 'di-run-001',
         experimentId: 'district_intel',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'SUCCESS',
         artifactBucket: 'gp-agent-artifacts-dev',
         artifactKey: 'district_intel/di-run-001/district_intel.json',
@@ -324,7 +325,7 @@ describe('CandidateExperimentsService', () => {
 
       expect(experimentRunsService.updateMany).toHaveBeenCalledWith({
         where: {
-          candidateId: '100',
+          organizationSlug: 'acme-for-mayor',
           experimentId: {
             in: ['peer_city_benchmarking', 'meeting_briefing'],
           },
@@ -355,7 +356,7 @@ describe('CandidateExperimentsService', () => {
       const districtIntelRun = {
         runId: 'di-run-002',
         experimentId: 'district_intel',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'SUCCESS',
         artifactBucket: 'gp-agent-artifacts-dev',
         artifactKey: 'district_intel/di-run-002/district_intel.json',
@@ -398,7 +399,7 @@ describe('CandidateExperimentsService', () => {
       experimentRunsService.findFirst.mockResolvedValue({
         id: 'existing-run',
         experimentId: 'voter_targeting',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'PENDING',
       })
 
@@ -415,7 +416,7 @@ describe('CandidateExperimentsService', () => {
       experimentRunsService.findFirst.mockResolvedValue({
         id: 'existing-run',
         experimentId: 'voter_targeting',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'RUNNING',
       })
 
@@ -495,7 +496,7 @@ describe('CandidateExperimentsService', () => {
 
       expect(experimentRunsService.findFirst).toHaveBeenCalledWith({
         where: {
-          candidateId: '100',
+          organizationSlug: 'acme-for-mayor',
           experimentId: 'voter_targeting',
           status: { in: ['PENDING', 'RUNNING'] },
         },
@@ -513,7 +514,7 @@ describe('CandidateExperimentsService', () => {
 
       expect(experimentRunsService.findFirst).toHaveBeenCalledWith({
         where: {
-          candidateId: '100',
+          organizationSlug: 'acme-for-mayor',
           experimentId: 'voter_targeting',
           status: { in: ['PENDING', 'RUNNING'] },
         },
@@ -547,7 +548,7 @@ describe('CandidateExperimentsService', () => {
       expect(dispatchCall.params.state).toBe('CA')
     })
 
-    it('logs stripped keys with experimentId and candidateId', async () => {
+    it('logs stripped keys with experimentId and organizationSlug', async () => {
       await service.requestExperiment(testUser, {
         experimentId: 'voter_targeting',
         params: { injectedKey: 'bad value' },
@@ -556,7 +557,7 @@ describe('CandidateExperimentsService', () => {
       expect(logger.warn).toHaveBeenCalledWith(
         {
           experimentId: 'voter_targeting',
-          candidateId: '100',
+          organizationSlug: 'acme-for-mayor',
           strippedKeys: ['injectedKey'],
         },
         'Stripped unknown param keys',
@@ -616,7 +617,7 @@ describe('CandidateExperimentsService', () => {
     it('returns parsed JSON artifact from S3', async () => {
       const run = {
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         artifactBucket: 'gp-agent-artifacts-dev',
         artifactKey: 'test_exp/run-abc/result.json',
       }
@@ -648,7 +649,7 @@ describe('CandidateExperimentsService', () => {
     it('throws ForbiddenException when run belongs to different campaign', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '999',
+        organizationSlug: 'someone-else',
         artifactBucket: 'bucket',
         artifactKey: 'key',
       })
@@ -661,7 +662,7 @@ describe('CandidateExperimentsService', () => {
     it('throws NotFoundException when CONTRACT_VIOLATION run has no artifact', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         status: 'CONTRACT_VIOLATION',
         artifactBucket: null,
         artifactKey: null,
@@ -675,7 +676,7 @@ describe('CandidateExperimentsService', () => {
     it('throws NotFoundException when artifact fields are missing', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         artifactBucket: null,
         artifactKey: null,
       })
@@ -688,7 +689,7 @@ describe('CandidateExperimentsService', () => {
     it('throws NotFoundException when S3 returns undefined', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         artifactBucket: 'bucket',
         artifactKey: 'key',
       })
@@ -702,7 +703,7 @@ describe('CandidateExperimentsService', () => {
     it('throws BadRequestException when S3 content is invalid JSON', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         artifactBucket: 'bucket',
         artifactKey: 'key',
       })
@@ -716,7 +717,7 @@ describe('CandidateExperimentsService', () => {
     it('propagates S3 errors when getFile throws', async () => {
       experimentRunsService.findFirst.mockResolvedValue({
         runId: 'run-abc',
-        candidateId: '100',
+        organizationSlug: 'acme-for-mayor',
         artifactBucket: 'nonexistent-bucket',
         artifactKey: 'key',
       })

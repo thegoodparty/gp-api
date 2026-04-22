@@ -24,10 +24,8 @@ describe('AgentDispatchService', () => {
 
   beforeEach(() => {
     vi.stubEnv('AWS_REGION', 'us-west-2')
-    vi.stubEnv(
-      'AGENT_DISPATCH_QUEUE_URL',
-      'https://sqs.us-west-2.amazonaws.com/123/agent-dispatch-dev.fifo',
-    )
+    vi.stubEnv('SQS_QUEUE_BASE_URL', 'https://sqs.us-west-2.amazonaws.com/123')
+    vi.stubEnv('AGENT_DISPATCH_QUEUE_NAME', 'agent-dispatch-dev.fifo')
 
     logger = createMockLogger()
     experimentRunsService = {
@@ -36,7 +34,7 @@ describe('AgentDispatchService', () => {
           id: 'mock-id',
           runId: 'mock-run-id',
           experimentId: 'voter_targeting',
-          candidateId: 'candidate-1',
+          organizationSlug: 'acme-for-mayor',
           status: 'PENDING',
         }),
       },
@@ -57,14 +55,14 @@ describe('AgentDispatchService', () => {
 
     const result = await service.dispatch({
       experimentId: 'voter_targeting',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       params: { key: 'value' },
     })
 
     expect(experimentRunsService.model.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         experimentId: 'voter_targeting',
-        candidateId: 'candidate-1',
+        organizationSlug: 'acme-for-mayor',
         status: 'PENDING',
         params: { key: 'value' },
       }),
@@ -72,7 +70,7 @@ describe('AgentDispatchService', () => {
 
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        groupId: 'agent-dispatch-candidate-1',
+        groupId: 'agent-dispatch-acme-for-mayor',
         body: expect.any(String),
       }),
     )
@@ -80,7 +78,7 @@ describe('AgentDispatchService', () => {
     const sentBody = JSON.parse(mockSend.mock.calls[0][0].body as string)
     expect(sentBody).toMatchObject({
       experiment_id: 'voter_targeting',
-      candidate_id: 'candidate-1',
+      organization_slug: 'acme-for-mayor',
       run_id: result.runId,
       params: { key: 'value' },
     })
@@ -88,7 +86,7 @@ describe('AgentDispatchService', () => {
     expect(result.runId).toMatch(/^[0-9a-f-]{36}$/)
     expect(result).toMatchObject({
       experimentId: 'voter_targeting',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       status: 'dispatched',
     })
 
@@ -103,7 +101,7 @@ describe('AgentDispatchService', () => {
     await expect(
       service.dispatch({
         experimentId: 'voter_targeting',
-        candidateId: 'candidate-1',
+        organizationSlug: 'acme-for-mayor',
         params: {},
       }),
     ).rejects.toThrow('Failed to dispatch experiment. Please try again.')
@@ -125,7 +123,7 @@ describe('AgentDispatchService', () => {
     await expect(
       service.dispatch({
         experimentId: 'voter_targeting',
-        candidateId: 'candidate-1',
+        organizationSlug: 'acme-for-mayor',
         params: {},
       }),
     ).rejects.toThrow('DB connection lost')
@@ -138,12 +136,12 @@ describe('AgentDispatchService', () => {
 
     const result1 = await service.dispatch({
       experimentId: 'voter_targeting',
-      candidateId: 'c1',
+      organizationSlug: 'acme-for-mayor',
       params: {},
     })
     const result2 = await service.dispatch({
       experimentId: 'voter_targeting',
-      candidateId: 'c1',
+      organizationSlug: 'acme-for-mayor',
       params: {},
     })
 
