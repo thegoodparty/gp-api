@@ -21,7 +21,7 @@ const makeResultMessage = (data: Record<string, unknown>): Message => ({
     data: {
       experimentId: 'hello_world',
       runId: 'run-123',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       status: 'success',
       artifactKey: 'hello_world/run-123/result.json',
       artifactBucket: 'gp-agent-artifacts-dev',
@@ -247,7 +247,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
         type: QueueType.AGENT_EXPERIMENT_RESULT,
         data: {
           runId: 'run-123',
-          candidateId: 'candidate-1',
+          organizationSlug: 'acme-for-mayor',
           status: 'success',
         },
       }),
@@ -267,7 +267,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
         type: QueueType.AGENT_EXPERIMENT_RESULT,
         data: {
           experimentId: 'hello_world',
-          candidateId: 'candidate-1',
+          organizationSlug: 'acme-for-mayor',
           status: 'success',
         },
       }),
@@ -280,7 +280,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     ).not.toHaveBeenCalled()
   })
 
-  it('throws ZodError when candidateId is missing', async () => {
+  it('throws ZodError when organizationSlug is missing', async () => {
     const message: Message = {
       MessageId: 'msg-1',
       Body: JSON.stringify({

@@ -8,21 +8,21 @@ enum ExperimentRunStatus {
 }
 
 model ExperimentRun {
-  id              String              @id @default(uuid(7))
-  runId           String              @unique @map("run_id")
-  experimentId    String              @map("experiment_id")
-  candidateId     String              @map("candidate_id")
-  status          ExperimentRunStatus @default(PENDING)
-  params          Json                @default("{}") @db.JsonB
-  artifactBucket  String?             @map("artifact_bucket")
-  artifactKey     String?             @map("artifact_key")
-  durationSeconds Float?              @map("duration_seconds")
-  error           String?
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  id               String              @id @default(uuid(7))
+  runId            String              @unique @map("run_id")
+  experimentId     String              @map("experiment_id")
+  organizationSlug String              @map("organization_slug")
+  organization     Organization        @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+  status           ExperimentRunStatus @default(PENDING)
+  params           Json                @default("{}") @db.JsonB
+  artifactBucket   String?             @map("artifact_bucket")
+  artifactKey      String?             @map("artifact_key")
+  durationSeconds  Float?              @map("duration_seconds")
+  error            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  @@index([experimentId])
-  @@index([candidateId])
+  @@index([organizationSlug, experimentId])
   @@index([status])
   @@map("experiment_run")
 }

@@ -63,9 +63,9 @@ export class CandidateExperimentsService {
 
   async getMyRuns(user: User) {
     const campaign = await this.getCampaignForUser(user.id)
-    const candidateId = String(campaign.id)
+    const organizationSlug = campaign.organizationSlug
     return this.experimentRuns.findMany({
-      where: { candidateId },
+      where: { organizationSlug },
       orderBy: { createdAt: 'desc' },
     })
   }
@@ -84,10 +84,10 @@ export class CandidateExperimentsService {
       throw new ForbiddenException('Campaign is not enrolled in AI beta')
     }
 
-    const candidateId = String(campaign.id)
+    const organizationSlug = campaign.organizationSlug
     const existingRun = await this.experimentRuns.findFirst({
       where: {
-        candidateId,
+        organizationSlug,
         experimentId: body.experimentId,
         status: { in: ['PENDING', 'RUNNING'] },
       },
@@ -105,7 +105,7 @@ export class CandidateExperimentsService {
         (k) => !allowedKeys.includes(k),
       )
       this.logger.warn(
-        { experimentId: body.experimentId, candidateId, strippedKeys },
+        { experimentId: body.experimentId, organizationSlug, strippedKeys },
         'Stripped unknown param keys',
       )
     }
@@ -124,7 +124,7 @@ export class CandidateExperimentsService {
       if (body.experimentId === 'district_intel') {
         await this.experimentRuns.updateMany({
           where: {
-            candidateId: String(campaign.id),
+            organizationSlug,
             experimentId: {
               in: ['peer_city_benchmarking', 'meeting_briefing'],
             },
@@ -151,7 +151,7 @@ export class CandidateExperimentsService {
 
   async getArtifact(user: User, runId: string) {
     const campaign = await this.getCampaignForUser(user.id)
-    const candidateId = String(campaign.id)
+    const organizationSlug = campaign.organizationSlug
 
     const run = await this.experimentRuns.findFirst({
       where: { runId },
@@ -159,7 +159,7 @@ export class CandidateExperimentsService {
     if (!run) {
       throw new NotFoundException('Experiment run not found')
     }
-    if (run.candidateId !== candidateId) {
+    if (run.organizationSlug !== organizationSlug) {
       throw new ForbiddenException(
         'Experiment run does not belong to your campaign',
       )
@@ -218,7 +218,7 @@ export class CandidateExperimentsService {
 
     return this.dispatchService.dispatch({
       experimentId: body.experimentId,
-      candidateId: String(campaign.id),
+      organizationSlug: campaign.organizationSlug,
       params: { ...body.params, ...autoParams },
     })
   }
@@ -264,10 +264,10 @@ export class CandidateExperimentsService {
     }
 
     if (body.experimentId === 'peer_city_benchmarking') {
-      const candidateId = String(campaign.id)
+      const organizationSlug = campaign.organizationSlug
       const districtIntelRun = await this.experimentRuns.findFirst({
         where: {
-          candidateId,
+          organizationSlug,
           experimentId: 'district_intel',
           status: 'SUCCESS',
         },
@@ -286,10 +286,10 @@ export class CandidateExperimentsService {
     }
 
     if (body.experimentId === 'meeting_briefing') {
-      const candidateId = String(campaign.id)
+      const organizationSlug = campaign.organizationSlug
       const districtIntelRun = await this.experimentRuns.findFirst({
         where: {
-          candidateId,
+          organizationSlug,
           experimentId: 'district_intel',
           status: 'SUCCESS',
         },
@@ -305,7 +305,7 @@ export class CandidateExperimentsService {
 
     return this.dispatchService.dispatch({
       experimentId: body.experimentId,
-      candidateId: String(campaign.id),
+      organizationSlug: campaign.organizationSlug,
       params: { ...body.params, ...autoParams },
     })
   }

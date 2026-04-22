@@ -1318,4 +1318,94 @@ describe('QueueConsumerService - message type routing', () => {
 
     expect(result).toBe(true)
   })
+
+describe('QueueConsumerService - poison pill handling', () => {
+  let service: QueueConsumerService
+  let mockLogger: ReturnType<typeof createMockLogger>
+  let experimentRunsService: {
+    findFirst: ReturnType<typeof vi.fn>
+    client: {
+      experimentRun: { update: ReturnType<typeof vi.fn> }
+    }
+  }
+
+  beforeEach(() => {
+    mockLogger = createMockLogger()
+    experimentRunsService = {
+      findFirst: vi.fn(),
+      client: {
+        experimentRun: { update: vi.fn() },
+      },
+    }
+
+    service = new QueueConsumerService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      experimentRunsService as never,
+      mockLogger,
+    )
+  })
+
+  it('deletes messages with malformed agentExperimentResult data (zod validation fails)', async () => {
+    const receiptHandle = 'receipt-handle-malformed-zod'
+    const message: Message = {
+      MessageId: 'msg-poison-zod',
+      ReceiptHandle: receiptHandle,
+      Body: JSON.stringify({
+        type: QueueType.AGENT_EXPERIMENT_RESULT,
+        data: {
+          candidateId: '4',
+          experimentId: 'x',
+          runId: 'r',
+          status: 'failed',
+        },
+      }),
+    }
+
+    const result = await service.handleMessage(message)
+
+    expect(result).toBe(true)
+    expect(experimentRunsService.findFirst).not.toHaveBeenCalled()
+  })
+
+  it('deletes messages with a non-JSON Body rather than re-queueing forever', async () => {
+    const message: Message = {
+      MessageId: 'msg-poison-json',
+      ReceiptHandle: 'receipt-handle-garbage',
+      Body: 'not json',
+    }
+
+    const result = await service.handleMessage(message)
+
+    expect(result).toBe(true)
+  })
+
+  it('deletes messages with an unrecognized type rather than silently looping', async () => {
+    const message: Message = {
+      MessageId: 'msg-poison-type',
+      ReceiptHandle: 'receipt-handle-unknown-type',
+      Body: JSON.stringify({
+        type: 'unrecognizedFutureEvent',
+        data: { foo: 'bar' },
+      }),
+    }
+
+    const result = await service.handleMessage(message)
+
+    expect(result).toBe(true)
+  })
 })

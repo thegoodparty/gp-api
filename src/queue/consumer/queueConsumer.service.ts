@@ -13,6 +13,7 @@ import {
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { ZodError } from 'zod'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -74,13 +75,22 @@ import type { AgentExperimentResultData } from '../queue.types'
 
 import { ExperimentRunStatus } from '@prisma/client'
 
+class UnrecognizedQueueTypeError extends Error {
+  constructor(public readonly receivedType: unknown) {
+    super(`Unrecognized queue message type: ${String(receivedType)}`)
+    this.name = 'UnrecognizedQueueTypeError'
+  }
+}
+
 const EXPERIMENT_STATUS_MAP: Record<
   AgentExperimentResultData['status'],
   ExperimentRunStatus
 > = {
+  running: ExperimentRunStatus.RUNNING,
   success: ExperimentRunStatus.SUCCESS,
   failed: ExperimentRunStatus.FAILED,
   contract_violation: ExperimentRunStatus.CONTRACT_VIOLATION,
+  stale: ExperimentRunStatus.STALE,
 }
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
@@ -193,6 +203,10 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
+      if (this.isPoisonPill(error)) {
+        this.logPoisonPill(message, error)
+        return false // Don't requeue — delete poison pill from queue
+      }
       this.logger.error({
         message,
         error: serializeError(error),
@@ -200,6 +214,28 @@ export class QueueConsumerService {
       })
       return true // Indicate that we should requeue
     }
+  }
+
+  private isPoisonPill(error: unknown): boolean {
+    if (error instanceof ZodError) return true
+    if (error instanceof SyntaxError) return true
+    if (error instanceof UnrecognizedQueueTypeError) return true
+    return false
+  }
+
+  private logPoisonPill(message: Message, error: unknown) {
+    const body = message.Body ?? ''
+    const truncatedBody =
+      body.length > 500 ? `${body.slice(0, 500)}...(truncated)` : body
+    this.logger.warn(
+      {
+        messageId: message.MessageId,
+        receiptHandle: message.ReceiptHandle,
+        bodyPreview: truncatedBody,
+        error: serializeError(error),
+      },
+      'Poison pill detected — deleting from queue to unblock MessageGroup',
+    )
   }
 
   private legacyShouldRequeueError(error: Error): boolean {
@@ -379,11 +415,9 @@ export class QueueConsumerService {
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
       default:
-        this.logger.warn(
-          { messageId: message.MessageId, body: message.Body },
-          'unknown queue message type',
+        throw new UnrecognizedQueueTypeError(
+          (queueMessage as { type?: unknown })?.type,
         )
-        return true
     }
   }
 

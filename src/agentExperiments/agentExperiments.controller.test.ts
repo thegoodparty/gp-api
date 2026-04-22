@@ -23,7 +23,7 @@ describe('AgentExperimentsController', () => {
       dispatch: vi.fn().mockResolvedValue({
         runId: 'test-run-id',
         experimentId: 'voter_targeting',
-        candidateId: 'candidate-1',
+        organizationSlug: 'acme-for-mayor',
         status: 'dispatched',
       }),
     }
@@ -32,14 +32,14 @@ describe('AgentExperimentsController', () => {
         {
           runId: 'run-1',
           experimentId: 'voter_targeting',
-          candidateId: '42',
+          organizationSlug: 'acme-for-mayor',
           status: 'SUCCESS',
         },
       ]),
       requestExperiment: vi.fn().mockResolvedValue({
         runId: 'new-run-id',
         experimentId: 'voter_targeting',
-        candidateId: '42',
+        organizationSlug: 'acme-for-mayor',
         status: 'dispatched',
       }),
       getArtifact: vi.fn().mockResolvedValue({ result: 'data' }),
@@ -53,20 +53,20 @@ describe('AgentExperimentsController', () => {
   it('dispatches an experiment and returns the result', async () => {
     const result = await controller.dispatch({
       experimentId: 'voter_targeting',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       params: { foo: 'bar' },
     })
 
     expect(dispatchService.dispatch).toHaveBeenCalledWith({
       experimentId: 'voter_targeting',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       params: { foo: 'bar' },
     })
 
     expect(result).toEqual({
       runId: 'test-run-id',
       experimentId: 'voter_targeting',
-      candidateId: 'candidate-1',
+      organizationSlug: 'acme-for-mayor',
       status: 'dispatched',
     })
   })
@@ -79,14 +79,17 @@ describe('AgentExperimentsController', () => {
       {
         runId: 'run-1',
         experimentId: 'voter_targeting',
-        candidateId: '42',
+        organizationSlug: 'acme-for-mayor',
         status: 'SUCCESS',
       },
     ])
   })
 
   it('requests an experiment for the current user', async () => {
-    const body = { experimentId: 'voter_targeting', params: { key: 'val' } }
+    const body = {
+      experimentId: 'voter_targeting' as const,
+      params: { key: 'val' },
+    }
     const result = await controller.requestExperiment(testUser, body)
 
     expect(candidateExperiments.requestExperiment).toHaveBeenCalledWith(
@@ -96,7 +99,7 @@ describe('AgentExperimentsController', () => {
     expect(result).toEqual({
       runId: 'new-run-id',
       experimentId: 'voter_targeting',
-      candidateId: '42',
+      organizationSlug: 'acme-for-mayor',
       status: 'dispatched',
     })
   })

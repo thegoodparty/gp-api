@@ -165,11 +165,23 @@ export type PollClusterAnalysisJson = z.infer<
 export const AgentExperimentResultSchema = z.object({
   experimentId: z.string(),
   runId: z.string(),
-  candidateId: z.string(),
-  status: z.enum(['success', 'failed', 'contract_violation']),
+  organizationSlug: z.string(),
+  // pmf-engine emits `running` when the agent first starts, and `stale` when
+  // an upstream dependency (e.g. district_intel) was regenerated, invalidating
+  // this run. Both map to Prisma ExperimentRunStatus enum values.
+  status: z.enum([
+    'running',
+    'success',
+    'failed',
+    'contract_violation',
+    'stale',
+  ]),
   artifactKey: z.string().optional(),
   artifactBucket: z.string().optional(),
   durationSeconds: z.number().optional(),
+  costUsd: z.number().optional(),
+  reasonCode: z.string().optional(),
+  detail: z.string().optional(),
   error: z.string().optional(),
 })
 

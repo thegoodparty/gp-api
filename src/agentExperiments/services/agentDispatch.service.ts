@@ -19,8 +19,15 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
+const resolveQueueUrl = () => {
+  const name = process.env.AGENT_DISPATCH_QUEUE_NAME
+  const base = process.env.SQS_QUEUE_BASE_URL
+  if (!name || !base) return ''
+  return `${base}/${name}`
+}
+
 const dispatchProducer = Producer.create({
-  queueUrl: process.env.AGENT_DISPATCH_QUEUE_URL || '',
+  queueUrl: resolveQueueUrl(),
   sqs: new SQSClient(sqsConfig),
 })
 
@@ -40,7 +47,7 @@ export class AgentDispatchService {
       data: {
         runId,
         experimentId: input.experimentId,
-        candidateId: input.candidateId,
+        organizationSlug: input.organizationSlug,
         status: 'PENDING',
         params: input.params,
       },
@@ -48,7 +55,7 @@ export class AgentDispatchService {
 
     const messageBody = {
       experiment_id: input.experimentId,
-      candidate_id: input.candidateId,
+      organization_slug: input.organizationSlug,
       run_id: runId,
       params: input.params,
     }
@@ -60,7 +67,7 @@ export class AgentDispatchService {
         id: deduplicationId,
         body: JSON.stringify(messageBody),
         deduplicationId,
-        groupId: `agent-dispatch-${input.candidateId}`,
+        groupId: `agent-dispatch-${input.organizationSlug}`,
       })
     } catch (error) {
       this.logger.error(
@@ -68,7 +75,7 @@ export class AgentDispatchService {
           error,
           runId,
           experimentId: input.experimentId,
-          candidateId: input.candidateId,
+          organizationSlug: input.organizationSlug,
         },
         'Failed to send dispatch message to SQS',
       )
@@ -85,7 +92,7 @@ export class AgentDispatchService {
       {
         runId,
         experimentId: input.experimentId,
-        candidateId: input.candidateId,
+        organizationSlug: input.organizationSlug,
       },
       'Experiment dispatched',
     )
@@ -93,7 +100,7 @@ export class AgentDispatchService {
     return {
       runId,
       experimentId: input.experimentId,
-      candidateId: input.candidateId,
+      organizationSlug: input.organizationSlug,
       status: 'dispatched' as const,
     }
   }

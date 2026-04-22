@@ -13,7 +13,7 @@ const experimentIdSchema = z.enum(EXPERIMENT_IDS)
 
 const dispatchExperimentSchema = z.object({
   experimentId: experimentIdSchema,
-  candidateId: z.string().min(1),
+  organizationSlug: z.string().min(1),
   params: z.record(z.unknown()).default({}),
 })
 
