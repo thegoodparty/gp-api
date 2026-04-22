@@ -4,6 +4,8 @@ import { ClerkClient } from '@clerk/backend'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersService } from './users.service'
+import { AnalyticsService } from '@/analytics/analytics.service'
+import { StripeService } from '@/vendors/stripe/services/stripe.service'
 
 const service = useTestService()
 
@@ -267,6 +269,202 @@ describe('UsersService', () => {
       await expect(
         usersService.impersonateUser(service.user.id, 'user_actor_clerk_id'),
       ).rejects.toThrow(BadGatewayException)
+    })
+  })
+
+  describe('deleteUser', () => {
+    let clerkClient: ClerkClient
+    let analyticsService: AnalyticsService
+    let stripeService: StripeService
+
+    beforeEach(() => {
+      clerkClient = service.app.get<ClerkClient>(CLERK_CLIENT_PROVIDER_TOKEN)
+      analyticsService = service.app.get<AnalyticsService>(AnalyticsService)
+      stripeService = service.app.get<StripeService>(StripeService)
+    })
+
+    it('deletes the DB record and calls clerkClient.users.deleteUser when user has a clerkId', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'delete-me@example.com',
+          clerkId: 'clerk_delete_test_id',
+        },
+      })
+      vi.spyOn(clerkClient.users, 'deleteUser').mockResolvedValue(
+        {} as Awaited<ReturnType<typeof clerkClient.users.deleteUser>>,
+      )
+      vi.spyOn(analyticsService, 'track').mockResolvedValue(
+        {} as Awaited<ReturnType<typeof analyticsService.track>>,
+      )
+
+      await usersService.deleteUser(targetUser.id, service.user.id)
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).toBeNull()
+      expect(clerkClient.users.deleteUser).toHaveBeenCalledWith(
+        'clerk_delete_test_id',
+      )
+    })
+
+    it('deletes the DB record and skips Clerk when user has no clerkId', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'no-clerk@example.com',
+          clerkId: null,
+        },
+      })
+      const deleteUserSpy = vi
+        .spyOn(clerkClient.users, 'deleteUser')
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof clerkClient.users.deleteUser>>,
+        )
+      vi.spyOn(analyticsService, 'track').mockResolvedValue(
+        {} as Awaited<ReturnType<typeof analyticsService.track>>,
+      )
+
+      await usersService.deleteUser(targetUser.id, service.user.id)
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).toBeNull()
+      expect(deleteUserSpy).not.toHaveBeenCalled()
+    })
+
+    it('rolls back DB delete and throws BadGatewayException when Clerk deleteUser fails', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'clerk-fail@example.com',
+          clerkId: 'clerk_fail_id',
+        },
+      })
+      vi.spyOn(clerkClient.users, 'deleteUser').mockRejectedValue(
+        new Error('Clerk API error'),
+      )
+
+      await expect(
+        usersService.deleteUser(targetUser.id, service.user.id),
+      ).rejects.toThrow(BadGatewayException)
+
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).not.toBeNull()
+    })
+
+    it('fires Account - User Deleted event with self initiatedBy when user deletes their own account', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'self-delete@example.com',
+          clerkId: null,
+        },
+      })
+      const trackSpy = vi
+        .spyOn(analyticsService, 'track')
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
+
+      await usersService.deleteUser(targetUser.id, targetUser.id)
+
+      expect(trackSpy).toHaveBeenCalledWith(
+        targetUser.id,
+        'Account - User Deleted',
+        expect.not.objectContaining({ initiatedByUserId: expect.anything() }),
+        expect.objectContaining({ email: targetUser.email }),
+      )
+    })
+
+    it('fires Account - User Deleted event with admin initiatedBy when an admin deletes an account', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'admin-deleted@example.com',
+          clerkId: null,
+        },
+      })
+      const trackSpy = vi
+        .spyOn(analyticsService, 'track')
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
+
+      await usersService.deleteUser(targetUser.id, service.user.id)
+
+      expect(trackSpy).toHaveBeenCalledWith(
+        targetUser.id,
+        'Account - User Deleted',
+        expect.objectContaining({
+          initiatedBy: 'admin',
+          initiatedByUserId: service.user.id,
+        }),
+        expect.objectContaining({ email: targetUser.email }),
+      )
+    })
+
+    it('does not fire analytics event when Clerk deletion fails', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'analytics-no-fire@example.com',
+          clerkId: 'clerk_analytics_fail_id',
+        },
+      })
+      vi.spyOn(clerkClient.users, 'deleteUser').mockRejectedValue(
+        new Error('Clerk API error'),
+      )
+      const trackSpy = vi
+        .spyOn(analyticsService, 'track')
+        .mockResolvedValue(
+          {} as Awaited<ReturnType<typeof analyticsService.track>>,
+        )
+
+      await expect(
+        usersService.deleteUser(targetUser.id, service.user.id),
+      ).rejects.toThrow(BadGatewayException)
+
+      expect(trackSpy).not.toHaveBeenCalled()
+    })
+
+    it('does not cancel Stripe subscription when Clerk deletion fails and transaction rolls back', async () => {
+      const targetUser = await service.prisma.user.create({
+        data: {
+          email: 'stripe-rollback@example.com',
+          clerkId: 'clerk_stripe_rollback_id',
+        },
+      })
+      await service.prisma.organization.create({
+        data: {
+          slug: `org-stripe-rollback-${targetUser.id}`,
+          ownerId: targetUser.id,
+          positionId: 'br-pos-stripe-test',
+        },
+      })
+      await service.prisma.campaign.create({
+        data: {
+          userId: targetUser.id,
+          slug: `stripe-rollback-${targetUser.id}`,
+          organizationSlug: `org-stripe-rollback-${targetUser.id}`,
+          details: { subscriptionId: 'sub_should_not_cancel' },
+        },
+      })
+
+      vi.spyOn(clerkClient.users, 'deleteUser').mockRejectedValue(
+        new Error('Clerk API error'),
+      )
+      const cancelSpy = vi
+        .spyOn(stripeService, 'cancelSubscription')
+        .mockResolvedValue(undefined as never)
+
+      await expect(
+        usersService.deleteUser(targetUser.id, service.user.id),
+      ).rejects.toThrow(BadGatewayException)
+
+      expect(cancelSpy).not.toHaveBeenCalled()
+      const found = await service.prisma.user.findUnique({
+        where: { id: targetUser.id },
+      })
+      expect(found).not.toBeNull()
     })
   })
 })
