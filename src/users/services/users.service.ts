@@ -42,6 +42,16 @@ import { CrmUsersService } from './crmUsers.service'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
+// Shared bucket for all Clerk calls made during test-user cleanup. Hoisted to
+// module scope so rate-limit state is shared across getUserList and every
+// deleteUser call in a single sweep (and across sweeps).
+const clerkCleanupThrottle = throttle({ limit: 2, interval: 1000 })
+const throttledClerkRequest = clerkCleanupThrottle(<T>(fn: () => Promise<T>) =>
+  fn(),
+)
+
+const TEST_USER_DOMAIN = '@test.goodparty.org'
+
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(
@@ -528,119 +538,70 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
   /**
    * Regularly deletes old e2e test users that were created more than 3 hours
-   * ago. Pass 1 (every env) clears any DB rows we own; Pass 2 (dev only) sweeps
-   * orphan Clerk users in the shared non-live instance.
+   * ago. Cleans out users from both the postgres db and from Clerk.
    */
   @Interval(ms('6h'))
   async deleteTestUsers() {
-    const cutoff = subHours(new Date(), 3)
-    const throttledClerkDelete = throttle({ limit: 10, interval: 1000 })(
-      (clerkId: string) => this.clerkClient.users.deleteUser(clerkId),
-    )
+    try {
+      const cutoff = subHours(new Date(), 3)
 
-    const dbDeleted = await this.deleteDbTestUsers(cutoff, throttledClerkDelete)
-    const orphansDeleted =
-      process.env.OTEL_SERVICE_ENVIRONMENT === 'dev'
-        ? await this.sweepOrphanClerkTestUsers(cutoff, throttledClerkDelete)
-        : 0
+      // 1. Delete DB users.
+      const dbUsers = await this.model.findMany({
+        where: {
+          email: { endsWith: TEST_USER_DOMAIN },
+          createdAt: { lt: cutoff },
+        },
+        select: { id: true, email: true },
+      })
 
-    this.logger.info(
-      { dbDeleted, orphansDeleted },
-      'Test user cleanup complete',
-    )
-  }
-
-  private async deleteDbTestUsers(
-    cutoff: Date,
-    throttledClerkDelete: (clerkId: string) => Promise<unknown>,
-  ) {
-    const testUsers = await this.model.findMany({
-      where: {
-        email: { endsWith: '@test.goodparty.org' },
-        createdAt: { lt: cutoff },
-      },
-      select: { id: true, clerkId: true, email: true },
-    })
-
-    this.logger.info(`Found ${testUsers.length} DB test users to delete`)
-
-    let deleted = 0
-    for (const user of testUsers) {
-      if (user.clerkId) {
+      for (const dbUser of dbUsers) {
         try {
-          await throttledClerkDelete(user.clerkId)
+          await this.model.delete({ where: { id: dbUser.id } })
+          this.logger.info({ userId: dbUser.id }, 'Deleted DB test user')
         } catch (err) {
-          this.logger.warn(
-            { err, clerkId: user.clerkId, email: user.email },
-            'Failed to delete Clerk user during DB test-user cleanup',
+          this.logger.error(
+            { err, userId: dbUser.id },
+            'Failed to delete DB test user, skipping',
           )
         }
       }
 
-      try {
-        await this.model.delete({ where: { id: user.id } })
-        deleted++
-      } catch (err) {
-        this.logger.warn(
-          { err, userId: user.id, email: user.email },
-          'Failed to delete DB test user',
+      // 2. Delete Clerk users.
+      // For now, don't worry about paginating. This 500 limit will always
+      // catch up at our current pace of test user creation.
+      const { data: clerkUsers } = await throttledClerkRequest(() =>
+        this.clerkClient.users.getUserList({
+          limit: 500,
+          query: TEST_USER_DOMAIN,
+        }),
+      )
+
+      const clerkUsersToDelete = clerkUsers
+        .filter((user) =>
+          user.emailAddresses.some((e) =>
+            e.emailAddress.endsWith(TEST_USER_DOMAIN),
+          ),
         )
-      }
-    }
+        .filter((user) => user.createdAt < cutoff.getTime())
 
-    return deleted
-  }
-
-  private async sweepOrphanClerkTestUsers(
-    cutoff: Date,
-    throttledClerkDelete: (clerkId: string) => Promise<unknown>,
-  ) {
-    const cutoffMs = cutoff.getTime()
-    const pageSize = 100
-    let offset = 0
-    let deleted = 0
-
-    while (true) {
-      const { data: clerkUsers } = await this.clerkClient.users.getUserList({
-        limit: pageSize,
-        offset,
-      })
-
-      if (clerkUsers.length === 0) break
-
-      const candidates = clerkUsers.filter((user) => {
-        const email =
-          user.primaryEmailAddress?.emailAddress ??
-          user.emailAddresses?.[0]?.emailAddress
-        return (
-          email?.endsWith('@test.goodparty.org') && user.createdAt < cutoffMs
-        )
-      })
-
-      for (const clerkUser of candidates) {
-        const existing = await this.model.findUnique({
-          where: { clerkId: clerkUser.id },
-          select: { id: true },
-        })
-        if (existing) continue
-
+      for (const clerkUser of clerkUsersToDelete) {
         try {
-          await throttledClerkDelete(clerkUser.id)
-          deleted++
+          await throttledClerkRequest(() =>
+            this.clerkClient.users.deleteUser(clerkUser.id),
+          )
+          this.logger.info({ userId: clerkUser.id }, 'Deleted Clerk test user')
         } catch (err) {
-          this.logger.warn(
-            { err, clerkId: clerkUser.id },
-            'Failed to delete orphan Clerk test user',
+          this.logger.error(
+            { err, userId: clerkUser.id },
+            'Failed to delete Clerk test user, skipping',
           )
         }
       }
 
-      if (clerkUsers.length < pageSize) break
-      offset += pageSize
+      this.logger.info('Test user cleanup pass complete')
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to delete test users')
     }
-
-    this.logger.info(`Deleted ${deleted} orphan Clerk test users`)
-    return deleted
   }
 
   private wrapReadsWithEnrichment() {
