@@ -21,7 +21,6 @@ import { Interval } from '@nestjs/schedule'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { subHours } from 'date-fns'
-import { chunk } from 'es-toolkit'
 import ms from 'ms'
 import throttle from 'p-throttle'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -531,32 +530,120 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   }
 
   /**
-   * Regularly automatically delete old test users that were
-   * created more than 3 hours ago.
+   * Regularly deletes old e2e test users that were created more than 3 hours
+   * ago. Pass 1 (every env) clears any DB rows we own; Pass 2 (dev only) sweeps
+   * orphan Clerk users in the shared non-live instance.
    */
   @Interval(ms('6h'))
   async deleteTestUsers() {
+    const cutoff = subHours(new Date(), 3)
+    const throttledClerkDelete = throttle({ limit: 10, interval: 1000 })(
+      (clerkId: string) => this.clerkClient.users.deleteUser(clerkId),
+    )
+
+    const dbDeleted = await this.deleteDbTestUsers(cutoff, throttledClerkDelete)
+    const orphansDeleted =
+      process.env.OTEL_SERVICE_ENVIRONMENT === 'dev'
+        ? await this.sweepOrphanClerkTestUsers(cutoff, throttledClerkDelete)
+        : 0
+
+    this.logger.info(
+      { dbDeleted, orphansDeleted },
+      'Test user cleanup complete',
+    )
+  }
+
+  private async deleteDbTestUsers(
+    cutoff: Date,
+    throttledClerkDelete: (clerkId: string) => Promise<unknown>,
+  ) {
     const testUsers = await this.model.findMany({
       where: {
         email: { endsWith: '@test.goodparty.org' },
-        createdAt: { lt: subHours(new Date(), 3) },
+        createdAt: { lt: cutoff },
       },
+      select: { id: true, clerkId: true, email: true },
     })
 
-    this.logger.info(`Found ${testUsers.length} test users to delete`)
+    this.logger.info(`Found ${testUsers.length} DB test users to delete`)
 
-    const deleteUsers = throttle({ limit: 1, interval: 1000 })(
-      async (userIds: number[]) =>
-        this.model.deleteMany({ where: { id: { in: userIds } } }),
-    )
+    let deleted = 0
+    for (const user of testUsers) {
+      if (user.clerkId) {
+        try {
+          await throttledClerkDelete(user.clerkId)
+        } catch (err) {
+          this.logger.warn(
+            { err, clerkId: user.clerkId, email: user.email },
+            'Failed to delete Clerk user during DB test-user cleanup',
+          )
+        }
+      }
 
-    for (const users of chunk(testUsers, 10)) {
-      await deleteUsers(users.map((user) => user.id))
-      this.logger.info({
-        ids: users.map((user) => user.id),
-        msg: 'Deleted users',
-      })
+      try {
+        await this.model.delete({ where: { id: user.id } })
+        deleted++
+      } catch (err) {
+        this.logger.warn(
+          { err, userId: user.id, email: user.email },
+          'Failed to delete DB test user',
+        )
+      }
     }
+
+    return deleted
+  }
+
+  private async sweepOrphanClerkTestUsers(
+    cutoff: Date,
+    throttledClerkDelete: (clerkId: string) => Promise<unknown>,
+  ) {
+    const cutoffMs = cutoff.getTime()
+    const pageSize = 100
+    let offset = 0
+    let deleted = 0
+
+    while (true) {
+      const { data: clerkUsers } = await this.clerkClient.users.getUserList({
+        limit: pageSize,
+        offset,
+      })
+
+      if (clerkUsers.length === 0) break
+
+      const candidates = clerkUsers.filter((user) => {
+        const email =
+          user.primaryEmailAddress?.emailAddress ??
+          user.emailAddresses?.[0]?.emailAddress
+        return (
+          email?.endsWith('@test.goodparty.org') && user.createdAt < cutoffMs
+        )
+      })
+
+      for (const clerkUser of candidates) {
+        const existing = await this.model.findUnique({
+          where: { clerkId: clerkUser.id },
+          select: { id: true },
+        })
+        if (existing) continue
+
+        try {
+          await throttledClerkDelete(clerkUser.id)
+          deleted++
+        } catch (err) {
+          this.logger.warn(
+            { err, clerkId: clerkUser.id },
+            'Failed to delete orphan Clerk test user',
+          )
+        }
+      }
+
+      if (clerkUsers.length < pageSize) break
+      offset += pageSize
+    }
+
+    this.logger.info(`Deleted ${deleted} orphan Clerk test users`)
+    return deleted
   }
 
   private wrapReadsWithEnrichment() {

@@ -1,8 +1,10 @@
 import { useTestService } from '@/test-service'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
-import { ClerkClient } from '@clerk/backend'
+import { ClerkClient, User } from '@clerk/backend'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { subHours } from 'date-fns'
+import ms from 'ms'
 import { UsersService } from './users.service'
 import { AnalyticsService } from '@/analytics/analytics.service'
 import { StripeService } from '@/vendors/stripe/services/stripe.service'
@@ -573,6 +575,221 @@ describe('UsersService', () => {
         where: { id: targetUser.id },
       })
       expect(found).not.toBeNull()
+    })
+  })
+
+  describe('deleteTestUsers', () => {
+    let clerkClient: ClerkClient
+    const ORIGINAL_ENV = process.env.OTEL_SERVICE_ENVIRONMENT
+
+    const makeClerkUser = (overrides: {
+      id: string
+      email: string
+      createdAt: number
+    }): User =>
+      ({
+        id: overrides.id,
+        createdAt: overrides.createdAt,
+        primaryEmailAddress: { emailAddress: overrides.email },
+        emailAddresses: [{ emailAddress: overrides.email }],
+      }) as unknown as User
+
+    const setGetUserListPages = (pages: User[][]) => {
+      const spy = vi.spyOn(clerkClient.users, 'getUserList')
+      pages.forEach((data) => {
+        spy.mockResolvedValueOnce({
+          data,
+          totalCount: data.length,
+        } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
+      })
+      spy.mockResolvedValue({
+        data: [],
+        totalCount: 0,
+      } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
+      return spy
+    }
+
+    beforeEach(() => {
+      clerkClient = service.app.get<ClerkClient>(CLERK_CLIENT_PROVIDER_TOKEN)
+      delete process.env.OTEL_SERVICE_ENVIRONMENT
+      vi.spyOn(clerkClient.users, 'deleteUser').mockResolvedValue(
+        {} as Awaited<ReturnType<typeof clerkClient.users.deleteUser>>,
+      )
+      vi.spyOn(clerkClient.users, 'getUserList').mockResolvedValue({
+        data: [],
+        totalCount: 0,
+      } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
+    })
+
+    afterEach(() => {
+      if (ORIGINAL_ENV === undefined) {
+        delete process.env.OTEL_SERVICE_ENVIRONMENT
+      } else {
+        process.env.OTEL_SERVICE_ENVIRONMENT = ORIGINAL_ENV
+      }
+    })
+
+    it('pass 1: deletes old DB test users with clerkId from Clerk and DB', async () => {
+      const user = await service.prisma.user.create({
+        data: {
+          email: 'test-1@test.goodparty.org',
+          clerkId: 'clerk_test_1',
+          createdAt: subHours(new Date(), 5),
+        },
+      })
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).toHaveBeenCalledWith('clerk_test_1')
+      const found = await service.prisma.user.findUnique({
+        where: { id: user.id },
+      })
+      expect(found).toBeNull()
+    })
+
+    it('pass 1: deletes DB user without clerkId and skips Clerk', async () => {
+      const user = await service.prisma.user.create({
+        data: {
+          email: 'test-2@test.goodparty.org',
+          clerkId: null,
+          createdAt: subHours(new Date(), 5),
+        },
+      })
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).not.toHaveBeenCalled()
+      const found = await service.prisma.user.findUnique({
+        where: { id: user.id },
+      })
+      expect(found).toBeNull()
+    })
+
+    it('pass 1: leaves DB test users younger than 3h alone', async () => {
+      const user = await service.prisma.user.create({
+        data: {
+          email: 'test-fresh@test.goodparty.org',
+          clerkId: 'clerk_fresh',
+          createdAt: new Date(Date.now() - ms('1h')),
+        },
+      })
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).not.toHaveBeenCalled()
+      const found = await service.prisma.user.findUnique({
+        where: { id: user.id },
+      })
+      expect(found).not.toBeNull()
+    })
+
+    it('pass 1: deletes DB row even when Clerk delete fails, and continues batch', async () => {
+      vi.spyOn(clerkClient.users, 'deleteUser').mockRejectedValueOnce(
+        new Error('Clerk API error'),
+      )
+
+      const failing = await service.prisma.user.create({
+        data: {
+          email: 'test-fail@test.goodparty.org',
+          clerkId: 'clerk_fail',
+          createdAt: subHours(new Date(), 5),
+        },
+      })
+      const succeeding = await service.prisma.user.create({
+        data: {
+          email: 'test-succeed@test.goodparty.org',
+          clerkId: 'clerk_succeed',
+          createdAt: subHours(new Date(), 5),
+        },
+      })
+
+      await usersService.deleteTestUsers()
+
+      const foundFailing = await service.prisma.user.findUnique({
+        where: { id: failing.id },
+      })
+      const foundSucceeding = await service.prisma.user.findUnique({
+        where: { id: succeeding.id },
+      })
+      expect(foundFailing).toBeNull()
+      expect(foundSucceeding).toBeNull()
+      expect(clerkClient.users.deleteUser).toHaveBeenCalledTimes(2)
+    })
+
+    it('pass 2 (dev): deletes orphan Clerk users with no DB row', async () => {
+      process.env.OTEL_SERVICE_ENVIRONMENT = 'dev'
+      setGetUserListPages([
+        [
+          makeClerkUser({
+            id: 'clerk_orphan',
+            email: 'test-orphan@test.goodparty.org',
+            createdAt: Date.now() - ms('5h'),
+          }),
+        ],
+      ])
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).toHaveBeenCalledWith('clerk_orphan')
+    })
+
+    it('pass 2 (dev): skips Clerk users with a matching DB row', async () => {
+      process.env.OTEL_SERVICE_ENVIRONMENT = 'dev'
+      await service.prisma.user.create({
+        data: {
+          email: 'still-here@goodparty.org',
+          clerkId: 'clerk_has_db_row',
+          createdAt: new Date(Date.now() - ms('1h')),
+        },
+      })
+      setGetUserListPages([
+        [
+          makeClerkUser({
+            id: 'clerk_has_db_row',
+            email: 'still-here@test.goodparty.org',
+            createdAt: Date.now() - ms('5h'),
+          }),
+        ],
+      ])
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).not.toHaveBeenCalled()
+    })
+
+    it('pass 2 (dev): skips Clerk users younger than 3h', async () => {
+      process.env.OTEL_SERVICE_ENVIRONMENT = 'dev'
+      setGetUserListPages([
+        [
+          makeClerkUser({
+            id: 'clerk_fresh_orphan',
+            email: 'fresh-orphan@test.goodparty.org',
+            createdAt: Date.now() - ms('1h'),
+          }),
+        ],
+      ])
+
+      await usersService.deleteTestUsers()
+
+      expect(clerkClient.users.deleteUser).not.toHaveBeenCalled()
+    })
+
+    it('pass 2 gate: does not paginate Clerk outside dev', async () => {
+      process.env.OTEL_SERVICE_ENVIRONMENT = 'qa'
+      const listSpy = setGetUserListPages([
+        [
+          makeClerkUser({
+            id: 'clerk_orphan_qa',
+            email: 'orphan-qa@test.goodparty.org',
+            createdAt: Date.now() - ms('5h'),
+          }),
+        ],
+      ])
+
+      await usersService.deleteTestUsers()
+
+      expect(listSpy).not.toHaveBeenCalled()
+      expect(clerkClient.users.deleteUser).not.toHaveBeenCalled()
     })
   })
 })
