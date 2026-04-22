@@ -6,6 +6,7 @@ import {
 } from '@/shared/constants/paginationOptions.consts'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 import { ClerkClient } from '@clerk/backend'
 import { type ListUsersPagination } from '@goodparty_org/contracts'
 import {
@@ -33,7 +34,6 @@ import Stripe from 'stripe'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
-import { EVENTS } from '@/vendors/segment/segment.types'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
@@ -188,12 +188,12 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           : []),
         ...(signUpMode
           ? [
-              {
-                name: 'facilitated_signup',
-                value:
-                  signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
-              },
-            ]
+            {
+              name: 'facilitated_signup',
+              value:
+                signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
+            },
+          ]
           : []),
       ],
       'registerPage',
@@ -384,20 +384,18 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       email: user?.email,
       hubspotId: metaData?.hubspotId as string | undefined,
     }
+    const trackingEvent = EVENTS.Account.UserDeleted
+    const trackingProperties = {
+      clerkId: user?.clerkId,
+      hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
+      initiatedBy: isSelf ? 'self' : 'admin',
+      ...(!isSelf && { initiatedByUserId }),
+    }
+
     try {
-      await this.analytics.track(
-        id,
-        EVENTS.Account.UserDeleted,
-        {
-          clerkId: user?.clerkId,
-          hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
-          initiatedBy: isSelf ? 'self' : 'admin',
-          ...(!isSelf && { initiatedByUserId }),
-        },
-        userContext,
-      )
+      await this.analytics.track(id, trackingEvent, trackingProperties, userContext)
     } catch (error) {
-      this.logger.error({ error }, 'Failed to track user deletion event')
+      this.logger.error({ error, trackingEvent, trackingProperties }, 'Failed to track user deletion event')
     }
   }
 
@@ -485,19 +483,19 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     const where: Prisma.UserWhereInput = {
       ...(firstName
         ? {
-            firstName: {
-              contains: firstName,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          }
+          firstName: {
+            contains: firstName,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        }
         : {}),
       ...(lastName
         ? {
-            lastName: {
-              contains: lastName,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          }
+          lastName: {
+            contains: lastName,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        }
         : {}),
       ...(email
         ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
