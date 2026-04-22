@@ -33,6 +33,20 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
     })
     orgSlug = campaignOrgSlug(reg.campaign.id)
 
+    // Default-task generation requires a today-or-future election date.
+    const futureElectionDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10)
+    const updateResponse = await request.put('/v1/campaigns/mine', {
+      headers: authHeaders(reg.token, orgSlug),
+      data: { details: { electionDate: futureElectionDate } },
+    })
+    if (!updateResponse.ok()) {
+      throw new Error(
+        `Campaign update failed: ${updateResponse.status()} ${await updateResponse.text()}`,
+      )
+    }
+
     // Trigger the SSE stream to create default tasks.
     // Use native fetch with AbortController — abort after 5s which is enough
     // for generateDefaultTasks to complete. Playwright's request API blocks
