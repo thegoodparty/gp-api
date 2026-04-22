@@ -97,7 +97,7 @@ export = async () => {
 
   const tevynPollCsvsBucket = new aws.s3.Bucket('tevyn-poll-csvs-bucket', {
     bucket: `tevyn-poll-csvs-${stage}`,
-    forceDestroy: false,
+    forceDestroy: environment === 'preview',
   })
 
   new aws.s3.BucketPublicAccessBlock('tevyn-poll-csvs-pab', {
@@ -110,7 +110,7 @@ export = async () => {
 
   const zipToAreaCodeBucket = new aws.s3.Bucket('zip-to-area-code-bucket', {
     bucket: `zip-to-area-code-mappings-${stage}`,
-    forceDestroy: false,
+    forceDestroy: environment === 'preview',
   })
   new aws.s3.BucketPublicAccessBlock('zip-to-area-code-mappings-pab', {
     bucket: zipToAreaCodeBucket.id,
