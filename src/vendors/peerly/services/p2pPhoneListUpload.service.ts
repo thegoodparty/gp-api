@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Readable } from 'stream'
 import { Campaign } from '@prisma/client'
@@ -57,6 +57,13 @@ export class P2pPhoneListUploadService {
         filters,
       )
     } catch (error) {
+      if (error instanceof HttpException) {
+        this.logger.warn(
+          { error },
+          `CSV generation rejected for campaign ${campaign.id} (HttpException passthrough)`,
+        )
+        throw error
+      }
       this.logger.error(
         { error },
         `Failed to generate CSV buffer for campaign ${campaign.id}:`,
