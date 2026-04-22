@@ -88,3 +88,8 @@ scripts/*.csv
 .ai
 repomix.config.json
 src/generated/route-types.ts
+
+# Claude Code
+.claude/settings.json
+.claude/settings.local.json
+.claude/worktrees/
