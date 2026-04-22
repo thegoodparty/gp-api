@@ -45,7 +45,6 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         .split('T')[0],
       geoLocation: {},
       party: faker.lorem.word(),
-      office: faker.lorem.word(),
       raceId: faker.string.nanoid(),
       pledged: faker.datatype.boolean(0.8),
       knowRun: faker.helpers.maybe(() => 'yes', { probability: 0.6 }),

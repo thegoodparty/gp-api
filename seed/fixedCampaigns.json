@@ -8,17 +8,14 @@
       "party": "Libertarian",
       "state": "MI",
       "county": "Lenawee County",
-      "office": "Other",
       "campaignCommittee": "Paper Street Paper Co.",
       "raceId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb25FbGVjdGlvbi8yMjM4Mjk1",
       "knowRun": "yes",
       "pledged": false,
       "electionId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvRWxlY3Rpb24vNTk4OQ==",
       "hasPrimary": true,
-      "positionId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMjIwMDg1",
       "ballotLevel": "CITY",
       "geoLocation": {},
-      "otherOffice": "Tecumseh City Mayor",
       "electionDate": "2026-11-03",
       "partisanType": "nonpartisan",
       "runForOffice": "no",
@@ -55,8 +52,7 @@
       "primaryElectionDate": "2026-07-01",
       "geoLocation": {},
       "party": "Communist",
-      "level": "State",
-      "office": "Senator"
+      "level": "State"
     },
     "data": {
       "hubSpotUpdates": {
@@ -78,8 +74,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Libertarian",
-      "level": "City",
-      "office": "Councilman"
+      "level": "City"
     },
     "data": {
       "hubSpotUpdates": {
@@ -101,8 +96,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Communist",
-      "level": "City",
-      "office": "Mayor"
+      "level": "City"
     },
     "data": {
       "hubSpotUpdates": {
@@ -124,8 +118,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Libertarian",
-      "level": "County",
-      "office": "Sheriff"
+      "level": "County"
     },
     "data": {
       "hubSpotUpdates": {
@@ -147,8 +140,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Communist",
-      "level": "State",
-      "office": "Governor"
+      "level": "State"
     },
     "data": {
       "hubSpotUpdates": {
@@ -170,8 +162,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Libertarian",
-      "level": "County",
-      "office": "Commissioner"
+      "level": "County"
     },
     "data": {
       "hubSpotUpdates": {
@@ -193,8 +184,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Communist",
-      "level": "State",
-      "office": "Attorney General"
+      "level": "State"
     },
     "data": {
       "hubSpotUpdates": {
@@ -216,8 +206,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Libertarian",
-      "level": "County",
-      "office": "Treasurer"
+      "level": "County"
     },
     "data": {
       "hubSpotUpdates": {
@@ -239,8 +228,7 @@
       "primaryElectionDate": "2025-11-01",
       "geoLocation": {},
       "party": "Communist",
-      "level": "City",
-      "office": "Councilman"
+      "level": "City"
     },
     "data": {
       "hubSpotUpdates": {

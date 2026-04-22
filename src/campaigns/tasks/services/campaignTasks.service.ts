@@ -34,7 +34,14 @@ import {
   RecurrenceRule,
   RecurringTaskTemplate,
 } from '../campaignTasks.types'
-import { generalAwarenessTasks } from '../fixtures/defaultAwarenessTasks'
+import {
+  campaignFinanceAwarenessTask,
+  designMaterialsAwarenessTask,
+  generalAwarenessTasks,
+  generalElectionDayAwarenessTask,
+  metaVerifiedAwarenessTask,
+  primaryElectionDayAwarenessTask,
+} from '../fixtures/defaultAwarenessTasks'
 import { defaultRecurringTasks } from '../fixtures/defaultRecurringTasks'
 import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
@@ -46,6 +53,7 @@ const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
 const MAX_TASK_WINDOW_DAYS = 49
 const SHORTENED_WINDOW_BUFFER_DAYS = 7
 const FULL_WINDOW_THRESHOLD_DAYS = 56
+const SIGNUP_AWARENESS_MIN_DAYS_TO_ELECTION = 42
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -375,14 +383,10 @@ export class CampaignTasksService extends createPrismaBase(
 
       const { hubspotId } = campaign.data
 
-      const hubspotLink = hubspotId
-        ? `<https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}|${hubspotId}>`
-        : 'N/A'
-
       const slackBody = [
         ':white_check_mark: *AI Campaign Plan Created*',
-        `*Candidate:* ${candidateName}`,
-        `*HubSpot ID:* ${hubspotLink}`,
+        `Candidate: ${candidateName}`,
+        `HubSpot ID: ${hubspotId ?? 'N/A'}`,
         '',
         `*Outreach Tasks (${outreachTasks.length}):*`,
         ...(taskLines.length > 0 ? taskLines : ['None']),
@@ -414,6 +418,55 @@ export class CampaignTasksService extends createPrismaBase(
     campaign: Campaign,
     today: Date,
   ): CampaignTask[] {
+    if (this.hasExpiredElectionOnly(campaign, today)) {
+      return []
+    }
+    const baseTasks = this.buildBaseDefaultTasks(campaign, today)
+    const electionDate = this.resolveElectionDate(campaign, today)
+    return this.sortTasksByDate([
+      ...baseTasks,
+      this.buildCampaignFinanceAwarenessTask(today, electionDate),
+      ...this.buildSignupAwarenessTasks(today, electionDate),
+      ...this.buildElectionDayAwarenessTasks(campaign, today),
+    ])
+  }
+
+  private buildElectionDayAwarenessTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
+    const { details } = campaign
+    if (!details) return []
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    const referenceDate = generalDate ?? primaryDate
+    if (!referenceDate) return []
+    const tasks: CampaignTask[] = []
+    if (primaryDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          primaryElectionDayAwarenessTask,
+          primaryDate,
+          referenceDate,
+        ),
+      )
+    }
+    if (generalDate) {
+      tasks.push(
+        this.buildElectionDayAwarenessTask(
+          generalElectionDayAwarenessTask,
+          generalDate,
+          referenceDate,
+        ),
+      )
+    }
+    return tasks
+  }
+
+  private buildBaseDefaultTasks(
+    campaign: Campaign,
+    today: Date,
+  ): CampaignTask[] {
     const { details } = campaign
     if (!details) {
       return this.distributeTasksOverWindow(
@@ -427,7 +480,7 @@ export class CampaignTasksService extends createPrismaBase(
     const generalDate = this.hasFutureDate(details.electionDate, today)
 
     if (primaryDate && generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -448,11 +501,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-      ])
+      ]
     }
 
     if (primaryDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           primaryDefaultTasks,
           today,
@@ -463,11 +516,11 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           primaryDate,
         ),
-      ])
+      ]
     }
 
     if (generalDate) {
-      return this.sortTasksByDate([
+      return [
         ...this.distributeTasksOverWindow(
           generalDefaultTasks,
           today,
@@ -483,18 +536,34 @@ export class CampaignTasksService extends createPrismaBase(
           today,
           generalDate,
         ),
-      ])
+      ]
     }
 
-    const hasAnyElectionDate =
-      details.primaryElectionDate || details.electionDate
-    return hasAnyElectionDate
-      ? []
-      : this.distributeTasksOverWindow(
-          generalDefaultTasks,
-          today,
-          addDays(today, MAX_TASK_WINDOW_DAYS),
-        )
+    return this.distributeTasksOverWindow(
+      generalDefaultTasks,
+      today,
+      addDays(today, MAX_TASK_WINDOW_DAYS),
+    )
+  }
+
+  private resolveElectionDate(campaign: Campaign, today: Date): Date | null {
+    const { details } = campaign
+    if (!details) return null
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return generalDate ?? primaryDate ?? null
+  }
+
+  private hasExpiredElectionOnly(campaign: Campaign, today: Date): boolean {
+    const { details } = campaign
+    if (!details) return false
+    const hasAnyElectionDate = Boolean(
+      details.primaryElectionDate || details.electionDate,
+    )
+    if (!hasAnyElectionDate) return false
+    const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
+    const generalDate = this.hasFutureDate(details.electionDate, today)
+    return !primaryDate && !generalDate
   }
 
   private hasFutureDate(
@@ -567,6 +636,68 @@ export class CampaignTasksService extends createPrismaBase(
         }
       })
       .filter((task) => !isBefore(parseIsoDateString(task.date), today))
+  }
+
+  private buildCampaignFinanceAwarenessTask(
+    today: Date,
+    electionDate: Date | null,
+  ): CampaignTask {
+    const saturday = addDays(startOfWeek(today), 6)
+    const week = electionDate
+      ? differenceInWeeks(electionDate, saturday, { roundingMethod: 'ceil' })
+      : 0
+    return {
+      ...campaignFinanceAwarenessTask,
+      week,
+      date: formatDate(saturday, DateFormats.isoDate),
+    }
+  }
+
+  private buildSignupAwarenessTasks(
+    today: Date,
+    electionDate: Date | null,
+  ): CampaignTask[] {
+    if (
+      electionDate &&
+      differenceInCalendarDays(electionDate, today) <
+        SIGNUP_AWARENESS_MIN_DAYS_TO_ELECTION
+    ) {
+      return []
+    }
+
+    const startOfNextWeek = addDays(startOfWeek(today), 7)
+    const wednesday = addDays(startOfNextWeek, 3)
+    const thursday = addDays(startOfNextWeek, 4)
+
+    const buildTask = (
+      template: Omit<CampaignTaskTemplate, 'week'>,
+      date: Date,
+    ): CampaignTask => ({
+      ...template,
+      week: electionDate
+        ? differenceInWeeks(electionDate, date, { roundingMethod: 'ceil' })
+        : 0,
+      date: formatDate(date, DateFormats.isoDate),
+    })
+
+    return [
+      buildTask(metaVerifiedAwarenessTask, wednesday),
+      buildTask(designMaterialsAwarenessTask, thursday),
+    ]
+  }
+
+  private buildElectionDayAwarenessTask(
+    template: Omit<CampaignTaskTemplate, 'week'>,
+    electionDayDate: Date,
+    referenceElectionDate: Date,
+  ): CampaignTask {
+    return {
+      ...template,
+      week: differenceInWeeks(referenceElectionDate, electionDayDate, {
+        roundingMethod: 'ceil',
+      }),
+      date: formatDate(electionDayDate, DateFormats.isoDate),
+    }
   }
 
   private computeRecurringTasks(
