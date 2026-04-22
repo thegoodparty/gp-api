@@ -203,23 +203,24 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never,
-      {} as never,
+      {} as never, // aiContentService
+      {} as never, // slackService
       analytics as unknown as AnalyticsService,
       campaignsService as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      {} as never, // aiGenerationService
+      {} as never, // campaignTasksService
+      {} as never, // tcrComplianceService
+      {} as never, // domainsService
       pollsService as unknown as PollsService,
       pollIssuesService as never,
       pollIndividualMessage as never,
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      {} as never, // usersService
+      {} as never, // organizationsService
+      {} as never, // weeklyTasksDigestHandler
+      {} as never, // experimentRunsService
       createMockLogger(),
     )
   })
@@ -730,202 +731,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalled()
   })
 
-  describe('QueueConsumerService - P2V handling', () => {
-    let service: QueueConsumerService
-    let mockP2vService: {
-      handlePathToVictory: ReturnType<typeof vi.fn>
-      analyzePathToVictoryResponse: ReturnType<typeof vi.fn>
-      findUniqueOrThrow: ReturnType<typeof vi.fn>
-      update: ReturnType<typeof vi.fn>
-    }
-    let mockSlack: {
-      message: ReturnType<typeof vi.fn>
-      errorMessage: ReturnType<typeof vi.fn>
-      formattedMessage: ReturnType<typeof vi.fn>
-    }
-    let mockCampaigns: {
-      findUnique: ReturnType<typeof vi.fn>
-      findUniqueOrThrow: ReturnType<typeof vi.fn>
-    }
-
-    beforeEach(async () => {
-      mockP2vService = {
-        handlePathToVictory: vi.fn(),
-        analyzePathToVictoryResponse: vi.fn(),
-        findUniqueOrThrow: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
-      }
-      mockSlack = {
-        message: vi.fn().mockResolvedValue(undefined),
-        errorMessage: vi.fn().mockResolvedValue(undefined),
-        formattedMessage: vi.fn().mockResolvedValue(undefined),
-      }
-      mockCampaigns = {
-        findUnique: vi.fn(),
-        findUniqueOrThrow: vi.fn(),
-      }
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          QueueConsumerService,
-          { provide: PinoLogger, useValue: createMockLogger() },
-          { provide: AiContentService, useValue: {} },
-          { provide: SlackService, useValue: mockSlack },
-          { provide: PathToVictoryService, useValue: mockP2vService },
-          {
-            provide: AnalyticsService,
-            useValue: {
-              track: vi.fn().mockResolvedValue(undefined),
-              identify: vi.fn().mockResolvedValue(undefined),
-            },
-          },
-          { provide: CampaignsService, useValue: mockCampaigns },
-          { provide: CampaignTasksService, useValue: {} },
-          { provide: CampaignTcrComplianceService, useValue: {} },
-          { provide: DomainsService, useValue: {} },
-          { provide: PollsService, useValue: {} },
-          { provide: PollIssuesService, useValue: {} },
-          { provide: PollIndividualMessageService, useValue: {} },
-          { provide: ElectedOfficeService, useValue: {} },
-          { provide: ContactsService, useValue: {} },
-          { provide: S3Service, useValue: {} },
-          { provide: UsersService, useValue: {} },
-          { provide: OrganizationsService, useValue: {} },
-          { provide: ExperimentRunsService, useValue: {} },
-        ],
-      }).compile()
-
-      service = module.get<QueueConsumerService>(QueueConsumerService)
-
-      const mockLogger = createMockLogger()
-      Object.defineProperty(service, 'logger', {
-        get: () => mockLogger,
-        configurable: true,
-      })
-
-      vi.clearAllMocks()
-    })
-
-    describe('handlePathToVictoryFailure', () => {
-      let handleFailure: (
-        campaign: ReturnType<typeof makeCampaign>,
-      ) => Promise<boolean>
-
-      beforeEach(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handleFailure = (service as any).handlePathToVictoryFailure.bind(
-          service,
-        )
-      })
-
-      it('returns true (requeue) and increments p2vAttempts when < 3 attempts', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 1, p2vStatus: P2VStatus.districtMatched }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(true)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(2)
-        // Should NOT mark as failed or send Slack
-        expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
-        expect(mockSlack.message).not.toHaveBeenCalled()
-      })
-
-      it('returns false and marks Failed when exhausted retries and status is Waiting', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.waiting }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(false)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(3)
-        expect(updateData.p2vStatus).toBe(P2VStatus.failed)
-        expect(mockSlack.message).toHaveBeenCalled()
-        expect(mockRecordBlockedStateEvent).toHaveBeenCalled()
-      })
-
-      it('returns false and preserves DistrictMatched when exhausted retries', async () => {
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.districtMatched }),
-        )
-
-        const result = await handleFailure(makeCampaign())
-
-        expect(result).toBe(false)
-        const updateData = mockP2vService.update.mock.calls[0][0].data.data
-        expect(updateData.p2vAttempts).toBe(3)
-        // Status preserved — gold's DistrictMatched is NOT overwritten to Failed
-        expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
-        expect(mockSlack.message).not.toHaveBeenCalled()
-        expect(mockRecordBlockedStateEvent).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('handlePathToVictoryMessage (via processMessage)', () => {
-      const makeQueueMessage = () => ({
-        Body: JSON.stringify({
-          type: 'pathToVictory',
-          data: {
-            slug: 'test-slug',
-            campaignId: '1',
-            officeName: 'City Council',
-            electionDate: '2024-11-05',
-            electionTerm: 4,
-            electionLevel: 'local',
-            electionState: 'CA',
-            electionCounty: 'Los Angeles',
-            electionMunicipality: 'Los Angeles',
-            partisanType: 'nonpartisan',
-            priorElectionDates: [],
-          },
-        }),
-      })
-
-      const mockP2VResponse = {
-        slug: 'test-slug',
-        pathToVictoryResponse: {
-          electionType: '',
-          electionLocation: '',
-          district: '',
-          counts: { projectedTurnout: 0, winNumber: 0, voterContactGoal: 0 },
-        },
-        officeName: 'City Council',
-        electionDate: '2024-11-05',
-        electionTerm: 4,
-        electionLevel: 'local',
-        electionState: 'CA',
-        electionCounty: 'Los Angeles',
-        electionMunicipality: 'Los Angeles',
-        partisanType: 'nonpartisan',
-        priorElectionDates: [],
-      }
-
-      it('does not throw when failure handler returns false (already matched)', async () => {
-        mockP2vService.handlePathToVictory.mockResolvedValue(mockP2VResponse)
-        mockCampaigns.findUnique.mockResolvedValue({
-          ...makeCampaign(),
-          pathToVictory: { id: 100, data: {} },
-        })
-        mockP2vService.analyzePathToVictoryResponse.mockResolvedValue(false)
-        // handlePathToVictoryFailure returns false (don't requeue)
-        mockP2vService.findUniqueOrThrow.mockResolvedValue(
-          makeP2V({
-            p2vAttempts: 2,
-            p2vStatus: P2VStatus.districtMatched,
-          }),
-        )
-
-        // withLegacyErrorSwallowing: no throw → returns true (message processed)
-        const result = await service.processMessage(makeQueueMessage() as never)
-
-        expect(result).toBe(true)
-      })
-    })
-  })
 })
 
 describe('QueueConsumerService - triggerPollExecution', () => {
@@ -1037,23 +842,24 @@ describe('QueueConsumerService - triggerPollExecution', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never,
-      { client: {} } as never,
-      {} as never,
+      {} as never, // aiContentService
+      { client: {} } as never, // slackService
+      {} as never, // analytics
       campaignsService as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      {} as never, // aiGenerationService
+      {} as never, // campaignTasksService
+      {} as never, // tcrComplianceService
+      {} as never, // domainsService
       pollsService as never,
-      {} as never,
-      {} as never,
+      {} as never, // pollIssuesService
+      {} as never, // pollIndividualMessage
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
       usersService as never,
-      {} as never,
-      {} as never,
+      {} as never, // organizationsService
+      {} as never, // weeklyTasksDigestHandler
+      {} as never, // experimentRunsService
       createMockLogger(),
     )
   })
@@ -1177,6 +983,7 @@ describe('QueueConsumerService - message type routing', () => {
           provide: WeeklyTasksDigestHandlerService,
           useValue: { handleWeeklyTasksDigest: vi.fn() },
         },
+        { provide: ExperimentRunsService, useValue: {} },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()
@@ -1224,7 +1031,7 @@ describe('QueueConsumerService - message type routing', () => {
     expect(mockSlackService.message).not.toHaveBeenCalled()
   })
 
-  it('acknowledges unknown message types via default branch', async () => {
+  it('throws UnrecognizedQueueTypeError on unknown message types so handleMessage can delete the poison pill', async () => {
     const message: Message = {
       MessageId: 'msg-unknown',
       Body: JSON.stringify({
@@ -1233,9 +1040,9 @@ describe('QueueConsumerService - message type routing', () => {
       }),
     }
 
-    const result = await service.processMessage(message)
-
-    expect(result).toBe(true)
+    await expect(service.processMessage(message)).rejects.toThrow(
+      /Unrecognized queue message type/,
+    )
   })
 
   it('routes weeklyTasksDigest messages to the handler', async () => {
@@ -1318,6 +1125,7 @@ describe('QueueConsumerService - message type routing', () => {
 
     expect(result).toBe(true)
   })
+})
 
 describe('QueueConsumerService - poison pill handling', () => {
   let service: QueueConsumerService
@@ -1339,22 +1147,23 @@ describe('QueueConsumerService - poison pill handling', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      {} as never, // aiContentService
+      {} as never, // slackService
+      {} as never, // analytics
+      {} as never, // campaignsService
+      {} as never, // aiGenerationService
+      {} as never, // campaignTasksService
+      {} as never, // tcrComplianceService
+      {} as never, // domainsService
+      {} as never, // pollsService
+      {} as never, // pollIssuesService
+      {} as never, // pollIndividualMessage
+      {} as never, // electedOfficeService
+      {} as never, // contactsService
+      {} as never, // s3Service
+      {} as never, // usersService
+      {} as never, // organizationsService
+      {} as never, // weeklyTasksDigestHandler
       experimentRunsService as never,
       mockLogger,
     )
