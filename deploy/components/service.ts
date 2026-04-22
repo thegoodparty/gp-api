@@ -51,16 +51,23 @@ export function createService({
   dependsOn,
 }: ServiceConfig): ServiceOutput {
   const isProd = environment === 'prod'
+  const isPreview = environment === 'preview'
   const serviceName = `gp-api-${stage}`
 
   const select = <T>(values: Record<'preview' | 'dev' | 'qa' | 'prod', T>): T =>
     values[environment]
 
   const clusterName = `gp-${stage}-fargateCluster`
-  const cluster = new aws.ecs.Cluster('ecsCluster', {
-    name: clusterName,
-    settings: [{ name: 'containerInsights', value: 'enabled' }],
-  })
+  // Preview cluster gets a wider delete timeout so pulumi destroy can keep
+  // retrying DeleteCluster while tasks drain, without workflow intervention.
+  const cluster = new aws.ecs.Cluster(
+    'ecsCluster',
+    {
+      name: clusterName,
+      settings: [{ name: 'containerInsights', value: 'enabled' }],
+    },
+    isPreview ? { customTimeouts: { delete: '30m' } } : undefined,
+  )
 
   const albSecurityGroup = new aws.ec2.SecurityGroup('albSecurityGroup', {
     name: select({
@@ -119,7 +126,7 @@ export function createService({
     protocol: 'HTTP',
     targetType: 'ip',
     vpcId,
-    deregistrationDelay: 120,
+    deregistrationDelay: isPreview ? 0 : 120,
     healthCheck: {
       path: '/v1/health',
       interval: 60,
@@ -238,6 +245,7 @@ export function createService({
           cpu: parseInt(cpu),
           memory: parseInt(memory),
           essential: true,
+          ...(isPreview ? { stopTimeout: 2 } : {}),
           secrets: sortBy(Object.entries(sec), [([name]) => name]).map(
             ([name, valueFrom]) => ({
               name,
@@ -301,6 +309,9 @@ export function createService({
       },
       enableExecuteCommand: true,
       waitForSteadyState: true,
+      // Preview: force-delete so pulumi destroy doesn't have to scale to 0
+      // and wait before calling DeleteService.
+      forceDelete: isPreview,
     },
     { dependsOn, customTimeouts: { create: '45m', update: '45m' } },
   )
