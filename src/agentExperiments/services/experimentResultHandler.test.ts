@@ -57,28 +57,23 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     }
 
     const service = new QueueConsumerService(
-      { handleGenerateAiContent: vi.fn() } as never,
-      { errorMessage: vi.fn(), message: vi.fn() } as never,
-      { handlePathToVictoryMessage: vi.fn() } as never,
-      { track: vi.fn(), identify: vi.fn() } as never,
-      { findUniqueOrThrow: vi.fn() } as never,
-      { getCvTokenStatus: vi.fn() } as never,
-      { update: vi.fn() } as never,
-      { findUnique: vi.fn() } as never,
-      {
-        model: { deleteMany: vi.fn() },
-        client: { pollIssue: { createMany: vi.fn() } },
-      } as never,
-      { findMany: vi.fn(), client: { $transaction: vi.fn() } } as never,
-      {
-        findUnique: vi.fn(),
-        client: { electedOffice: { findUnique: vi.fn() } },
-      } as never,
-      { findContacts: vi.fn() } as never,
-      { getFile: vi.fn() } as never,
-      { findUnique: vi.fn() } as never,
-      { findFirst: vi.fn() } as never,
-      { findFirst: vi.fn() } as never,
+      {} as never, // aiContentService
+      {} as never, // slackService
+      {} as never, // analytics
+      {} as never, // campaignsService
+      {} as never, // aiGenerationService
+      {} as never, // campaignTasksService
+      {} as never, // tcrComplianceService
+      {} as never, // domainsService
+      {} as never, // pollsService
+      {} as never, // pollIssuesService
+      {} as never, // pollIndividualMessage
+      {} as never, // electedOfficeService
+      {} as never, // contactsService
+      {} as never, // s3Service
+      {} as never, // usersService
+      {} as never, // organizationsService
+      {} as never, // weeklyTasksDigestHandler
       experimentRunsService as never,
       logger,
     )
