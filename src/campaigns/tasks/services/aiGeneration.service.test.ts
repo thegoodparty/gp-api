@@ -1,5 +1,5 @@
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiGenerationService } from './aiGeneration.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
@@ -84,6 +84,11 @@ describe('AiGenerationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Freeze time so assertions against hard-coded future dates (e.g. the 2026
+    // electionDate in makeCampaign) stay stable after that date has passed in
+    // real life. Fakes only Date — setTimeout/setInterval stay real.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-04-01T12:00:00Z'))
     vi.mocked(
       mockOrganizationsService.resolvePositionNameByOrganizationSlug!,
     ).mockResolvedValue('Mayor')
@@ -94,6 +99,10 @@ describe('AiGenerationService', () => {
       mockGooglePlacesService as GooglePlacesService,
       createMockLogger(),
     )
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('triggerGeneration', () => {
@@ -217,6 +226,30 @@ describe('AiGenerationService', () => {
         expect.objectContaining({ primaryElectionDate: '2026-06-02' }),
       )
     })
+
+    // date-fns parse is lenient about zero-padding and trailing whitespace —
+    // each case below would slip past a pure date-fns check but is rejected
+    // by the regex guard.
+    it.each([
+      ['non-zero-padded month+day', '2026-1-4'],
+      ['non-zero-padded day', '2026-11-4'],
+      ['trailing whitespace', '2026-11-04 '],
+      ['slash separator', '2026/11/04'],
+      ['iso datetime', '2026-11-04T10:00:00'],
+    ])('rejects electionDate with %s (%s)', async (_label, electionDate) => {
+      await expect(
+        service.triggerGeneration({
+          campaignId: 1,
+          electionDate,
+          state: 'MA',
+          city: 'Boston',
+          officeName: null,
+          officeLevel: null,
+          primaryElectionDate: null,
+        }),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockQueueProducer.sendToCampaignPlanQueue).not.toHaveBeenCalled()
+    })
   })
 
   describe('triggerEventGeneration', () => {
@@ -279,6 +312,22 @@ describe('AiGenerationService', () => {
 
       expect(mockQueueProducer.sendToCampaignPlanQueue).toHaveBeenCalledWith(
         expect.objectContaining({ city: null }),
+      )
+    })
+
+    it('trims whitespace around details.city before sending', async () => {
+      const campaign = makeCampaign({
+        details: {
+          city: '  Boston  ',
+          state: 'MA',
+          electionDate: '2026-11-04',
+        },
+      } as Partial<Campaign>)
+
+      await service.triggerEventGeneration(campaign)
+
+      expect(mockQueueProducer.sendToCampaignPlanQueue).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Boston' }),
       )
     })
 

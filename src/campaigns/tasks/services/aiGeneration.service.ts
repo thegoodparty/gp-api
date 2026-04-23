@@ -50,6 +50,14 @@ export type CampaignPlanLambdaPayload = {
   primaryElectionDate: string | null
 }
 
+const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/
+
+// date-fns parse is permissive with zero-padding (e.g. "2026-1-4" is VALID
+// even with a zero-padded format string), so pair the regex with the calendar
+// validity check.
+const isStrictIsoDate = (s: string): boolean =>
+  YYYY_MM_DD.test(s) && isValid(parseIsoDateString(s))
+
 @Injectable()
 export class AiGenerationService {
   constructor(
@@ -63,17 +71,14 @@ export class AiGenerationService {
   }
 
   async triggerGeneration(payload: CampaignPlanLambdaPayload): Promise<void> {
-    if (
-      !payload.electionDate ||
-      !isValid(parseIsoDateString(payload.electionDate))
-    ) {
+    if (!payload.electionDate || !isStrictIsoDate(payload.electionDate)) {
       throw new BadRequestException(
         'electionDate must be a YYYY-MM-DD date string',
       )
     }
     if (
       payload.primaryElectionDate !== null &&
-      !isValid(parseIsoDateString(payload.primaryElectionDate))
+      !isStrictIsoDate(payload.primaryElectionDate)
     ) {
       throw new BadRequestException(
         'primaryElectionDate must be a YYYY-MM-DD date string when provided',
@@ -129,8 +134,9 @@ export class AiGenerationService {
 
   private async resolveCity(campaign: Campaign): Promise<string | null> {
     const detailsCity = campaign.details?.city
-    if (typeof detailsCity === 'string' && detailsCity.trim() !== '') {
-      return detailsCity
+    if (typeof detailsCity === 'string') {
+      const trimmed = detailsCity.trim()
+      if (trimmed !== '') return trimmed
     }
 
     if (!campaign.placeId) return null
