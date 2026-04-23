@@ -6,7 +6,7 @@ import { HEADER_MAPPING } from '../constants/headerMapping.const'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { GetVoterFileSchema } from '../voterFile/schemas/GetVoterFile.schema'
 import { PinoLogger } from 'nestjs-pino'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const VOTER_DATASTORE = requireEnv('VOTER_DATASTORE')
 

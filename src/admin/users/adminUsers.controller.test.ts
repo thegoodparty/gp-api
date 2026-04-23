@@ -73,7 +73,6 @@ describe('AdminUsersController', () => {
 
     controller = new AdminUsersController(
       usersService,
-      campaignsService,
       slackService,
       createMockLogger(),
     )
@@ -189,6 +188,34 @@ describe('AdminUsersController', () => {
         99,
         mockUser.clerkId,
       )
+    })
+  })
+
+  describe('delete', () => {
+    it('calls deleteUser with target user id and requesting admin id', async () => {
+      vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
+        mockTargetUser,
+      )
+      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(undefined)
+
+      await controller.delete(mockTargetUser.id, { id: mockUser.id })
+
+      expect(usersService.deleteUser).toHaveBeenCalledWith(
+        mockTargetUser.id,
+        mockUser.id,
+      )
+    })
+
+    it('does not call campaignsService.deleteAll — cascade handles it', async () => {
+      vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
+        mockTargetUser,
+      )
+      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(undefined)
+      const deleteAllSpy = vi.spyOn(campaignsService, 'deleteAll')
+
+      await controller.delete(mockTargetUser.id, { id: mockUser.id })
+
+      expect(deleteAllSpy).not.toHaveBeenCalled()
     })
   })
 })

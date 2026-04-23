@@ -57,10 +57,14 @@ export function createService({
     values[environment]
 
   const clusterName = `gp-${stage}-fargateCluster`
-  const cluster = new aws.ecs.Cluster('ecsCluster', {
-    name: clusterName,
-    settings: [{ name: 'containerInsights', value: 'enabled' }],
-  })
+  const cluster = new aws.ecs.Cluster(
+    'ecsCluster',
+    {
+      name: clusterName,
+      settings: [{ name: 'containerInsights', value: 'enabled' }],
+    },
+    { dependsOn },
+  )
 
   const albSecurityGroup = new aws.ec2.SecurityGroup('albSecurityGroup', {
     name: select({
@@ -302,7 +306,7 @@ export function createService({
       enableExecuteCommand: true,
       waitForSteadyState: true,
     },
-    { dependsOn, customTimeouts: { create: '45m', update: '45m' } },
+    { customTimeouts: { create: '45m', update: '45m' } },
   )
 
   new aws.route53.Record('dnsARecord', {

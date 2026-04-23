@@ -9,6 +9,7 @@ import {
   getDay,
   isAfter,
   isBefore,
+  isValid,
   startOfDay,
   startOfWeek,
   subWeeks,
@@ -18,6 +19,7 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   DateFormats,
   formatDate,
+  isDateTodayOrFuture,
   parseIsoDateString,
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
@@ -234,6 +236,22 @@ export class CampaignTasksService extends createPrismaBase(
     subscriber: Subscriber<MessageEvent>,
   ): Promise<void> {
     try {
+      const today = startOfDay(new Date())
+      if (!this.hasActiveElection(campaign, today)) {
+        this.logger.info(
+          {
+            campaignId: campaign.id,
+            electionDate: campaign.details?.electionDate,
+            primaryElectionDate: campaign.details?.primaryElectionDate,
+          },
+          'skipping task generation: no active election',
+        )
+        const tasks = await this.listCampaignTasks(campaign)
+        subscriber.next({ data: { type: 'complete', tasks } })
+        subscriber.complete()
+        return
+      }
+
       subscriber.next({
         data: {
           type: 'progress',
@@ -250,7 +268,7 @@ export class CampaignTasksService extends createPrismaBase(
         return
       }
 
-      await this.generateDefaultTasks(campaign)
+      await this.generateDefaultTasks(campaign, today)
 
       const triggered =
         await this.aiGenerationService.triggerEventGeneration(campaign)
@@ -317,16 +335,14 @@ export class CampaignTasksService extends createPrismaBase(
     }
   }
 
-  async deleteAllTasks(campaignId: number) {
-    await this.model.deleteMany({
-      where: { campaignId },
-    })
-  }
-
   async generateDefaultTasks(
     campaign: Campaign,
     today = startOfDay(new Date()),
   ) {
+    if (!this.hasActiveElection(campaign, today)) {
+      return
+    }
+
     let created = false
     await this.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
@@ -468,13 +484,7 @@ export class CampaignTasksService extends createPrismaBase(
     today: Date,
   ): CampaignTask[] {
     const { details } = campaign
-    if (!details) {
-      return this.distributeTasksOverWindow(
-        generalDefaultTasks,
-        today,
-        addDays(today, MAX_TASK_WINDOW_DAYS),
-      )
-    }
+    if (!details) return []
 
     const primaryDate = this.hasFutureDate(details.primaryElectionDate, today)
     const generalDate = this.hasFutureDate(details.electionDate, today)
@@ -539,11 +549,7 @@ export class CampaignTasksService extends createPrismaBase(
       ]
     }
 
-    return this.distributeTasksOverWindow(
-      generalDefaultTasks,
-      today,
-      addDays(today, MAX_TASK_WINDOW_DAYS),
-    )
+    return []
   }
 
   private resolveElectionDate(campaign: Campaign, today: Date): Date | null {
@@ -571,8 +577,16 @@ export class CampaignTasksService extends createPrismaBase(
     today: Date,
   ): Date | null {
     if (!dateString) return null
-    const date = startOfDay(parseIsoDateString(dateString))
-    return isBefore(date, today) ? null : date
+    if (!isDateTodayOrFuture(dateString, today)) return null
+    return startOfDay(parseIsoDateString(dateString))
+  }
+
+  private hasActiveElection(campaign: Campaign, today: Date): boolean {
+    const { primaryElectionDate, electionDate } = campaign.details ?? {}
+    return (
+      isDateTodayOrFuture(primaryElectionDate, today) ||
+      isDateTodayOrFuture(electionDate, today)
+    )
   }
 
   private distributeTasksOverWindow(
@@ -882,9 +896,31 @@ export class CampaignTasksService extends createPrismaBase(
       select: { details: true },
     })
     const electionDate = campaign.details?.electionDate
+    const electionDay = electionDate
+      ? startOfDay(parseIsoDateString(electionDate))
+      : null
+    if (!electionDay || !isValid(electionDay)) {
+      this.logger.info(
+        { campaignId, electionDate },
+        'skipping event task insert: no valid election date',
+      )
+      return
+    }
     const paradeTasks = this.buildParadeAwarenessTasks(tasks, electionDate)
     const allTasks = [...tasks, ...paradeTasks]
-    const tasksToCreate = this.mapTasksToCreateData(campaignId, allTasks)
+    const filteredTasks = allTasks.filter(
+      (task) =>
+        !isAfter(startOfDay(parseIsoDateString(task.date)), electionDay),
+    )
+    const dropped = allTasks.length - filteredTasks.length
+    if (dropped > 0) {
+      this.logger.info(
+        { campaignId, electionDate, dropped },
+        'dropped event tasks dated after election',
+      )
+    }
+    if (filteredTasks.length === 0) return
+    const tasksToCreate = this.mapTasksToCreateData(campaignId, filteredTasks)
     await this.model.createMany({
       data: tasksToCreate,
       skipDuplicates: true,

@@ -3,8 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
-  HttpStatus,
   MessageEvent,
   Param,
   Put,
@@ -46,13 +44,6 @@ export class CampaignTasksController {
     @Param('id') id: string,
   ) {
     return this.tasksService.unCompleteTask(campaign, id)
-  }
-
-  // TODO: This is a temporary endpoint to delete all tasks for a campaign for testing purposes
-  @Delete()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteAllTasks(@ReqCampaign() campaign: Campaign) {
-    await this.tasksService.deleteAllTasks(campaign.id)
   }
 
   @Sse('generate/stream')

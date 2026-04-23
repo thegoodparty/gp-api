@@ -1,4 +1,4 @@
-import { requireEnv, getEnv } from 'src/shared/utils/env'
+import { requireEnv, getEnv } from 'src/shared/util/env.util'
 
 enum AppEnv {
   PROD = 'production',

@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "ai-rules:update": "git submodule update --remote ai-rules",
+    "postinstall": "git submodule update --init --recursive || echo 'WARN: ai-rules submodule init failed — run: git submodule update --init --recursive'",
+    "setup": "npm ci && cp -n .env.example .env && docker compose up -d && npm run migrate:reset && printf '\\nSetup complete. Edit .env with vendor keys before running npm run start:dev\\n'",
     "build": "npm run build:contracts && nest build",
     "build:contracts": "tsx scripts/build-contracts.ts",
     "codegen": "graphql-codegen",
@@ -33,6 +35,8 @@
     "start:dev": "npm run build:contracts && tsx scripts/check-pending-migrations.ts && nest start --watch",
     "start:prod": "node -r ./dist/otel.js dist/main",
     "test": "npx vitest run",
+    "types": "npx tsc --noEmit",
+    "verify": "npm run lint && npm run types && npm run test",
     "test:e2e": "playwright test --config=e2e-tests/playwright.config.ts",
     "test:e2e:debug": "playwright test --config=e2e-tests/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report e2e-tests/playwright-report",

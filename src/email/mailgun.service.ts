@@ -3,7 +3,7 @@ import FormData from 'form-data'
 import Mailgun, { MailgunMessageData } from 'mailgun.js'
 import { IMailgunClient } from 'mailgun.js/Interfaces'
 import { PinoLogger } from 'nestjs-pino'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const EMAIL_DOMAIN = 'mg.goodparty.org'
 const API_KEY = requireEnv('MAILGUN_API_KEY')

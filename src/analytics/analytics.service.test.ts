@@ -113,4 +113,23 @@ describe('AnalyticsService', () => {
       ).rejects.toThrow('Segment service down')
     })
   })
+
+  describe('track - pre-fetched userContext', () => {
+    it('skips DB lookup and uses provided userContext', async () => {
+      const providedContext = {
+        email: 'pre-fetched@example.com',
+        hubspotId: 'hs-prefetched',
+      }
+
+      await service.track(7, 'Test Event', { source: 'test' }, providedContext)
+
+      expect(mockUsersService.findFirst).not.toHaveBeenCalled()
+      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
+        7,
+        'Test Event',
+        { email: 'pre-fetched@example.com', source: 'test' },
+        providedContext,
+      )
+    })
+  })
 })

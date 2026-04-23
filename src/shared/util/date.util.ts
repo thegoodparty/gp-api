@@ -1,4 +1,13 @@
-import { DateArg, endOfDay, format, parse, startOfDay, subDays } from 'date-fns'
+import {
+  DateArg,
+  endOfDay,
+  format,
+  isBefore,
+  isValid,
+  parse,
+  startOfDay,
+  subDays,
+} from 'date-fns'
 
 export const toDateOnlyString = (d?: Date | null) => {
   return d ? d.toISOString().slice(0, 10) : undefined
@@ -25,6 +34,16 @@ export const getMidnightForDate = (date: Date) =>
 
 export const parseIsoDateString = (dateString: string) =>
   parse(dateString, DateFormats.isoDate, new Date())
+
+export const isDateTodayOrFuture = (
+  dateString: string | undefined | null,
+  today: Date = startOfDay(new Date()),
+): boolean => {
+  if (!dateString) return false
+  const date = parseIsoDateString(dateString)
+  if (!isValid(date)) return false
+  return !isBefore(startOfDay(date), today)
+}
 
 export const getDateRangeWithDefaults = (
   startDate?: Date,
