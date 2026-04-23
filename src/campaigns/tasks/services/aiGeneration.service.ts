@@ -105,14 +105,18 @@ export class AiGenerationService {
       this.resolveOfficeName(campaign),
     ])
 
+    // `|| null` (not `??`) so empty strings in the stored details collapse to
+    // null. updateCampaign.schema.ts lets `primaryElectionDate` be "" — without
+    // this coercion the strict ISO check in triggerGeneration would reject and
+    // the surrounding try/catch would silently drop event generation.
     const payload: CampaignPlanLambdaPayload = {
       campaignId: campaign.id,
       electionDate: electionDate ?? '',
-      state: state ?? null,
+      state: state || null,
       city,
       officeName,
-      officeLevel: ballotLevel ?? null,
-      primaryElectionDate: primaryElectionDate ?? null,
+      officeLevel: ballotLevel || null,
+      primaryElectionDate: primaryElectionDate || null,
     }
 
     try {

@@ -286,6 +286,46 @@ describe('AiGenerationService', () => {
       )
     })
 
+    // updateCampaign.schema.ts permits "" on primaryElectionDate. Without the
+    // `|| null` coercion, the strict ISO validator in triggerGeneration would
+    // reject primaryElectionDate="" and the surrounding try/catch would
+    // silently drop event generation for those campaigns.
+    it('coerces empty-string primaryElectionDate to null instead of rejecting', async () => {
+      const result = await service.triggerEventGeneration(
+        makeCampaign({
+          details: {
+            city: 'Boston',
+            state: 'MA',
+            electionDate: '2026-11-04',
+            ballotLevel: 'CITY',
+            primaryElectionDate: '',
+          },
+        } as Partial<Campaign>),
+      )
+
+      expect(result).toBe(true)
+      expect(mockQueueProducer.sendToCampaignPlanQueue).toHaveBeenCalledWith(
+        expect.objectContaining({ primaryElectionDate: null }),
+      )
+    })
+
+    it('coerces empty-string state to null in the payload', async () => {
+      await service.triggerEventGeneration(
+        makeCampaign({
+          details: {
+            city: 'Boston',
+            state: '',
+            electionDate: '2026-11-04',
+            ballotLevel: 'CITY',
+          },
+        } as Partial<Campaign>),
+      )
+
+      expect(mockQueueProducer.sendToCampaignPlanQueue).toHaveBeenCalledWith(
+        expect.objectContaining({ state: null }),
+      )
+    })
+
     it('falls back to Google Places when details.city is missing but placeId is set', async () => {
       vi.mocked(mockGooglePlacesService.getAddressByPlaceId!).mockResolvedValue(
         placeResponseForCity('Cambridge'),
