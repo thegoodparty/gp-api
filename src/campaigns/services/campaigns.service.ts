@@ -36,6 +36,7 @@ import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
   CampaignPlanVersionData,
+  CampaignWithOrg,
   PlanVersion,
   UpdateCampaignFieldsInput,
 } from '../campaigns.types'
@@ -84,7 +85,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     sortOrder = DEFAULT_SORT_ORDER,
     userId,
     slug,
-  }: ListCampaignsPagination): Promise<PaginatedResults<Campaign>> {
+  }: ListCampaignsPagination): Promise<
+    PaginatedResults<Campaign & { positionName: string | null }>
+  > {
     const where: Prisma.CampaignWhereInput = {
       ...(userId ? { userId } : {}),
       ...(slug
@@ -92,12 +95,39 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         : {}),
     }
 
+    const campaigns = await this.model.findMany({
+      skip,
+      take: limit,
+      orderBy: { [sortBy]: sortOrder },
+      where,
+      include: { organization: true },
+    })
+
+    const uniquePositionIds = [
+      ...new Set(
+        campaigns
+          .map((c: CampaignWithOrg) => c.organization.positionId)
+          .filter((id): id is string => id !== null),
+      ),
+    ]
+    const resolvedPositions = await Promise.all(
+      uniquePositionIds.map((positionId) =>
+        this.organizations.resolvePositionContext({ positionId }),
+      ),
+    )
+    const positionNameById = new Map(
+      uniquePositionIds.map((id, i) => [id, resolvedPositions[i].positionName]),
+    )
+
     return {
-      data: await this.model.findMany({
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        where,
+      data: campaigns.map((item: CampaignWithOrg) => {
+        const { organization: org, ...campaign } = item
+        const positionName =
+          org.customPositionName ??
+          (org.positionId
+            ? (positionNameById.get(org.positionId) ?? null)
+            : null)
+        return { ...campaign, positionName }
       }),
       meta: {
         total: await this.model.count({ where }),
@@ -105,6 +135,21 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         limit,
       },
     }
+  }
+
+  async findByIdWithOrg(
+    id: number,
+  ): Promise<Campaign & { positionName: string | null }> {
+    const { organization: org, ...campaign } =
+      (await this.model.findUniqueOrThrow({
+        where: { id },
+        include: { organization: true },
+      })) as CampaignWithOrg
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: org.customPositionName,
+      positionId: org.positionId,
+    })
+    return { ...campaign, positionName }
   }
 
   async create(args: Prisma.CampaignCreateArgs) {

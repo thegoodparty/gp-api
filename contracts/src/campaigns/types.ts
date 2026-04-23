@@ -144,7 +144,10 @@ export type CampaignDetails = {
   geoLocationFailed?: boolean
   city?: string | null
   county?: string | null
+  office?: string
+  otherOffice?: string
   normalizedOffice?: string | null
+  positionId?: string | null
   party?: string
   otherParty?: string
   district?: string

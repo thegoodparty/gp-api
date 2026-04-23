@@ -1,4 +1,6 @@
-import { Prisma } from '@prisma/client'
+import { Campaign, Organization, Prisma } from '@prisma/client'
+
+export type CampaignWithOrg = Campaign & { organization: Organization }
 
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 

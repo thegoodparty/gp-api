@@ -109,6 +109,7 @@ describe('CampaignsController', () => {
       findFirst: vi.fn(),
       findFirstOrThrow: vi.fn(),
       findByUserId: vi.fn(),
+      findByIdWithOrg: vi.fn(),
       listCampaigns: vi.fn(),
       getStatus: vi.fn(),
       createForUser: vi.fn(),
@@ -159,7 +160,7 @@ describe('CampaignsController', () => {
   describe('list', () => {
     it('returns paginated campaigns filtered by userId', async () => {
       vi.spyOn(campaignsService, 'listCampaigns').mockResolvedValue({
-        data: [mockCampaign],
+        data: [{ ...mockCampaign, positionName: null }],
         meta: { total: 1, offset: 0, limit: 100 },
       })
 
@@ -591,20 +592,21 @@ describe('CampaignsController', () => {
 
   describe('findById (M2M GET :id)', () => {
     it('returns campaign parsed through ReadCampaignOutputSchema', async () => {
-      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
-        mockCampaign,
-      )
+      vi.spyOn(campaignsService, 'findByIdWithOrg').mockResolvedValue({
+        ...mockCampaign,
+        positionName: null,
+      })
 
       const result = await controller.findById({ id: mockCampaign.id })
 
-      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: mockCampaign.id },
-      })
+      expect(campaignsService.findByIdWithOrg).toHaveBeenCalledWith(
+        mockCampaign.id,
+      )
       expect(result).toHaveProperty('id', mockCampaign.id)
     })
 
     it('throws when campaign does not exist', async () => {
-      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockRejectedValue(
+      vi.spyOn(campaignsService, 'findByIdWithOrg').mockRejectedValue(
         new NotFoundException(),
       )
 

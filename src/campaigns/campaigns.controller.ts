@@ -35,6 +35,7 @@ import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
+import { CampaignWith } from './campaigns.types'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import {
@@ -45,7 +46,6 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
-import { CampaignWith } from './campaigns.types'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -91,8 +91,7 @@ export class CampaignsController {
   @Get('list')
   @ResponseSchema(PaginatedResponseSchema(ReadCampaignOutputSchema))
   async list(@Query() query: ListCampaignsPaginationDto) {
-    const { data, meta } = await this.campaigns.listCampaigns(query)
-    return { data, meta }
+    return this.campaigns.listCampaigns(query)
   }
 
   @Get('mine/status')
@@ -202,9 +201,7 @@ export class CampaignsController {
   @Get(':id')
   @ResponseSchema(ReadCampaignOutputSchema)
   async findById(@Param() { id }: IdParamSchema) {
-    return this.campaigns.findUniqueOrThrow({
-      where: { id },
-    })
+    return this.campaigns.findByIdWithOrg(id)
   }
 
   @UseGuards(M2MOnly)
