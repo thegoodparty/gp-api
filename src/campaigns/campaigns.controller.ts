@@ -46,6 +46,7 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith } from './campaigns.types'
+import { CampaignWithPositionNameSchema } from './schemas/CampaignWithPositionName.schema'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -89,10 +90,22 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get('list')
-  @ResponseSchema(PaginatedResponseSchema(ReadCampaignOutputSchema))
+  @ResponseSchema(PaginatedResponseSchema(CampaignWithPositionNameSchema))
   async list(@Query() query: ListCampaignsPaginationDto) {
     const { data, meta } = await this.campaigns.listCampaigns(query)
-    return { data, meta }
+
+    const enriched = await Promise.all(
+      data.map(async ({ organization, ...campaign }) => {
+        const { positionName } =
+          await this.organizations.resolvePositionContext({
+            customPositionName: organization?.customPositionName,
+            positionId: organization?.positionId,
+          })
+        return { ...campaign, positionName }
+      }),
+    )
+
+    return { data: enriched, meta }
   }
 
   @Get('mine/status')
