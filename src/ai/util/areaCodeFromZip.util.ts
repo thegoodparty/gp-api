@@ -4,7 +4,7 @@ import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
 import { AiService } from '../ai.service'
 import { PinoLogger } from 'nestjs-pino'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const ZIP_TO_AREA_CODE_FILE = 'zip-to-area-code-mappings.json'
 const CACHE_EXPIRY_YEARS = 1

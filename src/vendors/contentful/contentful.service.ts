@@ -6,7 +6,7 @@ import {
   EntrySkeletonType,
 } from 'contentful'
 import { Injectable } from '@nestjs/common'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const CONTENTFUL_SPACE_ID = requireEnv('CONTENTFUL_SPACE_ID')
 const CONTENTFUL_ACCESS_TOKEN = requireEnv('CONTENTFUL_ACCESS_TOKEN')

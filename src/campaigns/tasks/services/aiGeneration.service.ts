@@ -10,6 +10,7 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { campaignPlanQueueConfig } from 'src/queue/queue.config'
 import { CampaignPlanCompleteMessage } from 'src/queue/queue.types'
+import { isDateTodayOrFuture } from 'src/shared/util/date.util'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 
 const LambdaEventTaskSchema = z.object({
@@ -73,6 +74,14 @@ export class AiGenerationService {
 
   async triggerEventGeneration(campaign: Campaign): Promise<boolean> {
     const { city, state, electionDate } = campaign.details ?? {}
+
+    if (!isDateTodayOrFuture(electionDate)) {
+      this.logger.info(
+        { campaignId: campaign.id, electionDate },
+        'skipping event generation: election date missing or past',
+      )
+      return false
+    }
 
     try {
       await this.triggerGeneration({

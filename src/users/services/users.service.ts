@@ -6,6 +6,7 @@ import {
 } from '@/shared/constants/paginationOptions.consts'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 import { ClerkClient } from '@clerk/backend'
 import { type ListUsersPagination } from '@goodparty_org/contracts'
 import {
@@ -304,7 +305,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     return updatedUser
   }
 
-  async deleteUser(id: number) {
+  async deleteUser(id: number, initiatedByUserId: number) {
     const user = await this.model.findUnique({
       where: { id },
       include: { campaigns: true },
@@ -315,6 +316,29 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const subscriptionId = (campaign?.details as { subscriptionId?: string })
       ?.subscriptionId
+
+    await this.client.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id } })
+      this.logger.info({ userId: id }, 'User deleted from database')
+
+      if (user?.clerkId) {
+        try {
+          await this.clerkClient.users.deleteUser(user.clerkId)
+          this.logger.info(
+            { userId: id, clerkId: user.clerkId },
+            'User deleted from Clerk',
+          )
+        } catch (error) {
+          this.logger.error(
+            { error },
+            `Failed to delete Clerk user ${user.clerkId} during account deletion`,
+          )
+          throw new BadGatewayException(
+            `Failed to delete Clerk user during account deletion`,
+          )
+        }
+      }
+    })
 
     if (subscriptionId) {
       try {
@@ -333,24 +357,54 @@ export class UsersService extends createPrismaBase(MODELS.User) {
                 statusCode: stripeError.statusCode,
               },
             },
-            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} `,
+            `Failed to cancel subscription ${subscriptionId} after user deletion: ${stripeError.message}`,
           )
         } else {
           this.logger.error(
             { error },
-            `Unexpected error canceling subscription ${subscriptionId}`,
+            `Unexpected error canceling subscription ${subscriptionId} after user deletion`,
           )
         }
-        throw new BadGatewayException(
-          `Failed to cancel subscription before user deletion`,
-        )
       }
     }
-    return this.model.delete({
-      where: {
+
+    await this.trackUserDeletion(id, initiatedByUserId, user)
+  }
+
+  private async trackUserDeletion(
+    id: number,
+    initiatedByUserId: number,
+    user: Prisma.UserGetPayload<{ include: { campaigns: true } }> | null,
+  ) {
+    const isSelf = initiatedByUserId === id
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const metaData = user?.metaData as PrismaJson.UserMetaData | null
+    const userContext = {
+      email: user?.email,
+      hubspotId: metaData?.hubspotId as string | undefined,
+    }
+    const trackingEvent = EVENTS.Account.UserDeleted
+    const trackingProperties = {
+      clerkId: user?.clerkId,
+      hadActiveCampaign: (user?.campaigns?.length ?? 0) > 0,
+      initiatedBy: isSelf ? 'self' : 'admin',
+      ...(!isSelf && { initiatedByUserId }),
+    }
+
+    try {
+      await this.analytics.track(
         id,
-      },
-    })
+        trackingEvent,
+        trackingProperties,
+        userContext,
+      )
+    } catch (error) {
+      this.logger.error(
+        { error, trackingEvent, trackingProperties },
+        'Failed to track user deletion event',
+      )
+    }
   }
 
   async impersonateUser(userId: number, actorClerkId: string) {

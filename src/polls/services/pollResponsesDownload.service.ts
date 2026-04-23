@@ -4,7 +4,7 @@ import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
 import { stripLeadingNewlines } from '../utils/polls.utils'
 import { PinoLogger } from 'nestjs-pino'
-import { requireEnv } from 'src/shared/utils/env'
+import { requireEnv } from 'src/shared/util/env.util'
 
 const UTF8_BOM = '\uFEFF'
 

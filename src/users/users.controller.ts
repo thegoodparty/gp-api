@@ -152,9 +152,9 @@ export class UsersController {
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param() { id }: UserIdParamSchema) {
+  async delete(@Param() { id }: UserIdParamSchema, @ReqUser() reqUser: User) {
     try {
-      return await this.usersService.deleteUser(id)
+      return await this.usersService.deleteUser(id, reqUser.id)
     } catch (error: unknown | PrismaClientKnownRequestError) {
       if (
         error instanceof PrismaClientKnownRequestError &&

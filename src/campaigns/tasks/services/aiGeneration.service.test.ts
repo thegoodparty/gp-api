@@ -146,6 +146,28 @@ describe('AiGenerationService', () => {
 
       expect(result).toBe(false)
     })
+
+    it('returns false without sending when election date is in the past', async () => {
+      const campaign = makeCampaign({
+        details: { city: 'Boston', state: 'MA', electionDate: '2020-11-03' },
+      } as Partial<Campaign>)
+
+      const result = await service.triggerEventGeneration(campaign)
+
+      expect(result).toBe(false)
+      expect(mockQueueProducer.sendToCampaignPlanQueue).not.toHaveBeenCalled()
+    })
+
+    it('returns false without sending when election date is missing', async () => {
+      const campaign = makeCampaign({
+        details: { city: 'Boston', state: 'MA' },
+      } as Partial<Campaign>)
+
+      const result = await service.triggerEventGeneration(campaign)
+
+      expect(result).toBe(false)
+      expect(mockQueueProducer.sendToCampaignPlanQueue).not.toHaveBeenCalled()
+    })
   })
 
   describe('readResultFromS3', () => {

@@ -57,12 +57,14 @@ export class AnalyticsService {
     userId: number,
     eventName: string,
     properties?: SegmentTrackEventProperties,
+    prefetchedUserContext?: UserContext,
   ) {
     this.logger.debug(
       `[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`,
     )
 
-    const userContext = await this.getUserContext(userId)
+    const userContext =
+      prefetchedUserContext ?? (await this.getUserContext(userId))
 
     const impersonationState = getImpersonationContext()
 

@@ -393,12 +393,12 @@ describe('UsersController', () => {
   })
 
   describe('delete', () => {
-    it('deletes the user by id', async () => {
-      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(mockUser)
+    it('deletes the user by id and passes requesting user id', async () => {
+      vi.spyOn(usersService, 'deleteUser').mockResolvedValue(undefined)
 
-      await controller.delete({ id: userId })
+      await controller.delete({ id: userId }, mockUser)
 
-      expect(usersService.deleteUser).toHaveBeenCalledWith(userId)
+      expect(usersService.deleteUser).toHaveBeenCalledWith(userId, mockUser.id)
     })
 
     it('silently handles Prisma P2025 (record not found) error', async () => {
@@ -408,7 +408,9 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(controller.delete({ id: 999 })).resolves.toBeUndefined()
+      await expect(
+        controller.delete({ id: 999 }, mockUser),
+      ).resolves.toBeUndefined()
     })
 
     it('rethrows non-P2025 Prisma errors', async () => {
@@ -418,7 +420,7 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(controller.delete({ id: userId })).rejects.toThrow(
+      await expect(controller.delete({ id: userId }, mockUser)).rejects.toThrow(
         PrismaClientKnownRequestError,
       )
     })
@@ -428,7 +430,7 @@ describe('UsersController', () => {
         new Error('DB connection lost'),
       )
 
-      await expect(controller.delete({ id: userId })).rejects.toThrow(
+      await expect(controller.delete({ id: userId }, mockUser)).rejects.toThrow(
         'DB connection lost',
       )
     })
