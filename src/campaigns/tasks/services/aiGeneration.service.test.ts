@@ -313,7 +313,9 @@ describe('AiGenerationService', () => {
     })
 
     it('sends null officeName when organizationSlug is missing', async () => {
-      const campaign = makeCampaign({ organizationSlug: '' } as Partial<Campaign>)
+      const campaign = makeCampaign({
+        organizationSlug: '',
+      } as Partial<Campaign>)
 
       await service.triggerEventGeneration(campaign)
 
