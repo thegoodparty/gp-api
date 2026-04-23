@@ -55,6 +55,7 @@ describe('AdminUsersController', () => {
     const usersServiceMock: Partial<UsersService> = {
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
+      findUserByEmail: vi.fn(),
       createUser: vi.fn(),
       deleteUser: vi.fn(),
       impersonateUser: vi.fn(),
@@ -83,6 +84,36 @@ describe('AdminUsersController', () => {
       const guards = getGuards('impersonate')
       expect(guards).toContain(AdminOrM2MGuard)
     })
+
+    it('protects searchByEmail with AdminOrM2MGuard', () => {
+      const guards = getGuards('searchByEmail')
+      expect(guards).toContain(AdminOrM2MGuard)
+    })
+  })
+
+  describe('searchByEmail', () => {
+    it('returns users whose email contains the search term', async () => {
+      vi.spyOn(usersService, 'findMany').mockResolvedValue([mockTargetUser])
+
+      const result = await controller.searchByEmail('candidate')
+
+      expect(usersService.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            email: expect.objectContaining({ contains: 'candidate' }),
+          },
+        }),
+      )
+      expect(result).toEqual([mockTargetUser])
+    })
+
+    it('returns empty array when no users match', async () => {
+      vi.spyOn(usersService, 'findMany').mockResolvedValue([])
+
+      const result = await controller.searchByEmail('nobody')
+
+      expect(result).toEqual([])
+    })
   })
 
   describe('impersonate', () => {
@@ -107,28 +138,28 @@ describe('AdminUsersController', () => {
       expect(result).toEqual({ token: 'actor_token_123' })
     })
 
-    it('falls back to body.actorClerkId when req.user has no clerkId', async () => {
-      const adminWithoutClerkId = { ...mockUser, clerkId: null }
+    it('uses actorEmail from body when called in an impersonating session (not req.user.clerkId)', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
       )
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
-        token: 'actor_token_456',
+        token: 'swap_token',
       })
 
-      const req = { user: adminWithoutClerkId } as unknown as IncomingRequest
+      const candidateUser = { ...mockTargetUser, impersonating: true }
+      const req = { user: candidateUser } as IncomingRequest
       const result = await controller.impersonate(42, req, {
-        actorClerkId: 'm2m_actor_clerk_id',
+        actorEmail: 'admin@goodparty.org',
       })
 
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
-        'm2m_actor_clerk_id',
+        'admin@goodparty.org',
       )
-      expect(result).toEqual({ token: 'actor_token_456' })
+      expect(result).toEqual({ token: 'swap_token' })
     })
 
-    it('uses body.actorClerkId when called via M2M (no req.user)', async () => {
+    it('uses actorEmail directly as actor sub when called via M2M (no req.user)', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
       )
@@ -138,20 +169,18 @@ describe('AdminUsersController', () => {
 
       const req = { user: undefined } as IncomingRequest
       const result = await controller.impersonate(42, req, {
-        actorClerkId: 'svc_clerk_id',
+        actorEmail: 'admin@goodparty.org',
       })
 
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
-        'svc_clerk_id',
+        'admin@goodparty.org',
       )
       expect(result).toEqual({ token: 'm2m_token' })
     })
 
-    it('throws BadRequestException when no actorClerkId can be resolved', async () => {
-      const req = {
-        user: { ...mockUser, clerkId: null },
-      } as unknown as IncomingRequest
+    it('throws BadRequestException when M2M call omits actorEmail', async () => {
+      const req = { user: undefined } as IncomingRequest
 
       await expect(controller.impersonate(42, req, {})).rejects.toThrow(
         BadRequestException,
@@ -161,11 +190,11 @@ describe('AdminUsersController', () => {
       expect(usersService.impersonateUser).not.toHaveBeenCalled()
     })
 
-    it('throws BadRequestException with descriptive message when actorClerkId is missing', async () => {
+    it('throws BadRequestException with descriptive message when actorEmail is missing', async () => {
       const req = { user: undefined } as IncomingRequest
 
       await expect(controller.impersonate(42, req, {})).rejects.toThrow(
-        'actorClerkId is required when using M2M auth',
+        'actorEmail is required when using M2M auth',
       )
     })
 

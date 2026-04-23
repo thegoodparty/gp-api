@@ -1,4 +1,5 @@
 import { IncomingRequest } from '@/authentication/authentication.types'
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { AdminOrM2MGuard } from '@/authentication/guards/AdminOrM2M.guard'
 import {
   BadRequestException,
@@ -16,11 +17,10 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { subDays, subMonths } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { UsersService } from 'src/users/services/users.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -62,6 +62,16 @@ export class AdminUsersController {
     return this.usersService.findMany({ where: { createdAt: { gt: date } } })
   }
 
+  @Get('search')
+  @UseGuards(AdminOrM2MGuard)
+  async searchByEmail(@Query('email') email: string) {
+    return this.usersService.findMany({
+      where: { email: { contains: email, mode: Prisma.QueryMode.insensitive } },
+      take: 10,
+      select: { id: true, email: true, name: true },
+    })
+  }
+
   @Get(':id')
   @Roles(UserRole.admin)
   async get(@Param('id', ParseIntPipe) id: number) {
@@ -79,14 +89,20 @@ export class AdminUsersController {
   async impersonate(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: IncomingRequest,
-    @Body() body: { actorClerkId?: string },
+    @Body() body: { actorEmail?: string },
   ) {
-    const actorClerkId = req.user?.clerkId ?? body.actorClerkId
+    // In an impersonating session, req.user is the candidate — never use it as actor
+    let actorClerkId =
+      req.actorUser?.clerkId ??
+      (req.user?.impersonating ? undefined : req.user?.clerkId)
 
     if (!actorClerkId) {
-      throw new BadRequestException(
-        'actorClerkId is required when using M2M auth',
-      )
+      if (!body.actorEmail) {
+        throw new BadRequestException(
+          'actorEmail is required when using M2M auth',
+        )
+      }
+      actorClerkId = body.actorEmail
     }
 
     this.logger.info(
