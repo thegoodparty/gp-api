@@ -1,0 +1,164 @@
+name: API - Postman (Workspace, No Seed, CI .env)
+
+on:
+  pull_request:
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  postman-tests:
+    name: Run Postman Collections (Workspace)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        ports: [ "5432:5432" ]
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gpdb
+        options: >-
+          --health-cmd="pg_isready -U postgres -d gpdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gpdb
+      BASE_URL: ${{ vars.BASE_URL || 'http://localhost:3000' }}
+      POSTMAN_WORKSPACE_ID: ${{ vars.POSTMAN_WORKSPACE_ID }}
+      POSTMAN_ENV_UID: ${{ vars.POSTMAN_ENVIRONMENT_ID }}
+      PRISMA_SKIP_SEED: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22.12.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --- Prisma migration without seed ---
+      - name: Migrate database (skip seed)
+        run: npx prisma migrate reset --force --skip-seed
+
+      # --- Create CI .env from .env.example requirements ---
+      # Add/adjust keys to match your .env.example exactly.
+      - name: Create .env for CI
+        run: |
+          cat > .env << 'EOF'
+          NODE_ENV=test
+          PORT=3000
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/gpdb
+
+          # App secrets (safe dummy values if not exercised by tests)
+          JWT_SECRET=dummy_jwt_secret
+          SESSION_SECRET=dummy_session_secret
+
+          # S3-related (dummy to satisfy config/bootstrap if required)
+          AWS_S3_KEY=dummy
+          AWS_S3_SECRET=dummy
+          AWS_S3_REGION=us-east-1
+          AWS_S3_BUCKET=dummy
+
+          # Add any other REQUIRED keys from .env.example here.
+          # e.g. REDIS_URL=redis://localhost:6379
+          # STRIPE_SECRET=dummy
+          # SENDGRID_API_KEY=dummy
+          EOF
+
+      - name: Install wait-on
+        run: npm i -g wait-on
+
+      - name: Start API (background)
+        run: |
+          npm run start:dev > server.log 2>&1 &
+          echo $! > server.pid
+
+      # If your app exposes /health, prefer that; otherwise keep /api (Swagger)
+      - name: Wait for API readiness (90s)
+        run: wait-on "$BASE_URL/api" -t 90000
+
+      - name: Show server log on failure
+        if: failure()
+        run: |
+          echo "----- server.log (tail) -----"
+          tail -n 400 server.log || true
+          echo "----- full server.log path: $PWD/server.log -----"
+
+      - name: Install Postman CLI and jq
+        run: |
+          npm i -g @postman/cli
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Authenticate Postman CLI
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: postman login --with-api-key "$POSTMAN_API_KEY"
+
+      - name: Discover and run all collections in workspace
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p postman-reports
+
+          echo "Fetching collections for workspace: ${POSTMAN_WORKSPACE_ID}"
+          collections_json=$(curl -sS \
+            --header "X-Api-Key: ${POSTMAN_API_KEY}" \
+            "https://api.getpostman.com/collections?workspace=${POSTMAN_WORKSPACE_ID}")
+
+          mapfile -t COL_UIDS < <(echo "$collections_json" | jq -r '.collections[].uid')
+          mapfile -t COL_NAMES < <(echo "$collections_json" | jq -r '.collections[].name')
+
+          if [ ${#COL_UIDS[@]} -eq 0 ]; then
+            echo "No collections found in the workspace."
+            exit 1
+          fi
+
+          overall_status=0
+          for idx in "${!COL_UIDS[@]}"; do
+            uid="${COL_UIDS[$idx]}"
+            name="$(echo "${COL_NAMES[$idx]}" | tr -cd '[:alnum:]._-' | cut -c1-60)"
+            name="${name:-collection}"
+
+            echo "Running collection: ${COL_NAMES[$idx]} ($uid)"
+            args=( collection run "$uid"
+                   --env-var "baseUrl=$BASE_URL"
+                   --reporters "junit,html"
+                   --reporter-junit-export "postman-reports/${name}.${uid}.junit.xml"
+                   --reporter-html-export "postman-reports/${name}.${uid}.report.html" )
+
+            if [ -n "${POSTMAN_ENV_UID:-}" ]; then
+              args+=( -e "$POSTMAN_ENV_UID" )
+            fi
+
+            if ! postman "${args[@]}"; then
+              echo "Collection failed: ${COL_NAMES[$idx]}"
+              overall_status=1
+            fi
+          done
+
+          exit $overall_status
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f server.pid ]; then kill "$(cat server.pid)" || true; fi
+
+      - name: Upload artifacts (reports & server log)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postman-and-server-logs
+          path: |
+            postman-reports/
+            server.log
