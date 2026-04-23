@@ -10,7 +10,14 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { campaignPlanQueueConfig } from 'src/queue/queue.config'
 import { CampaignPlanCompleteMessage } from 'src/queue/queue.types'
-import { isDateTodayOrFuture } from 'src/shared/util/date.util'
+import { isValid } from 'date-fns'
+import {
+  isDateTodayOrFuture,
+  parseIsoDateString,
+} from 'src/shared/util/date.util'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
+import { extractCity } from '@/vendors/google/util/GooglePlaces.util'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 
 const LambdaEventTaskSchema = z.object({
@@ -33,47 +40,52 @@ const LambdaResultPayloadSchema = z.object({
 export type LambdaEventTask = z.infer<typeof LambdaEventTaskSchema>
 export type LambdaResultPayload = z.infer<typeof LambdaResultPayloadSchema>
 
+export type CampaignPlanLambdaPayload = {
+  campaignId: number
+  electionDate: string
+  state: string | null
+  city: string | null
+  officeName: string | null
+  officeLevel: string | null
+  primaryElectionDate: string | null
+}
+
 @Injectable()
 export class AiGenerationService {
   constructor(
     private readonly queueProducerService: QueueProducerService,
     private readonly s3Service: S3Service,
+    private readonly organizationsService: OrganizationsService,
+    private readonly googlePlacesService: GooglePlacesService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiGenerationService.name)
   }
 
-  async triggerGeneration(params: {
-    campaignId: number
-    electionDate: string
-    city: string
-    state: string
-  }): Promise<void> {
-    if (!params.city || !params.state || !params.electionDate) {
-      this.logger.error(
-        {
-          campaignId: params.campaignId,
-          city: params.city,
-          state: params.state,
-          electionDate: params.electionDate,
-        },
-        'missing required fields for event generation',
-      )
+  async triggerGeneration(payload: CampaignPlanLambdaPayload): Promise<void> {
+    if (
+      !payload.electionDate ||
+      !isValid(parseIsoDateString(payload.electionDate))
+    ) {
       throw new BadRequestException(
-        'Missing required campaign fields for event generation',
+        'electionDate must be a YYYY-MM-DD date string',
+      )
+    }
+    if (
+      payload.primaryElectionDate !== null &&
+      !isValid(parseIsoDateString(payload.primaryElectionDate))
+    ) {
+      throw new BadRequestException(
+        'primaryElectionDate must be a YYYY-MM-DD date string when provided',
       )
     }
 
-    await this.queueProducerService.sendToCampaignPlanQueue({
-      campaignId: params.campaignId,
-      election_date: params.electionDate,
-      city: params.city,
-      state: params.state,
-    })
+    await this.queueProducerService.sendToCampaignPlanQueue(payload)
   }
 
   async triggerEventGeneration(campaign: Campaign): Promise<boolean> {
-    const { city, state, electionDate } = campaign.details ?? {}
+    const details = campaign.details ?? {}
+    const { state, electionDate, ballotLevel, primaryElectionDate } = details
 
     if (!isDateTodayOrFuture(electionDate)) {
       this.logger.info(
@@ -83,13 +95,27 @@ export class AiGenerationService {
       return false
     }
 
+    const [city, officeName] = await Promise.all([
+      this.resolveCity(campaign),
+      this.resolveOfficeName(campaign),
+    ])
+
+    const payload: CampaignPlanLambdaPayload = {
+      campaignId: campaign.id,
+      electionDate: electionDate ?? '',
+      state: state ?? null,
+      city,
+      officeName,
+      officeLevel: ballotLevel ?? null,
+      primaryElectionDate: primaryElectionDate ?? null,
+    }
+
     try {
-      await this.triggerGeneration({
-        campaignId: campaign.id,
-        electionDate: electionDate ?? '',
-        city: city ?? '',
-        state: state ?? '',
-      })
+      this.logger.info(
+        { campaignId: campaign.id, payload },
+        'triggering campaign plan Lambda generation',
+      )
+      await this.triggerGeneration(payload)
     } catch (error) {
       this.logger.warn(
         { campaignId: campaign.id, error },
@@ -98,12 +124,45 @@ export class AiGenerationService {
       return false
     }
 
-    this.logger.info(
-      { campaignId: campaign.id },
-      'triggered campaign plan Lambda generation',
-    )
-
     return true
+  }
+
+  private async resolveCity(campaign: Campaign): Promise<string | null> {
+    const detailsCity = campaign.details?.city
+    if (typeof detailsCity === 'string' && detailsCity.trim() !== '') {
+      return detailsCity
+    }
+
+    if (!campaign.placeId) return null
+
+    try {
+      const place = await this.googlePlacesService.getAddressByPlaceId(
+        campaign.placeId,
+      )
+      return extractCity(place)?.long_name ?? null
+    } catch (error) {
+      this.logger.warn(
+        { campaignId: campaign.id, placeId: campaign.placeId, error },
+        'Google Places city fallback failed — sending null city',
+      )
+      return null
+    }
+  }
+
+  private async resolveOfficeName(campaign: Campaign): Promise<string | null> {
+    if (!campaign.organizationSlug) return null
+
+    try {
+      return await this.organizationsService.resolvePositionNameByOrganizationSlug(
+        campaign.organizationSlug,
+      )
+    } catch (error) {
+      this.logger.warn(
+        { campaignId: campaign.id, error },
+        'office name resolution failed — sending null officeName',
+      )
+      return null
+    }
   }
 
   async readResultFromS3(s3Key: string): Promise<LambdaResultPayload> {
