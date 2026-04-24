@@ -5,6 +5,8 @@ import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interc
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
 import {
+  CampaignWithLiveContextSchema,
+  CampaignWithPositionNameSchema,
   ListCampaignsPaginationSchema,
   ReadCampaignOutputSchema,
   SetDistrictOutputSchema,
@@ -46,7 +48,6 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignWith } from './campaigns.types'
-import { CampaignWithPositionNameSchema } from './schemas/CampaignWithPositionName.schema'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -213,23 +214,25 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get(':id')
+  @ResponseSchema(CampaignWithLiveContextSchema)
   async findById(@Param() { id }: IdParamSchema) {
-    const campaign = await this.campaigns.findUniqueOrThrow({
-      where: { id },
-      include: {
-        organization: {
-          select: {
-            customPositionName: true,
-            positionId: true,
+    const { organization, ...campaign } =
+      await this.campaigns.findUniqueOrThrow({
+        where: { id },
+        include: {
+          organization: {
+            select: {
+              customPositionName: true,
+              positionId: true,
+            },
           },
         },
-      },
-    })
+      })
 
     const [{ positionName }, liveMetrics] = await Promise.all([
       this.organizations.resolvePositionContext({
-        customPositionName: campaign.organization?.customPositionName,
-        positionId: campaign.organization?.positionId,
+        customPositionName: organization?.customPositionName,
+        positionId: organization?.positionId,
       }),
       this.campaigns.fetchLiveRaceTargetMetrics(campaign),
     ])

@@ -112,28 +112,11 @@ export class OrganizationsController {
     return toAPIOrganization(org)
   }
 
-  @Get('/admin/:slug')
-  @UseGuards(AdminOrM2MGuard)
-  async adminGetOrganization(
-    @Param('slug') slug: string,
-  ): Promise<APIOrganization> {
-    const org = await this.organizationsService.adminGetOrganization(slug)
-    return toAPIOrganization(org)
-  }
-
-  @Patch('/admin/:slug')
-  @UseGuards(AdminOrM2MGuard)
-  async adminPatchOrganization(
-    @Param('slug') slug: string,
-    @Body() updates: PatchOrganizationDto,
-  ): Promise<APIOrganization> {
-    const org = await this.organizationsService.adminPatchOrganization(
-      slug,
-      updates,
-    )
-    return toAPIOrganization(org)
-  }
-
+  // NOTE: Static admin routes (e.g. `/admin/list`) MUST be declared before
+  // parameterized admin routes (`/admin/:slug`). NestJS matches routes in
+  // declaration order, so a parameterized route declared first will swallow
+  // the static one (e.g. `GET /admin/list` would resolve to `adminGetOrganization`
+  // with `slug = 'list'`).
   @Get('/admin/list')
   @UseGuards(AdminOrM2MGuard)
   async adminListOrganizations(@Query() query: AdminListOrganizationsDto) {
@@ -162,5 +145,27 @@ export class OrganizationsController {
         }
       }),
     }
+  }
+
+  @Get('/admin/:slug')
+  @UseGuards(AdminOrM2MGuard)
+  async adminGetOrganization(
+    @Param('slug') slug: string,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.adminGetOrganization(slug)
+    return toAPIOrganization(org)
+  }
+
+  @Patch('/admin/:slug')
+  @UseGuards(AdminOrM2MGuard)
+  async adminPatchOrganization(
+    @Param('slug') slug: string,
+    @Body() updates: PatchOrganizationDto,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.adminPatchOrganization(
+      slug,
+      updates,
+    )
+    return toAPIOrganization(org)
   }
 }
