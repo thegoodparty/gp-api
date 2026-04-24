@@ -377,6 +377,7 @@ export = async () => {
         prod: '',
       }),
       AGENT_DISPATCH_QUEUE_NAME: select({
+        // Preview intentionally omitted — dispatch fails at runtime with a log
         preview: '',
         dev: 'agent-dispatch-dev.fifo',
         qa: 'agent-dispatch-qa.fifo',

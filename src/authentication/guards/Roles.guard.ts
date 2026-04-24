@@ -15,9 +15,8 @@ export class RolesGuard implements CanActivate {
       return true
     }
     const { user } = context.switchToHttp().getRequest<{
-      user: { roles?: UserRole[]; impersonating?: boolean }
+      user: { roles?: UserRole[] }
     }>()
-    if (user.impersonating) return true
     return requiredRoles.some((role) => user.roles?.includes(role))
   }
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
@@ -25,7 +26,6 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import type { PollResponseJsonRow } from '../queue.types'
 import { QueueType } from '../queue.types'
-import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { QueueConsumerService } from './queueConsumer.service'
 
 vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
@@ -203,40 +203,40 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never, // aiContentService
-      {} as never, // slackService
+      {} as never,
+      {} as never,
       analytics as unknown as AnalyticsService,
       campaignsService as never,
-      {} as never, // aiGenerationService
-      {} as never, // campaignTasksService
-      {} as never, // tcrComplianceService
-      {} as never, // domainsService
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
       pollsService as unknown as PollsService,
       pollIssuesService as never,
       pollIndividualMessage as never,
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
-      {} as never, // usersService
-      {} as never, // organizationsService
-      {} as never, // weeklyTasksDigestHandler
-      {} as never, // experimentRunsService
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
 
-  it('returns undefined and does not create messages when poll is not found', async () => {
+  it('acks and does not create messages when poll is not found', async () => {
     pollsService.findUnique.mockResolvedValue(null)
     const message = createPollAnalysisCompleteMessage({ pollId })
 
     const result = await service.processMessage(message)
 
-    expect(result).toBeUndefined()
+    expect(result).toBe(true)
     expect(s3Service.getFile).not.toHaveBeenCalled()
     expect(pollIssuesService.model.deleteMany).not.toHaveBeenCalled()
   })
 
-  it('returns undefined and does not create messages when poll is not SCHEDULED or IN_PROGRESS', async () => {
+  it('acks and does not create messages when poll is not SCHEDULED or IN_PROGRESS', async () => {
     pollsService.findUnique.mockResolvedValue({
       id: pollId,
       electedOfficeId,
@@ -247,7 +247,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
     const result = await service.processMessage(message)
 
-    expect(result).toBeUndefined()
+    expect(result).toBe(true)
     expect(s3Service.getFile).not.toHaveBeenCalled()
   })
 
@@ -730,7 +730,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(deleteWhere.id.in).toHaveLength(1)
     expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalled()
   })
-
 })
 
 describe('QueueConsumerService - triggerPollExecution', () => {
@@ -842,24 +841,24 @@ describe('QueueConsumerService - triggerPollExecution', () => {
     }
 
     service = new QueueConsumerService(
-      {} as never, // aiContentService
-      { client: {} } as never, // slackService
-      {} as never, // analytics
+      {} as never,
+      { client: {} } as never,
+      {} as never,
       campaignsService as never,
-      {} as never, // aiGenerationService
-      {} as never, // campaignTasksService
-      {} as never, // tcrComplianceService
-      {} as never, // domainsService
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
       pollsService as never,
-      {} as never, // pollIssuesService
-      {} as never, // pollIndividualMessage
+      {} as never,
+      {} as never,
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
       usersService as never,
-      {} as never, // organizationsService
-      {} as never, // weeklyTasksDigestHandler
-      {} as never, // experimentRunsService
+      {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -1031,7 +1030,7 @@ describe('QueueConsumerService - message type routing', () => {
     expect(mockSlackService.message).not.toHaveBeenCalled()
   })
 
-  it('throws UnrecognizedQueueTypeError on unknown message types so handleMessage can delete the poison pill', async () => {
+  it('acknowledges unknown message types via default branch', async () => {
     const message: Message = {
       MessageId: 'msg-unknown',
       Body: JSON.stringify({
@@ -1040,9 +1039,9 @@ describe('QueueConsumerService - message type routing', () => {
       }),
     }
 
-    await expect(service.processMessage(message)).rejects.toThrow(
-      /Unrecognized queue message type/,
-    )
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
   })
 
   it('routes weeklyTasksDigest messages to the handler', async () => {
@@ -1122,98 +1121,6 @@ describe('QueueConsumerService - message type routing', () => {
     // With withLegacyErrorSwallowing: returns true (discard, don't requeue)
     // Without it: would throw and cause a requeue
     const result = await service.processMessage(message)
-
-    expect(result).toBe(true)
-  })
-})
-
-describe('QueueConsumerService - poison pill handling', () => {
-  let service: QueueConsumerService
-  let mockLogger: ReturnType<typeof createMockLogger>
-  let experimentRunsService: {
-    findFirst: ReturnType<typeof vi.fn>
-    client: {
-      experimentRun: { update: ReturnType<typeof vi.fn> }
-    }
-  }
-
-  beforeEach(() => {
-    mockLogger = createMockLogger()
-    experimentRunsService = {
-      findFirst: vi.fn(),
-      client: {
-        experimentRun: { update: vi.fn() },
-      },
-    }
-
-    service = new QueueConsumerService(
-      {} as never, // aiContentService
-      {} as never, // slackService
-      {} as never, // analytics
-      {} as never, // campaignsService
-      {} as never, // aiGenerationService
-      {} as never, // campaignTasksService
-      {} as never, // tcrComplianceService
-      {} as never, // domainsService
-      {} as never, // pollsService
-      {} as never, // pollIssuesService
-      {} as never, // pollIndividualMessage
-      {} as never, // electedOfficeService
-      {} as never, // contactsService
-      {} as never, // s3Service
-      {} as never, // usersService
-      {} as never, // organizationsService
-      {} as never, // weeklyTasksDigestHandler
-      experimentRunsService as never,
-      mockLogger,
-    )
-  })
-
-  it('deletes messages with malformed agentExperimentResult data (zod validation fails)', async () => {
-    const receiptHandle = 'receipt-handle-malformed-zod'
-    const message: Message = {
-      MessageId: 'msg-poison-zod',
-      ReceiptHandle: receiptHandle,
-      Body: JSON.stringify({
-        type: QueueType.AGENT_EXPERIMENT_RESULT,
-        data: {
-          candidateId: '4',
-          experimentId: 'x',
-          runId: 'r',
-          status: 'failed',
-        },
-      }),
-    }
-
-    const result = await service.handleMessage(message)
-
-    expect(result).toBe(true)
-    expect(experimentRunsService.findFirst).not.toHaveBeenCalled()
-  })
-
-  it('deletes messages with a non-JSON Body rather than re-queueing forever', async () => {
-    const message: Message = {
-      MessageId: 'msg-poison-json',
-      ReceiptHandle: 'receipt-handle-garbage',
-      Body: 'not json',
-    }
-
-    const result = await service.handleMessage(message)
-
-    expect(result).toBe(true)
-  })
-
-  it('deletes messages with an unrecognized type rather than silently looping', async () => {
-    const message: Message = {
-      MessageId: 'msg-poison-type',
-      ReceiptHandle: 'receipt-handle-unknown-type',
-      Body: JSON.stringify({
-        type: 'unrecognizedFutureEvent',
-        data: { foo: 'bar' },
-      }),
-    }
-
-    const result = await service.handleMessage(message)
 
     expect(result).toBe(true)
   })

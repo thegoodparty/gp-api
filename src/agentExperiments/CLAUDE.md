@@ -1,98 +1,115 @@
 # Agent Experiments Module
 
-Dispatches AI agent experiments to the PMF Engine (Fargate), tracks runs, and serves artifacts back to the webapp.
+gp-api's side of the PMF Engine contract. Dispatches agent experiment runs to SQS, records them in the `experiment_run` table, and reconciles results from the agent-results queue.
+
+This module is intentionally thin — it is a **transport layer**, not a product layer. It does not know which experiments exist, what params they need, who is allowed to run them, or how artifacts are consumed. Callers own all of that; this module only moves runs through states.
 
 ## How It Works
 
 ```
-webapp POST /request → candidateExperiments.service → agentDispatch.service → SQS dispatch queue
-                                                                                    ↓
-                                                                            Lambda → Fargate (agent)
-                                                                                    ↓
-webapp GET /artifact ← candidateExperiments.service ← S3 ← agent uploads artifact
-                                                    ← queue consumer updates ExperimentRun status
+caller (gp-api service)
+   │
+   │  ExperimentRunsService.dispatchRun({ experimentType, organizationSlug, params })
+   ▼
+DB: INSERT experiment_run (status=RUNNING)      SQS: agent-dispatch-{env}.fifo
+                                                         │
+                                                         ▼
+                                                Lambda → Fargate (PMF Engine)
+                                                         │
+                                                         ▼
+                                                S3: artifact upload
+                                                         │
+                                                         ▼
+                                           SQS: agent-results queue
+                                                         │
+                                                         ▼
+QueueConsumerService.handleAgentExperimentResult
+   │
+   │  optimistic-locking UPDATE experiment_run
+   ▼
+status RUNNING → COMPLETED | FAILED,  artifactKey/Bucket, durationSeconds, error
 ```
 
-### Request Flow
+### Lifecycle
 
-1. **Webapp** calls `POST /v1/agent-experiments/request` with `{ experimentId }`
-2. **Controller** routes to `CandidateExperimentsService.requestExperiment()`
-3. **Service** validates AI beta VIP, determines mode (win/serve) from `EXPERIMENT_MODES`
-4. **Dispatch method** builds `autoParams` from campaign data, then calls `AgentDispatchService.dispatch()`
-5. **AgentDispatchService** creates `ExperimentRun` (PENDING) in DB, sends SQS message to `agent-dispatch-{env}.fifo`
-6. **Lambda** (in gp-ai-projects) picks up SQS, launches Fargate task with experiment config
-7. **Fargate agent** runs (2-10 min), uploads JSON artifact to S3, sends callback via SQS
-8. **Callback Lambda** validates artifact, forwards to `agent-results-{env}.fifo` (gp-api's consumer queue)
-9. **Queue consumer** (gp-api) updates ExperimentRun to SUCCESS with `artifactBucket` + `artifactKey`
-10. **Webapp** polls `GET /mine` every 5s, sees SUCCESS, fetches artifact via `GET /artifact/:runId`
+```
+RUNNING ──► COMPLETED        (result.status = "success")
+        └─► FAILED           (result.status = "failed" or "contract_violation",
+                              or sweeper timeout at 45 min, or SQS dispatch error)
+```
 
-### Experiment Modes
+Three terminal states only. `contract_violation` at the queue boundary collapses to `FAILED` — the distinction belongs (if anywhere) in the `error` column, not the enum.
 
-| Mode | Audience | Gating | Experiments |
-|------|----------|--------|-------------|
-| `win` | Candidates running for office | `isAiBetaVip` + P2V electionType/Location | voter_targeting, walking_plan |
-| `serve` | Elected officials | `isAiBetaVip` + ElectedOffice record | district_intel, peer_city_benchmarking |
+### Callback idempotency
 
-### Experiment Dependencies
-
-- `peer_city_benchmarking` depends on `district_intel` — finds the latest SUCCESS district_intel run, fetches artifact from S3, passes trimmed issues (title/summary/status only — full artifact is too large for 8KB ECS env var limit) + artifact key/bucket in params
-- When `district_intel` is dispatched, any SUCCESS `peer_city_benchmarking` runs are marked STALE
-
-### Auto-Populated Params
-
-Both dispatch methods build params automatically from campaign data. Caller params override auto-populated values.
-
-**Win**: state, l2DistrictType, l2DistrictName, districtType, districtName, office, party, city, county, zip, topIssues, winNumber, voterContactGoal, projectedTurnout
-
-**Serve**: state, officialName, officeName, city, county, zip, topIssues, l2DistrictType (optional), l2DistrictName (optional), districtType (optional), swornInDate (optional)
-
-**peer_city_benchmarking** (additional): districtIntelRunId, districtIntelArtifactKey, districtIntelArtifactBucket, issues (trimmed)
+`handleAgentExperimentResult` uses `optimisticLockingUpdate` on `updatedAt` and guards on `status === RUNNING` before patching. A duplicate result for an already-terminal run is logged and dropped.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `agentExperiments.controller.ts` | REST endpoints: dispatch, mine, request, available, artifact |
-| `agentExperiments.module.ts` | NestJS module wiring |
-| `schemas/agentExperiments.schema.ts` | Zod DTOs: DispatchExperimentDto, RequestExperimentDto |
-| `services/candidateExperiments.service.ts` | Main logic: EXPERIMENT_MODES, dispatch routing, artifact retrieval, STALE invalidation |
-| `services/agentDispatch.service.ts` | Creates ExperimentRun + sends SQS dispatch message |
-| `services/experimentRuns.service.ts` | Prisma CRUD for ExperimentRun (extends createPrismaBase) |
+| File                                 | Purpose                                                                |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| `agentExperiments.module.ts`         | Nest module — exports `ExperimentRunsService`                          |
+| `services/experimentRuns.service.ts` | `dispatchRun()`, `sweepStaleRuns()` (`@Cron`), + inherited Prisma CRUD |
 
-## Endpoints
+No controller, no schemas, no other services. HTTP surface is a caller concern.
 
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
-| `/v1/agent-experiments/dispatch` | POST | admin | Direct dispatch (admin tool) |
-| `/v1/agent-experiments/request` | POST | candidate, admin | User-facing: validates campaign, auto-populates params |
-| `/v1/agent-experiments/mine` | GET | candidate, admin | List all runs for user's campaign |
-| `/v1/agent-experiments/available` | GET | candidate, admin | List experiments for user's mode |
-| `/v1/agent-experiments/:runId/artifact` | GET | candidate, admin | Fetch artifact JSON from S3 |
+## SQS message shapes
 
-## ExperimentRun Status Flow
+**Dispatch** (gp-api → agent) — produced by `ExperimentRunsService.dispatchRun()`:
 
-```
-PENDING → RUNNING → SUCCESS
-                  → FAILED
-                  → CONTRACT_VIOLATION
-SUCCESS → STALE (when dependent experiment is regenerated)
+```json
+{
+  "run_id": "<uuid>",
+  "params": { ... },
+  "organization_slug": "...",
+  "experiment_type": "..."
+}
 ```
 
-## Adding a New Experiment
+Sent to the queue named by `AGENT_DISPATCH_QUEUE_NAME` (e.g. `agent-dispatch-dev.fifo`). The URL is resolved once on first dispatch via `sqs:GetQueueUrl` and cached on the service instance. `MessageGroupId = "agent-dispatch-{organizationSlug}"` (per-org FIFO ordering), with a random `MessageDeduplicationId`.
 
-1. **`schemas/agentExperiments.schema.ts`**: Add experiment ID to `EXPERIMENT_IDS` array — this is the source of truth for the Zod enum. TypeScript will error anywhere the ID set is used exhaustively until all locations are updated.
-2. **`services/candidateExperiments.service.ts`**: Add to `EXPERIMENT_MODES` (`'win'` or `'serve'`). The `Record<ExperimentId, ...>` type will force you to add it — won't compile otherwise.
-3. **`services/candidateExperiments.service.ts`**: If it needs special params (like peer_city_benchmarking needs district_intel), add logic in the dispatch method. If it has dependencies, add invalidation logic in `requestExperiment()`.
-4. **`prisma/schema/experimentRun.prisma`**: Add new enum values if needed + create migration.
-5. **`services/candidateExperiments.service.test.ts`**: Add tests for dispatch with auto-populated params, available experiments list, and any dependency/invalidation logic.
+**Result** (agent → gp-api) — consumed by `QueueConsumerService.handleAgentExperimentResult`. Schema in `src/queue/queue.types.ts` (`AgentExperimentResultSchema`):
+
+```ts
+{
+  runId: string,
+  status: 'success' | 'failed' | 'contract_violation',
+  artifactKey?: string,
+  artifactBucket?: string,
+  durationSeconds?: number,
+  error?: string,      // truncated to 1000 chars on write
+}
+```
+
+Envelope: `{ type: QueueType.AGENT_EXPERIMENT_RESULT, data: <above> }`.
+
+## Stale-run sweeper
+
+`ExperimentRunsService.sweepStaleRuns` runs on `*/15 * * * *`. Any `RUNNING` run with `createdAt` older than 45 minutes is flipped to `FAILED` with a timeout-error message. Runs on every replica — safe because the `UPDATE` is idempotent.
+
+## Data model
+
+`experiment_run` (see `prisma/schema/experimentRun.prisma`):
+
+- `runId` — unique, uuid7, used in SQS messages and by callers
+- `organizationSlug` → `Organization.slug`, `onDelete: Cascade`
+- `experimentType: String` — opaque to this module; callers define the value space
+- `status: ExperimentRunStatus { RUNNING, COMPLETED, FAILED }`
+- `params: Json`, `artifactBucket/Key`, `durationSeconds`, `error`
+- `@@index([organizationSlug, experimentType])`
 
 ## Testing
 
 ```bash
 npx vitest run src/agentExperiments/
+npx vitest run src/queue/consumer/queueConsumer.service.test.ts
 ```
 
 ## Environment Variables
 
-- `AGENT_DISPATCH_QUEUE_URL` — SQS FIFO queue for dispatch messages
-- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — for SQS + S3
+- `AGENT_DISPATCH_QUEUE_NAME` — FIFO queue name (e.g. `agent-dispatch-dev.fifo`). The URL is resolved at runtime via `GetQueueUrl` and cached.
+- AWS credentials from the standard provider chain (env, IAM role, etc.)
+
+### Preview environments
+
+`AGENT_DISPATCH_QUEUE_NAME` is **not set** in preview envs. Dispatch fails at runtime: the DB row is flipped to `FAILED`, an error is logged, and `dispatchRun` throws `BadGatewayException`. Callers that want to exercise agent dispatch on a PR branch should merge to `develop` and test against dev. (Rationale: per-PR agent queues would require provisioning a matching consumer in `gp-ai-projects` per preview, which isn't worth the cost for a PR verification step.)

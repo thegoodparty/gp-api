@@ -34,35 +34,11 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
         electionDate: '2026-11-03',
         state: 'NC',
         party: 'independent',
-        office: 'Other',
-        city: 'Hendersonville',
-        county: 'Henderson',
-        isAiBetaVip: true,
       } satisfies PrismaJson.CampaignDetails,
       didWin: true,
       isDemo: false,
       isActive: true,
       isVerified: true,
-    },
-  })
-
-  // update pathToVictory data to match the office above
-
-  await prisma.pathToVictory.update({
-    where: { campaignId: campaign.id },
-    data: {
-      data: {
-        source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
-        winNumber: 3142,
-        districtId: '17337513-5499-deb9-1cb9-9afc0c3c654e',
-        electionType: 'City',
-        p2vCompleteDate: '2025-09-25',
-        electionLocation: 'HENDERSONVILLE CITY',
-        projectedTurnout: 6282,
-        voterContactGoal: 15710,
-        districtManuallySet: false,
-      },
     },
   })
 
@@ -79,15 +55,6 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
     userId: user.id,
     campaignId: campaign.id,
     organizationSlug: eoOrgSlug,
-  })
-
-  await prisma.organization.upsert({
-    where: { slug: electedOffice.organizationSlug },
-    update: {},
-    create: {
-      slug: electedOffice.organizationSlug,
-      ownerId: user.id,
-    },
   })
 
   const createdElectedOffice = await prisma.electedOffice.create({

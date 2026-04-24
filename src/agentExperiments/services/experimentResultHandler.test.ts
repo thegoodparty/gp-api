@@ -1,349 +1,251 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PinoLogger } from 'nestjs-pino'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '@aws-sdk/client-sqs'
+import { ExperimentRunStatus } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { QueueType } from '@/queue/queue.types'
 import { QueueConsumerService } from '@/queue/consumer/queueConsumer.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
-  ...(await importOriginal()),
+  ...(await importOriginal<object>()),
   sendTevynAPIPollMessage: vi.fn(),
 }))
 
-vi.mock('src/observability/grafana/otel.client', () => ({
-  recordBlockedStateEvent: vi.fn(),
-}))
+const RUN_ID = 'run-abc'
 
-const makeResultMessage = (data: Record<string, unknown>): Message => ({
+type ResultOverrides = {
+  runId?: string
+  status?: 'success' | 'failed' | 'contract_violation' | string
+  artifactKey?: string
+  artifactBucket?: string
+  durationSeconds?: number
+  error?: string
+}
+
+const makeMessage = (overrides: ResultOverrides = {}): Message => ({
   MessageId: 'msg-1',
   Body: JSON.stringify({
     type: QueueType.AGENT_EXPERIMENT_RESULT,
     data: {
-      experimentId: 'hello_world',
-      runId: 'run-123',
-      organizationSlug: 'acme-for-mayor',
+      runId: RUN_ID,
       status: 'success',
-      artifactKey: 'hello_world/run-123/result.json',
+      artifactKey: 'district_intel/run-abc/result.json',
       artifactBucket: 'gp-agent-artifacts-dev',
       durationSeconds: 42,
-      ...data,
+      ...overrides,
     },
   }),
 })
 
+const callModifier = async (
+  mod: (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+) =>
+  mod({
+    runId: RUN_ID,
+    status: ExperimentRunStatus.RUNNING,
+    artifactKey: null,
+    artifactBucket: null,
+    durationSeconds: null,
+    error: null,
+    updatedAt: new Date(),
+  })
+
 describe('QueueConsumerService - handleAgentExperimentResult', () => {
-  let processMessage: (message: Message) => Promise<boolean | undefined>
+  let service: QueueConsumerService
   let experimentRunsService: {
-    findFirst: ReturnType<typeof vi.fn>
-    client: {
-      experimentRun: { update: ReturnType<typeof vi.fn> }
-    }
+    findUnique: ReturnType<typeof vi.fn>
+    optimisticLockingUpdate: ReturnType<typeof vi.fn>
   }
   let logger: PinoLogger
 
-  beforeEach(async () => {
+  beforeEach(() => {
     logger = createMockLogger()
-
     experimentRunsService = {
-      findFirst: vi.fn().mockResolvedValue({
-        id: 'db-id-1',
-        runId: 'run-123',
-        experimentId: 'hello_world',
-        status: 'PENDING',
+      findUnique: vi.fn().mockResolvedValue({
+        runId: RUN_ID,
+        status: ExperimentRunStatus.RUNNING,
+        organizationSlug: 'org-1',
+        experimentType: 'district_intel',
+        updatedAt: new Date(),
       }),
-      client: {
-        experimentRun: { update: vi.fn().mockResolvedValue({}) },
-      },
+      optimisticLockingUpdate: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _params: unknown,
+            mod: (
+              run: Record<string, unknown>,
+            ) => Promise<Record<string, unknown>>,
+          ) => callModifier(mod),
+        ),
     }
 
-    const service = new QueueConsumerService(
-      {} as never, // aiContentService
-      {} as never, // slackService
-      {} as never, // analytics
-      {} as never, // campaignsService
-      {} as never, // aiGenerationService
-      {} as never, // campaignTasksService
-      {} as never, // tcrComplianceService
-      {} as never, // domainsService
-      {} as never, // pollsService
-      {} as never, // pollIssuesService
-      {} as never, // pollIndividualMessage
-      {} as never, // electedOfficeService
-      {} as never, // contactsService
-      {} as never, // s3Service
-      {} as never, // usersService
-      {} as never, // organizationsService
-      {} as never, // weeklyTasksDigestHandler
+    service = new QueueConsumerService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
       experimentRunsService as never,
       logger,
     )
-
-    processMessage = service.processMessage.bind(service)
   })
 
-  it('updates experiment run on success result', async () => {
-    const result = await processMessage(makeResultMessage({}))
-
-    expect(experimentRunsService.findFirst).toHaveBeenCalledWith({
-      where: { runId: 'run-123' },
-    })
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).toHaveBeenCalledWith({
-      where: { id: 'db-id-1', status: { in: ['PENDING', 'RUNNING'] } },
-      data: {
-        status: 'SUCCESS',
-        artifactKey: 'hello_world/run-123/result.json',
-        artifactBucket: 'gp-agent-artifacts-dev',
-        durationSeconds: 42,
-        error: undefined,
-      },
-    })
-
-    expect(result).toBe(true)
-  })
-
-  it('maps failed status correctly', async () => {
-    const result = await processMessage(
-      makeResultMessage({ status: 'failed', error: 'Agent crashed' }),
+  it('transitions RUNNING -> COMPLETED on success, writes artifact + duration, and acks', async () => {
+    const result = await service.processMessage(
+      makeMessage({ status: 'success' }),
     )
 
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).toHaveBeenCalledWith(
+    expect(result).toBe(true)
+    expect(experimentRunsService.findUnique).toHaveBeenCalledWith({
+      where: { runId: RUN_ID },
+    })
+    expect(experimentRunsService.optimisticLockingUpdate).toHaveBeenCalledWith(
+      { where: { runId: RUN_ID } },
+      expect.any(Function),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.COMPLETED)
+    expect(patched.artifactKey).toBe('district_intel/run-abc/result.json')
+    expect(patched.artifactBucket).toBe('gp-agent-artifacts-dev')
+    expect(patched.durationSeconds).toBe(42)
+    expect(patched.error).toBeNull()
+  })
+
+  it('maps "failed" to FAILED and preserves the error string', async () => {
+    await service.processMessage(
+      makeMessage({ status: 'failed', error: 'Agent crashed' }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.FAILED)
+    expect(patched.error).toBe('Agent crashed')
+  })
+
+  it('collapses "contract_violation" to FAILED at the boundary', async () => {
+    await service.processMessage(
+      makeMessage({ status: 'contract_violation', error: 'missing field' }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.FAILED)
+    expect(patched.error).toBe('missing field')
+  })
+
+  it('truncates error to 1000 chars to keep the column bounded', async () => {
+    await service.processMessage(
+      makeMessage({ status: 'failed', error: 'x'.repeat(2000) }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(typeof patched.error).toBe('string')
+    expect((patched.error as string).length).toBe(1000)
+  })
+
+  it('acks and skips update when run does not exist (prevents DLQ loop)', async () => {
+    experimentRunsService.findUnique.mockResolvedValue(null)
+
+    const result = await service.processMessage(makeMessage())
+
+    expect(result).toBe(true)
+    expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'FAILED',
-          error: 'Agent crashed',
-        }),
+        data: expect.objectContaining({ runId: RUN_ID }),
       }),
+      'Experiment run not found',
     )
-
-    expect(result).toBe(true)
+    expect(experimentRunsService.optimisticLockingUpdate).not.toHaveBeenCalled()
   })
 
-  it('maps contract_violation status correctly', async () => {
-    await processMessage(makeResultMessage({ status: 'contract_violation' }))
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: 'CONTRACT_VIOLATION' }),
-      }),
-    )
-  })
-
-  it('logs error and returns true when run not found', async () => {
-    experimentRunsService.findFirst.mockResolvedValue(null)
-
-    const result = await processMessage(makeResultMessage({}))
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-    expect(logger.error).toHaveBeenCalled()
-    expect(result).toBe(true)
-  })
-
-  it('ignores result for already-completed run', async () => {
-    experimentRunsService.findFirst.mockResolvedValue({
-      id: 'db-id-1',
-      runId: 'run-123',
-      status: 'SUCCESS',
+  it('acks and skips update when run is already terminal COMPLETED', async () => {
+    experimentRunsService.findUnique.mockResolvedValue({
+      runId: RUN_ID,
+      status: ExperimentRunStatus.COMPLETED,
+      updatedAt: new Date(),
     })
 
-    const result = await processMessage(makeResultMessage({}))
+    const result = await service.processMessage(makeMessage())
 
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
     expect(result).toBe(true)
+    expect(logger.info).toHaveBeenCalledWith(
+      { runId: RUN_ID },
+      'Experiment run already completed, skipping',
+    )
+    expect(experimentRunsService.optimisticLockingUpdate).not.toHaveBeenCalled()
   })
 
-  it('throws ZodError for unrecognized status values', async () => {
+  it('acks and skips update when run is already terminal FAILED', async () => {
+    experimentRunsService.findUnique.mockResolvedValue({
+      runId: RUN_ID,
+      status: ExperimentRunStatus.FAILED,
+      updatedAt: new Date(),
+    })
+
+    const result = await service.processMessage(makeMessage())
+
+    expect(result).toBe(true)
+    expect(experimentRunsService.optimisticLockingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('rejects unknown status values at Zod parse', async () => {
     await expect(
-      processMessage(makeResultMessage({ status: 'unknown_status' })),
+      service.processMessage(makeMessage({ status: 'weird' })),
     ).rejects.toThrow()
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-    expect(experimentRunsService.findFirst).not.toHaveBeenCalled()
+    expect(experimentRunsService.findUnique).not.toHaveBeenCalled()
   })
 
-  it('skips update when run is STALE (terminal guard)', async () => {
-    experimentRunsService.findFirst.mockResolvedValue({
-      id: 'db-id-1',
-      runId: 'run-123',
-      status: 'STALE',
-    })
-
-    const result = await processMessage(makeResultMessage({}))
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ runId: 'run-123' }),
-      expect.stringContaining('already completed'),
-    )
-    expect(result).toBe(true)
-  })
-
-  it('skips update when run is CONTRACT_VIOLATION (terminal guard)', async () => {
-    experimentRunsService.findFirst.mockResolvedValue({
-      id: 'db-id-1',
-      runId: 'run-123',
-      status: 'CONTRACT_VIOLATION',
-    })
-
-    const result = await processMessage(makeResultMessage({}))
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ runId: 'run-123' }),
-      expect.stringContaining('already completed'),
-    )
-    expect(result).toBe(true)
-  })
-
-  it('stores error message with contract_violation status', async () => {
-    const contractError = 'Missing required field: score.total'
-    await processMessage(
-      makeResultMessage({ status: 'contract_violation', error: contractError }),
-    )
-
-    const updateCall =
-      experimentRunsService.client.experimentRun.update.mock.calls[0][0]
-    expect(updateCall.data.status).toBe('CONTRACT_VIOLATION')
-    expect(updateCall.data.error).toBe(contractError)
-  })
-
-  it('truncates long error messages with contract_violation status', async () => {
-    const longError = 'Contract violation: ' + 'x'.repeat(2000)
-    await processMessage(
-      makeResultMessage({ status: 'contract_violation', error: longError }),
-    )
-
-    const updateCall =
-      experimentRunsService.client.experimentRun.update.mock.calls[0][0]
-    expect(updateCall.data.status).toBe('CONTRACT_VIOLATION')
-    expect(updateCall.data.error.length).toBeLessThanOrEqual(1000)
-  })
-
-  it('throws ZodError when experimentId is missing', async () => {
+  it('rejects messages missing runId at Zod parse', async () => {
     const message: Message = {
       MessageId: 'msg-1',
       Body: JSON.stringify({
         type: QueueType.AGENT_EXPERIMENT_RESULT,
-        data: {
-          runId: 'run-123',
-          organizationSlug: 'acme-for-mayor',
-          status: 'success',
-        },
+        data: { status: 'success' },
       }),
     }
-
-    await expect(processMessage(message)).rejects.toThrow()
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
+    await expect(service.processMessage(message)).rejects.toThrow()
+    expect(experimentRunsService.findUnique).not.toHaveBeenCalled()
   })
 
-  it('throws ZodError when runId is missing', async () => {
-    const message: Message = {
-      MessageId: 'msg-1',
-      Body: JSON.stringify({
-        type: QueueType.AGENT_EXPERIMENT_RESULT,
-        data: {
-          experimentId: 'hello_world',
-          organizationSlug: 'acme-for-mayor',
-          status: 'success',
-        },
-      }),
-    }
-
-    await expect(processMessage(message)).rejects.toThrow()
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-  })
-
-  it('throws ZodError when organizationSlug is missing', async () => {
-    const message: Message = {
-      MessageId: 'msg-1',
-      Body: JSON.stringify({
-        type: QueueType.AGENT_EXPERIMENT_RESULT,
-        data: {
-          experimentId: 'hello_world',
-          runId: 'run-123',
-          status: 'success',
-        },
-      }),
-    }
-
-    await expect(processMessage(message)).rejects.toThrow()
-
-    expect(
-      experimentRunsService.client.experimentRun.update,
-    ).not.toHaveBeenCalled()
-  })
-
-  it('propagates error when DB update fails during status transition', async () => {
-    experimentRunsService.client.experimentRun.update.mockRejectedValue(
-      new Error('Connection refused'),
+  it('propagates errors from optimisticLockingUpdate', async () => {
+    experimentRunsService.optimisticLockingUpdate.mockRejectedValue(
+      new Error('db timeout'),
     )
 
-    await expect(processMessage(makeResultMessage({}))).rejects.toThrow(
-      'Connection refused',
+    await expect(service.processMessage(makeMessage())).rejects.toThrow(
+      'db timeout',
     )
-  })
-
-  it('acknowledges message when sweeper already moved run to terminal state (P2025)', async () => {
-    const p2025Error = Object.assign(
-      new Error(
-        'An operation failed because it depends on one or more records that were required but not found.',
-      ),
-      { code: 'P2025', name: 'PrismaClientKnownRequestError' },
-    )
-    experimentRunsService.client.experimentRun.update.mockRejectedValue(
-      p2025Error,
-    )
-
-    const result = await processMessage(makeResultMessage({}))
-
-    expect(result).toBe(true)
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ runId: 'run-123' }),
-      expect.stringContaining('already transitioned'),
-    )
-  })
-
-  it('uses conditional update to prevent sweeper race (Fix #4)', async () => {
-    await processMessage(makeResultMessage({}))
-
-    const updateCall =
-      experimentRunsService.client.experimentRun.update.mock.calls[0][0]
-    expect(updateCall.where).toEqual(
-      expect.objectContaining({
-        id: 'db-id-1',
-        status: { in: ['PENDING', 'RUNNING'] },
-      }),
-    )
-  })
-
-  it('truncates long error messages to prevent DB bloat (Fix #6)', async () => {
-    const longError = 'x'.repeat(2000)
-    await processMessage(makeResultMessage({ status: 'failed', error: longError }))
-
-    const updateCall =
-      experimentRunsService.client.experimentRun.update.mock.calls[0][0]
-    expect(updateCall.data.error.length).toBeLessThanOrEqual(1000)
   })
 })

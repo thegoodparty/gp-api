@@ -13,7 +13,6 @@ import {
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
-import { ZodError } from 'zod'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
 import { groupBy } from 'es-toolkit'
@@ -47,9 +46,9 @@ import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
-  AgentExperimentResultSchema,
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
+  AgentExperimentResultSchema,
   DomainEmailForwardingMessage,
   WeeklyTasksDigestMessageSchema,
   PollAnalysisCompleteEvent,
@@ -74,24 +73,6 @@ import { OrgDistrict } from '@/organizations/organizations.types'
 import type { AgentExperimentResultData } from '../queue.types'
 
 import { ExperimentRunStatus } from '@prisma/client'
-
-class UnrecognizedQueueTypeError extends Error {
-  constructor(public readonly receivedType: unknown) {
-    super(`Unrecognized queue message type: ${String(receivedType)}`)
-    this.name = 'UnrecognizedQueueTypeError'
-  }
-}
-
-const EXPERIMENT_STATUS_MAP: Record<
-  AgentExperimentResultData['status'],
-  ExperimentRunStatus
-> = {
-  running: ExperimentRunStatus.RUNNING,
-  success: ExperimentRunStatus.SUCCESS,
-  failed: ExperimentRunStatus.FAILED,
-  contract_violation: ExperimentRunStatus.CONTRACT_VIOLATION,
-  stale: ExperimentRunStatus.STALE,
-}
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -203,10 +184,6 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      if (this.isPoisonPill(error)) {
-        this.logPoisonPill(message, error)
-        return false // Don't requeue — delete poison pill from queue
-      }
       this.logger.error({
         message,
         error: serializeError(error),
@@ -214,28 +191,6 @@ export class QueueConsumerService {
       })
       return true // Indicate that we should requeue
     }
-  }
-
-  private isPoisonPill(error: unknown): boolean {
-    if (error instanceof ZodError) return true
-    if (error instanceof SyntaxError) return true
-    if (error instanceof UnrecognizedQueueTypeError) return true
-    return false
-  }
-
-  private logPoisonPill(message: Message, error: unknown) {
-    const body = message.Body ?? ''
-    const truncatedBody =
-      body.length > 500 ? `${body.slice(0, 500)}...(truncated)` : body
-    this.logger.warn(
-      {
-        messageId: message.MessageId,
-        receiptHandle: message.ReceiptHandle,
-        bodyPreview: truncatedBody,
-        error: serializeError(error),
-      },
-      'Poison pill detected — deleting from queue to unblock MessageGroup',
-    )
   }
 
   private legacyShouldRequeueError(error: Error): boolean {
@@ -312,7 +267,7 @@ export class QueueConsumerService {
   //  misinterpreted by other modules/services.
   //
   //  https://goodparty.atlassian.net/browse/WEB-4518
-  async processMessage(message: Message) {
+  async processMessage(message: Message): Promise<boolean> {
     if (!message || !message.Body) {
       return true // Delete invalid messages from queue
     }
@@ -415,9 +370,11 @@ export class QueueConsumerService {
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
       default:
-        throw new UnrecognizedQueueTypeError(
-          (queueMessage as { type?: unknown })?.type,
+        this.logger.warn(
+          { messageId: message.MessageId, body: message.Body },
+          'unknown queue message type',
         )
+        return true
     }
   }
 
@@ -577,13 +534,15 @@ export class QueueConsumerService {
     return true
   }
 
-  private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
+  private async handlePollAnalysisComplete(
+    event: PollAnalysisCompleteEvent,
+  ): Promise<boolean> {
     const { pollId, totalResponses, responsesLocation, issues } = event.data
     this.logger.info(`Handling poll analysis complete event for poll ${pollId}`)
     const data = await this.getPollAndOrganization(pollId)
     if (!data) {
       this.logger.info('Poll not found, ignoring event')
-      return
+      return true
     }
     const { poll, office, organization } = data
     const { electedOfficeId } = poll
@@ -607,7 +566,7 @@ export class QueueConsumerService {
         },
         'Poll is not in expected state, ignoring event',
       )
-      return
+      return true
     }
 
     const constituency = await this.contactsService.findContacts(
@@ -852,55 +811,50 @@ export class QueueConsumerService {
   }
 
   private async handleAgentExperimentResult(data: AgentExperimentResultData) {
-    const run = await this.experimentRunsService.findFirst({
+    const run = await this.experimentRunsService.findUnique({
       where: { runId: data.runId },
     })
 
     if (!run) {
-      this.logger.error({ runId: data.runId }, 'Experiment run not found for callback')
+      this.logger.error({ data }, 'Experiment run not found')
       return true
     }
 
-    if (run.status === 'SUCCESS' || run.status === 'FAILED' || run.status === 'CONTRACT_VIOLATION' || run.status === 'STALE') {
-      this.logger.info({ runId: data.runId }, 'Experiment run already completed, skipping')
+    if (run.status !== ExperimentRunStatus.RUNNING) {
+      this.logger.info(
+        { runId: data.runId },
+        'Experiment run already completed, skipping',
+      )
       return true
     }
 
-    const status = EXPERIMENT_STATUS_MAP[data.status]
-
-    const truncatedError = data.error ? data.error.slice(0, 1000) : undefined
-
-    try {
-      await this.experimentRunsService.client.experimentRun.update({
-        where: { id: run.id, status: { in: ['PENDING', 'RUNNING'] } },
-        data: {
-          status,
-          artifactKey: data.artifactKey,
-          artifactBucket: data.artifactBucket,
-          durationSeconds: data.durationSeconds,
-          error: truncatedError,
-        },
-      })
-    } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as { code: string }).code === 'P2025'
-      ) {
-        this.logger.warn(
-          { runId: data.runId },
-          'Run already transitioned by sweeper, acknowledging callback',
-        )
-        return true
-      }
-      throw error
-    }
-
-    this.logger.info(
-      { runId: data.runId, status, experimentId: data.experimentId },
-      'Updated experiment run from callback',
+    const updatedRun = await this.experimentRunsService.optimisticLockingUpdate(
+      { where: { runId: data.runId } },
+      async (run) => {
+        if (run.status !== ExperimentRunStatus.RUNNING) {
+          this.logger.info(
+            { runId: data.runId },
+            'Experiment run already completed, skipping',
+          )
+          throw new Error('Experiment run already completed')
+        }
+        run.status = {
+          success: ExperimentRunStatus.COMPLETED,
+          failed: ExperimentRunStatus.FAILED,
+          contract_violation: ExperimentRunStatus.FAILED,
+        }[data.status]
+        run.artifactKey = data.artifactKey ?? null
+        run.artifactBucket = data.artifactBucket ?? null
+        run.durationSeconds = data.durationSeconds ?? null
+        run.error = data.error?.slice(0, 1000) ?? null
+        return run
+      },
     )
 
+    this.logger.info(
+      { updatedRun, data },
+      'Updated experiment run from queue event',
+    )
     return true
   }
 
@@ -909,11 +863,11 @@ export class QueueConsumerService {
     messageId: string
     sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
     isExpansion: boolean
-  }) {
+  }): Promise<boolean> {
     const data = await this.getPollAndOrganization(params.pollId)
     if (!data) {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
-      return
+      return true
     }
     const { poll, office, organization } = data
 
@@ -924,7 +878,7 @@ export class QueueConsumerService {
 
     if (!user) {
       this.logger.info(`${params.pollId} User not found, ignoring event`)
-      return
+      return true
     }
 
     const bucket = process.env.TEVYN_POLL_CSVS_BUCKET
