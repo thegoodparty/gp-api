@@ -55,7 +55,10 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           },
         })
 
-      if (!peerlyIdentityId) {
+      const resolvedIdentityId =
+        peerlyIdentityId ?? process.env.PEERLY_TEST_IDENTITY_ID
+
+      if (!resolvedIdentityId) {
         throw new BadRequestException(
           'TCR Compliance Peerly identity ID is required for P2P outreach',
         )
@@ -85,7 +88,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           title: createOutreachDto.title,
         },
         scriptText: resolvedScriptText,
-        identityId: peerlyIdentityId,
+        identityId: resolvedIdentityId,
         name,
         didState,
         didNpaSubset,
