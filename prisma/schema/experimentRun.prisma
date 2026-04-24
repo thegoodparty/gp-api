@@ -1,28 +1,30 @@
 enum ExperimentRunStatus {
-  PENDING
   RUNNING
-  SUCCESS
+  COMPLETED
   FAILED
-  CONTRACT_VIOLATION
-  STALE
 }
 
 model ExperimentRun {
-  id               String              @id @default(uuid(7))
-  runId            String              @unique @map("run_id")
-  experimentId     String              @map("experiment_id")
-  organizationSlug String              @map("organization_slug")
-  organization     Organization        @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
-  status           ExperimentRunStatus @default(PENDING)
-  params           Json                @default("{}") @db.JsonB
-  artifactBucket   String?             @map("artifact_bucket")
-  artifactKey      String?             @map("artifact_key")
-  durationSeconds  Float?              @map("duration_seconds")
-  error            String?
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
+  runId String @unique @default(uuid(7)) @map("run_id")
 
-  @@index([organizationSlug, experimentId])
-  @@index([status])
+  organizationSlug String       @map("organization_slug")
+  organization     Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+
+  // e.g. "district_intel"
+  experimentType String @map("experiment_type")
+
+  status ExperimentRunStatus @default(RUNNING)
+
+  params Json @default("{}") @db.JsonB
+
+  artifactBucket  String? @map("artifact_bucket")
+  artifactKey     String? @map("artifact_key")
+  durationSeconds Float?  @map("duration_seconds")
+  error           String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationSlug, experimentType])
   @@map("experiment_run")
 }

@@ -1,7 +1,7 @@
 model VoterFileFilter {
-  id                         Int          @id @default(autoincrement())
-  createdAt                  DateTime     @default(now()) @map("created_at")
-  updatedAt                  DateTime     @updatedAt @map("updated_at")
+  id                         Int           @id @default(autoincrement())
+  createdAt                  DateTime      @default(now()) @map("created_at")
+  updatedAt                  DateTime      @updatedAt @map("updated_at")
   name                       String?
   audienceSuperVoters        Boolean?      @default(false) @map("audience_super_voters")
   audienceLikelyVoters       Boolean?      @default(false) @map("audience_likely_voters")
@@ -61,8 +61,8 @@ model VoterFileFilter {
   homeownerUnknown           Boolean?      @default(false) @map("homeowner_unknown")
   voterCount                 Int?          @map("voter_count")
   outreaches                 Outreach[]
-  organizationSlug           String       @map("organization_slug")
-  organization               Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+  organizationSlug           String        @map("organization_slug")
+  organization               Organization  @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
   @@index([organizationSlug])
   @@map("voter_file_filter")
