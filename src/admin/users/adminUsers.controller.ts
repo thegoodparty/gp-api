@@ -89,9 +89,9 @@ export class AdminUsersController {
   async impersonate(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: IncomingRequest,
-    @Body() body: { actorClerkId?: string },
+    @Body() body: { actorEmail?: string },
   ) {
-    const actorClerkId = this.resolveActorClerkId(req, body.actorClerkId)
+    const actorClerkId = await this.resolveActorClerkId(req, body.actorEmail)
 
     this.logger.info(
       { targetUserId: id, actorClerkId, authSource: req.user ? 'user' : 'm2m' },
@@ -102,22 +102,23 @@ export class AdminUsersController {
     return this.usersService.impersonateUser(user.id, actorClerkId)
   }
 
-  private resolveActorClerkId(
+  private async resolveActorClerkId(
     req: IncomingRequest,
-    actorClerkId?: string,
-  ): string {
-    // In an impersonating session, req.user is the candidate — never use it as actor
-    const clerkId =
-      req.actorUser?.clerkId ??
-      (req.user?.impersonating ? undefined : req.user?.clerkId) ??
-      actorClerkId
+    actorEmail?: string,
+  ): Promise<string> {
+    if (req.actorUser?.clerkId) return req.actorUser.clerkId
 
-    if (!clerkId) {
-      throw new BadRequestException(
-        'actorClerkId is required when using M2M auth',
-      )
+    if (req.user && !req.user.impersonating && req.user.clerkId) {
+      return req.user.clerkId
     }
-    return clerkId
+
+    // Swap: actor.sub already embedded in the JWT from initial impersonation
+    if (req.actorSub) return req.actorSub
+
+    // M2M initial impersonation: resolve email → gp-api Clerk ID
+    if (actorEmail) return this.usersService.resolveClerkIdByEmail(actorEmail)
+
+    throw new BadRequestException('actorEmail is required when using M2M auth')
   }
 
   @Delete(':id')

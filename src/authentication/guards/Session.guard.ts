@@ -54,6 +54,10 @@ export class SessionGuard implements CanActivate {
       const { externalUserId, actor } =
         await this.authProvider.verifySessionToken(token)
 
+      if (actor?.sub) {
+        request.actorSub = actor.sub
+      }
+
       const [user, actorUser] = await Promise.all([
         this.resolveUser(externalUserId, 'subject'),
         actor ? this.resolveUser(actor.sub, 'actor') : Promise.resolve(null),

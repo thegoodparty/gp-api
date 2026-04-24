@@ -5,5 +5,6 @@ export interface IncomingRequest extends Request {
   headers: Headers & { authorization?: string }
   user?: User & { impersonating?: boolean }
   actorUser?: User
+  actorSub?: string
   m2mToken?: VerifiedM2MToken
 }

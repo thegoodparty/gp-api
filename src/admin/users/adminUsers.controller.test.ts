@@ -56,6 +56,7 @@ describe('AdminUsersController', () => {
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       findUserByEmail: vi.fn(),
+      resolveClerkIdByEmail: vi.fn(),
       createUser: vi.fn(),
       deleteUser: vi.fn(),
       impersonateUser: vi.fn(),
@@ -138,7 +139,7 @@ describe('AdminUsersController', () => {
       expect(result).toEqual({ token: 'actor_token_123' })
     })
 
-    it('uses actorClerkId from body when called in an impersonating session', async () => {
+    it('uses actorSub from request when swapping in an impersonating session', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
       )
@@ -147,11 +148,13 @@ describe('AdminUsersController', () => {
       })
 
       const candidateUser = { ...mockTargetUser, impersonating: true }
-      const req = { user: candidateUser } as IncomingRequest
-      const result = await controller.impersonate(42, req, {
-        actorClerkId: mockUser.clerkId!,
-      })
+      const req = {
+        user: candidateUser,
+        actorSub: mockUser.clerkId,
+      } as IncomingRequest
+      const result = await controller.impersonate(42, req, {})
 
+      expect(usersService.resolveClerkIdByEmail).not.toHaveBeenCalled()
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
         mockUser.clerkId,
@@ -159,9 +162,12 @@ describe('AdminUsersController', () => {
       expect(result).toEqual({ token: 'swap_token' })
     })
 
-    it('uses actorClerkId from body when called via M2M (no req.user)', async () => {
+    it('resolves actorEmail via resolveClerkIdByEmail when called via M2M', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
+      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
+        mockUser.clerkId!,
       )
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
         token: 'm2m_token',
@@ -169,9 +175,12 @@ describe('AdminUsersController', () => {
 
       const req = { user: undefined } as IncomingRequest
       const result = await controller.impersonate(42, req, {
-        actorClerkId: mockUser.clerkId!,
+        actorEmail: mockUser.email,
       })
 
+      expect(usersService.resolveClerkIdByEmail).toHaveBeenCalledWith(
+        mockUser.email,
+      )
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
         mockUser.clerkId,
@@ -179,7 +188,7 @@ describe('AdminUsersController', () => {
       expect(result).toEqual({ token: 'm2m_token' })
     })
 
-    it('throws BadRequestException when M2M call omits actorClerkId', async () => {
+    it('throws BadRequestException when M2M call omits actorEmail', async () => {
       const req = { user: undefined } as IncomingRequest
 
       await expect(controller.impersonate(42, req, {})).rejects.toThrow(
@@ -190,11 +199,11 @@ describe('AdminUsersController', () => {
       expect(usersService.impersonateUser).not.toHaveBeenCalled()
     })
 
-    it('throws BadRequestException with descriptive message when actorClerkId is missing', async () => {
+    it('throws BadRequestException with descriptive message when actorEmail is missing', async () => {
       const req = { user: undefined } as IncomingRequest
 
       await expect(controller.impersonate(42, req, {})).rejects.toThrow(
-        'actorClerkId is required when using M2M auth',
+        'actorEmail is required when using M2M auth',
       )
     })
 

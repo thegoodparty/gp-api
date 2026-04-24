@@ -49,14 +49,18 @@ describe('AdminOrM2MGuard', () => {
 
   it('allows impersonating sessions (actor claim present)', () => {
     const result = guard.canActivate(
-      mockContext({ user: { roles: [UserRole.candidate], impersonating: true } }),
+      mockContext({
+        user: { roles: [UserRole.candidate], impersonating: true },
+      }),
     )
     expect(result).toBe(true)
   })
 
   it('rejects non-impersonating candidate sessions', () => {
     const result = guard.canActivate(
-      mockContext({ user: { roles: [UserRole.candidate], impersonating: false } }),
+      mockContext({
+        user: { roles: [UserRole.candidate], impersonating: false },
+      }),
     )
     expect(result).toBe(false)
   })
