@@ -22,7 +22,6 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { subHours } from 'date-fns'
 import ms from 'ms'
-import throttle from 'p-throttle'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   PaginatedResults,
@@ -39,16 +38,9 @@ import {
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
+import { clerkThrottle } from 'seed/util/clerkThrottle.util'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
-
-// Shared bucket for all Clerk calls made during test-user cleanup. Hoisted to
-// module scope so rate-limit state is shared across getUserList and every
-// deleteUser call in a single sweep (and across sweeps).
-const clerkCleanupThrottle = throttle({ limit: 2, interval: 1000 })
-const throttledClerkRequest = clerkCleanupThrottle(<T>(fn: () => Promise<T>) =>
-  fn(),
-)
 
 const TEST_USER_DOMAIN = '@test.goodparty.org'
 
@@ -572,7 +564,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       // 2. Delete Clerk users.
       // For now, don't worry about paginating. This 500 limit will always
       // catch up at our current pace of test user creation.
-      const { data: clerkUsers } = await throttledClerkRequest(() =>
+      const { data: clerkUsers } = await clerkThrottle(() =>
         this.clerkClient.users.getUserList({
           limit: 500,
           query: TEST_USER_DOMAIN,
@@ -589,7 +581,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
       for (const clerkUser of clerkUsersToDelete) {
         try {
-          await throttledClerkRequest(() =>
+          await clerkThrottle(() =>
             this.clerkClient.users.deleteUser(clerkUser.id),
           )
           this.logger.info({ userId: clerkUser.id }, 'Deleted Clerk test user')
