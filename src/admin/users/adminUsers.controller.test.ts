@@ -56,6 +56,7 @@ describe('AdminUsersController', () => {
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       findUserByEmail: vi.fn(),
+      resolveClerkIdByEmail: vi.fn(),
       createUser: vi.fn(),
       deleteUser: vi.fn(),
       impersonateUser: vi.fn(),
@@ -138,9 +139,12 @@ describe('AdminUsersController', () => {
       expect(result).toEqual({ token: 'actor_token_123' })
     })
 
-    it('uses actorEmail from body when called in an impersonating session (not req.user.clerkId)', async () => {
+    it('resolves actorEmail to Clerk ID when called in an impersonating session', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
+      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
+        mockUser.clerkId!,
       )
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
         token: 'swap_token',
@@ -152,16 +156,22 @@ describe('AdminUsersController', () => {
         actorEmail: 'admin@goodparty.org',
       })
 
+      expect(usersService.resolveClerkIdByEmail).toHaveBeenCalledWith(
+        'admin@goodparty.org',
+      )
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
-        'admin@goodparty.org',
+        mockUser.clerkId,
       )
       expect(result).toEqual({ token: 'swap_token' })
     })
 
-    it('uses actorEmail directly as actor sub when called via M2M (no req.user)', async () => {
+    it('resolves actorEmail to Clerk ID when called via M2M (no req.user)', async () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
+      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
+        mockUser.clerkId!,
       )
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
         token: 'm2m_token',
@@ -172,9 +182,12 @@ describe('AdminUsersController', () => {
         actorEmail: 'admin@goodparty.org',
       })
 
+      expect(usersService.resolveClerkIdByEmail).toHaveBeenCalledWith(
+        'admin@goodparty.org',
+      )
       expect(usersService.impersonateUser).toHaveBeenCalledWith(
         mockTargetUser.id,
-        'admin@goodparty.org',
+        mockUser.clerkId,
       )
       expect(result).toEqual({ token: 'm2m_token' })
     })

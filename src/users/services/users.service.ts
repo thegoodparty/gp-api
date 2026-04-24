@@ -407,6 +407,14 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     }
   }
 
+  async resolveClerkIdByEmail(email: string): Promise<string> {
+    const result = await this.clerkClient.users.getUserList({
+      emailAddress: [email],
+      limit: 1,
+    })
+    return result.data[0]?.id ?? email
+  }
+
   async impersonateUser(userId: number, actorClerkId: string) {
     const user = await this.findUser({ id: userId })
     if (!user?.clerkId) {

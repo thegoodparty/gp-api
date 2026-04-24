@@ -102,7 +102,9 @@ export class AdminUsersController {
           'actorEmail is required when using M2M auth',
         )
       }
-      actorClerkId = body.actorEmail
+      actorClerkId = await this.usersService.resolveClerkIdByEmail(
+        body.actorEmail,
+      )
     }
 
     this.logger.info(

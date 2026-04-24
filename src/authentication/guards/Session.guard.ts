@@ -127,6 +127,10 @@ export class SessionGuard implements CanActivate {
         : rawUser
     }
 
+    if (role === 'actor') {
+      return null
+    }
+
     try {
       const providerUser = await this.authProvider.getUser(externalUserId)
       if (!providerUser?.email) {
