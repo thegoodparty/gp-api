@@ -102,21 +102,44 @@ export class AdminUsersController {
     return this.usersService.impersonateUser(user.id, actorClerkId)
   }
 
+  // Resolves which Clerk ID to embed as actor.sub in the impersonation token.
+  //
+  // gp-admin and gp-api/gp-webapp run on separate Clerk instances, so an admin's
+  // Clerk ID from gp-admin is never valid here. We accept actorEmail instead and
+  // resolve it against gp-api's Clerk instance. If the admin has no account in
+  // this instance (common — they may have never logged into the webapp), we fall
+  // back to the email string itself. Clerk does not validate actor.sub at token
+  // creation time, so this works in practice; SessionGuard's startsWith('user_')
+  // check prevents the downstream 404 latency on every subsequent request.
+  // If Clerk ever starts validating actor.sub, admins will need gp-api accounts.
   private async resolveActorClerkId(
     req: IncomingRequest,
     actorEmail?: string,
   ): Promise<string> {
+    // Happy path: actor resolved from the JWT (admin has a gp-api Clerk account)
     if (req.actorUser?.clerkId) return req.actorUser.clerkId
 
+    // Direct admin session (not currently impersonating someone)
     if (req.user && !req.user.impersonating && req.user.clerkId) {
       return req.user.clerkId
     }
 
-    // Swap: actor.sub already embedded in the JWT from initial impersonation
+    // Swap path: actor.sub is already embedded in the current JWT — carry it forward
+    // without re-resolving so the actor identity stays consistent for the session
     if (req.actorSub) return req.actorSub
 
-    // M2M initial impersonation: resolve email → gp-api Clerk ID
-    if (actorEmail) return this.usersService.resolveClerkIdByEmail(actorEmail)
+    // M2M initial impersonation from gp-admin: resolve email → gp-api Clerk ID,
+    // falling back to the email string if the admin has no gp-api account
+    if (actorEmail) {
+      const clerkId = await this.usersService.resolveClerkIdByEmail(actorEmail)
+      if (!clerkId.startsWith('user_')) {
+        this.logger.warn(
+          { actorEmail },
+          'Actor has no gp-api Clerk account — using email as actor.sub fallback',
+        )
+      }
+      return clerkId
+    }
 
     throw new BadRequestException('actorEmail is required when using M2M auth')
   }

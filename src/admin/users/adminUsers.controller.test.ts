@@ -207,6 +207,30 @@ describe('AdminUsersController', () => {
       )
     })
 
+    it('uses email directly as actor identity when no Clerk account exists in this environment', async () => {
+      const unknownEmail = 'unknown@example.com'
+      vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
+        mockTargetUser,
+      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
+        unknownEmail,
+      )
+      vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
+        token: 'fallback_token',
+      })
+
+      const req = { user: undefined } as IncomingRequest
+      const result = await controller.impersonate(42, req, {
+        actorEmail: unknownEmail,
+      })
+
+      expect(usersService.impersonateUser).toHaveBeenCalledWith(
+        mockTargetUser.id,
+        unknownEmail,
+      )
+      expect(result).toEqual({ token: 'fallback_token' })
+    })
+
     it('looks up target user by the path param id before impersonating', async () => {
       const differentTargetUser = { ...mockTargetUser, id: 99 }
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
