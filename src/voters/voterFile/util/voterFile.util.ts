@@ -333,50 +333,50 @@ function customFiltersToQuery(filters: CustomFilter[]) {
     switch (filter) {
       case 'audience_superVoters':
         filterConditions.audience.push(`CASE
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                          THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                          THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                           ELSE NULL
                                         END > 75`)
         break
       case 'audience_likelyVoters':
         filterConditions.audience.push(`(CASE
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                          THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                          THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                           ELSE NULL
                                         END > 50 AND
                                         CASE
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                          THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                          THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                           ELSE NULL
                                         END <= 75)`)
         break
       case 'audience_unreliableVoters':
         filterConditions.audience.push(`(CASE
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                          THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                          THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                           ELSE NULL
                                         END > 25 AND
                                         CASE
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                          THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                          THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                           ELSE NULL
                                         END <= 50)`)
         break
       case 'audience_unlikelyVoters':
         filterConditions.audience.push(`(CASE
-                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                              THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                              THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                               ELSE NULL
                                             END > 1 AND
                                             CASE
-                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
-                                              THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
+                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+(\\.[0-9]+)?$'
+                                              THEN CAST("Voters_VotingPerformanceEvenYearGeneral" AS numeric)
                                               ELSE NULL
                                             END <= 25)`)
         break
       case 'audience_firstTimeVoters':
         filterConditions.audience.push(
-          `"Voters_VotingPerformanceEvenYearGeneral" IN ('0%', 'Not Eligible', '')`,
+          `"Voters_VotingPerformanceEvenYearGeneral" IN ('0.0', '0%', 'Not Eligible', '')`,
         )
         break
       case 'party_independent':
