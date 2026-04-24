@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Query,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -13,12 +14,12 @@ import {
   FriendlyOrganization,
 } from './services/organizations.service'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
-import { User, UserRole } from '@prisma/client'
+import { User } from '@prisma/client'
 import {
   AdminListOrganizationsDto,
   PatchOrganizationDto,
 } from './schemas/organization.schema'
-import { Roles } from '@/authentication/decorators/Roles.decorator'
+import { AdminOrM2MGuard } from '@/authentication/guards/AdminOrM2M.guard'
 import { pick } from 'es-toolkit'
 import { OrgDistrict } from './organizations.types'
 
@@ -111,8 +112,13 @@ export class OrganizationsController {
     return toAPIOrganization(org)
   }
 
+  // NOTE: Static admin routes (e.g. `/admin/list`) MUST be declared before
+  // parameterized admin routes (`/admin/:slug`). NestJS matches routes in
+  // declaration order, so a parameterized route declared first will swallow
+  // the static one (e.g. `GET /admin/list` would resolve to `adminGetOrganization`
+  // with `slug = 'list'`).
   @Get('/admin/list')
-  @Roles(UserRole.admin)
+  @UseGuards(AdminOrM2MGuard)
   async adminListOrganizations(@Query() query: AdminListOrganizationsDto) {
     const organizations =
       await this.organizationsService.adminListOrganizations(query)
@@ -139,5 +145,27 @@ export class OrganizationsController {
         }
       }),
     }
+  }
+
+  @Get('/admin/:slug')
+  @UseGuards(AdminOrM2MGuard)
+  async adminGetOrganization(
+    @Param('slug') slug: string,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.adminGetOrganization(slug)
+    return toAPIOrganization(org)
+  }
+
+  @Patch('/admin/:slug')
+  @UseGuards(AdminOrM2MGuard)
+  async adminPatchOrganization(
+    @Param('slug') slug: string,
+    @Body() updates: PatchOrganizationDto,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.adminPatchOrganization(
+      slug,
+      updates,
+    )
+    return toAPIOrganization(org)
   }
 }

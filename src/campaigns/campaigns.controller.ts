@@ -5,6 +5,8 @@ import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interc
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
 import {
+  CampaignWithLiveContextSchema,
+  CampaignWithPositionNameSchema,
   ListCampaignsPaginationSchema,
   ReadCampaignOutputSchema,
   SetDistrictOutputSchema,
@@ -89,10 +91,22 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get('list')
-  @ResponseSchema(PaginatedResponseSchema(ReadCampaignOutputSchema))
+  @ResponseSchema(PaginatedResponseSchema(CampaignWithPositionNameSchema))
   async list(@Query() query: ListCampaignsPaginationDto) {
     const { data, meta } = await this.campaigns.listCampaigns(query)
-    return { data, meta }
+
+    const enriched = await Promise.all(
+      data.map(async ({ organization, ...campaign }) => {
+        const { positionName } =
+          await this.organizations.resolvePositionContext({
+            customPositionName: organization?.customPositionName,
+            positionId: organization?.positionId,
+          })
+        return { ...campaign, positionName }
+      }),
+    )
+
+    return { data: enriched, meta }
   }
 
   @Get('mine/status')
@@ -200,11 +214,30 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get(':id')
-  @ResponseSchema(ReadCampaignOutputSchema)
+  @ResponseSchema(CampaignWithLiveContextSchema)
   async findById(@Param() { id }: IdParamSchema) {
-    return this.campaigns.findUniqueOrThrow({
-      where: { id },
-    })
+    const { organization, ...campaign } =
+      await this.campaigns.findUniqueOrThrow({
+        where: { id },
+        include: {
+          organization: {
+            select: {
+              customPositionName: true,
+              positionId: true,
+            },
+          },
+        },
+      })
+
+    const [{ positionName }, liveMetrics] = await Promise.all([
+      this.organizations.resolvePositionContext({
+        customPositionName: organization?.customPositionName,
+        positionId: organization?.positionId,
+      }),
+      this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+    ])
+
+    return { ...campaign, positionName, raceTargetMetrics: liveMetrics }
   }
 
   @UseGuards(M2MOnly)

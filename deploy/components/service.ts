@@ -123,7 +123,7 @@ export function createService({
     protocol: 'HTTP',
     targetType: 'ip',
     vpcId,
-    deregistrationDelay: 120,
+    deregistrationDelay: isProd ? 120 : 15,
     healthCheck: {
       path: '/v1/health',
       interval: 60,
@@ -303,6 +303,8 @@ export function createService({
         enable: true,
         rollback: false,
       },
+      deploymentMinimumHealthyPercent: isProd ? 100 : 0,
+      deploymentMaximumPercent: 200,
       enableExecuteCommand: true,
       waitForSteadyState: true,
     },

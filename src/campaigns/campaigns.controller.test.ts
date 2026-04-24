@@ -157,9 +157,13 @@ describe('CampaignsController', () => {
   })
 
   describe('list', () => {
-    it('returns paginated campaigns filtered by userId', async () => {
+    it('enriches each item with positionName resolved from its organization', async () => {
+      const campaignWithOrg = {
+        ...mockCampaign,
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
       vi.spyOn(campaignsService, 'listCampaigns').mockResolvedValue({
-        data: [mockCampaign],
+        data: [campaignWithOrg],
         meta: { total: 1, offset: 0, limit: 100 },
       })
 
@@ -168,9 +172,45 @@ describe('CampaignsController', () => {
       expect(campaignsService.listCampaigns).toHaveBeenCalledWith({
         userId: 1,
       })
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
+        customPositionName: null,
+        positionId: 'pos-1',
+      })
       expect(result.data).toHaveLength(1)
-      expect(result.data[0]).toHaveProperty('id', mockCampaign.id)
+      expect(result.data[0]).toMatchObject({
+        id: mockCampaign.id,
+        positionName: 'Mayor',
+      })
+      // The relation itself should be stripped from the response.
+      expect(result.data[0]).not.toHaveProperty('organization')
       expect(result.meta).toEqual({ total: 1, offset: 0, limit: 100 })
+    })
+
+    it('returns null positionName when the org has no position info', async () => {
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
+      vi.spyOn(campaignsService, 'listCampaigns').mockResolvedValue({
+        data: [
+          {
+            ...mockCampaign,
+            organization: { customPositionName: null, positionId: null },
+          },
+        ],
+        meta: { total: 1, offset: 0, limit: 100 },
+      })
+
+      const result = await controller.list({ userId: 1 })
+
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
+        customPositionName: null,
+        positionId: null,
+      })
+      expect(result.data[0]).toMatchObject({ positionName: null })
     })
 
     it('returns empty data when no campaigns exist', async () => {
@@ -590,7 +630,7 @@ describe('CampaignsController', () => {
   })
 
   describe('findById (M2M GET :id)', () => {
-    it('returns campaign parsed through ReadCampaignOutputSchema', async () => {
+    it('returns campaign enriched with positionName and raceTargetMetrics', async () => {
       vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
         mockCampaign,
       )
@@ -599,8 +639,18 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: mockCampaign.id },
+        include: {
+          organization: {
+            select: {
+              customPositionName: true,
+              positionId: true,
+            },
+          },
+        },
       })
       expect(result).toHaveProperty('id', mockCampaign.id)
+      expect(result).toHaveProperty('positionName')
+      expect(result).toHaveProperty('raceTargetMetrics')
     })
 
     it('throws when campaign does not exist', async () => {
