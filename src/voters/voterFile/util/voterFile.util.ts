@@ -376,7 +376,7 @@ function customFiltersToQuery(filters: CustomFilter[]) {
         break
       case 'audience_firstTimeVoters':
         filterConditions.audience.push(
-          `"Voters_VotingPerformanceEvenYearGeneral" IN ('0.0', '0%', 'Not Eligible', '')`,
+          `("Voters_VotingPerformanceEvenYearGeneral" IS NULL OR "Voters_VotingPerformanceEvenYearGeneral" = '0.0')`,
         )
         break
       case 'party_independent':
