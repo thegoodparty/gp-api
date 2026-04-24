@@ -89,23 +89,9 @@ export class AdminUsersController {
   async impersonate(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: IncomingRequest,
-    @Body() body: { actorEmail?: string },
+    @Body() body: { actorClerkId?: string },
   ) {
-    // In an impersonating session, req.user is the candidate — never use it as actor
-    let actorClerkId =
-      req.actorUser?.clerkId ??
-      (req.user?.impersonating ? undefined : req.user?.clerkId)
-
-    if (!actorClerkId) {
-      if (!body.actorEmail) {
-        throw new BadRequestException(
-          'actorEmail is required when using M2M auth',
-        )
-      }
-      actorClerkId = await this.usersService.resolveClerkIdByEmail(
-        body.actorEmail,
-      )
-    }
+    const actorClerkId = this.resolveActorClerkId(req, body.actorClerkId)
 
     this.logger.info(
       { targetUserId: id, actorClerkId, authSource: req.user ? 'user' : 'm2m' },
@@ -114,6 +100,24 @@ export class AdminUsersController {
 
     const user = await this.usersService.findUniqueOrThrow({ where: { id } })
     return this.usersService.impersonateUser(user.id, actorClerkId)
+  }
+
+  private resolveActorClerkId(
+    req: IncomingRequest,
+    actorClerkId?: string,
+  ): string {
+    // In an impersonating session, req.user is the candidate — never use it as actor
+    const clerkId =
+      req.actorUser?.clerkId ??
+      (req.user?.impersonating ? undefined : req.user?.clerkId) ??
+      actorClerkId
+
+    if (!clerkId) {
+      throw new BadRequestException(
+        'actorClerkId is required when using M2M auth',
+      )
+    }
+    return clerkId
   }
 
   @Delete(':id')
