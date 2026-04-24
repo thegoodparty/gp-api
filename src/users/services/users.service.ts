@@ -487,6 +487,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     firstName,
     lastName,
     email,
+    isPro,
   }: ListUsersPagination): Promise<PaginatedResults<User>> {
     const where: Prisma.UserWhereInput = {
       ...(firstName
@@ -508,6 +509,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       ...(email
         ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
         : {}),
+      ...(isPro === true ? { campaigns: { some: { isPro: true } } } : {}),
+      ...(isPro === false ? { campaigns: { none: { isPro: true } } } : {}),
     }
 
     const data = await this.model.findMany({
