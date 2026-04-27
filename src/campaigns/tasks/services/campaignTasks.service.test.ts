@@ -67,6 +67,10 @@ const mockSlackService: Partial<SlackService> = {
   message: vi.fn(),
 }
 
+const mockCampaignsService = {
+  patchCampaignDetails: vi.fn(),
+}
+
 type CampaignOverrides = Partial<
   Omit<Campaign, 'details' | 'data' | 'aiContent'>
 > & {
@@ -119,6 +123,7 @@ describe('CampaignTasksService', () => {
     service = new CampaignTasksService(
       mockAiGeneration as AiGenerationService,
       mockSlackService as SlackService,
+      mockCampaignsService as never,
     )
     Object.defineProperty(service, '_prisma', {
       get: () => ({
@@ -969,19 +974,15 @@ describe('CampaignTasksService', () => {
       mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
       mockModel.count.mockResolvedValueOnce(1)
       mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
-      mockCampaignModel.update.mockResolvedValue({})
+      mockCampaignsService.patchCampaignDetails.mockResolvedValue({})
 
       await service.notifySlackOnProUpgrade(1)
 
       expect(mockSlackService.message).toHaveBeenCalledTimes(1)
-      expect(mockCampaignModel.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: {
-          details: expect.objectContaining({
-            proUpgradeSlackNotifiedAt: expect.any(Number),
-          }),
-        },
-      })
+      expect(mockCampaignsService.patchCampaignDetails).toHaveBeenCalledWith(
+        1,
+        { proUpgradeSlackNotifiedAt: expect.any(Number) },
+      )
     })
 
     it('does nothing if proUpgradeSlackNotifiedAt is already set', async () => {
@@ -993,7 +994,7 @@ describe('CampaignTasksService', () => {
 
       expect(mockModel.count).not.toHaveBeenCalled()
       expect(mockSlackService.message).not.toHaveBeenCalled()
-      expect(mockCampaignModel.update).not.toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
     })
 
     it('does not send Slack if no default tasks exist', async () => {
@@ -1003,7 +1004,7 @@ describe('CampaignTasksService', () => {
       await service.notifySlackOnProUpgrade(1)
 
       expect(mockSlackService.message).not.toHaveBeenCalled()
-      expect(mockCampaignModel.update).not.toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
     })
 
     it('does nothing when the campaign has no details', async () => {
@@ -1019,7 +1020,7 @@ describe('CampaignTasksService', () => {
       mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
       mockModel.count.mockResolvedValueOnce(1)
       mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
-      mockCampaignModel.update.mockResolvedValue({})
+      mockCampaignsService.patchCampaignDetails.mockResolvedValue({})
 
       const messageMock = vi.mocked(mockSlackService.message!)
       messageMock.mockReset()
@@ -1031,14 +1032,14 @@ describe('CampaignTasksService', () => {
       await service.notifySlackOnProUpgrade(1)
 
       expect(messageMock).toHaveBeenCalledTimes(3)
-      expect(mockCampaignModel.update).toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).toHaveBeenCalled()
     })
 
     it('swallows errors when slack fails on all 3 attempts', async () => {
       mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
       mockModel.count.mockResolvedValueOnce(1)
       mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
-      mockCampaignModel.update.mockClear()
+      mockCampaignsService.patchCampaignDetails.mockClear()
 
       const messageMock = vi.mocked(mockSlackService.message!)
       messageMock.mockReset()
@@ -1046,7 +1047,7 @@ describe('CampaignTasksService', () => {
 
       await expect(service.notifySlackOnProUpgrade(1)).resolves.not.toThrow()
       expect(messageMock).toHaveBeenCalledTimes(3)
-      expect(mockCampaignModel.update).not.toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
     })
   })
 

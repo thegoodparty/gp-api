@@ -1,4 +1,10 @@
-import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common'
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  MessageEvent,
+  NotFoundException,
+} from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import {
   addDays,
@@ -23,6 +29,7 @@ import {
   parseIsoDateString,
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   SlackChannel,
@@ -49,6 +56,7 @@ import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiGenerationService } from './aiGeneration.service'
+import { CampaignsService } from '../../services/campaigns.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
@@ -65,6 +73,8 @@ export class CampaignTasksService extends createPrismaBase(
   constructor(
     private readonly aiGenerationService: AiGenerationService,
     private readonly slackService: SlackService,
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaignsService: WrapperType<CampaignsService>,
   ) {
     super()
   }
@@ -390,14 +400,8 @@ export class CampaignTasksService extends createPrismaBase(
 
       await this.sendCampaignPlanSlackMessage(campaignId)
 
-      await this.client.campaign.update({
-        where: { id: campaignId },
-        data: {
-          details: {
-            ...campaign.details,
-            proUpgradeSlackNotifiedAt: Date.now(),
-          },
-        },
+      await this.campaignsService.patchCampaignDetails(campaignId, {
+        proUpgradeSlackNotifiedAt: Date.now(),
       })
     } catch (error) {
       this.logger.error(
