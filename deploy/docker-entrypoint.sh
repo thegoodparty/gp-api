@@ -69,17 +69,6 @@ case "$CLERK_SECRET_KEY" in
 esac
 
 if [ "$IS_PREVIEW" = "true" ]; then
-  echo "Preview environment detected. Skipping Clerk user migration (seeded users are ephemeral)."
-else
-  echo "Running Clerk user migration..."
-  if npx tsx scripts/clerk-user-migration.ts; then
-    echo "Clerk user migration completed successfully."
-  else
-    echo "WARNING: Clerk user migration exited with code $?. Continuing with app startup..."
-  fi
-fi
-
-if [ "$IS_PREVIEW" = "true" ]; then
   echo "Preview environment detected. Running seed..."
   if npx tsx seed/seed.ts; then
     echo "Seed completed successfully."
