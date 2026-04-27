@@ -298,7 +298,7 @@ export function createService({
           containerPort: 80,
         },
       ],
-      healthCheckGracePeriodSeconds: 600,
+      healthCheckGracePeriodSeconds: 120,
       deploymentCircuitBreaker: {
         enable: true,
         rollback: false,
@@ -308,7 +308,7 @@ export function createService({
       enableExecuteCommand: true,
       waitForSteadyState: true,
     },
-    { customTimeouts: { create: '15m', update: '15m' } },
+    { customTimeouts: { create: '5m', update: '5m' } },
   )
 
   new aws.route53.Record('dnsARecord', {
