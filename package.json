@@ -21,7 +21,6 @@
     "lint": "eslint '{src,apps,libs,test}/**/*.ts' && prettier --check 'src/**/*.{ts,js,json}'",
     "lint:fix": "eslint '{src,apps,libs,test}/**/*.ts' --fix && prettier --write 'src/**/*.{ts,js,json}'",
     "migrate:clean": "tsx scripts/migrate-clean.ts",
-    "migrate:clerk-users": "tsx scripts/clerk-user-migration.ts",
     "migrate:deploy": "npx prisma migrate deploy",
     "migrate:destroy": "tsx scripts/migrate-clean.ts --preserve-fixed --skip-db",
     "migrate:dev": "npx prisma migrate dev",

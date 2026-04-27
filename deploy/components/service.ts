@@ -123,7 +123,7 @@ export function createService({
     protocol: 'HTTP',
     targetType: 'ip',
     vpcId,
-    deregistrationDelay: 120,
+    deregistrationDelay: isProd ? 120 : 15,
     healthCheck: {
       path: '/v1/health',
       interval: 60,
@@ -298,15 +298,17 @@ export function createService({
           containerPort: 80,
         },
       ],
-      healthCheckGracePeriodSeconds: 1800,
+      healthCheckGracePeriodSeconds: 120,
       deploymentCircuitBreaker: {
         enable: true,
         rollback: false,
       },
+      deploymentMinimumHealthyPercent: isProd ? 100 : 0,
+      deploymentMaximumPercent: 200,
       enableExecuteCommand: true,
       waitForSteadyState: true,
     },
-    { customTimeouts: { create: '45m', update: '45m' } },
+    { customTimeouts: { create: '5m', update: '5m' } },
   )
 
   new aws.route53.Record('dnsARecord', {
