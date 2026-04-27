@@ -25,6 +25,7 @@ import {
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
+import { CampaignTasksService } from '../tasks/services/campaignTasks.service'
 
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
@@ -113,6 +114,10 @@ const buildOrgSyncModule = async (overrides?: {
       },
       { provide: OrganizationsService, useValue: {} },
       { provide: SlackService, useValue: {} },
+      {
+        provide: CampaignTasksService,
+        useValue: { notifySlackOnProUpgrade: vi.fn() },
+      },
       { provide: PinoLogger, useValue: createMockLogger() },
       CampaignsService,
     ],
@@ -484,6 +489,10 @@ describe('CampaignsService - redeemFreeTexts', () => {
         {
           provide: SlackService,
           useValue: {},
+        },
+        {
+          provide: CampaignTasksService,
+          useValue: { notifySlackOnProUpgrade: vi.fn() },
         },
         // Provide CampaignsService LAST - all dependencies are now available
         { provide: PinoLogger, useValue: createMockLogger() },
@@ -863,6 +872,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       mockElections as ElectionsService,
       mockOrganizations as OrganizationsService,
       {} as SlackService,
+      { notifySlackOnProUpgrade: vi.fn() } as unknown as CampaignTasksService,
     )
   })
 
