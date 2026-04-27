@@ -975,6 +975,7 @@ describe('CampaignTasksService', () => {
       mockModel.count.mockResolvedValueOnce(1)
       mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
       mockCampaignsService.patchCampaignDetails.mockResolvedValue({})
+      vi.mocked(mockSlackService.message!).mockResolvedValue('ok')
 
       await service.notifySlackOnProUpgrade(1)
 
@@ -1027,12 +1028,27 @@ describe('CampaignTasksService', () => {
       messageMock
         .mockRejectedValueOnce(new Error('boom1'))
         .mockRejectedValueOnce(new Error('boom2'))
-        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce('ok')
 
       await service.notifySlackOnProUpgrade(1)
 
       expect(messageMock).toHaveBeenCalledTimes(3)
       expect(mockCampaignsService.patchCampaignDetails).toHaveBeenCalled()
+    })
+
+    it('retries when slack returns no data (swallowed failure)', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(1)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
+      mockCampaignsService.patchCampaignDetails.mockClear()
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      messageMock.mockReset()
+      messageMock.mockResolvedValue(undefined)
+
+      await expect(service.notifySlackOnProUpgrade(1)).resolves.not.toThrow()
+      expect(messageMock).toHaveBeenCalledTimes(3)
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
     })
 
     it('swallows errors when slack fails on all 3 attempts', async () => {

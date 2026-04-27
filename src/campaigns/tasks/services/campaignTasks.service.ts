@@ -480,21 +480,25 @@ export class CampaignTasksService extends createPrismaBase(
     channel: SlackChannel,
     maxAttempts = 3,
   ) {
+    // SlackService.message() swallows axios errors and returns undefined on
+    // failure, so we have to treat a falsy return as a failure ourselves —
+    // a thrown error here would only happen for misconfiguration.
     let lastError: unknown
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.slackService.message(message, channel)
-        return
+        const result = await this.slackService.message(message, channel)
+        if (result) return
+        lastError = new Error('Slack message returned no data')
       } catch (error) {
         lastError = error
-        if (attempt === maxAttempts) break
-        const delayMs = 2 ** (attempt - 1) * SLACK_RETRY_BASE_DELAY_MS
-        this.logger.warn(
-          { error, attempt, channel, delayMs },
-          'Slack send failed, retrying',
-        )
-        await sleep(delayMs)
       }
+      if (attempt === maxAttempts) break
+      const delayMs = 2 ** (attempt - 1) * SLACK_RETRY_BASE_DELAY_MS
+      this.logger.warn(
+        { error: lastError, attempt, channel, delayMs },
+        'Slack send failed, retrying',
+      )
+      await sleep(delayMs)
     }
     throw lastError
   }
