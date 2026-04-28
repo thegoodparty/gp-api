@@ -1,3 +1,4 @@
+import { AgentExperimentsModule } from '@/agentExperiments/agentExperiments.module'
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
 import { AuthenticationModule } from '@/authentication/authentication.module'
@@ -58,6 +59,7 @@ import { loggerModule } from './observability/logging/logger-module'
     ElectionsModule,
     TopIssuesModule,
     AdminModule,
+    AgentExperimentsModule,
     SharedModule,
     PaymentsModule,
     VotersModule,

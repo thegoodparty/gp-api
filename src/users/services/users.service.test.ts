@@ -41,6 +41,114 @@ describe('UsersService', () => {
     })
   })
 
+  describe('listUsers', () => {
+    let proUserId: number
+    let nonProUserId: number
+    let noCampaignUserId: number
+
+    beforeEach(async () => {
+      const prisma = service.prisma
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+      const proUser = await prisma.user.create({
+        data: {
+          email: `pro-user-${suffix}@test.goodparty.org`,
+          firstName: 'Pro',
+          lastName: 'User',
+          name: 'Pro User',
+        },
+      })
+      proUserId = proUser.id
+
+      const orgProSlug = `org-pro-${suffix}`
+      await prisma.organization.create({
+        data: {
+          slug: orgProSlug,
+          ownerId: proUserId,
+        },
+      })
+      await prisma.campaign.create({
+        data: {
+          slug: `camp-pro-${suffix}`,
+          organizationSlug: orgProSlug,
+          userId: proUserId,
+          isPro: true,
+        },
+      })
+
+      const nonProUser = await prisma.user.create({
+        data: {
+          email: `non-pro-user-${suffix}@test.goodparty.org`,
+          firstName: 'NonPro',
+          lastName: 'User',
+          name: 'NonPro User',
+        },
+      })
+      nonProUserId = nonProUser.id
+
+      const orgNpSlug = `org-np-${suffix}`
+      await prisma.organization.create({
+        data: {
+          slug: orgNpSlug,
+          ownerId: nonProUserId,
+        },
+      })
+      await prisma.campaign.create({
+        data: {
+          slug: `camp-np-${suffix}`,
+          organizationSlug: orgNpSlug,
+          userId: nonProUserId,
+          isPro: false,
+        },
+      })
+
+      const noCampaignUser = await prisma.user.create({
+        data: {
+          email: `no-camp-user-${suffix}@test.goodparty.org`,
+          firstName: 'NoCamp',
+          lastName: 'User',
+          name: 'NoCamp User',
+        },
+      })
+      noCampaignUserId = noCampaignUser.id
+    })
+
+    it('returns only users with at least one Pro campaign when isPro=true', async () => {
+      const { data, meta } = await usersService.listUsers({
+        isPro: true,
+        email: '@test.goodparty.org',
+      })
+      const ids = data.map((u) => u.id)
+      expect(ids).toContain(proUserId)
+      expect(ids).not.toContain(nonProUserId)
+      expect(ids).not.toContain(noCampaignUserId)
+      expect(meta.total).toBe(1)
+    })
+
+    it('excludes users with any Pro campaign when isPro=false', async () => {
+      const { data, meta } = await usersService.listUsers({
+        isPro: false,
+        email: '@test.goodparty.org',
+      })
+      const ids = data.map((u) => u.id)
+      expect(ids).not.toContain(proUserId)
+      expect(ids).toContain(nonProUserId)
+      expect(ids).toContain(noCampaignUserId)
+      expect(meta.total).toBe(2)
+    })
+
+    it('returns all seeded users when isPro is omitted', async () => {
+      const { data, meta } = await usersService.listUsers({
+        email: '@test.goodparty.org',
+      })
+      const ids = data.map((u) => u.id)
+      expect(meta.total).toBe(3)
+      expect(ids.sort((a, b) => a - b)).toEqual(
+        [proUserId, nonProUserId, noCampaignUserId].sort((a, b) => a - b),
+      )
+    })
+  })
+
   describe('patchUserMetaData', () => {
     it('should set metadata on user with no existing metadata', async () => {
       const updated = await usersService.patchUserMetaData(service.user.id, {

@@ -84,7 +84,17 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     sortOrder = DEFAULT_SORT_ORDER,
     userId,
     slug,
-  }: ListCampaignsPagination): Promise<PaginatedResults<Campaign>> {
+  }: ListCampaignsPagination): Promise<
+    PaginatedResults<
+      Prisma.CampaignGetPayload<{
+        include: {
+          organization: {
+            select: { customPositionName: true; positionId: true }
+          }
+        }
+      }>
+    >
+  > {
     const where: Prisma.CampaignWhereInput = {
       ...(userId ? { userId } : {}),
       ...(slug
@@ -98,6 +108,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         take: limit,
         orderBy: { [sortBy]: sortOrder },
         where,
+        include: {
+          organization: {
+            select: { customPositionName: true, positionId: true },
+          },
+        },
       }),
       meta: {
         total: await this.model.count({ where }),

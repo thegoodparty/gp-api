@@ -901,8 +901,255 @@ describe('PATCH /v1/organizations/:slug', () => {
   })
 })
 
+describe('GET /v1/organizations/admin/:slug', () => {
+  it('returns 403 for non-admin users without an M2M token', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-401',
+        ownerId: service.user.id,
+      },
+    })
+
+    const result = await service.client.get(
+      '/v1/organizations/admin/campaign-401',
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('returns an organization owned by another user when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const otherUser = await service.prisma.user.create({
+      data: { email: 'admin-target@goodparty.org' },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-402',
+        ownerId: otherUser.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: otherUser.id,
+        slug: 'admin-target-campaign',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-402',
+      },
+    })
+
+    const result = await service.client.get(
+      '/v1/organizations/admin/campaign-402',
+    )
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'campaign-402',
+        name: '2026 Campaign',
+        campaignId: 402,
+        electedOfficeId: null,
+      },
+    })
+  })
+
+  it('returns an EO organization owned by another user when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-eo-admin',
+      brPositionId: 'br-pos-eo-admin',
+      brDatabaseId: 'br-db-eo-admin',
+      state: 'CO',
+      name: 'County Commissioner',
+    })
+
+    const otherUser = await service.prisma.user.create({
+      data: { email: 'admin-eo-target@goodparty.org' },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'eo-admin-1',
+        ownerId: otherUser.id,
+        positionId: 'br-pos-eo-admin',
+      },
+    })
+
+    const result = await service.client.get(
+      '/v1/organizations/admin/eo-admin-1',
+    )
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'eo-admin-1',
+        name: 'County Commissioner',
+        positionName: 'County Commissioner',
+        electedOfficeId: 'admin-1',
+        campaignId: null,
+      },
+    })
+  })
+
+  it('returns 404 for a non-existent slug when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const result = await service.client.get(
+      '/v1/organizations/admin/does-not-exist',
+    )
+
+    expect(result.status).toBe(404)
+  })
+})
+
+describe('PATCH /v1/organizations/admin/:slug', () => {
+  it('returns 403 for non-admin users without an M2M token', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-501',
+        ownerId: service.user.id,
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/admin/campaign-501',
+      { customPositionName: 'Forbidden' },
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('updates an organization owned by another user when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const otherUser = await service.prisma.user.create({
+      data: { email: 'admin-patch-target@goodparty.org' },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-502',
+        ownerId: otherUser.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: otherUser.id,
+        slug: 'admin-patch-target-campaign',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-502',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/admin/campaign-502',
+      { customPositionName: 'Admin Set Name' },
+    )
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'campaign-502',
+        name: '2026 Campaign',
+        campaignId: 502,
+      },
+    })
+
+    const updated = await service.prisma.organization.findUnique({
+      where: { slug: 'campaign-502' },
+    })
+    expect(updated?.customPositionName).toBe('Admin Set Name')
+  })
+
+  it('resolves ballotReadyPositionId via election service when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue({
+      id: 'pos-admin-patch',
+      brPositionId: 'br-pos-admin-patch',
+      brDatabaseId: 'br-db-admin-patch',
+      state: 'CA',
+      name: 'Mayor',
+    })
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-admin-patch',
+      brPositionId: 'br-pos-admin-patch',
+      brDatabaseId: 'br-db-admin-patch',
+      state: 'CA',
+      name: 'Mayor',
+    })
+
+    const otherUser = await service.prisma.user.create({
+      data: { email: 'admin-patch-position@goodparty.org' },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-503',
+        ownerId: otherUser.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: otherUser.id,
+        slug: 'admin-patch-position-campaign',
+        details: {},
+        organizationSlug: 'campaign-503',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/admin/campaign-503',
+      { ballotReadyPositionId: 'br-pos-admin-patch' },
+    )
+
+    expect(result.status).toBe(200)
+
+    const updated = await service.prisma.organization.findUnique({
+      where: { slug: 'campaign-503' },
+    })
+    expect(updated?.positionId).toBe('pos-admin-patch')
+  })
+
+  it('returns 404 for a non-existent slug when caller is admin', async () => {
+    await service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: ['admin'] },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/admin/does-not-exist',
+      { customPositionName: 'whatever' },
+    )
+
+    expect(result.status).toBe(404)
+  })
+})
+
 describe('GET /v1/organizations/admin/list', () => {
-  it('returns 403 for non-admin users', async () => {
+  it('returns 403 for non-admin users without an M2M token', async () => {
     const result = await service.client.get('/v1/organizations/admin/list')
 
     expect(result.status).toBe(403)

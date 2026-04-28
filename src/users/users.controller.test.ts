@@ -172,6 +172,23 @@ describe('UsersController', () => {
       expect(usersService.listUsers).toHaveBeenCalledWith(query)
     })
 
+    it('forwards the isPro filter to the service', async () => {
+      vi.spyOn(usersService, 'listUsers').mockResolvedValue({
+        data: [],
+        meta: { total: 0, offset: 0, limit: 10 },
+      })
+
+      await controller.list({ offset: 0, limit: 10, isPro: true })
+      expect(usersService.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: true }),
+      )
+
+      await controller.list({ offset: 0, limit: 10, isPro: false })
+      expect(usersService.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: false }),
+      )
+    })
+
     it('returns empty data array when no users match', async () => {
       vi.spyOn(usersService, 'listUsers').mockResolvedValue({
         data: [],

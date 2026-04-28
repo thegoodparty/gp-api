@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
@@ -219,22 +220,23 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
 
-  it('returns undefined and does not create messages when poll is not found', async () => {
+  it('acks and does not create messages when poll is not found', async () => {
     pollsService.findUnique.mockResolvedValue(null)
     const message = createPollAnalysisCompleteMessage({ pollId })
 
     const result = await service.processMessage(message)
 
-    expect(result).toBeUndefined()
+    expect(result).toBe(true)
     expect(s3Service.getFile).not.toHaveBeenCalled()
     expect(pollIssuesService.model.deleteMany).not.toHaveBeenCalled()
   })
 
-  it('returns undefined and does not create messages when poll is not SCHEDULED or IN_PROGRESS', async () => {
+  it('acks and does not create messages when poll is not SCHEDULED or IN_PROGRESS', async () => {
     pollsService.findUnique.mockResolvedValue({
       id: pollId,
       electedOfficeId,
@@ -245,7 +247,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
     const result = await service.processMessage(message)
 
-    expect(result).toBeUndefined()
+    expect(result).toBe(true)
     expect(s3Service.getFile).not.toHaveBeenCalled()
   })
 
@@ -856,6 +858,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       usersService as never,
       {} as never,
       {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -979,6 +982,7 @@ describe('QueueConsumerService - message type routing', () => {
           provide: WeeklyTasksDigestHandlerService,
           useValue: { handleWeeklyTasksDigest: vi.fn() },
         },
+        { provide: ExperimentRunsService, useValue: {} },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()

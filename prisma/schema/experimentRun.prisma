@@ -1,0 +1,31 @@
+enum ExperimentRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model ExperimentRun {
+  runId String @unique @default(uuid(7)) @map("run_id")
+
+  organizationSlug String       @map("organization_slug")
+  organization     Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+
+  // e.g. "district_intel"
+  experimentType String @map("experiment_type")
+
+  status ExperimentRunStatus @default(RUNNING)
+
+  params Json @default("{}") @db.JsonB
+
+  artifactBucket  String? @map("artifact_bucket")
+  artifactKey     String? @map("artifact_key")
+  durationSeconds Float?  @map("duration_seconds")
+  costUsd         Float?  @map("cost_usd")
+  error           String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationSlug, experimentType])
+  @@map("experiment_run")
+}
