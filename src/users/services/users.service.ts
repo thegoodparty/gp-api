@@ -38,7 +38,7 @@ import {
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
-import { clerkThrottle } from 'seed/util/clerkThrottle.util'
+import { clerkThrottle } from '@/vendors/clerk/util/clerkThrottle.util'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 

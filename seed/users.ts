@@ -6,7 +6,7 @@ import {
   ensureBcryptHash,
   hashPasswordSync,
 } from '../src/users/util/passwords.util'
-import { clerkThrottle } from './util/clerkThrottle.util'
+import { clerkThrottle } from '../src/vendors/clerk/util/clerkThrottle.util'
 
 const NUM_USERS = 20
 
