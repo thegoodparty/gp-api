@@ -407,6 +407,17 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     }
   }
 
+  // Returns the Clerk user ID for the given email, or the email itself if no
+  // account exists in this instance. Callers that require a real Clerk ID should
+  // check that the result starts with 'user_'.
+  async resolveClerkIdByEmail(email: string): Promise<string> {
+    const result = await this.clerkClient.users.getUserList({
+      emailAddress: [email],
+      limit: 1,
+    })
+    return result.data[0]?.id ?? email
+  }
+
   async impersonateUser(userId: number, actorClerkId: string) {
     const user = await this.findUser({ id: userId })
     if (!user?.clerkId) {
