@@ -21,9 +21,7 @@ import { Interval } from '@nestjs/schedule'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { subHours } from 'date-fns'
-import { chunk } from 'es-toolkit'
 import ms from 'ms'
-import throttle from 'p-throttle'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   PaginatedResults,
@@ -40,8 +38,11 @@ import {
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
+import { clerkThrottle } from '@/vendors/clerk/util/clerkThrottle.util'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
+
+const TEST_USER_DOMAIN = '@test.goodparty.org'
 
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
@@ -531,31 +532,70 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   }
 
   /**
-   * Regularly automatically delete old test users that were
-   * created more than 3 hours ago.
+   * Regularly deletes old e2e test users that were created more than 3 hours
+   * ago. Cleans out users from both the postgres db and from Clerk.
    */
   @Interval(ms('6h'))
   async deleteTestUsers() {
-    const testUsers = await this.model.findMany({
-      where: {
-        email: { endsWith: '@test.goodparty.org' },
-        createdAt: { lt: subHours(new Date(), 3) },
-      },
-    })
+    try {
+      const cutoff = subHours(new Date(), 3)
 
-    this.logger.info(`Found ${testUsers.length} test users to delete`)
-
-    const deleteUsers = throttle({ limit: 1, interval: 1000 })(
-      async (userIds: number[]) =>
-        this.model.deleteMany({ where: { id: { in: userIds } } }),
-    )
-
-    for (const users of chunk(testUsers, 10)) {
-      await deleteUsers(users.map((user) => user.id))
-      this.logger.info({
-        ids: users.map((user) => user.id),
-        msg: 'Deleted users',
+      // 1. Delete DB users.
+      const dbUsers = await this.model.findMany({
+        where: {
+          email: { endsWith: TEST_USER_DOMAIN },
+          createdAt: { lt: cutoff },
+        },
+        select: { id: true, email: true },
       })
+
+      for (const dbUser of dbUsers) {
+        try {
+          await this.model.delete({ where: { id: dbUser.id } })
+          this.logger.info({ userId: dbUser.id }, 'Deleted DB test user')
+        } catch (err) {
+          this.logger.error(
+            { err, userId: dbUser.id },
+            'Failed to delete DB test user, skipping',
+          )
+        }
+      }
+
+      // 2. Delete Clerk users.
+      // For now, don't worry about paginating. This 500 limit will always
+      // catch up at our current pace of test user creation.
+      const { data: clerkUsers } = await clerkThrottle(() =>
+        this.clerkClient.users.getUserList({
+          limit: 500,
+          query: TEST_USER_DOMAIN,
+        }),
+      )
+
+      const clerkUsersToDelete = clerkUsers
+        .filter((user) =>
+          user.emailAddresses.some((e) =>
+            e.emailAddress.endsWith(TEST_USER_DOMAIN),
+          ),
+        )
+        .filter((user) => user.createdAt < cutoff.getTime())
+
+      for (const clerkUser of clerkUsersToDelete) {
+        try {
+          await clerkThrottle(() =>
+            this.clerkClient.users.deleteUser(clerkUser.id),
+          )
+          this.logger.info({ userId: clerkUser.id }, 'Deleted Clerk test user')
+        } catch (err) {
+          this.logger.error(
+            { err, userId: clerkUser.id },
+            'Failed to delete Clerk test user, skipping',
+          )
+        }
+      }
+
+      this.logger.info('Test user cleanup pass complete')
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to delete test users')
     }
   }
 
