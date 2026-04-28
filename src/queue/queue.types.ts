@@ -10,6 +10,7 @@ export enum QueueType {
   POLL_EXPANSION = 'pollExpansion',
   CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
   WEEKLY_TASKS_DIGEST = 'weeklyTasksDigest',
+  AGENT_EXPERIMENT_RESULT = 'agentExperimentResult',
 }
 
 export type QueueMessage =
@@ -35,6 +36,10 @@ export type QueueMessage =
   | {
       type: QueueType.WEEKLY_TASKS_DIGEST
       data: WeeklyTasksDigestMessage
+    }
+  | {
+      type: QueueType.AGENT_EXPERIMENT_RESULT
+      data: AgentExperimentResultData
     }
 
 export type GenerateAiContentMessageData = {
@@ -155,4 +160,18 @@ export type PollResponseJsonRow = z.infer<typeof PollResponseJsonRowSchema>
 export const PollClusterAnalysisJsonSchema = z.array(PollResponseJsonRowSchema)
 export type PollClusterAnalysisJson = z.infer<
   typeof PollClusterAnalysisJsonSchema
+>
+
+export const AgentExperimentResultSchema = z.object({
+  runId: z.string(),
+  status: z.enum(['success', 'failed', 'contract_violation']),
+  artifactKey: z.string().optional(),
+  artifactBucket: z.string().optional(),
+  durationSeconds: z.number().optional(),
+  costUsd: z.number().optional(),
+  error: z.string().optional(),
+})
+
+export type AgentExperimentResultData = z.infer<
+  typeof AgentExperimentResultSchema
 >

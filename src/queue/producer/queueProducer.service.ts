@@ -97,9 +97,12 @@ export class QueueProducerService {
 
   async sendToCampaignPlanQueue(body: {
     campaignId: number
-    election_date: string
-    city: string
-    state: string
+    electionDate: string
+    state: string | null
+    city: string | null
+    officeName: string | null
+    officeLevel: string | null
+    primaryElectionDate: string | null
   }): Promise<void> {
     const { localUrl, inputQueueUrl } = campaignPlanQueueConfig
 
