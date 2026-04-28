@@ -38,7 +38,7 @@ import {
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
-import { clerkThrottle } from 'seed/util/clerkThrottle.util'
+import { clerkThrottle } from '@/shared/util/clerkThrottle.util'
 
 /** Result of resolving a gp-api Clerk user by email for impersonation actor.sub. */
 export type ResolvedActorIdentity =

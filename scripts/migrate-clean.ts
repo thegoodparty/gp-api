@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { createClerkClient } from '@clerk/backend'
 import { SingleBar, Presets } from 'cli-progress'
 import pmap from 'p-map'
-import { clerkThrottle } from '../seed/util/clerkThrottle.util'
+import { clerkThrottle } from '../src/shared/util/clerkThrottle.util'
 import { FIXED_EMAILS } from '../seed/users'
 
 const PRESERVE_FIXED = process.argv.includes('--preserve-fixed')
