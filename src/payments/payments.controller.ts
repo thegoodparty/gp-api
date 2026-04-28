@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Headers,
   HttpCode,
@@ -73,5 +74,21 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   async fixMissingCustomerIds() {
     return this.paymentsService.fixMissingCustomerIds()
+  }
+
+  /**
+   * Replays the Stripe subscription-checkout success path for a user whose
+   * webhook originally failed and is now stuck on "Subscription Pending".
+   * See ENG-7570.
+   */
+  @Post('recover-pending-subscription')
+  @Roles(UserRole.admin)
+  @HttpCode(HttpStatus.OK)
+  async recoverPendingSubscription(@Body() body: { userId: number }) {
+    const userId = Number(body?.userId)
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new BadRequestException('userId is required and must be a number')
+    }
+    return this.stripeEvents.replayPendingProCheckoutForUser(userId)
   }
 }

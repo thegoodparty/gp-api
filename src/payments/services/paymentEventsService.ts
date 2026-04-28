@@ -13,7 +13,11 @@ import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, User } from '@prisma/client'
-import { DateFormats, formatDate } from '../../shared/util/date.util'
+import {
+  DateFormats,
+  formatDate,
+  isDateTodayOrFuture,
+} from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
@@ -21,7 +25,6 @@ import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { PurchaseService } from './purchase.service'
@@ -208,6 +211,44 @@ export class PaymentEventsService {
   }
 
   /**
+   * Replays the post-payment success path for a checkout session.
+   * Used by the admin recovery endpoint to unstick users whose webhook
+   * originally failed (e.g. past electionDate; see ENG-7570).
+   */
+  async replayPendingProCheckoutForUser(userId: number) {
+    const user = await this.usersService.findUser({ id: userId })
+    if (!user) {
+      throw new BadRequestException(`No user found with id ${userId}`)
+    }
+    const checkoutSessionId = user.metaData?.checkoutSessionId
+    if (!checkoutSessionId) {
+      throw new BadRequestException(
+        `User ${userId} has no checkoutSessionId to replay`,
+      )
+    }
+    const session =
+      await this.stripeService.retrieveCheckoutSession(checkoutSessionId)
+    if (session.mode !== CheckoutSessionMode.SUBSCRIPTION) {
+      throw new BadRequestException(
+        `Checkout session ${checkoutSessionId} is not a subscription checkout`,
+      )
+    }
+    if (session.payment_status !== 'paid') {
+      throw new BadRequestException(
+        `Checkout session ${checkoutSessionId} payment_status is ${session.payment_status}; cannot replay`,
+      )
+    }
+    const sessionUserId = Number(session.metadata?.userId)
+    if (!Number.isInteger(sessionUserId) || sessionUserId !== userId) {
+      throw new BadRequestException(
+        `Checkout session ${checkoutSessionId} does not belong to user ${userId}`,
+      )
+    }
+    await this.handleSubscriptionCheckoutCompleted(session)
+    return { userId, checkoutSessionId, replayed: true }
+  }
+
+  /**
    * Handles checkout.session.completed events for subscription checkouts (Pro plan).
    */
   private async handleSubscriptionCheckoutCompleted(
@@ -240,11 +281,38 @@ export class PaymentEventsService {
     }
 
     const { id: campaignId } = campaign
-    const electionDate = parseCampaignElectionDate(campaign)
-    if (!electionDate || electionDate < new Date()) {
-      throw new BadGatewayException(
-        'No electionDate or electionDate is in the past',
+    const hasValidElectionDate = isDateTodayOrFuture(
+      campaign.details?.electionDate,
+    )
+
+    // The customer has already been charged by Stripe at this point, so we must
+    // grant Pro access regardless of election-date validity — otherwise the user
+    // is stuck on "Subscription Pending" forever (ENG-7570). When the date is
+    // invalid we still complete the entitlement, then alert ops to follow up.
+    if (!hasValidElectionDate) {
+      this.logger.error(
+        {
+          userId: user.id,
+          campaignId,
+          customerId,
+          subscriptionId,
+          electionDate: campaign.details?.electionDate,
+        },
+        '[WEBHOOK] Granting Pro despite missing/past electionDate — campaign needs manual triage',
       )
+      try {
+        await this.slackService.message(
+          {
+            text: `:warning: Pro subscription completed but campaign has missing/past electionDate. Manual triage needed.\nUser: \`${getUserFullName(user)}\` (${user.email})\nCampaign slug: \`${campaign.slug}\`\nelectionDate: \`${campaign.details?.electionDate ?? 'null'}\`\nsubscriptionId: \`${String(subscriptionId)}\``,
+          },
+          IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+        )
+      } catch (error) {
+        this.logger.error(
+          { error },
+          '[WEBHOOK] Failed to send election-date triage Slack alert',
+        )
+      }
     }
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
@@ -274,31 +342,47 @@ export class PaymentEventsService {
       checkoutSessionId: null,
     })
 
-    // Non-critical: Send notifications - log failures but don't fail webhook
-    const results = await Promise.allSettled([
-      this.sendProSignUpSlackMessage(user, campaign),
-      (async () => {
-        const district = campaign.organizationSlug
-          ? await this.organizationsService.getDistrictForOrgSlug(
-              campaign.organizationSlug,
-            )
-          : null
-        await this.voterFileDownloadAccess.downloadAccessAlert(
-          campaign,
-          user,
-          district,
-        )
-      })(),
-    ])
+    // Non-critical: Send notifications - log failures but don't fail webhook.
+    // Skip the voter-file alert when the election date is invalid since the
+    // downstream district lookup assumes a current race.
+    const notificationTasks: Array<{
+      label: string
+      run: () => Promise<unknown>
+    }> = [
+      {
+        label: 'send Slack message',
+        run: () => this.sendProSignUpSlackMessage(user, campaign),
+      },
+    ]
+    if (hasValidElectionDate) {
+      notificationTasks.push({
+        label: 'send voter file alert',
+        run: async () => {
+          const district = campaign.organizationSlug
+            ? await this.organizationsService.getDistrictForOrgSlug(
+                campaign.organizationSlug,
+              )
+            : null
+          await this.voterFileDownloadAccess.downloadAccessAlert(
+            campaign,
+            user,
+            district,
+          )
+        },
+      })
+    }
 
-    // Log any notification failures
+    const results = await Promise.allSettled(
+      notificationTasks.map(({ run }) => run()),
+    )
+
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const action = ['send Slack message', 'send voter file alert'][index]
+        const { label } = notificationTasks[index]!
         this.logger.error(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           { reason: result.reason },
-          `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
+          `[WEBHOOK] Failed to ${label} - User: ${user.id}, CustomerId: ${customerId}`,
         )
       }
     })

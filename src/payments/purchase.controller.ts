@@ -5,6 +5,8 @@ import { Campaign, Organization, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
+import { isDateTodayOrFuture } from '../shared/util/date.util'
 import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import {
@@ -21,6 +23,7 @@ export class PurchaseController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly usersService: UsersService,
+    private readonly campaignsService: CampaignsService,
     private readonly purchaseService: PurchaseService,
     private readonly logger: PinoLogger,
   ) {
@@ -30,6 +33,25 @@ export class PurchaseController {
   @Post('checkout-session')
   async createProCheckoutSession(@ReqUser() user: User) {
     const { email } = user
+
+    // Block checkout up front when normal Pro activation cannot proceed cleanly,
+    // rather than letting Stripe charge the customer and forcing webhook recovery
+    // for a subscription that needs manual triage (ENG-7570).
+    const campaign = await this.campaignsService.findByUserId(user.id)
+    if (!campaign) {
+      throw new BadRequestException({
+        message: 'No campaign found for user',
+        errorCode: 'CAMPAIGN_NOT_FOUND',
+      })
+    }
+    if (!isDateTodayOrFuture(campaign.details?.electionDate)) {
+      throw new BadRequestException({
+        message:
+          'Campaign election date is missing or in the past. Update your election date before renewing Pro.',
+        errorCode: 'CAMPAIGN_ELECTION_DATE_INVALID',
+      })
+    }
+
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id, email)
 
