@@ -168,6 +168,7 @@ export const AgentExperimentResultSchema = z.object({
   artifactKey: z.string().optional(),
   artifactBucket: z.string().optional(),
   durationSeconds: z.number().optional(),
+  costUsd: z.number().optional(),
   error: z.string().optional(),
 })
 

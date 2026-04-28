@@ -838,16 +838,18 @@ export class QueueConsumerService {
           )
           throw new Error('Experiment run already completed')
         }
-        run.status = {
-          success: ExperimentRunStatus.COMPLETED,
-          failed: ExperimentRunStatus.FAILED,
-          contract_violation: ExperimentRunStatus.FAILED,
-        }[data.status]
-        run.artifactKey = data.artifactKey ?? null
-        run.artifactBucket = data.artifactBucket ?? null
-        run.durationSeconds = data.durationSeconds ?? null
-        run.error = data.error?.slice(0, 1000) ?? null
-        return run
+        return {
+          status: {
+            success: ExperimentRunStatus.COMPLETED,
+            failed: ExperimentRunStatus.FAILED,
+            contract_violation: ExperimentRunStatus.FAILED,
+          }[data.status],
+          artifactKey: data.artifactKey ?? null,
+          artifactBucket: data.artifactBucket ?? null,
+          durationSeconds: data.durationSeconds ?? null,
+          costUsd: data.costUsd ?? null,
+          error: data.error?.slice(0, 1000) ?? null,
+        }
       },
     )
 

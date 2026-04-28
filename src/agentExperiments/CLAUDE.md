@@ -77,6 +77,7 @@ Sent to the queue named by `AGENT_DISPATCH_QUEUE_NAME` (e.g. `agent-dispatch-dev
   artifactKey?: string,
   artifactBucket?: string,
   durationSeconds?: number,
+  costUsd?: number,
   error?: string,      // truncated to 1000 chars on write
 }
 ```

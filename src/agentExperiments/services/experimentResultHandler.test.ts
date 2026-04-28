@@ -19,6 +19,7 @@ type ResultOverrides = {
   artifactKey?: string
   artifactBucket?: string
   durationSeconds?: number
+  costUsd?: number
   error?: string
 }
 
@@ -32,6 +33,7 @@ const makeMessage = (overrides: ResultOverrides = {}): Message => ({
       artifactKey: 'district_intel/run-abc/result.json',
       artifactBucket: 'gp-agent-artifacts-dev',
       durationSeconds: 42,
+      costUsd: 0.18,
       ...overrides,
     },
   }),
@@ -42,11 +44,16 @@ const callModifier = async (
 ) =>
   mod({
     runId: RUN_ID,
+    organizationSlug: 'org-1',
+    experimentType: 'district_intel',
     status: ExperimentRunStatus.RUNNING,
+    params: {},
     artifactKey: null,
     artifactBucket: null,
     durationSeconds: null,
+    costUsd: null,
     error: null,
+    createdAt: new Date(),
     updatedAt: new Date(),
   })
 
@@ -127,7 +134,29 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     expect(patched.artifactKey).toBe('district_intel/run-abc/result.json')
     expect(patched.artifactBucket).toBe('gp-agent-artifacts-dev')
     expect(patched.durationSeconds).toBe(42)
+    expect(patched.costUsd).toBe(0.18)
     expect(patched.error).toBeNull()
+  })
+
+  it('modifier returns only writable scalars — no relation FKs or unique keys (would break Prisma update)', async () => {
+    // Production failed with `Unknown argument organizationSlug` because the
+    // modifier mutated and returned the entire row, including the relation
+    // FK (organizationSlug) and unique key (runId). Prisma rejects those in
+    // update.data. Lock the modifier output to only the columns this handler
+    // is supposed to change.
+    await service.processMessage(makeMessage({ status: 'success' }))
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched).not.toHaveProperty('organizationSlug')
+    expect(patched).not.toHaveProperty('runId')
+    expect(patched).not.toHaveProperty('experimentType')
+    expect(patched).not.toHaveProperty('createdAt')
+    expect(patched).not.toHaveProperty('params')
   })
 
   it('maps "failed" to FAILED and preserves the error string', async () => {

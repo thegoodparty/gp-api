@@ -20,6 +20,7 @@ model ExperimentRun {
   artifactBucket  String? @map("artifact_bucket")
   artifactKey     String? @map("artifact_key")
   durationSeconds Float?  @map("duration_seconds")
+  costUsd         Float?  @map("cost_usd")
   error           String?
 
   createdAt DateTime @default(now()) @map("created_at")
