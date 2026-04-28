@@ -23,6 +23,9 @@ export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   'GET /v1/contacts/download': {
     p95LatencyMs: 999_999,
   },
+  'GET /v1/organizations': {
+    p95LatencyMs: 3_000,
+  },
   'POST /v1/polls/analyze-bias': {
     p95LatencyMs: 999_999,
   },
