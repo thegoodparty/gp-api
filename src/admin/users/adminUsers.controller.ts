@@ -131,14 +131,16 @@ export class AdminUsersController {
     // M2M initial impersonation from gp-admin: resolve email → gp-api Clerk ID,
     // falling back to the email string if the admin has no gp-api account
     if (actorEmail) {
-      const clerkId = await this.usersService.resolveClerkIdByEmail(actorEmail)
-      if (!clerkId.startsWith('user_')) {
+      const identity =
+        await this.usersService.resolveClerkIdByEmail(actorEmail)
+      if (identity.source === 'email-fallback') {
         this.logger.warn(
           { actorEmail },
           'Actor has no gp-api Clerk account — using email as actor.sub fallback',
         )
+        return identity.email
       }
-      return clerkId
+      return identity.clerkId
     }
 
     throw new BadRequestException('actorEmail is required when using M2M auth')

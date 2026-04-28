@@ -166,9 +166,10 @@ describe('AdminUsersController', () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
       )
-      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
-        mockUser.clerkId!,
-      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue({
+        source: 'clerk',
+        clerkId: mockUser.clerkId!,
+      })
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
         token: 'm2m_token',
       })
@@ -212,9 +213,10 @@ describe('AdminUsersController', () => {
       vi.spyOn(usersService, 'findUniqueOrThrow').mockResolvedValue(
         mockTargetUser,
       )
-      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue(
-        unknownEmail,
-      )
+      vi.spyOn(usersService, 'resolveClerkIdByEmail').mockResolvedValue({
+        source: 'email-fallback',
+        email: unknownEmail,
+      })
       vi.spyOn(usersService, 'impersonateUser').mockResolvedValue({
         token: 'fallback_token',
       })

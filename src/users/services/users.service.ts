@@ -41,6 +41,11 @@ import {
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
 
+/** Result of resolving a gp-api Clerk user by email for impersonation actor.sub. */
+export type ResolvedActorIdentity =
+  | { source: 'clerk'; clerkId: string }
+  | { source: 'email-fallback'; email: string }
+
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
 @Injectable()
@@ -407,15 +412,18 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     }
   }
 
-  // Returns the Clerk user ID for the given email, or the email itself if no
-  // account exists in this instance. Callers that require a real Clerk ID should
-  // check that the result starts with 'user_'.
-  async resolveClerkIdByEmail(email: string): Promise<string> {
+  /** Resolves gp-api Clerk user id by email, or signals email fallback when no user exists. */
+  async resolveClerkIdByEmail(
+    email: string,
+  ): Promise<ResolvedActorIdentity> {
     const result = await this.clerkClient.users.getUserList({
       emailAddress: [email],
       limit: 1,
     })
-    return result.data[0]?.id ?? email
+    const clerkId = result.data[0]?.id
+    return clerkId
+      ? { source: 'clerk', clerkId }
+      : { source: 'email-fallback', email }
   }
 
   async impersonateUser(userId: number, actorClerkId: string) {
