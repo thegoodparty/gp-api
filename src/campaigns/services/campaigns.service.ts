@@ -41,6 +41,7 @@ import {
 } from '../campaigns.types'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
+import { CampaignTasksService } from '../tasks/services/campaignTasks.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -61,6 +62,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly elections: ElectionsService,
     private readonly organizations: OrganizationsService,
     private readonly slack: SlackService,
+    @Inject(forwardRef(() => CampaignTasksService))
+    private readonly campaignTasks: WrapperType<CampaignTasksService>,
   ) {
     super()
   }
@@ -431,6 +434,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     await this.patchCampaignDetails(campaignId, {
       isProUpdatedAt: Date.now(),
     }) // TODO: this should be an ISO dateTime string, not a unix timestamp
+
+    if (isBecomingProFirstTime) {
+      void this.campaignTasks.notifySlackOnProUpgrade(campaignId)
+    }
 
     if (trackCampaign) {
       const updatedIsPro = campaign?.isPro
