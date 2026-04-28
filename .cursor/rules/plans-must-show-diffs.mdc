@@ -1,0 +1,36 @@
+---
+description: Plans for code changes MUST present code as diffs, not current or target state alone
+alwaysApply: true
+---
+
+# Plans Must Show Code Diffs
+
+When the user asks for a plan that involves code changes, ALWAYS present the proposed changes as code DIFFS / DELTAS. Never present only the current state, only the target state, or a prose-only description of the edit.
+
+REQUIRED:
+- Show the change as a unified diff with `-` for removed lines and `+` for added lines.
+- Include enough surrounding context lines to make the location unambiguous.
+- Use fenced code blocks with the `diff` language tag, e.g.:
+
+```diff
+-      await signOut({ redirectUrl: getMarketingUrl('/blog') })
++      await signOut({ redirectUrl: getMarketingUrl('/run-for-office') })
+```
+
+- For multi-file plans, provide a separate diff block per file and label each with the file path above the block as a markdown link, e.g. `[app/foo/bar.tsx](app/foo/bar.tsx)`.
+- If a change adds new lines with no removals (or vice versa), still use the `diff` block with `+` (or `-`) prefixes so the delta is unambiguous.
+
+PROHIBITED:
+- Showing the current code only and describing the change in prose.
+- Showing the final/target code only without the prior state.
+- Mixing current and target snippets in separate blocks without diff markers.
+- Any plan for code changes that does not surface every concrete edit as a diff.
+
+RATIONALE:
+- Diffs make the exact change reviewable at a glance.
+- Prevents ambiguity about what is being added, removed, or left alone.
+- Matches how the change will appear in PR review.
+
+ENFORCEMENT:
+- This rule applies to EVERY plan that modifies code, in every repo.
+- If a diff cannot be produced (e.g. brand-new file with no prior content), state that explicitly and still show the full new file inside a normal fenced code block, noting it is a new file.

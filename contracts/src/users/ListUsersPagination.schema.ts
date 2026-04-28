@@ -15,6 +15,10 @@ export const ListUsersPaginationSchema = FilterablePaginationSchema({
     firstName: paginationFilter,
     lastName: paginationFilter,
     email: paginationFilter,
+    isPro: z
+      .enum(['true', 'false'])
+      .transform((v) => v === 'true')
+      .optional(),
   },
 })
 

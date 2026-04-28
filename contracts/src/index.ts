@@ -162,6 +162,21 @@ export {
 } from './campaigns/SetDistrictOutput.schema'
 
 export {
+  RaceTargetMetricsSchema,
+  type RaceTargetMetrics,
+} from './campaigns/RaceTargetMetrics.schema'
+
+export {
+  CampaignWithPositionNameSchema,
+  type CampaignWithPositionName,
+} from './campaigns/CampaignWithPositionName.schema'
+
+export {
+  CampaignWithLiveContextSchema,
+  type CampaignWithLiveContext,
+} from './campaigns/CampaignWithLiveContext.schema'
+
+export {
   CAMPAIGN_SORT_KEYS,
   ListCampaignsPaginationSchema,
   type ListCampaignsPagination,

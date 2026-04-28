@@ -1,5 +1,6 @@
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import {
   Body,
   Controller,
@@ -25,6 +26,7 @@ import { UseElectedOffice } from './decorators/UseElectedOffice.decorator'
 import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
   CreateElectedOfficeDto,
+  SetElectedOfficeDistrictDto,
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
 import { ListElectedOfficePaginationSchema } from './schemas/ListElectedOfficePagination.schema'
@@ -33,7 +35,10 @@ import { ElectedOfficeService } from './services/electedOffice.service'
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
 export class ElectedOfficeController {
-  constructor(private readonly electedOfficeService: ElectedOfficeService) {}
+  constructor(
+    private readonly electedOfficeService: ElectedOfficeService,
+    private readonly organizationsService: OrganizationsService,
+  ) {}
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
@@ -120,5 +125,44 @@ export class ElectedOfficeController {
       data,
     })
     return req.m2mToken ? updated : this.toApi(updated)
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id/district')
+  async setDistrict(
+    @Param('id') id: string,
+    @Body() body: SetElectedOfficeDistrictDto,
+  ) {
+    const existing = await this.electedOfficeService.findUnique({
+      where: { id },
+    })
+    if (!existing) {
+      throw new NotFoundException('Elected office not found')
+    }
+
+    const orgSlug = OrganizationsService.electedOfficeOrgSlug(id)
+    const org = await this.organizationsService.findUnique({
+      where: { slug: orgSlug },
+    })
+    if (!org) {
+      throw new NotFoundException(
+        'Organization for this elected office not found',
+      )
+    }
+
+    const overrideDistrictId =
+      await this.organizationsService.resolveOverrideDistrictId({
+        positionId: org.positionId ?? undefined,
+        state: body.state,
+        L2DistrictType: body.L2DistrictType,
+        L2DistrictName: body.L2DistrictName,
+      })
+
+    await this.organizationsService.model.update({
+      where: { slug: orgSlug },
+      data: { overrideDistrictId },
+    })
+
+    return { electedOfficeId: id, overrideDistrictId }
   }
 }
