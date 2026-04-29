@@ -321,9 +321,8 @@ describe('UsersService', () => {
         totalCount: 0,
       } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
 
-      const result = await usersService.resolveClerkIdByEmail(
-        'nobody@example.com',
-      )
+      const result =
+        await usersService.resolveClerkIdByEmail('nobody@example.com')
 
       expect(result).toEqual({
         source: 'email-fallback',

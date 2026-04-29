@@ -414,9 +414,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   }
 
   /** Resolves gp-api Clerk user id by email, or signals email fallback when no user exists. */
-  async resolveClerkIdByEmail(
-    email: string,
-  ): Promise<ResolvedActorIdentity> {
+  async resolveClerkIdByEmail(email: string): Promise<ResolvedActorIdentity> {
     const result = await this.clerkClient.users.getUserList({
       emailAddress: [email],
       limit: 1,

@@ -131,8 +131,7 @@ export class AdminUsersController {
     // M2M initial impersonation from gp-admin: resolve email → gp-api Clerk ID,
     // falling back to the email string if the admin has no gp-api account
     if (actorEmail) {
-      const identity =
-        await this.usersService.resolveClerkIdByEmail(actorEmail)
+      const identity = await this.usersService.resolveClerkIdByEmail(actorEmail)
       if (identity.source === 'email-fallback') {
         this.logger.warn(
           { actorEmail },
