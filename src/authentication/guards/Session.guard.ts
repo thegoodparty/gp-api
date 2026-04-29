@@ -95,13 +95,18 @@ export class SessionGuard implements CanActivate {
     ])
 
     if (rawUser) {
+      // Use `||` (not `??`) so empty strings from Clerk also fall back to the
+      // DB value, matching the truthiness check in
+      // ClerkUserEnricherService.applyFields. `??` would only catch
+      // null/undefined and let `''` through, which can fail downstream
+      // schema validation (e.g. EmailSchema, firstName.min(2)).
       return clerkFields
         ? {
             ...rawUser,
-            email: clerkFields.email ?? rawUser.email,
-            firstName: clerkFields.firstName ?? rawUser.firstName,
-            lastName: clerkFields.lastName ?? rawUser.lastName,
-            name: clerkFields.name ?? rawUser.name,
+            email: clerkFields.email || rawUser.email,
+            firstName: clerkFields.firstName || rawUser.firstName,
+            lastName: clerkFields.lastName || rawUser.lastName,
+            name: clerkFields.name || rawUser.name,
             avatar: clerkFields.avatar,
           }
         : rawUser
