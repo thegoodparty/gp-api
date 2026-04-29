@@ -98,10 +98,10 @@ export class SessionGuard implements CanActivate {
       return clerkFields
         ? {
             ...rawUser,
-            email: clerkFields.email,
-            firstName: clerkFields.firstName,
-            lastName: clerkFields.lastName,
-            name: clerkFields.name,
+            email: clerkFields.email ?? rawUser.email,
+            firstName: clerkFields.firstName ?? rawUser.firstName,
+            lastName: clerkFields.lastName ?? rawUser.lastName,
+            name: clerkFields.name ?? rawUser.name,
             avatar: clerkFields.avatar,
           }
         : rawUser

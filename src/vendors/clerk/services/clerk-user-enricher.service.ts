@@ -4,10 +4,10 @@ import { PinoLogger } from 'nestjs-pino'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 
 export interface ClerkUserFields {
-  email: string
-  firstName: string
-  lastName: string
-  name: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+  name: string | null
   avatar: string | null
 }
 
@@ -45,20 +45,7 @@ export class ClerkUserEnricherService {
 
     try {
       const clerkUser = await this.clerkClient.users.getUser(clerkId)
-      const email =
-        clerkUser.primaryEmailAddress?.emailAddress ??
-        clerkUser.emailAddresses?.[0]?.emailAddress
-
-      const firstName = clerkUser.firstName ?? ''
-      const lastName = clerkUser.lastName ?? ''
-
-      const fields: ClerkUserFields = {
-        email: email ?? '',
-        firstName,
-        lastName,
-        name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
-        avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
-      }
+      const fields = this.buildFields(clerkUser)
 
       this.fieldsCache.set(clerkId, {
         fields,
@@ -125,20 +112,7 @@ export class ClerkUserEnricherService {
       })
 
       for (const clerkUser of clerkUsers.data) {
-        const email =
-          clerkUser.primaryEmailAddress?.emailAddress ??
-          clerkUser.emailAddresses?.[0]?.emailAddress
-
-        const firstName = clerkUser.firstName ?? ''
-        const lastName = clerkUser.lastName ?? ''
-
-        const fields: ClerkUserFields = {
-          email: email ?? '',
-          firstName,
-          lastName,
-          name: clerkUser.fullName ?? `${firstName} ${lastName}`.trim(),
-          avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
-        }
+        const fields = this.buildFields(clerkUser)
 
         result.set(clerkUser.id, fields)
         this.fieldsCache.set(clerkUser.id, {
@@ -160,13 +134,48 @@ export class ClerkUserEnricherService {
     user: T,
     fields: ClerkUserFields,
   ): T {
+    // Only overwrite a field when Clerk has a non-empty value. Otherwise
+    // keep the database value so downstream response-schema validation
+    // (e.g. EmailSchema, firstName.min(2)) doesn't reject the user.
     return {
       ...user,
-      ...('email' in user ? { email: fields.email } : {}),
-      ...('firstName' in user ? { firstName: fields.firstName } : {}),
-      ...('lastName' in user ? { lastName: fields.lastName } : {}),
-      ...('name' in user ? { name: fields.name } : {}),
+      ...('email' in user && fields.email ? { email: fields.email } : {}),
+      ...('firstName' in user && fields.firstName
+        ? { firstName: fields.firstName }
+        : {}),
+      ...('lastName' in user && fields.lastName
+        ? { lastName: fields.lastName }
+        : {}),
+      ...('name' in user && fields.name ? { name: fields.name } : {}),
       ...('avatar' in user ? { avatar: fields.avatar } : {}),
+    }
+  }
+
+  private buildFields(clerkUser: {
+    primaryEmailAddress?: { emailAddress: string } | null
+    emailAddresses?: { emailAddress: string }[]
+    firstName: string | null
+    lastName: string | null
+    fullName: string | null
+    hasImage: boolean
+    imageUrl: string
+  }): ClerkUserFields {
+    const email =
+      clerkUser.primaryEmailAddress?.emailAddress ??
+      clerkUser.emailAddresses?.[0]?.emailAddress ??
+      null
+
+    const firstName = clerkUser.firstName ?? null
+    const lastName = clerkUser.lastName ?? null
+    const fallbackName = [firstName, lastName].filter(Boolean).join(' ').trim()
+    const name = clerkUser.fullName ?? (fallbackName.length > 0 ? fallbackName : null)
+
+    return {
+      email,
+      firstName,
+      lastName,
+      name,
+      avatar: clerkUser.hasImage ? clerkUser.imageUrl : null,
     }
   }
 }
