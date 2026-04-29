@@ -139,6 +139,7 @@ export type CampaignDetails = {
   pledged?: boolean
   isProUpdatedAt?: number
   customIssues?: CustomIssue[]
+  whyRunning?: string
   runningAgainst?: Opponent[]
   geoLocation?: GeoLocation
   geoLocationFailed?: boolean
