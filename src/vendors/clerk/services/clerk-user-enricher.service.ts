@@ -168,7 +168,8 @@ export class ClerkUserEnricherService {
     const firstName = clerkUser.firstName ?? null
     const lastName = clerkUser.lastName ?? null
     const fallbackName = [firstName, lastName].filter(Boolean).join(' ').trim()
-    const name = clerkUser.fullName ?? (fallbackName.length > 0 ? fallbackName : null)
+    const name =
+      clerkUser.fullName ?? (fallbackName.length > 0 ? fallbackName : null)
 
     return {
       email,

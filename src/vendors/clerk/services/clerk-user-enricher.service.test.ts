@@ -15,7 +15,9 @@ type ClerkUserShape = {
   imageUrl: string
 }
 
-const buildClerkUser = (overrides: Partial<ClerkUserShape> = {}): ClerkUserShape => ({
+const buildClerkUser = (
+  overrides: Partial<ClerkUserShape> = {},
+): ClerkUserShape => ({
   id: 'clerk_default',
   primaryEmailAddress: { emailAddress: 'clerk@goodparty.org' },
   emailAddresses: [{ emailAddress: 'clerk@goodparty.org' }],
