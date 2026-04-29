@@ -30,7 +30,6 @@ declare global {
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
-      whyRunning?: string
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
       geoLocation?: {
         geoHash?: string

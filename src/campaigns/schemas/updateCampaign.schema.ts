@@ -32,7 +32,6 @@ const CampaignDetailsSchema = z
         position: z.string(),
       }),
     ),
-    whyRunning: z.string().max(2000),
     runningAgainst: z.array(
       z.object({
         name: z.string(),
