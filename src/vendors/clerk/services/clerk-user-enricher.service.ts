@@ -225,10 +225,7 @@ export class ClerkUserEnricherService {
   private async tryResolveAndPersistClerkId<T extends Enrichable>(
     user: T,
   ): Promise<string | null> {
-    const id =
-      'id' in user && typeof (user as { id?: unknown }).id === 'number'
-        ? (user as { id: number }).id
-        : null
+    const id = typeof user.id === 'number' ? user.id : null
     const email =
       typeof user.email === 'string' && user.email.trim().length > 0
         ? user.email.trim()
