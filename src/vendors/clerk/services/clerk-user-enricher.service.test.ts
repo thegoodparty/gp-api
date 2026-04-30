@@ -313,17 +313,6 @@ describe('ClerkUserEnricherService', () => {
         ],
       })
 
-      getUser.mockResolvedValueOnce(
-        buildClerkUser({
-          id: 'user_lazy_1',
-          firstName: 'Lazy',
-          lastName: 'Linked',
-          fullName: 'Lazy Linked',
-          hasImage: true,
-          imageUrl: 'https://img.clerk/lazy.png',
-        }),
-      )
-
       const dbUser = {
         id: 300,
         clerkId: null,
@@ -346,6 +335,7 @@ describe('ClerkUserEnricherService', () => {
         lastName: 'Linked',
         avatar: 'https://img.clerk/lazy.png',
       })
+      expect(getUser).not.toHaveBeenCalled()
     })
 
     it('nulls avatar on single-user Clerk fetch failure when clerkId is set', async () => {

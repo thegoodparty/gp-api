@@ -253,6 +253,13 @@ export class ClerkUserEnricherService {
         where: { id },
         data: { clerkId: clerkUser.id },
       })
+      // Reuse the Clerk payload we already have: enrichUser() calls fetchClerkFields() next,
+      // which would otherwise hit getUser() for the same id (extra latency + quota).
+      const fields = this.buildFields(clerkUser)
+      this.fieldsCache.set(clerkUser.id, {
+        fields,
+        expiresAt: Date.now() + this.cacheTtlMs,
+      })
       return clerkUser.id
     } catch (err) {
       if (
