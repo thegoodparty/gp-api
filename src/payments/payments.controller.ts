@@ -10,9 +10,11 @@ import {
   Post,
   RawBodyRequest,
   Req,
+  UseGuards,
 } from '@nestjs/common'
 import { UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { AdminOrM2MGuard } from 'src/authentication/guards/AdminOrM2M.guard'
 import { Stripe } from 'stripe'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
@@ -82,7 +84,7 @@ export class PaymentsController {
    * See ENG-7570.
    */
   @Post('recover-pending-subscription')
-  @Roles(UserRole.admin)
+  @UseGuards(AdminOrM2MGuard)
   @HttpCode(HttpStatus.OK)
   async recoverPendingSubscription(@Body() body: { userId: number }) {
     const userId = Number(body?.userId)
