@@ -106,4 +106,21 @@ export const GLOBAL_ALERTS: Alert[] = [
     ].join('\n\n'),
     notify: 'win-bugs',
   },
+  {
+    slug: 'admin-impersonation-email-fallback-spike',
+    name: '[Admin] Impersonation falling back to email actor',
+    type: 'log',
+    expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Actor has no gp-api Clerk account" [15m]))',
+    threshold: 5,
+    for: '5m',
+    message: [
+      'More than 5 admin impersonations have used the email-as-actor.sub fallback in the last 15 minutes.',
+      "This means actorEmail lookups against gp-api's Clerk instance returned no match for those impersonation requests. Possible causes:",
+      '  • Admins without a gp-api Clerk account are impersonating (a routine baseline may exist; we have not yet measured it)',
+      '  • Email casing/format regression in gp-admin → SDK → controller',
+      '  • Clerk lookup degraded or rate-limited',
+      '  • Clerk has begun rejecting non-user_ actor.sub values',
+      'Click *View in Grafana* to see the warn log lines (search "Actor has no gp-api Clerk account") and inspect the affected actorEmail values, then verify whether those admins exist in the gp-api Clerk instance.',
+    ].join('\n\n'),
+  },
 ]
