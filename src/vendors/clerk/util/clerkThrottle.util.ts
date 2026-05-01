@@ -10,5 +10,5 @@ export const clerkThrottle = throttleRequestsWithRetry({
   workerCount: 1,
   safetyFactor: 0.5,
   maxRetries: 3,
-  label: 'clerk-seed',
+  label: 'clerk-api',
 })

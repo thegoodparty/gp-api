@@ -2,7 +2,12 @@ import { Test } from '@nestjs/testing'
 import { LoggerModule } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
+import { PrismaService } from '@/prisma/prisma.service'
 import { ClerkUserEnricherService } from './clerk-user-enricher.service'
+
+vi.mock('@/vendors/clerk/util/clerkThrottle.util', () => ({
+  clerkThrottle: <T>(fn: () => Promise<T>) => fn(),
+}))
 
 type ClerkUserShape = {
   id: string
@@ -33,10 +38,12 @@ describe('ClerkUserEnricherService', () => {
   let enricher: ClerkUserEnricherService
   let getUser: ReturnType<typeof vi.fn>
   let getUserList: ReturnType<typeof vi.fn>
+  let userUpdate: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     getUser = vi.fn()
     getUserList = vi.fn()
+    userUpdate = vi.fn().mockResolvedValue({})
 
     const moduleRef = await Test.createTestingModule({
       imports: [LoggerModule.forRoot({ pinoHttp: { enabled: false } })],
@@ -46,6 +53,12 @@ describe('ClerkUserEnricherService', () => {
           provide: CLERK_CLIENT_PROVIDER_TOKEN,
           useValue: {
             users: { getUser, getUserList },
+          },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            user: { update: userUpdate },
           },
         },
       ],
@@ -64,6 +77,8 @@ describe('ClerkUserEnricherService', () => {
             firstName: 'Newer',
             lastName: 'Name',
             fullName: 'Newer Name',
+            hasImage: true,
+            imageUrl: 'https://img.clerk/new.png',
           }),
         ],
       })
@@ -85,14 +100,11 @@ describe('ClerkUserEnricherService', () => {
         firstName: 'Newer',
         lastName: 'Name',
         name: 'Newer Name',
+        avatar: 'https://img.clerk/new.png',
       })
     })
 
     it('keeps the DB email when Clerk has no primary email (regression: search with "+" character)', async () => {
-      // Simulates a Clerk user that exists but has no primaryEmailAddress and
-      // no emailAddresses entry. Previously the enricher overwrote the DB
-      // email with '' which then failed `EmailSchema` in
-      // ZodResponseInterceptor, returning a 500 to the admin search UI.
       getUserList.mockResolvedValue({
         data: [
           buildClerkUser({
@@ -187,12 +199,54 @@ describe('ClerkUserEnricherService', () => {
         firstName: 'Un',
         lastName: 'Changed',
         name: 'Un Changed',
-        avatar: null,
+        avatar: 'https://legacy/upload.png',
       }
 
       const [enriched] = await enricher.enrichUsers([dbUser])
 
-      expect(enriched).toEqual(dbUser)
+      expect(enriched.firstName).toBe('Un')
+      expect(enriched.avatar).toBe(null)
+    })
+
+    it('strips avatar when user has no clerkId', async () => {
+      const dbUser = {
+        id: 10,
+        clerkId: null as string | null,
+        email: 'legacy@goodparty.org',
+        firstName: 'Leg',
+        lastName: 'acy',
+        avatar: 'https://legacy/old.png',
+      }
+
+      const [enriched] = await enricher.enrichUsers([dbUser])
+
+      expect(enriched.avatar).toBe(null)
+      expect(getUserList).not.toHaveBeenCalled()
+    })
+
+    it('sets avatar to null when Clerk has no profile image', async () => {
+      getUserList.mockResolvedValue({
+        data: [
+          buildClerkUser({
+            id: 'clerk_no_img',
+            hasImage: false,
+            imageUrl: '',
+          }),
+        ],
+      })
+
+      const dbUser = {
+        id: 11,
+        clerkId: 'clerk_no_img',
+        email: 'u@goodparty.org',
+        firstName: 'U',
+        lastName: 'Ser',
+        avatar: 'https://cdn/stale-upload.png',
+      }
+
+      const [enriched] = await enricher.enrichUsers([dbUser])
+
+      expect(enriched.avatar).toBe(null)
     })
   })
 
@@ -221,7 +275,9 @@ describe('ClerkUserEnricherService', () => {
       expect(enriched.email).toBe('kept@goodparty.org')
     })
 
-    it('returns the user unchanged when clerkId is null', async () => {
+    it('returns avatar null when clerkId is null and lazy link finds no Clerk user', async () => {
+      getUserList.mockResolvedValue({ data: [] })
+
       const dbUser = {
         id: 200,
         clerkId: null,
@@ -229,7 +285,83 @@ describe('ClerkUserEnricherService', () => {
         firstName: 'No',
         lastName: 'Clerk',
         name: 'No Clerk',
+        avatar: 'https://legacy/x.png',
+      }
+
+      const enriched = await enricher.enrichUser(dbUser)
+
+      expect(enriched).toMatchObject({
+        clerkId: null,
         avatar: null,
+        firstName: 'No',
+      })
+      expect(userUpdate).not.toHaveBeenCalled()
+    })
+
+    it('lazy-links clerkId by email then applies Clerk avatar', async () => {
+      getUserList.mockResolvedValueOnce({
+        data: [
+          buildClerkUser({
+            id: 'user_lazy_1',
+            primaryEmailAddress: { emailAddress: 'lazy@goodparty.org' },
+            firstName: 'Lazy',
+            lastName: 'Linked',
+            fullName: 'Lazy Linked',
+            hasImage: true,
+            imageUrl: 'https://img.clerk/lazy.png',
+          }),
+        ],
+      })
+
+      const dbUser = {
+        id: 300,
+        clerkId: null,
+        email: 'lazy@goodparty.org',
+        firstName: 'Old',
+        lastName: 'Db',
+        name: 'Old Db',
+        avatar: 'https://legacy/db.png',
+      }
+
+      const enriched = await enricher.enrichUser(dbUser)
+
+      expect(userUpdate).toHaveBeenCalledWith({
+        where: { id: 300 },
+        data: { clerkId: 'user_lazy_1' },
+      })
+      expect(enriched).toMatchObject({
+        clerkId: 'user_lazy_1',
+        firstName: 'Lazy',
+        lastName: 'Linked',
+        avatar: 'https://img.clerk/lazy.png',
+      })
+      expect(getUser).not.toHaveBeenCalled()
+    })
+
+    it('nulls avatar on single-user Clerk fetch failure when clerkId is set', async () => {
+      getUser.mockRejectedValue(new Error('clerk down'))
+
+      const dbUser = {
+        id: 400,
+        clerkId: 'user_err',
+        email: 'e@goodparty.org',
+        firstName: 'Keep',
+        lastName: 'Me',
+        avatar: 'https://legacy/z.png',
+      }
+
+      const enriched = await enricher.enrichUser(dbUser)
+
+      expect(enriched.firstName).toBe('Keep')
+      expect(enriched.avatar).toBe(null)
+    })
+
+    it('returns the user unchanged when clerkId is null and no email (no avatar key)', async () => {
+      const dbUser = {
+        id: 500,
+        clerkId: null,
+        firstName: 'X',
+        lastName: 'Y',
       }
 
       const enriched = await enricher.enrichUser(dbUser)

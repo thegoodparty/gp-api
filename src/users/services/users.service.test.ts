@@ -3,7 +3,7 @@ import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-cli
 import { ClerkClient } from '@clerk/backend'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { UsersService } from './users.service'
+import { UsersService, type ResolvedActorIdentity } from './users.service'
 import { AnalyticsService } from '@/analytics/analytics.service'
 import { StripeService } from '@/vendors/stripe/services/stripe.service'
 
@@ -286,6 +286,48 @@ describe('UsersService', () => {
       await expect(
         usersService.findUserByResetToken('tests@goodparty.org', 'wrong-token'),
       ).rejects.toThrow()
+    })
+  })
+
+  describe('resolveClerkIdByEmail', () => {
+    let clerkClient: ClerkClient
+
+    beforeEach(() => {
+      clerkClient = service.app.get<ClerkClient>(CLERK_CLIENT_PROVIDER_TOKEN)
+    })
+
+    it('returns clerk source when Clerk returns a user for the email', async () => {
+      vi.spyOn(clerkClient.users, 'getUserList').mockResolvedValue({
+        data: [{ id: 'user_from_clerk_lookup' } as never],
+        totalCount: 1,
+      } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
+
+      const result: ResolvedActorIdentity =
+        await usersService.resolveClerkIdByEmail('anyone@example.com')
+
+      expect(result).toEqual({
+        source: 'clerk',
+        clerkId: 'user_from_clerk_lookup',
+      })
+      expect(clerkClient.users.getUserList).toHaveBeenCalledWith({
+        emailAddress: ['anyone@example.com'],
+        limit: 1,
+      })
+    })
+
+    it('returns email-fallback source when Clerk returns no users', async () => {
+      vi.spyOn(clerkClient.users, 'getUserList').mockResolvedValue({
+        data: [],
+        totalCount: 0,
+      } as Awaited<ReturnType<typeof clerkClient.users.getUserList>>)
+
+      const result =
+        await usersService.resolveClerkIdByEmail('nobody@example.com')
+
+      expect(result).toEqual({
+        source: 'email-fallback',
+        email: 'nobody@example.com',
+      })
     })
   })
 

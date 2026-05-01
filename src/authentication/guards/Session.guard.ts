@@ -54,7 +54,14 @@ export class SessionGuard implements CanActivate {
       const { externalUserId, actor } =
         await this.authProvider.verifySessionToken(token)
 
-      const user = await this.resolveUser(externalUserId)
+      if (actor?.sub) {
+        request.actorSub = actor.sub
+      }
+
+      const [user, actorUser] = await Promise.all([
+        this.resolveUser(externalUserId, 'subject'),
+        actor ? this.resolveUser(actor.sub, 'actor') : Promise.resolve(null),
+      ])
 
       if (!user) {
         this.logger.warn(
@@ -63,9 +70,19 @@ export class SessionGuard implements CanActivate {
         return this.allowPublicOrThrow(context)
       }
 
+      if (actor && !actorUser) {
+        this.logger.warn(
+          { actorSub: actor.sub },
+          'Actor claim present but actor could not be resolved — continuing without actor privileges',
+        )
+      }
+
       request.user = {
         ...user,
         impersonating: actor != null,
+      }
+      if (actorUser) {
+        request.actorUser = actorUser
       }
       this.sessions.trackSession(user)
     } catch (err) {
@@ -86,7 +103,14 @@ export class SessionGuard implements CanActivate {
     throw new UnauthorizedException()
   }
 
-  private async resolveUser(externalUserId: string): Promise<User | null> {
+  private async resolveUser(
+    externalUserId: string,
+    role: 'subject' | 'actor' = 'subject',
+  ): Promise<User | null> {
+    if (!externalUserId.startsWith('user_')) {
+      return null
+    }
+
     const [rawUser, clerkFields] = await Promise.all([
       this.usersService.model.findUnique({
         where: { clerkId: externalUserId },
@@ -95,28 +119,35 @@ export class SessionGuard implements CanActivate {
     ])
 
     if (rawUser) {
+      if (!clerkFields) {
+        // Clerk unreachable: keep DB identity fields but never serve a stale
+        // local avatar as if it were Clerk's (see ClerkUserEnricherService).
+        return { ...rawUser, avatar: null }
+      }
       // Use `||` (not `??`) so empty strings from Clerk also fall back to the
       // DB value, matching the truthiness check in
       // ClerkUserEnricherService.applyFields. `??` would only catch
       // null/undefined and let `''` through, which can fail downstream
       // schema validation (e.g. EmailSchema, firstName.min(2)).
-      return clerkFields
-        ? {
-            ...rawUser,
-            email: clerkFields.email || rawUser.email,
-            firstName: clerkFields.firstName || rawUser.firstName,
-            lastName: clerkFields.lastName || rawUser.lastName,
-            name: clerkFields.name || rawUser.name,
-            avatar: clerkFields.avatar,
-          }
-        : rawUser
+      return {
+        ...rawUser,
+        email: clerkFields.email || rawUser.email,
+        firstName: clerkFields.firstName || rawUser.firstName,
+        lastName: clerkFields.lastName || rawUser.lastName,
+        name: clerkFields.name || rawUser.name,
+        avatar: clerkFields.avatar,
+      }
+    }
+
+    if (role === 'actor') {
+      return null
     }
 
     try {
       const providerUser = await this.authProvider.getUser(externalUserId)
       if (!providerUser?.email) {
         this.logger.warn(
-          { externalUserId },
+          { clerkId: externalUserId, role },
           'Auth provider user has no email address, cannot provision',
         )
         return null
@@ -130,7 +161,7 @@ export class SessionGuard implements CanActivate {
       })
     } catch (err) {
       this.logger.error(
-        { err, externalUserId },
+        { err, clerkId: externalUserId, role },
         'Failed to provision user from auth provider',
       )
       return null

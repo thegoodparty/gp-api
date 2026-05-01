@@ -40,6 +40,11 @@ import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
 import { clerkThrottle } from '@/vendors/clerk/util/clerkThrottle.util'
 
+/** Result of resolving a gp-api Clerk user by email for impersonation actor.sub. */
+export type ResolvedActorIdentity =
+  | { source: 'clerk'; clerkId: string }
+  | { source: 'email-fallback'; email: string }
+
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
 const TEST_USER_DOMAIN = '@test.goodparty.org'
@@ -406,6 +411,18 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         'Failed to track user deletion event',
       )
     }
+  }
+
+  /** Resolves gp-api Clerk user id by email, or signals email fallback when no user exists. */
+  async resolveClerkIdByEmail(email: string): Promise<ResolvedActorIdentity> {
+    const result = await this.clerkClient.users.getUserList({
+      emailAddress: [email],
+      limit: 1,
+    })
+    const clerkId = result.data[0]?.id
+    return clerkId
+      ? { source: 'clerk', clerkId }
+      : { source: 'email-fallback', email }
   }
 
   async impersonateUser(userId: number, actorClerkId: string) {
