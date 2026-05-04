@@ -68,10 +68,15 @@ describe('ExperimentRunsService', () => {
       expect(mockModel.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           runId: expect.any(String),
-          type: 'district_intel',
+          experimentType: 'district_intel',
           organizationSlug: 'org-1',
           status: ExperimentRunStatus.RUNNING,
-          params: { foo: 'bar' },
+          params: {
+            state: 'CA',
+            city: 'San Francisco',
+            l2DistrictType: 'city',
+            l2DistrictName: 'San Francisco',
+          },
         }),
       })
 
@@ -86,7 +91,12 @@ describe('ExperimentRunsService', () => {
         unknown
       >
       expect(body).toMatchObject({
-        params: { foo: 'bar' },
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
         organization_slug: 'org-1',
         experiment_type: 'district_intel',
         run_id: expect.any(String),
@@ -94,7 +104,7 @@ describe('ExperimentRunsService', () => {
 
       expect(result).toMatchObject({
         runId: expect.any(String),
-        type: 'district_intel',
+        experimentType: 'district_intel',
         organizationSlug: 'org-1',
         status: ExperimentRunStatus.RUNNING,
       })
