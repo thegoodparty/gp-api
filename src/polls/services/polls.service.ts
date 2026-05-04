@@ -2,9 +2,7 @@ import { addBusinessDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { QueueType } from 'src/queue/queue.types'
-import { pollMessageGroup } from '../utils/polls.utils'
+import { inngest } from 'src/inngest/inngest.client'
 import { APIPollStatus, derivePollStatus } from '../polls.types'
 
 type PollCreateInput = Omit<
@@ -19,8 +17,20 @@ const estimatedCompletionDate = (scheduledDate: Date | string) =>
 
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(private readonly queueProducer: QueueProducerService) {
-    super()
+  private async sendPollCreationEvent(pollId: string) {
+    if (process.env.NODE_ENV === 'test') return
+    await inngest.send({
+      name: 'polls/creation.requested',
+      data: { pollId },
+    })
+  }
+
+  private async sendPollExpansionEvent(pollId: string) {
+    if (process.env.NODE_ENV === 'test') return
+    await inngest.send({
+      name: 'polls/expansion.requested',
+      data: { pollId },
+    })
   }
 
   async create(input: PollCreateInput) {
@@ -30,10 +40,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
         estimatedCompletionDate: estimatedCompletionDate(input.scheduledDate),
       },
     })
-    await this.queueProducer.sendMessage(
-      { type: QueueType.POLL_CREATION, data: { pollId: poll.id } },
-      pollMessageGroup(poll.id),
-    )
+    await this.sendPollCreationEvent(poll.id)
 
     return poll
   }
@@ -62,8 +69,6 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     return this.optimisticLockingUpdate(
       { where: { id: params.pollId } },
       (poll) => {
-        // We want to allow completing scheduled polls for testing purposes. In E2E tests
-        // we create polls and want to simulate completing them quickly.
         if (
           ![APIPollStatus.SCHEDULED, APIPollStatus.IN_PROGRESS].includes(
             derivePollStatus(poll),
@@ -106,10 +111,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
       },
     )
 
-    await this.queueProducer.sendMessage(
-      { type: QueueType.POLL_EXPANSION, data: { pollId: params.pollId } },
-      pollMessageGroup(params.pollId),
-    )
+    await this.sendPollExpansionEvent(params.pollId)
 
     return result
   }
