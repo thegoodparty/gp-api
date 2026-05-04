@@ -1,0 +1,62 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { execSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { compile, JSONSchema } from 'json-schema-to-typescript'
+
+const main = async () => {
+  execSync(
+    'aws s3 sync s3://agent-experiment-metadata-dev ./scripts/output/agent-metadata',
+    { cwd: `${__dirname}/..` },
+  )
+
+  const { experiments } = JSON.parse(
+    readFileSync('scripts/output/agent-metadata/index.json', 'utf8'),
+  )
+
+  const jobSchemas: Record<string, JSONSchema> = {}
+
+  for (const experiment of experiments) {
+    const manifest = JSON.parse(
+      readFileSync(
+        `scripts/output/agent-metadata/${experiment.id}/manifest.json`,
+        'utf8',
+      ),
+    )
+
+    jobSchemas[experiment.id] = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['Input', 'Output'],
+      properties: {
+        Input: manifest.input_schema,
+        Output: manifest.output_schema,
+      },
+    }
+  }
+
+  console.log(jobSchemas)
+
+  const types = await compile(
+    {
+      type: 'object',
+      additionalProperties: false,
+      properties: jobSchemas,
+      required: Object.keys(jobSchemas),
+    },
+    'AgentJobContracts',
+    {
+      bannerComment: '',
+    },
+  )
+  writeFileSync('src/generated/agent-job-contracts.ts', types)
+
+  console.log('✅ Agent job contracts generated')
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
