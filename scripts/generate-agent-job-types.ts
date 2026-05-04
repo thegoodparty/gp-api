@@ -5,6 +5,7 @@
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { compile, JSONSchema } from 'json-schema-to-typescript'
+import prettier from 'prettier'
 
 const main = async () => {
   execSync(
@@ -37,6 +38,8 @@ const main = async () => {
     }
   }
 
+  const outputPath = 'src/generated/agent-job-contracts.ts'
+
   const types = await compile(
     {
       type: 'object',
@@ -49,7 +52,14 @@ const main = async () => {
       bannerComment: '',
     },
   )
-  writeFileSync('src/generated/agent-job-contracts.ts', types)
+
+  const prettierConfig = await prettier.resolveConfig(outputPath)
+  const formatted = await prettier.format(types, {
+    ...prettierConfig,
+    parser: 'typescript',
+  })
+
+  writeFileSync(outputPath, formatted)
 
   console.log('✅ Agent job contracts generated')
 }
