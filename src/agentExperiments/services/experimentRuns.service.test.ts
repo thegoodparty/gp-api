@@ -55,9 +55,14 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       const result = await service.dispatchRun({
-        experimentType: 'district_intel',
+        type: 'district_intel',
         organizationSlug: 'org-1',
-        params: { foo: 'bar' },
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
 
       expect(mockModel.create).toHaveBeenCalledWith({
@@ -66,7 +71,12 @@ describe('ExperimentRunsService', () => {
           experimentType: 'district_intel',
           organizationSlug: 'org-1',
           status: ExperimentRunStatus.RUNNING,
-          params: { foo: 'bar' },
+          params: {
+            state: 'CA',
+            city: 'San Francisco',
+            l2DistrictType: 'city',
+            l2DistrictName: 'San Francisco',
+          },
         }),
       })
 
@@ -81,7 +91,12 @@ describe('ExperimentRunsService', () => {
         unknown
       >
       expect(body).toMatchObject({
-        params: { foo: 'bar' },
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
         organization_slug: 'org-1',
         experiment_type: 'district_intel',
         run_id: expect.any(String),
@@ -99,9 +114,14 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        experimentType: 'district_intel',
+        type: 'district_intel',
         organizationSlug: 'org-1',
-        params: {},
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
 
       const dbRunId = mockModel.create.mock.calls[0][0].data.runId as string
@@ -116,14 +136,24 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        experimentType: 'a',
+        type: 'district_intel',
         organizationSlug: 'org-alpha',
-        params: {},
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
       await service.dispatchRun({
-        experimentType: 'a',
+        type: 'district_intel',
         organizationSlug: 'org-beta',
-        params: {},
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
 
       const calls = sqsMock.commandCalls(SendMessageCommand)
@@ -140,9 +170,14 @@ describe('ExperimentRunsService', () => {
 
       await expect(
         service.dispatchRun({
-          experimentType: 'district_intel',
+          type: 'district_intel',
           organizationSlug: 'org-1',
-          params: {},
+          params: {
+            state: 'CA',
+            city: 'San Francisco',
+            l2DistrictType: 'city',
+            l2DistrictName: 'San Francisco',
+          },
         }),
       ).rejects.toThrow(BadGatewayException)
 
@@ -158,9 +193,14 @@ describe('ExperimentRunsService', () => {
 
       await expect(
         service.dispatchRun({
-          experimentType: 'district_intel',
+          type: 'district_intel',
           organizationSlug: 'org-1',
-          params: {},
+          params: {
+            state: 'CA',
+            city: 'San Francisco',
+            l2DistrictType: 'city',
+            l2DistrictName: 'San Francisco',
+          },
         }),
       ).rejects.toThrow('db down')
 
@@ -171,14 +211,24 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        experimentType: 'a',
+        type: 'district_intel',
         organizationSlug: 'org-1',
-        params: {},
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
       await service.dispatchRun({
-        experimentType: 'a',
+        type: 'district_intel',
         organizationSlug: 'org-1',
-        params: {},
+        params: {
+          state: 'CA',
+          city: 'San Francisco',
+          l2DistrictType: 'city',
+          l2DistrictName: 'San Francisco',
+        },
       })
 
       const id1 = mockModel.create.mock.calls[0][0].data.runId as string

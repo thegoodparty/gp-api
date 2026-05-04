@@ -229,6 +229,18 @@ npm unlink @goodparty_org/contracts
 npm install
 ```
 
+## Agent Job Contracts
+
+`src/generated/agent-job-contracts.ts` holds TypeScript types for every agent experiment's `Input` and `Output`, used by `ExperimentRunsService.dispatchRun()` to type-check `params` per `experimentType`. The file is generated from per-experiment `manifest.json` files (with `input_schema` and `output_schema` JSON Schemas) in the `agent-experiment-metadata-dev` S3 bucket.
+
+Regenerate after the agent side adds or changes a manifest:
+
+```bash
+tsx scripts/generate-agent-job-types.ts
+```
+
+Requires AWS credentials with read access to `agent-experiment-metadata-dev`. Commit the regenerated file. See `src/agentExperiments/CLAUDE.md` for the full dispatch flow.
+
 ## Deployment
 
 This project's deployment is managed via [Pulumi](https://www.pulumi.com/) within the [deploy](./deploy) directory.
