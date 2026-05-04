@@ -48,8 +48,3 @@ export type Alert = {
   /** Whether the alert is disabled. */
   disabled?: boolean
 }
-
-export type EndpointOverride = {
-  /** Override for p95 latency threshold (ms). */
-  p95LatencyMs?: number
-}
