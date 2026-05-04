@@ -119,16 +119,21 @@ export class SessionGuard implements CanActivate {
     ])
 
     if (rawUser) {
-      return clerkFields
-        ? {
-            ...rawUser,
-            email: clerkFields.email,
-            firstName: clerkFields.firstName,
-            lastName: clerkFields.lastName,
-            name: clerkFields.name,
-            avatar: clerkFields.avatar,
-          }
-        : rawUser
+      if (!clerkFields) {
+        // Clerk unreachable: keep DB identity fields but never serve a stale
+        // local avatar as if it were Clerk's (see ClerkUserEnricherService).
+        return { ...rawUser, avatar: null }
+      }
+      // Use `||` (not `??`) so empty strings from Clerk also fall back to the
+      // DB value, matching ClerkUserEnricherService.applyFields.
+      return {
+        ...rawUser,
+        email: clerkFields.email || rawUser.email,
+        firstName: clerkFields.firstName || rawUser.firstName,
+        lastName: clerkFields.lastName || rawUser.lastName,
+        name: clerkFields.name || rawUser.name,
+        avatar: clerkFields.avatar,
+      }
     }
 
     if (role === 'actor') {
