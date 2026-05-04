@@ -37,8 +37,6 @@ const main = async () => {
     }
   }
 
-  console.log(jobSchemas)
-
   const types = await compile(
     {
       type: 'object',
