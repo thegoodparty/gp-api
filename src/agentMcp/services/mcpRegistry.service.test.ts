@@ -10,6 +10,9 @@ import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { McpRegistryService } from './mcpRegistry.service'
 import { AgentMcpModule } from '../agentMcp.module'
 
+const buildModule = (imports: unknown[]) =>
+  Test.createTestingModule({ imports: imports as never[] })
+
 const InSchema = z.object({ slogan: z.string() })
 class InDto extends createZodDto(InSchema) {}
 const OutSchema = z.object({ ok: z.boolean() })
@@ -35,9 +38,7 @@ class FakeApp {}
 
 describe('McpRegistryService', () => {
   it('discovers @McpTool-decorated handlers and builds tool entries', async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [FakeApp],
-    }).compile()
+    const moduleRef = await buildModule([FakeApp]).compile()
     await moduleRef.init()
 
     const registry = moduleRef.get(McpRegistryService)
@@ -58,9 +59,7 @@ describe('McpRegistryService', () => {
   })
 
   it('does not include handlers without @McpTool', async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [FakeApp],
-    }).compile()
+    const moduleRef = await buildModule([FakeApp]).compile()
     await moduleRef.init()
 
     const tools = moduleRef.get(McpRegistryService).getAll()
@@ -77,9 +76,7 @@ describe('McpRegistryService', () => {
     @Module({ imports: [AgentMcpModule], controllers: [NoHttpController] })
     class NoHttpApp {}
 
-    const moduleRef = await Test.createTestingModule({
-      imports: [NoHttpApp],
-    }).compile()
+    const moduleRef = await buildModule([NoHttpApp]).compile()
 
     await expect(moduleRef.init()).rejects.toThrow(
       /has no HTTP method decorator/,
@@ -101,9 +98,7 @@ describe('McpRegistryService', () => {
     @Module({ imports: [AgentMcpModule], controllers: [DupController] })
     class DupApp {}
 
-    const moduleRef = await Test.createTestingModule({
-      imports: [DupApp],
-    }).compile()
+    const moduleRef = await buildModule([DupApp]).compile()
 
     await expect(moduleRef.init()).rejects.toThrow(/Duplicate MCP tool name/)
   })
