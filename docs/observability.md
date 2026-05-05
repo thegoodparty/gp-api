@@ -8,10 +8,9 @@ There are two categories of alerts:
 
 ### Controller Alerts (auto-generated)
 
-Every controller endpoint automatically gets two alerts:
+Every controller endpoint automatically gets one alert:
 
 - **Error count**: Fires when any requests return error status codes (≥ 400, excluding 401/403/404/409/498) within a 1-hour window.
-- **P95 latency**: Fires when the 95th percentile response time exceeds 2000ms for GET requests or 3000ms for writes (POST/PUT/DELETE/PATCH) over a 1-hour window.
 
 These are generated automatically from the controllers in the codebase -- you don't write them by hand. **All controller alerts are disabled by default** and require explicit opt-in via the ownership mapping (see [Ownership](#ownership) below).
 
@@ -59,12 +58,12 @@ Controllers that aren't assigned to either group still get alerts generated, but
 
 All alerting configuration lives in `deploy/`:
 
-| File                                              | Purpose                                                                          |
-| ------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `deploy/components/alerts.ts`                     | Ownership mapping, default thresholds, per-endpoint overrides, and global alerts |
-| `deploy/components/alerting/controller-alerts.ts` | Generates error count + latency alerts for each controller endpoint              |
-| `deploy/components/alerting/alerts.types.ts`      | Type definitions for `Alert`, `EndpointOverride`, `SlackGroup`                   |
-| `deploy/components/grafana.ts`                    | Converts alerts into Grafana rule groups via Pulumi                              |
+| File                                              | Purpose                                                   |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| `deploy/components/alerts.ts`                     | Ownership mapping and global alerts                       |
+| `deploy/components/alerting/controller-alerts.ts` | Generates error count alerts for each controller endpoint |
+| `deploy/components/alerting/alerts.types.ts`      | Type definitions for `Alert` and `SlackGroup`             |
+| `deploy/components/grafana.ts`                    | Converts alerts into Grafana rule groups via Pulumi       |
 
 ## How to opt in a controller
 
@@ -75,18 +74,6 @@ All of that controller's endpoint alerts become active on the next deploy.
 ## How to override thresholds
 
 Error alerts always fire on any unexpected error and cannot be overridden -- if an endpoint is returning errors, you should know about it.
-
-Latency thresholds can be overridden per-endpoint by adding an entry to `ENDPOINT_OVERRIDES` in `deploy/components/alerts.ts`:
-
-```typescript
-export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
-  'GET /v1/contacts': {
-    p95LatencyMs: 5000,
-  },
-}
-```
-
-Endpoint strings are in the format `METHOD /v1/controller/path` and are type-safe -- your editor will autocomplete them.
 
 ## How to add a new global alert
 
