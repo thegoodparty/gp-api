@@ -27,6 +27,11 @@ declare global {
       zip?: User['zip']
       knowRun?: 'yes' | null
       runForOffice?: 'yes' | 'no' | null
+      ballotStatus?:
+        | 'on-ballot'
+        | 'qualified-not-filed'
+        | 'considering'
+        | 'testing'
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
@@ -75,6 +80,7 @@ declare global {
       slug?: string
       hubSpotUpdates?: Partial<Record<HubSpot.IncomingProperty, string>>
       currentStep?: OnboardingStep
+      onboarding?: NewOnboardingAnswers
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number
       claimProfile?: string
@@ -85,6 +91,58 @@ declare global {
       adminUserEmail?: string
       hubspotId?: string
       name?: string
+    }
+
+    export type NewOnboardingBallotStatus =
+      | 'on-ballot'
+      | 'qualified-not-filed'
+      | 'considering'
+      | 'testing'
+
+    export type NewOnboardingPartyAffiliation =
+      | 'nonpartisan'
+      | 'independent-or-non-major'
+      | 'democrat'
+      | 'republican'
+
+    export type NewOnboardingOfficePath = 'structured' | 'manual'
+
+    export type NewOnboardingSelectedOffice = {
+      raceId: string
+      positionId?: string
+      positionName: string
+      level?: string
+      city?: string
+      electionDay?: string
+      electionId?: string
+      state?: string
+      partisanType?: string
+      hasPrimary?: boolean
+      primaryElectionDate?: string
+      primaryElectionId?: string
+      officeTermLength?: string
+      filingPeriodsStart?: string
+      filingPeriodsEnd?: string
+    }
+
+    export type NewOnboardingManualOfficeForm = {
+      office: string
+      state: string
+      city: string
+      district: string
+      officeTermLength: string
+      electionDate: string
+    }
+
+    export type NewOnboardingAnswers = {
+      officePath?: NewOnboardingOfficePath
+      manualOffice?: boolean
+      unmatchedOffice?: boolean
+      ballotStatus?: NewOnboardingBallotStatus
+      partyAffiliation?: NewOnboardingPartyAffiliation
+      officeZip?: string
+      structuredOffice?: NewOnboardingSelectedOffice
+      manualOfficeForm?: NewOnboardingManualOfficeForm
     }
 
     export type CampaignAiContent = {
