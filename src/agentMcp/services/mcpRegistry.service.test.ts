@@ -64,4 +64,26 @@ describe('McpRegistryService', () => {
     const tools = moduleRef.get(McpRegistryService).getAll()
     expect(tools.find((t) => t.handlerName === 'notATool')).toBeUndefined()
   })
+
+  it('throws when two handlers map to the same tool name', async () => {
+    @Controller('campaigns')
+    class DupController {
+      @Get('mine')
+      @McpTool({ description: 'First handler.' })
+      first() {}
+
+      @Get('mine')
+      @McpTool({ description: 'Duplicate handler.' })
+      second() {}
+    }
+
+    @Module({ imports: [AgentMcpModule], controllers: [DupController] })
+    class DupApp {}
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [DupApp],
+    }).compile()
+
+    await expect(moduleRef.init()).rejects.toThrow(/Duplicate MCP tool name/)
+  })
 })

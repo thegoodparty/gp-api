@@ -35,6 +35,7 @@ const joinPath = (controllerPath: string, methodPath: string): string => {
 @Injectable()
 export class McpRegistryService implements OnModuleInit {
   private tools: RegisteredMcpTool[] = []
+  private toolsByName = new Map<string, RegisteredMcpTool>()
 
   constructor(
     private readonly discovery: DiscoveryService,
@@ -87,7 +88,18 @@ export class McpRegistryService implements OnModuleInit {
       }
     }
 
+    const byName = new Map<string, RegisteredMcpTool>()
+    for (const t of collected) {
+      if (byName.has(t.toolName)) {
+        const existing = byName.get(t.toolName)!
+        throw new Error(
+          `Duplicate MCP tool name "${t.toolName}" — registered by ${existing.controllerClassName}.${existing.handlerName} and ${t.controllerClassName}.${t.handlerName}`,
+        )
+      }
+      byName.set(t.toolName, t)
+    }
     this.tools = collected
+    this.toolsByName = byName
   }
 
   getAll(): readonly RegisteredMcpTool[] {
@@ -95,6 +107,6 @@ export class McpRegistryService implements OnModuleInit {
   }
 
   findByToolName(name: string): RegisteredMcpTool | undefined {
-    return this.tools.find((t) => t.toolName === name)
+    return this.toolsByName.get(name)
   }
 }
