@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
+// NestJS DiscoveryService surfaces controller wrappers with `instance` and `metatype` typed as `any`,
+// and the Reflect API by definition returns `any`. This file works at the metadata layer; explicit
+// casts at every site would be noise. Behavior is covered by mcpRegistry.service.test.ts.
 import { Injectable, OnModuleInit, RequestMethod } from '@nestjs/common'
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core'
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants'

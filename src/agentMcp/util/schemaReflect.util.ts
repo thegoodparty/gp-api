@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion */
+// Reflection-driven schema extraction: Reflect.getMetadata returns `any`, so casting to the
+// expected metadata shape (ROUTE_ARGS_METADATA, design:paramtypes) is unavoidable here.
 import 'reflect-metadata'
 import { ZodSchema, z } from 'zod'
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants'

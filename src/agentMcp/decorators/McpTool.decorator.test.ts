@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
+// Test fixtures define decorated controller stubs whose method bodies don't matter.
 import { describe, expect, it } from 'vitest'
 import { Reflector } from '@nestjs/core'
 import { McpTool, MCP_TOOL_KEY, McpToolMetadata } from './McpTool.decorator'
