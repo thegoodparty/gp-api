@@ -69,7 +69,12 @@ export class McpRegistryService implements OnModuleInit {
         const methodPath: string =
           Reflect.getMetadata(PATH_METADATA, handler) ?? ''
 
-        if (httpMethodNum === undefined) continue
+        if (httpMethodNum === undefined) {
+          throw new Error(
+            `@McpTool applied to ${metatype.name}.${methodName}, which has no HTTP method decorator. ` +
+              `@McpTool can only be used on controller route handlers (@Get/@Post/@Put/@Patch/@Delete).`,
+          )
+        }
 
         const method = HTTP_METHOD_NAME[httpMethodNum] ?? 'UNKNOWN'
         const path = joinPath(controllerPath, methodPath)
