@@ -6,6 +6,7 @@ import { ElectionsModule } from 'src/elections/elections.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { VotersModule } from 'src/voters/voters.module'
 import { ContactsController } from './contacts.controller'
+import { OnboardingContactsController } from './onboardingContacts.controller'
 import { ContactsService } from './services/contacts.service'
 
 @Module({
@@ -17,7 +18,7 @@ import { ContactsService } from './services/contacts.service'
     ElectionsModule,
     OrganizationsModule,
   ],
-  controllers: [ContactsController],
+  controllers: [ContactsController, OnboardingContactsController],
   providers: [ContactsService],
   exports: [ContactsService],
 })

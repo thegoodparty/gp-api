@@ -269,23 +269,50 @@ export class ContactsService {
   }
 
   async getDistrictStats(organization: Organization) {
-    const fetchStats = async (districtParams: { districtId: string }) => {
-      const token = this.getValidS2SToken()
+    return this.withOrgDistrictResolution(organization, ({ districtId }) =>
+      this.fetchStatsByDistrictId(districtId),
+    )
+  }
 
-      const response = await lastValueFrom(
-        this.httpService.get<StatsResponse>(
-          `${PEOPLE_API_URL}/v1/people/stats`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: districtParams,
-          },
-        ),
+  async getDistrictStatsByDistrictOrPosition({
+    districtId,
+    ballotReadyPositionId,
+  }: {
+    districtId?: string
+    ballotReadyPositionId?: string
+  }): Promise<StatsResponse> {
+    let resolvedDistrictId = districtId
+
+    if (!resolvedDistrictId && ballotReadyPositionId) {
+      const position = await this.elections.getPositionByBallotReadyId(
+        ballotReadyPositionId,
+        { includeDistrict: true },
       )
-
-      return response.data
+      resolvedDistrictId = position?.district?.id ?? undefined
     }
 
-    return this.withOrgDistrictResolution(organization, fetchStats)
+    if (!resolvedDistrictId) {
+      throw new BadRequestException(
+        'Could not resolve a district from the provided districtId or ballotReadyPositionId',
+      )
+    }
+
+    return this.fetchStatsByDistrictId(resolvedDistrictId)
+  }
+
+  private async fetchStatsByDistrictId(
+    districtId: string,
+  ): Promise<StatsResponse> {
+    const token = this.getValidS2SToken()
+
+    const response = await lastValueFrom(
+      this.httpService.get<StatsResponse>(`${PEOPLE_API_URL}/v1/people/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { districtId },
+      }),
+    )
+
+    return response.data
   }
 
   private getValidS2SToken(): string {
