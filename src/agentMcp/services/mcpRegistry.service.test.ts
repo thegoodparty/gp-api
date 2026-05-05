@@ -43,13 +43,13 @@ describe('McpRegistryService', () => {
 
     expect(tools).toHaveLength(2)
 
-    const read = tools.find((t) => t.toolName === 'GET /campaigns/mine')!
+    const read = tools.find((t) => t.toolName === 'GET_campaigns_mine')!
     expect(read).toBeDefined()
     expect(read.description).toBe("Read the calling user's campaign.")
     expect(read.outputSchema).toBe(OutSchema)
     expect(read.inputSchema).toBeNull()
 
-    const update = tools.find((t) => t.toolName === 'PATCH /campaigns/mine')!
+    const update = tools.find((t) => t.toolName === 'PATCH_campaigns_mine')!
     expect(update).toBeDefined()
     expect(update.inputSchema).not.toBeNull()
     expect(update.outputSchema).toBe(OutSchema)
