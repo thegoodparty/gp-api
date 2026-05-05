@@ -7,7 +7,7 @@ import { McpTool } from '../src/agentMcp/decorators/McpTool.decorator'
 import { ResponseSchema } from '../src/shared/decorators/ResponseSchema.decorator'
 import { AgentMcpModule } from '../src/agentMcp/agentMcp.module'
 import { McpRegistryService } from '../src/agentMcp/services/mcpRegistry.service'
-import { RegisteredMcpTool } from '../src/agentMcp/agentMcp.types'
+import { findMissingSchemas } from './validate-mcp-tools'
 
 const Out = z.object({ ok: z.boolean() })
 const In = z.object({ x: z.string() })
@@ -33,16 +33,6 @@ class BadController {
   noOutput() {}
 }
 
-const findMissing = (tools: readonly RegisteredMcpTool[]) =>
-  tools
-    .map((t) => {
-      const reasons: string[] = []
-      if (!t.inputSchema) reasons.push('input')
-      if (!t.outputSchema) reasons.push('output')
-      return reasons.length ? { tool: t, reasons } : null
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-
 describe('validate-mcp-tools logic', () => {
   it('flags a tool missing @ResponseSchema', async () => {
     @Module({
@@ -56,11 +46,16 @@ describe('validate-mcp-tools logic', () => {
     }).compile()
     await moduleRef.init()
     const registry = moduleRef.get(McpRegistryService)
-    const result = findMissing(registry.getAll())
+    const result = findMissingSchemas(registry.getAll())
     expect(result).toHaveLength(2)
     const noOutput = result.find((r) => r.tool.handlerName === 'noOutput')
     expect(noOutput).toBeDefined()
-    expect(noOutput!.reasons).toContain('output')
+    expect(noOutput!.reasons).toContain('missing @ResponseSchema(...)')
+    const one = result.find((r) => r.tool.handlerName === 'one')
+    expect(one).toBeDefined()
+    expect(one!.reasons).toContain(
+      'missing input schema (no @Body/@Query/@Param Zod DTO)',
+    )
   })
 
   it('does not flag a handler that has both input and output schemas', async () => {
@@ -72,7 +67,7 @@ describe('validate-mcp-tools logic', () => {
     }).compile()
     await moduleRef.init()
     const registry = moduleRef.get(McpRegistryService)
-    const result = findMissing(registry.getAll())
+    const result = findMissingSchemas(registry.getAll())
     expect(result.find((r) => r.tool.handlerName === 'two')).toBeUndefined()
   })
 })

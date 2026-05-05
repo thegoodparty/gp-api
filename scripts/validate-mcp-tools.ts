@@ -23,7 +23,6 @@ export const findMissingSchemas = (
     .filter((x): x is MissingEntry => x !== null)
 
 export const runValidator = async () => {
-  process.env.QUEUE_CONSUMER_DISABLED = 'true'
   process.env.NODE_ENV = process.env.NODE_ENV ?? 'test'
 
   const app = await NestFactory.createApplicationContext(AppModule, {
@@ -38,33 +37,4 @@ export const runValidator = async () => {
   await app.close()
 
   return { tools, missing }
-}
-
-const main = async () => {
-  const { tools, missing } = await runValidator()
-
-  if (missing.length === 0) {
-    console.log(
-      `OK ${tools.length} @McpTool-decorated routes pass schema validation`,
-    )
-    process.exit(0)
-  }
-
-  console.error(
-    `FAIL ${missing.length} @McpTool-decorated route(s) failed schema validation:\n`,
-  )
-  for (const { tool, reasons } of missing) {
-    console.error(`  ${tool.toolName}`)
-    console.error(`    at ${tool.controllerClassName}.${tool.handlerName}`)
-    for (const r of reasons) console.error(`      - ${r}`)
-    console.error('')
-  }
-  process.exit(1)
-}
-
-if (require.main === module) {
-  main().catch((err) => {
-    console.error(err)
-    process.exit(1)
-  })
 }

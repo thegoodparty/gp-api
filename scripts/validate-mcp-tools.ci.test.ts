@@ -1,16 +1,22 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { runValidator } from './validate-mcp-tools'
 
 describe('validate-mcp-tools (CI)', () => {
-  it('every @McpTool handler in AppModule has both input and output schemas', async () => {
+  beforeAll(() => {
     vi.spyOn(PrismaService.prototype, 'onModuleInit').mockResolvedValue(
       undefined,
     )
     vi.spyOn(PrismaService.prototype, 'onModuleDestroy').mockResolvedValue(
       undefined,
     )
+  })
 
+  afterAll(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('every @McpTool handler in AppModule has both input and output schemas', async () => {
     const { missing } = await runValidator()
 
     if (missing.length > 0) {

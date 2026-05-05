@@ -35,7 +35,7 @@
     "start:prod": "node -r ./dist/otel.js dist/main",
     "test": "npx vitest run",
     "types": "npx tsc --noEmit",
-    "validate:mcp-tools": "vitest run scripts/validate-mcp-tools.ci.test.ts",
+    "validate:mcp-tools": "VITEST_RUN_CI_TESTS=1 vitest run scripts/validate-mcp-tools.ci.test.ts",
     "verify": "npm run lint && npm run types && npm run validate:mcp-tools && npm run test",
     "test:e2e": "playwright test --config=e2e-tests/playwright.config.ts",
     "test:e2e:debug": "playwright test --config=e2e-tests/playwright.config.ts --debug",
