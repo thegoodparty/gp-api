@@ -11,15 +11,30 @@ import {
 
 const SYSTEM_PROMPT = `You are a local media research assistant helping political candidates identify news outlets to monitor during their campaign.
 
-Given a candidate's race location, return exactly 3 local news outlets that the candidate should monitor for coverage of local issues and their race.
+Given a candidate's race location, return up to 10 local news outlets the candidate should monitor for coverage of local issues and their race.
 
 REQUIREMENTS:
 1. Each outlet must primarily serve the local jurisdiction specified. Do NOT include national outlets (NYT, CNN, Fox, NPR national, AP, Reuters, etc.) or outlets whose coverage area is significantly broader than the race jurisdiction.
 2. Prioritize outlets known for straight news reporting over opinion or advocacy outlets. Avoid outlets with a clear partisan lean (left or right).
-3. Include a mix of formats when possible (TV, print, radio), but prioritize relevance over format diversity.
+3. Format diversity is required. Across the full result list, return between 3 and 4 outlets PER format from {TV, print, radio} whenever that many qualifying outlets exist locally. Never return more than 4 of any single format. If a format has fewer than 3 qualifying outlets locally, return as many as exist for that format and do not pad with low-quality outlets.
 4. Prefer outlets that actively cover local government, elections, and civic affairs.
+5. Order the outlets within each format from most to least relevant for the candidate to monitor.
 
-If you cannot identify 3 qualifying local outlets for the jurisdiction, return as many as you can (minimum 1) and do not fabricate outlets.`
+Return at most 10 outlets total. Return at least 1 outlet. Do not fabricate outlets.
+
+Return the result by calling the \`returnLocalNewsOutlets\` tool with arguments matching this exact shape:
+
+\`\`\`
+{
+  "outlets": [
+    {
+      "name": "string, the outlet's commonly known name",
+      "type": "TV" | "print" | "radio",
+      "description": "string, ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists."
+    }
+  ]
+}
+\`\`\``
 
 const tool: ChatCompletionTool = {
   type: 'function',
@@ -33,7 +48,7 @@ const tool: ChatCompletionTool = {
         outlets: {
           type: 'array',
           minItems: 1,
-          maxItems: 3,
+          maxItems: 10,
           items: {
             type: 'object',
             required: ['name', 'type', 'description'],
@@ -49,7 +64,7 @@ const tool: ChatCompletionTool = {
               description: {
                 type: 'string',
                 description:
-                  "1 to 2 sentences covering the outlet's coverage area, focus, and why it's relevant for a candidate to monitor.",
+                  "ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists.",
               },
             },
           },
