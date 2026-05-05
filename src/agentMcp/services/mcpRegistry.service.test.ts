@@ -3,12 +3,19 @@
 import { describe, expect, it } from 'vitest'
 import { Test } from '@nestjs/testing'
 import { Body, Controller, Get, Patch, Module } from '@nestjs/common'
+import { DiscoveryModule } from '@nestjs/core'
 import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { McpTool } from '../decorators/McpTool.decorator'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { McpRegistryService } from './mcpRegistry.service'
-import { AgentMcpModule } from '../agentMcp.module'
+
+@Module({
+  imports: [DiscoveryModule],
+  providers: [McpRegistryService],
+  exports: [McpRegistryService],
+})
+class McpRegistryTestModule {}
 
 const buildModule = (imports: unknown[]) =>
   Test.createTestingModule({ imports: imports as never[] })
@@ -33,7 +40,7 @@ class FakeController {
   notATool() {}
 }
 
-@Module({ imports: [AgentMcpModule], controllers: [FakeController] })
+@Module({ imports: [McpRegistryTestModule], controllers: [FakeController] })
 class FakeApp {}
 
 describe('McpRegistryService', () => {
@@ -73,7 +80,10 @@ describe('McpRegistryService', () => {
       helper() {}
     }
 
-    @Module({ imports: [AgentMcpModule], controllers: [NoHttpController] })
+    @Module({
+      imports: [McpRegistryTestModule],
+      controllers: [NoHttpController],
+    })
     class NoHttpApp {}
 
     const moduleRef = await buildModule([NoHttpApp]).compile()
@@ -95,7 +105,7 @@ describe('McpRegistryService', () => {
       second() {}
     }
 
-    @Module({ imports: [AgentMcpModule], controllers: [DupController] })
+    @Module({ imports: [McpRegistryTestModule], controllers: [DupController] })
     class DupApp {}
 
     const moduleRef = await buildModule([DupApp]).compile()
