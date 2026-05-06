@@ -17,9 +17,6 @@ export class OnboardingVoterIssuesController {
   ): Promise<VoterIssuesResponse> {
     const issues = await this.elections.getVoterIssues({
       districtId: query.districtId,
-      ballotReadyPositionId: query.ballotReadyPositionId,
-      state: query.state,
-      city: query.city,
     })
     return { issues: issues ?? [] }
   }

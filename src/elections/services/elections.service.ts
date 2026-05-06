@@ -178,20 +178,12 @@ export class ElectionsService {
   }
 
   async getVoterIssues(params: {
-    districtId?: string
-    ballotReadyPositionId?: string
-    state?: string
-    city?: string
+    districtId: string
   }): Promise<VoterIssue[] | null> {
-    return this.electionApiGet<
-      VoterIssue[],
-      {
-        districtId?: string
-        ballotReadyPositionId?: string
-        state?: string
-        city?: string
-      }
-    >('voter-issues', params)
+    return this.electionApiGet<VoterIssue[], { districtId: string }>(
+      'voter-issues',
+      params,
+    )
   }
 
   async getDistrictId(
