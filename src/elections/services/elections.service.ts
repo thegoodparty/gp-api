@@ -20,6 +20,7 @@ import {
   ProjectedTurnout,
   RaceTargetDetailsResult,
   RaceTargetMetrics,
+  VoterIssue,
 } from '../types/elections.types'
 
 @Injectable()
@@ -174,6 +175,15 @@ export class ElectionsService {
 
   async getDistrict(id: string): Promise<District | null> {
     return this.electionApiGet<District, object>(`districts/${id}`, {})
+  }
+
+  async getVoterIssues(params: {
+    districtId: string
+  }): Promise<VoterIssue[] | null> {
+    return this.electionApiGet<VoterIssue[], { districtId: string }>(
+      'voter-issues',
+      params,
+    )
   }
 
   async getDistrictId(

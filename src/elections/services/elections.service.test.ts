@@ -407,4 +407,29 @@ describe('ElectionsService', () => {
       expect(service.cleanDistrictName('## ##')).toBe('## ##')
     })
   })
+
+  describe('getVoterIssues', () => {
+    it('returns the issues array from the API and forwards districtId', async () => {
+      const issues = [
+        { label: 'Education', score: 88, priority: 'high' as const },
+      ]
+      mockHttpGet.mockReturnValue(of({ data: issues, status: 200 }))
+
+      const result = await service.getVoterIssues({ districtId: 'd-1' })
+
+      expect(result).toEqual(issues)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('voter-issues'),
+        expect.objectContaining({ params: { districtId: 'd-1' } }),
+      )
+    })
+
+    it('returns null when the API returns null', async () => {
+      mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
+
+      const result = await service.getVoterIssues({ districtId: 'd-1' })
+
+      expect(result).toBeNull()
+    })
+  })
 })
