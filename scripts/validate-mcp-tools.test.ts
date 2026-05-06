@@ -3,20 +3,35 @@
 import { describe, expect, it } from 'vitest'
 import { Test } from '@nestjs/testing'
 import { Body, Controller, Get, Module } from '@nestjs/common'
-import { DiscoveryModule } from '@nestjs/core'
+import { DiscoveryModule, HttpAdapterHost } from '@nestjs/core'
+import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { McpTool } from '../src/agentMcp/decorators/McpTool.decorator'
 import { ResponseSchema } from '../src/shared/decorators/ResponseSchema.decorator'
-import { McpRegistryService } from '../src/agentMcp/services/mcpRegistry.service'
+import { McpServerService } from '../src/agentMcp/services/mcpServer.service'
+import { createMockLogger } from '../src/shared/test-utils/mockLogger.util'
 import { findMissingSchemas } from './validate-mcp-tools'
 
-@Module({
-  imports: [DiscoveryModule],
-  providers: [McpRegistryService],
-  exports: [McpRegistryService],
-})
-class McpRegistryTestModule {}
+const fakeHost = {
+  httpAdapter: { getInstance: () => ({ inject: async () => undefined }) },
+} as unknown as HttpAdapterHost
+
+const buildAppModule = (controllers: unknown[]) => {
+  @Module({
+    imports: [DiscoveryModule],
+    controllers: controllers as never[],
+    providers: [
+      McpServerService,
+      { provide: HttpAdapterHost, useValue: fakeHost },
+      { provide: PinoLogger, useValue: createMockLogger() },
+    ],
+    exports: [McpServerService],
+  })
+  class TestApp {}
+
+  return Test.createTestingModule({ imports: [TestApp] })
+}
 
 const Out = z.object({ ok: z.boolean() })
 const In = z.object({ x: z.string() })
@@ -54,18 +69,13 @@ class BadController {
 
 describe('validate-mcp-tools logic', () => {
   it('flags handlers missing @ResponseSchema and ones whose declared inputs lack a Zod DTO', async () => {
-    @Module({
-      imports: [McpRegistryTestModule],
-      controllers: [GoodController, BadController],
-    })
-    class TestApp {}
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [TestApp],
-    }).compile()
+    const moduleRef = await buildAppModule([
+      GoodController,
+      BadController,
+    ]).compile()
     await moduleRef.init()
-    const registry = moduleRef.get(McpRegistryService)
-    const result = findMissingSchemas(registry.getAll())
+    const tools = moduleRef.get(McpServerService).getTools()
+    const result = findMissingSchemas(tools)
 
     const noOutput = result.find((r) => r.tool.handlerName === 'noOutput')
     expect(noOutput).toBeDefined()
@@ -87,15 +97,10 @@ describe('validate-mcp-tools logic', () => {
   })
 
   it('does not flag a handler with no inputs at all and a valid @ResponseSchema', async () => {
-    @Module({ imports: [McpRegistryTestModule], controllers: [GoodController] })
-    class TestApp {}
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [TestApp],
-    }).compile()
+    const moduleRef = await buildAppModule([GoodController]).compile()
     await moduleRef.init()
-    const registry = moduleRef.get(McpRegistryService)
-    const result = findMissingSchemas(registry.getAll())
+    const tools = moduleRef.get(McpServerService).getTools()
+    const result = findMissingSchemas(tools)
     expect(result.find((r) => r.tool.handlerName === 'one')).toBeUndefined()
     expect(result.find((r) => r.tool.handlerName === 'two')).toBeUndefined()
   })

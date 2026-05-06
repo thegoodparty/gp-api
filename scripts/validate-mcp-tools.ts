@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from '../src/app.module'
-import { McpRegistryService } from '../src/agentMcp/services/mcpRegistry.service'
+import { McpServerService } from '../src/agentMcp/services/mcpServer.service'
 import { RegisteredMcpTool } from '../src/agentMcp/agentMcp.types'
 
 export type MissingEntry = {
@@ -52,8 +52,8 @@ export const runValidator = async () => {
   })
   await app.init()
 
-  const registry = app.get(McpRegistryService)
-  const tools = registry.getAll()
+  const mcp = app.get(McpServerService)
+  const tools = mcp.getTools()
   const missing = findMissingSchemas(tools)
 
   await app.close()

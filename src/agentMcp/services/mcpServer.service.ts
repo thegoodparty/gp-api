@@ -1,20 +1,35 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
 // zod-to-json-schema returns a JSONSchema-shaped object that the MCP SDK accepts as
 // Tool['inputSchema'], but its return type is broader than the SDK's tighter declaration.
 // The fastify adapter is loosely typed via HttpAdapterHost, so member access on the
-// underlying instance triggers unsafe-* lints. The casts here are deliberate adapters
-// to known runtime shapes (fastify's inject API, MCP SDK's Tool inputSchema). Behavior
-// is covered by mcpServer.service.test.ts.
-import { Injectable, Logger } from '@nestjs/common'
-import { HttpAdapterHost } from '@nestjs/core'
+// underlying instance triggers unsafe-* lints. NestJS DiscoveryService surfaces controller
+// wrappers with `instance` and `metatype` typed as `any`, and the Reflect API by definition
+// returns `any`. The casts here are deliberate adapters to known runtime shapes (fastify's
+// inject API, MCP SDK's Tool inputSchema, NestJS metadata layer). Behavior is covered by
+// mcpServer.service.test.ts.
+import { Injectable, RequestMethod } from '@nestjs/common'
+import {
+  DiscoveryService,
+  HttpAdapterHost,
+  MetadataScanner,
+  Reflector,
+} from '@nestjs/core'
+import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants'
+import { PinoLogger } from 'nestjs-pino'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js'
 import { zodToJsonSchema } from 'zod-to-json-schema'
-import { McpRegistryService } from './mcpRegistry.service'
+import { MCP_TOOL_KEY, McpToolMetadata } from '../decorators/McpTool.decorator'
+import {
+  reflectInputDeclarations,
+  reflectOutputSchema,
+} from '../util/schemaReflect.util'
+import { deriveToolName } from '../util/toolName.util'
 import { RegisteredMcpTool } from '../agentMcp.types'
 import { buildCombinedInputSchema } from '../util/inputSchema.util'
 
@@ -35,26 +50,54 @@ type FastifyAdapter = {
   }
 }
 
+const HTTP_METHOD_NAME: Record<number, string> = {
+  [RequestMethod.GET]: 'GET',
+  [RequestMethod.POST]: 'POST',
+  [RequestMethod.PUT]: 'PUT',
+  [RequestMethod.DELETE]: 'DELETE',
+  [RequestMethod.PATCH]: 'PATCH',
+  [RequestMethod.OPTIONS]: 'OPTIONS',
+  [RequestMethod.HEAD]: 'HEAD',
+  [RequestMethod.ALL]: 'ALL',
+}
+
+const joinPath = (controllerPath: string, methodPath: string): string => {
+  const c = controllerPath.startsWith('/')
+    ? controllerPath
+    : `/${controllerPath}`
+  const m = methodPath.startsWith('/')
+    ? methodPath
+    : methodPath
+      ? `/${methodPath}`
+      : ''
+  return `${c}${m}`.replace(/\/+/g, '/')
+}
+
 @Injectable()
 export class McpServerService {
-  private readonly logger = new Logger(McpServerService.name)
   private readonly server: Server
 
   constructor(
-    private readonly registry: McpRegistryService,
+    private readonly discovery: DiscoveryService,
+    private readonly metadataScanner: MetadataScanner,
+    private readonly reflector: Reflector,
     private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly logger: PinoLogger,
   ) {
+    this.logger.setContext(McpServerService.name)
+
     this.server = new Server(
       { name: 'gp-api', version: '1.0.0' },
       { capabilities: { tools: {} } },
     )
 
     this.server.setRequestHandler(ListToolsRequestSchema, () => ({
-      tools: this.registry.getAll().map((t) => this.toMcpTool(t)),
+      tools: this.gatherTools().map((t) => this.toMcpTool(t)),
     }))
 
     this.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
-      const tool = this.registry.findByToolName(req.params.name)
+      const tools = this.gatherTools()
+      const tool = tools.find((t) => t.toolName === req.params.name)
       if (!tool) {
         return {
           isError: true,
@@ -97,6 +140,74 @@ export class McpServerService {
 
   getServer(): Server {
     return this.server
+  }
+
+  getTools(): RegisteredMcpTool[] {
+    return this.gatherTools()
+  }
+
+  private gatherTools(): RegisteredMcpTool[] {
+    const controllers = this.discovery.getControllers()
+    const collected: RegisteredMcpTool[] = []
+
+    for (const wrapper of controllers) {
+      const { instance, metatype } = wrapper
+      if (!instance || !metatype) continue
+
+      const controllerPath: string =
+        Reflect.getMetadata(PATH_METADATA, metatype) ?? ''
+
+      const proto = Object.getPrototypeOf(instance)
+      const methodNames = this.metadataScanner.getAllMethodNames(proto)
+
+      for (const methodName of methodNames) {
+        const handler = proto[methodName]
+        const meta = this.reflector.get<McpToolMetadata>(MCP_TOOL_KEY, handler)
+        if (!meta) continue
+
+        const httpMethodNum: number | undefined = Reflect.getMetadata(
+          METHOD_METADATA,
+          handler,
+        )
+        const methodPath: string =
+          Reflect.getMetadata(PATH_METADATA, handler) ?? ''
+
+        if (httpMethodNum === undefined) {
+          throw new Error(
+            `@McpTool applied to ${metatype.name}.${methodName}, which has no HTTP method decorator. ` +
+              `@McpTool can only be used on controller route handlers (@Get/@Post/@Put/@Patch/@Delete).`,
+          )
+        }
+
+        const method = HTTP_METHOD_NAME[httpMethodNum] ?? 'UNKNOWN'
+        const path = joinPath(controllerPath, methodPath)
+        const toolName = deriveToolName(method, path)
+
+        collected.push({
+          toolName,
+          description: meta.description,
+          method,
+          path,
+          inputDeclarations: reflectInputDeclarations(proto, methodName, path),
+          outputSchema: reflectOutputSchema(handler),
+          controllerClassName: metatype.name,
+          handlerName: methodName,
+        })
+      }
+    }
+
+    const byName = new Map<string, RegisteredMcpTool>()
+    for (const t of collected) {
+      if (byName.has(t.toolName)) {
+        const existing = byName.get(t.toolName)!
+        throw new Error(
+          `Duplicate MCP tool name "${t.toolName}" — registered by ${existing.controllerClassName}.${existing.handlerName} and ${t.controllerClassName}.${t.handlerName}`,
+        )
+      }
+      byName.set(t.toolName, t)
+    }
+
+    return collected
   }
 
   private toMcpTool(t: RegisteredMcpTool): Tool {
