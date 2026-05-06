@@ -1,3 +1,4 @@
+import { RaceListItem } from '@goodparty_org/contracts'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import {
   ChatCompletionNamedToolChoice,
@@ -14,15 +15,16 @@ import {
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
 import { RacesByZipSchema } from '../schemas/RacesByZip.schema'
-import { RaceNode, RacesByIdNode } from '../types/ballotReady.types'
+import { RacesByIdNode } from '../types/ballotReady.types'
 import { GeoData } from '../types/elections.types'
 import {
   censusRowToGeoData,
   extractCityFromGeoData,
 } from '../util/geoData.util'
-import { parseRaces } from '../util/parseRaces.util'
+import { expandLevelToDisplayLevels } from '../util/levelExpansion.util'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
+import { ElectionsService } from './elections.service'
 import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
@@ -31,6 +33,7 @@ export class RacesService {
     private readonly censusEntities: CensusEntitiesService,
     private readonly ballotReadyService: BallotReadyService,
     private readonly ai: AiService,
+    private readonly elections: ElectionsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(RacesService.name)
@@ -52,103 +55,21 @@ export class RacesService {
     zipcode,
     level,
     electionDate,
-  }: RacesByZipSchema): Promise<RaceNode[]> {
-    try {
-      const existingPositions: Set<string> = new Set()
-      const elections: RaceNode[] = []
-      const primaryElectionDates: Record<
-        string,
-        {
-          electionDay: string
-          primaryElectionId: string
-        }
-      > = {}
-      let hasNextPage = true
-      let iterationCount = 0
-      const MAX_ITERATIONS = 50 // Safety limit to prevent infinite loops
-      const TIMEOUT_MS = 15 * 1000 // 15 second timeout
-      const startTime = Date.now()
-
-      let nextRacesPromise = this.ballotReadyService.fetchRacesByZipcode(
-        zipcode,
-        level,
-        electionDate,
-      )
-
-      while (hasNextPage && iterationCount < MAX_ITERATIONS) {
-        // Check timeout
-        if (Date.now() - startTime > TIMEOUT_MS) {
-          this.logger.warn(
-            `Timeout reached (${TIMEOUT_MS}ms) for zipcode ${zipcode}. Returning ${elections.length} elections loaded so far.`,
-          )
-          break
-        }
-
-        iterationCount++
-        this.logger.debug(
-          `Iteration ${iterationCount}: hasNextPage=${hasNextPage}, elections=${elections.length}`,
-        )
-
-        // Wait for the API response
-        const queryResponse = await nextRacesPromise
-        if (!queryResponse) {
-          throw new InternalServerErrorException(
-            'Could not fetch data from BallotReady',
-          )
-        }
-        const races = queryResponse.races
-        if (races?.edges) {
-          hasNextPage = races.pageInfo.hasNextPage
-          const startCursor = races.pageInfo.endCursor ?? null
-
-          this.logger.debug(
-            {
-              hasNextPage,
-              endCursor: startCursor,
-              edgesCount: races.edges.length,
-              totalElectionsSoFar: elections.length,
-            },
-            `Iteration ${iterationCount}: pageInfo`,
-          )
-
-          // Start the next API request while parsing
-          nextRacesPromise = hasNextPage
-            ? this.ballotReadyService.fetchRacesByZipcode(
-                zipcode,
-                level,
-                electionDate,
-                startCursor,
-              )
-            : Promise.resolve(null)
-
-          parseRaces(races, existingPositions, elections, primaryElectionDates)
-        } else {
-          hasNextPage = false
-        }
-      }
-
-      if (iterationCount >= MAX_ITERATIONS) {
-        this.logger.warn(
-          `Reached maximum iteration limit (${MAX_ITERATIONS}) for zipcode ${zipcode}. This may indicate a very large dataset or potential infinite loop.`,
-        )
-      }
-
-      try {
-        await this.attachCitiesToRaces(elections)
-      } catch (e) {
-        this.logger.error({ e }, 'failed to attach cities to races')
-      }
-
-      const totalTime = Date.now() - startTime
-      this.logger.debug(
-        `Completed: ${iterationCount} iterations, ${elections.length} elections in ${totalTime}ms`,
-      )
-
-      return elections
-    } catch (e) {
-      this.logger.error({ e }, 'error at getRacesByZip')
-      throw new InternalServerErrorException('Error getting races by zipcode')
-    }
+  }: RacesByZipSchema): Promise<RaceListItem[]> {
+    const today = new Date().toISOString().slice(0, 10)
+    const electionDateTo =
+      electionDate ??
+      (() => {
+        const d = new Date()
+        d.setFullYear(d.getFullYear() + 2)
+        return d.toISOString().slice(0, 10)
+      })()
+    return this.elections.getZipToPositions({
+      zip: zipcode,
+      displayOfficeLevels: expandLevelToDisplayLevels(level),
+      electionDateFrom: today,
+      electionDateTo,
+    })
   }
 
   private normalizeGeoId(geoId?: string | null): string | null {
@@ -156,46 +77,6 @@ export class RacesService {
     const parsed = parseInt(geoId, 10)
     if (Number.isNaN(parsed)) return null
     return parsed.toString()
-  }
-
-  private raceCensusKey(
-    race: RaceNode,
-  ): { key: string; mtfcc: string; geoId: string } | null {
-    const mtfcc = race?.position?.mtfcc
-    const geoId = this.normalizeGeoId(race?.position?.geoId)
-    if (!mtfcc || !geoId) return null
-    return { key: `${mtfcc}|${geoId}`, mtfcc, geoId }
-  }
-
-  private async attachCitiesToRaces(elections: RaceNode[]): Promise<void> {
-    const lookups = new Map<string, { mtfcc: string; geoId: string }>()
-    for (const race of elections) {
-      const pair = this.raceCensusKey(race)
-      if (pair) {
-        lookups.set(pair.key, { mtfcc: pair.mtfcc, geoId: pair.geoId })
-      }
-    }
-    if (lookups.size === 0) return
-
-    const censusRows = await this.censusEntities.findMany({
-      where: {
-        OR: Array.from(lookups.values()),
-      },
-    })
-
-    const cityByKey = new Map<string, string>()
-    for (const row of censusRows) {
-      const key = `${row.mtfcc}|${row.geoId}`
-      if (cityByKey.has(key)) continue
-      const city = extractCityFromGeoData(censusRowToGeoData(row))
-      if (city) cityByKey.set(key, city)
-    }
-
-    for (const race of elections) {
-      const pair = this.raceCensusKey(race)
-      const city = pair && cityByKey.get(pair.key)
-      if (city) race.city = city
-    }
   }
 
   private getRaceLevel(level: string) {
