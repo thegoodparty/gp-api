@@ -203,6 +203,21 @@ describe('OutreachNotificationService', () => {
 
       expect(mockSlackMessage).toHaveBeenCalledTimes(1)
     })
+
+    it('still increments the counter when Slack message fails', async () => {
+      mockSlackMessage.mockRejectedValueOnce(new Error('slack 5xx'))
+
+      await expect(
+        service.notifySuccess({
+          user: mockUser,
+          campaign: baseCampaign,
+          outreach: baseOutreach,
+        }),
+      ).resolves.toBeUndefined()
+
+      expect(mockSlackMessage).toHaveBeenCalledTimes(1)
+      expect(mockCampaignsUpdate).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('notifyFailure', () => {

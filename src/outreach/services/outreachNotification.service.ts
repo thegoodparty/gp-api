@@ -55,7 +55,6 @@ interface NotifySuccessParams {
   campaign: Campaign
   outreach: OutreachWithVoterFileFilter
   audienceRequest?: string
-  campaignPlanDueDate?: string
 }
 
 interface NotifyFailureParams {
@@ -87,7 +86,6 @@ export class OutreachNotificationService {
     campaign,
     outreach,
     audienceRequest,
-    campaignPlanDueDate,
   }: NotifySuccessParams): Promise<void> {
     if (!shouldNotifyCAS(outreach.outreachType)) return
 
@@ -123,26 +121,32 @@ export class OutreachNotificationService {
       ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId)
       : ''
 
-    await this.slack.message(
-      buildSlackBlocks({
-        name: `${(user.firstName || '').trim()} ${(user.lastName || '').trim()}`,
-        email: user.email,
-        ...(user.phone ? { phone: user.phone } : {}),
-        assignedPa,
-        crmCompanyId,
-        voterFileUrl,
-        type: outreach.outreachType,
-        date: outreach.date ?? undefined,
-        script,
-        ...(outreach.imageUrl ? { imageUrl: outreach.imageUrl } : {}),
-        message: outreach.message ? sanitizeHtml(outreach.message) : '',
-        formattedAudience: this.formatAudienceFiltersForSlack(audience),
-        audienceRequest,
-        peerlyJobUrl,
-        campaignPlanDueDate,
-      }),
-      TARGET_CHANNEL,
-    )
+    try {
+      await this.slack.message(
+        buildSlackBlocks({
+          name: `${(user.firstName || '').trim()} ${(user.lastName || '').trim()}`,
+          email: user.email,
+          ...(user.phone ? { phone: user.phone } : {}),
+          assignedPa,
+          crmCompanyId,
+          voterFileUrl,
+          type: outreach.outreachType,
+          date: outreach.date ?? undefined,
+          script,
+          ...(outreach.imageUrl ? { imageUrl: outreach.imageUrl } : {}),
+          message: outreach.message ? sanitizeHtml(outreach.message) : '',
+          formattedAudience: this.formatAudienceFiltersForSlack(audience),
+          audienceRequest,
+          peerlyJobUrl,
+        }),
+        TARGET_CHANNEL,
+      )
+    } catch (err) {
+      this.logger.error(
+        { err, outreachId: outreach.id, campaignId: campaign.id },
+        'CAS success Slack message failed',
+      )
+    }
 
     try {
       await this.campaignsService.update({
