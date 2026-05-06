@@ -124,6 +124,7 @@ export class BlockedStateInterceptor implements NestInterceptor {
 
         const blockedStateAttributes = {
           service: 'gp-api' as const,
+          // TODO(ENG-10165): NODE_ENV is 'production' in every deploy; for accurate observability env tagging use `process.env.OTEL_SERVICE_ENVIRONMENT`. See appEnvironment.util.ts.
           environment: process.env.NODE_ENV,
           userId,
           endpoint,

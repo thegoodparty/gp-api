@@ -90,6 +90,7 @@ export function buildMapFilters(
     },
   })
 
+  // TODO(ENG-10165): IS_PROD is true in every deploy (so this filter applies on dev/qa/preview too). Should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
   if (IS_PROD) {
     const isProdCondition = createJsonOrConditionString('Yes', [
       'hubSpotUpdates',
