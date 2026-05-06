@@ -1,13 +1,4 @@
-import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-
-const getVoterIssuesQuerySchema = z.object({
-  districtId: z.string().min(1),
-})
-
-export class GetVoterIssuesQueryDTO extends createZodDto(
-  getVoterIssuesQuerySchema,
-) {}
 
 export const voterIssueSchema = z.object({
   label: z.string(),
