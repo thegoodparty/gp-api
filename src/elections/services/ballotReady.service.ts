@@ -6,6 +6,7 @@ import { truncateZip } from 'src/shared/util/zipcodes.util'
 import zipcodes from 'zipcodes'
 import { ElectionLevels } from '../../shared/constants/governmentLevels'
 import {
+  RaceNode,
   RacesByIdNode,
   RacesByZipcode,
   RacesWithElectionDates,
@@ -112,6 +113,77 @@ export class BallotReadyService {
       return await this.graphQLClient.request(query)
     } catch (error) {
       this.logger.error({ error }, 'Error at fetchRaceById:')
+      return null
+    }
+  }
+
+  async fetchRaceByPositionAndDate(params: {
+    brPositionId: string
+    zip: string
+    electionDate: string
+  }): Promise<RaceNode | null> {
+    const { brPositionId, electionDate } = params
+    const query = gql`
+      query {
+        node(id: "${brPositionId}") {
+          ... on Position {
+            races(
+              filterBy: { electionDay: { eq: "${electionDate}" } }
+              first: 1
+            ) {
+              edges {
+                node {
+                  id
+                  isPrimary
+                  filingPeriods {
+                    startOn
+                    endOn
+                  }
+                  election {
+                    id
+                    electionDay
+                    name
+                    originalElectionDate
+                    state
+                    timezone
+                  }
+                  position {
+                    id
+                    appointed
+                    geoId
+                    mtfcc
+                    hasPrimary
+                    partisanType
+                    level
+                    name
+                    salary
+                    state
+                    subAreaName
+                    subAreaValue
+                    electionFrequencies {
+                      frequency
+                    }
+                    normalizedPosition {
+                      name
+                    }
+                    tier
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<{
+        node: {
+          races?: { edges: { node: RaceNode }[] }
+        } | null
+      }>(query)
+      return result?.node?.races?.edges?.[0]?.node ?? null
+    } catch (error) {
+      this.logger.error({ error }, 'Error at fetchRaceByPositionAndDate:')
       return null
     }
   }
