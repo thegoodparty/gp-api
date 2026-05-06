@@ -123,13 +123,16 @@ export class BallotReadyService {
     electionDate: string
   }): Promise<RaceNode | null> {
     const { brPositionId, electionDate } = params
+    const year = electionDate.slice(0, 4)
+    const rangeStart = `${year}-01-01`
+    const rangeEnd = `${year}-12-31`
     const query = gql`
       query {
         node(id: "${brPositionId}") {
           ... on Position {
             races(
-              filterBy: { electionDay: { eq: "${electionDate}" } }
-              first: 1
+              filterBy: { electionDay: { gte: "${rangeStart}", lte: "${rangeEnd}" } }
+              first: 50
             ) {
               edges {
                 node {
@@ -181,7 +184,27 @@ export class BallotReadyService {
           races?: { edges: { node: RaceNode }[] }
         } | null
       }>(query)
-      return result?.node?.races?.edges?.[0]?.node ?? null
+      const edges = result?.node?.races?.edges ?? []
+      const target = edges.find(
+        (e) => e.node.election.electionDay === electionDate,
+      )?.node
+      if (!target) {
+        return null
+      }
+      const primary = edges
+        .filter(
+          (e) =>
+            e.node.isPrimary && e.node.election.electionDay !== electionDate,
+        )
+        .map((e) => e.node)
+        .sort((a, b) =>
+          a.election.electionDay.localeCompare(b.election.electionDay),
+        )[0]
+      if (primary) {
+        target.election.primaryElectionDate = primary.election.electionDay
+        target.election.primaryElectionId = primary.election.id
+      }
+      return target
     } catch (error) {
       this.logger.error({ error }, 'Error at fetchRaceByPositionAndDate:')
       return null

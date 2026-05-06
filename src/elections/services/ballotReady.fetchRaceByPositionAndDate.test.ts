@@ -73,4 +73,64 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
 
     expect(result).toBeNull()
   })
+
+  it('attaches primaryElectionDate and primaryElectionId from a sibling primary race', async () => {
+    const generalNode = {
+      id: 'race-general',
+      isPrimary: false,
+      filingPeriods: [{ startOn: '2024-01-01', endOn: '2024-02-01' }],
+      election: {
+        id: 'election-general',
+        electionDay: '2024-11-05',
+        name: 'General',
+        originalElectionDate: '2024-11-05',
+        state: 'CA',
+        timezone: 'America/Los_Angeles',
+      },
+      position: {
+        id: 'br-pos-1',
+        appointed: false,
+        geoId: 'g-1',
+        mtfcc: 'G4110',
+        hasPrimary: true,
+        partisanType: 'nonpartisan',
+        level: 'CITY',
+        name: 'Mayor',
+        salary: null,
+        state: 'CA',
+        subAreaName: null,
+        subAreaValue: null,
+        electionFrequencies: [{ frequency: [4] }],
+        normalizedPosition: { name: 'Mayor' },
+        tier: 3,
+      },
+    }
+    const primaryNode = {
+      ...generalNode,
+      id: 'race-primary',
+      isPrimary: true,
+      election: {
+        ...generalNode.election,
+        id: 'election-primary',
+        electionDay: '2024-06-04',
+        name: 'Primary',
+        originalElectionDate: '2024-06-04',
+      },
+    }
+    mockRequest.mockResolvedValue({
+      node: {
+        races: { edges: [{ node: generalNode }, { node: primaryNode }] },
+      },
+    })
+
+    const result = await service.fetchRaceByPositionAndDate({
+      brPositionId: 'br-pos-1',
+      zip: '90210',
+      electionDate: '2024-11-05',
+    })
+
+    expect(result?.id).toBe('race-general')
+    expect(result?.election.primaryElectionDate).toBe('2024-06-04')
+    expect(result?.election.primaryElectionId).toBe('election-primary')
+  })
 })
