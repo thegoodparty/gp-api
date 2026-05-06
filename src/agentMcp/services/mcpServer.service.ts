@@ -75,8 +75,6 @@ const joinPath = (controllerPath: string, methodPath: string): string => {
 
 @Injectable()
 export class McpServerService {
-  private readonly server: Server
-
   constructor(
     private readonly discovery: DiscoveryService,
     private readonly metadataScanner: MetadataScanner,
@@ -85,17 +83,19 @@ export class McpServerService {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(McpServerService.name)
+  }
 
-    this.server = new Server(
+  createServer(): Server {
+    const server = new Server(
       { name: 'gp-api', version: '1.0.0' },
       { capabilities: { tools: {} } },
     )
 
-    this.server.setRequestHandler(ListToolsRequestSchema, () => ({
+    server.setRequestHandler(ListToolsRequestSchema, () => ({
       tools: this.gatherTools().map((t) => this.toMcpTool(t)),
     }))
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+    server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
       const tools = this.gatherTools()
       const tool = tools.find((t) => t.toolName === req.params.name)
       if (!tool) {
@@ -131,15 +131,24 @@ export class McpServerService {
         payload: args.body,
       })
 
+      if (response.statusCode >= 400) {
+        this.logger.warn(
+          {
+            toolName: tool.toolName,
+            method: tool.method,
+            statusCode: response.statusCode,
+          },
+          'MCP tool invocation returned non-2xx',
+        )
+      }
+
       return {
         content: [{ type: 'text', text: response.body }],
         isError: response.statusCode >= 400,
       }
     })
-  }
 
-  getServer(): Server {
-    return this.server
+    return server
   }
 
   getTools(): RegisteredMcpTool[] {
@@ -242,6 +251,8 @@ export class McpServerService {
         `Invalid @McpTool configuration:\n  ${violations.join('\n  ')}`,
       )
     }
+
+    this.logger.debug({ toolCount: collected.length }, 'gathered MCP tools')
 
     return collected
   }

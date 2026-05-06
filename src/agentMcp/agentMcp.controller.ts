@@ -11,11 +11,12 @@ export class AgentMcpController {
 
   @All()
   async handle(@Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    const server = this.mcp.createServer()
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     })
-    await this.mcp.getServer().connect(transport)
+    await server.connect(transport)
     await transport.handleRequest(req.raw, reply.raw, req.body)
   }
 }

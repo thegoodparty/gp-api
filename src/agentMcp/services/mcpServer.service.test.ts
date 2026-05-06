@@ -256,7 +256,7 @@ describe('McpServerService MCP request handlers', () => {
     await moduleRef.init()
 
     const svc = moduleRef.get(McpServerService)
-    const server = svc.getServer() as unknown as {
+    const server = svc.createServer() as unknown as {
       _requestHandlers: Map<
         string,
         (req: unknown, extra?: unknown) => Promise<unknown>
@@ -301,7 +301,7 @@ describe('McpServerService MCP request handlers', () => {
     await moduleRef.init()
 
     const svc = moduleRef.get(McpServerService)
-    const server = svc.getServer() as unknown as {
+    const server = svc.createServer() as unknown as {
       _requestHandlers: Map<
         string,
         (req: unknown, extra?: unknown) => Promise<unknown>
@@ -342,7 +342,7 @@ describe('McpServerService MCP request handlers', () => {
     await moduleRef.init()
 
     const svc = moduleRef.get(McpServerService)
-    const server = svc.getServer() as unknown as {
+    const server = svc.createServer() as unknown as {
       _requestHandlers: Map<
         string,
         (req: unknown, extra?: unknown) => Promise<unknown>
@@ -366,7 +366,7 @@ describe('McpServerService MCP request handlers', () => {
     await moduleRef.init()
 
     const svc = moduleRef.get(McpServerService)
-    const server = svc.getServer() as unknown as {
+    const server = svc.createServer() as unknown as {
       _requestHandlers: Map<
         string,
         (req: unknown, extra?: unknown) => Promise<unknown>
@@ -388,7 +388,7 @@ describe('McpServerService MCP request handlers', () => {
     await moduleRef.init()
 
     const svc = moduleRef.get(McpServerService)
-    const server = svc.getServer() as unknown as {
+    const server = svc.createServer() as unknown as {
       _requestHandlers: Map<
         string,
         (req: unknown, extra?: unknown) => Promise<unknown>
