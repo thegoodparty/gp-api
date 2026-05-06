@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiService } from '../../ai/ai.service'
+import type { RaceNode } from '../types/ballotReady.types'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
 import { ElectionsService } from './elections.service'
@@ -128,10 +129,8 @@ describe('RacesService', () => {
         position: { id: 'p', name: 'Mayor' },
         election: { electionDay: '2026-11-03' },
       }
-      // GraphQL codegen types are loose — RaceNode shape matches at runtime
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ballotReadyService.fetchRaceByPositionAndDate.mockResolvedValue(
-        fakeNode as any,
+        fakeNode as unknown as RaceNode,
       )
       const result = await service.getRaceByPositionAndDate({
         brPositionId: 'p',

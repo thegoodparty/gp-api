@@ -1,4 +1,8 @@
-import { RaceFull, RaceListItem } from '@goodparty_org/contracts'
+import {
+  RaceFull,
+  RaceFullSchema,
+  RaceListItem,
+} from '@goodparty_org/contracts'
 import {
   Injectable,
   InternalServerErrorException,
@@ -88,7 +92,7 @@ export class RacesService {
         `No race found for position ${params.brPositionId}, zip ${params.zip}, date ${params.electionDate}`,
       )
     }
-    return node as unknown as RaceFull
+    return RaceFullSchema.parse(node)
   }
 
   private normalizeGeoId(geoId?: string | null): string | null {

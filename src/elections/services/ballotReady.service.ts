@@ -198,11 +198,15 @@ export class BallotReadyService {
         )
         .map((e) => e.node)
         .sort((a, b) =>
-          a.election.electionDay.localeCompare(b.election.electionDay),
+          String(a.election.electionDay).localeCompare(
+            String(b.election.electionDay),
+          ),
         )[0]
       if (primary) {
-        target.election.primaryElectionDate = primary.election.electionDay
-        target.election.primaryElectionId = primary.election.id
+        target.election.primaryElectionDate = String(
+          primary.election.electionDay,
+        )
+        target.election.primaryElectionId = String(primary.election.id)
       }
       return target
     } catch (error) {
