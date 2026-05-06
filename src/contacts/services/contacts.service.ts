@@ -274,45 +274,40 @@ export class ContactsService {
     )
   }
 
-  async getDistrictStatsByDistrictOrPosition({
-    districtId,
-    ballotReadyPositionId,
-  }: {
-    districtId?: string
-    ballotReadyPositionId?: string
-  }): Promise<StatsResponse> {
-    let resolvedDistrictId = districtId
-
-    if (!resolvedDistrictId && ballotReadyPositionId) {
-      const position = await this.elections.getPositionByBallotReadyId(
-        ballotReadyPositionId,
-        { includeDistrict: true },
-      )
-      resolvedDistrictId = position?.district?.id ?? undefined
-    }
-
-    if (!resolvedDistrictId) {
-      throw new BadRequestException(
-        'Could not resolve a district from the provided districtId or ballotReadyPositionId',
-      )
-    }
-
-    return this.fetchStatsByDistrictId(resolvedDistrictId)
+  async resolveDistrictIdFromPosition(
+    ballotReadyPositionId: string,
+  ): Promise<string | undefined> {
+    const position = await this.elections.getPositionByBallotReadyId(
+      ballotReadyPositionId,
+      { includeDistrict: true },
+    )
+    return position?.district?.id ?? undefined
   }
 
-  private async fetchStatsByDistrictId(
-    districtId: string,
-  ): Promise<StatsResponse> {
+  async fetchStatsByDistrictId(districtId: string): Promise<StatsResponse> {
     const token = this.getValidS2SToken()
 
-    const response = await lastValueFrom(
-      this.httpService.get<StatsResponse>(`${PEOPLE_API_URL}/v1/people/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { districtId },
-      }),
-    )
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get<StatsResponse>(
+          `${PEOPLE_API_URL}/v1/people/stats`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { districtId },
+          },
+        ),
+      )
 
-    return response.data
+      return response.data
+    } catch (error) {
+      this.logger.error(
+        { error },
+        'Failed to fetch district stats from people API',
+      )
+      throw new BadGatewayException(
+        'Failed to fetch district stats from people API',
+      )
+    }
   }
 
   private getValidS2SToken(): string {

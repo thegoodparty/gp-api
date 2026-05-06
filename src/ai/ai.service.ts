@@ -45,7 +45,7 @@ type GetChatToolCompletionArgs = {
   tool?: ChatCompletionTool // list of functions that could be called.
   toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
-  models?: string[] // override PARSED_AI_MODELS for this call (tried in order)
+  models?: string[]
 }
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
