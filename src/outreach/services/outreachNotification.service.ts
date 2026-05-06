@@ -160,8 +160,6 @@ export class OutreachNotificationService {
         'textCampaignCount increment failed',
       )
     }
-
-    this.crmCampaigns.trackCampaign(campaign.id)
   }
 
   async notifyFailure({
