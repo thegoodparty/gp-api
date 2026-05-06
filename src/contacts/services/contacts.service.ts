@@ -269,23 +269,45 @@ export class ContactsService {
   }
 
   async getDistrictStats(organization: Organization) {
-    const fetchStats = async (districtParams: { districtId: string }) => {
-      const token = this.getValidS2SToken()
+    return this.withOrgDistrictResolution(organization, ({ districtId }) =>
+      this.fetchStatsByDistrictId(districtId),
+    )
+  }
 
+  async resolveDistrictIdFromPosition(
+    ballotReadyPositionId: string,
+  ): Promise<string | undefined> {
+    const position = await this.elections.getPositionByBallotReadyId(
+      ballotReadyPositionId,
+      { includeDistrict: true },
+    )
+    return position?.district?.id ?? undefined
+  }
+
+  async fetchStatsByDistrictId(districtId: string): Promise<StatsResponse> {
+    const token = this.getValidS2SToken()
+
+    try {
       const response = await lastValueFrom(
         this.httpService.get<StatsResponse>(
           `${PEOPLE_API_URL}/v1/people/stats`,
           {
             headers: { Authorization: `Bearer ${token}` },
-            params: districtParams,
+            params: { districtId },
           },
         ),
       )
 
       return response.data
+    } catch (error) {
+      this.logger.error(
+        { error },
+        'Failed to fetch district stats from people API',
+      )
+      throw new BadGatewayException(
+        'Failed to fetch district stats from people API',
+      )
     }
-
-    return this.withOrgDistrictResolution(organization, fetchStats)
   }
 
   private getValidS2SToken(): string {
