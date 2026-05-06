@@ -52,7 +52,7 @@ export class McpServerService {
       tools: this.registry.getAll().map((t) => this.toMcpTool(t)),
     }))
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
       const tool = this.registry.findByToolName(req.params.name)
       if (!tool) {
         return {
@@ -72,10 +72,13 @@ export class McpServerService {
         .httpAdapter as unknown as FastifyAdapter
       const fastify = adapter.getInstance()
 
+      // Forward the originating HTTP Authorization header so the inner injected
+      // request re-runs through the global SessionGuard as the same user. The
+      // MCP SDK exposes the originating headers via `extra.requestInfo` since 1.x.
       const forwardHeaders: Record<string, string> = {}
-      const incomingAuth = (req as unknown as { _agentAuthHeader?: string })
-        ._agentAuthHeader
-      if (incomingAuth) forwardHeaders.authorization = incomingAuth
+      const rawAuth = extra?.requestInfo?.headers?.authorization
+      const authValue = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth
+      if (authValue) forwardHeaders.authorization = authValue
 
       const response = await fastify.inject({
         method: tool.method,

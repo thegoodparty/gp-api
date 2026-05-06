@@ -28,12 +28,15 @@ const fakeWriteTool: RegisteredMcpTool = {
   handlerName: 'write',
 }
 
+type InjectOpts = {
+  method: string
+  url: string
+  headers?: Record<string, string>
+  payload?: unknown
+}
+
 const buildModule = async (
-  inject: (opts: {
-    method: string
-    url: string
-    payload?: unknown
-  }) => Promise<{
+  inject: (opts: InjectOpts) => Promise<{
     statusCode: number
     body: string
     headers: Record<string, string>
@@ -70,7 +73,10 @@ describe('McpServerService', () => {
     }))
     const svc = moduleRef.get(McpServerService)
     const server = svc.getServer() as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
     }
     const listHandler = server._requestHandlers.get('tools/list')
     expect(listHandler).toBeDefined()
@@ -86,34 +92,70 @@ describe('McpServerService', () => {
     expect((post.inputSchema as { type: string }).type).toBe('object')
   })
 
-  it('routes call_tool through fastify.inject with method + path', async () => {
-    const calls: { method: string; url: string; payload?: unknown }[] = []
-    const inject = vi.fn(
-      async (opts: { method: string; url: string; payload?: unknown }) => {
-        calls.push(opts)
-        return {
-          statusCode: 200,
-          body: '{"ok":true}',
-          headers: { 'content-type': 'application/json' },
-        }
-      },
-    )
+  it('routes call_tool through fastify.inject with method + path and forwards Authorization', async () => {
+    const calls: InjectOpts[] = []
+    const inject = vi.fn(async (opts: InjectOpts) => {
+      calls.push(opts)
+      return {
+        statusCode: 200,
+        body: '{"ok":true}',
+        headers: { 'content-type': 'application/json' },
+      }
+    })
     const moduleRef = await buildModule(inject)
     const svc = moduleRef.get(McpServerService)
     const server = svc.getServer() as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
     }
     const callHandler = server._requestHandlers.get('tools/call')!
-    const result = (await callHandler({
-      method: 'tools/call',
-      params: { name: 'POST_v1_foo', arguments: { body: { value: 'x' } } },
-    })) as { isError: boolean; content: Array<{ text: string }> }
+    const result = (await callHandler(
+      {
+        method: 'tools/call',
+        params: { name: 'POST_v1_foo', arguments: { body: { value: 'x' } } },
+      },
+      {
+        requestInfo: {
+          headers: { authorization: 'Bearer test-jwt' },
+        },
+      },
+    )) as { isError: boolean; content: Array<{ text: string }> }
     expect(result.isError).toBe(false)
     expect(calls).toHaveLength(1)
     expect(calls[0].method).toBe('POST')
     expect(calls[0].url).toBe('/v1/foo')
     expect(calls[0].payload).toEqual({ value: 'x' })
+    expect(calls[0].headers?.authorization).toBe('Bearer test-jwt')
     expect(result.content[0].text).toBe('{"ok":true}')
+  })
+
+  it('still calls fastify.inject when no Authorization header is present', async () => {
+    const calls: InjectOpts[] = []
+    const inject = vi.fn(async (opts: InjectOpts) => {
+      calls.push(opts)
+      return {
+        statusCode: 401,
+        body: '{"error":"unauthorized"}',
+        headers: { 'content-type': 'application/json' },
+      }
+    })
+    const moduleRef = await buildModule(inject)
+    const svc = moduleRef.get(McpServerService)
+    const server = svc.getServer() as unknown as {
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
+    }
+    const callHandler = server._requestHandlers.get('tools/call')!
+    await callHandler({
+      method: 'tools/call',
+      params: { name: 'POST_v1_foo', arguments: { body: { value: 'x' } } },
+    })
+    expect(calls).toHaveLength(1)
+    expect(calls[0].headers?.authorization).toBeUndefined()
   })
 
   it('returns isError when the upstream returns 4xx', async () => {
@@ -124,7 +166,10 @@ describe('McpServerService', () => {
     }))
     const svc = moduleRef.get(McpServerService)
     const server = svc.getServer() as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
     }
     const callHandler = server._requestHandlers.get('tools/call')!
     const result = (await callHandler({
@@ -142,7 +187,10 @@ describe('McpServerService', () => {
     }))
     const svc = moduleRef.get(McpServerService)
     const server = svc.getServer() as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
     }
     const callHandler = server._requestHandlers.get('tools/call')!
     const result = (await callHandler({
