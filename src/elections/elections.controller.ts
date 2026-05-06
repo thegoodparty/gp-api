@@ -1,8 +1,12 @@
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
-import { RaceListItemArraySchema } from '@goodparty_org/contracts'
+import {
+  RaceFullSchema,
+  RaceListItemArraySchema,
+} from '@goodparty_org/contracts'
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
+import { RaceByPositionSchema } from './schemas/RaceByPosition.schema'
 import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 import {
   GetDistrictNamesDTO,
@@ -30,6 +34,12 @@ export class ElectionsController {
       level,
       electionDate,
     })
+  }
+
+  @Get('race-by-position')
+  @ResponseSchema(RaceFullSchema)
+  async getRaceByPosition(@Query() dto: RaceByPositionSchema) {
+    return this.racesService.getRaceByPositionAndDate(dto)
   }
 
   @Get('districts/types')

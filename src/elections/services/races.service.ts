@@ -1,5 +1,9 @@
-import { RaceListItem } from '@goodparty_org/contracts'
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import { RaceFull, RaceListItem } from '@goodparty_org/contracts'
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
@@ -70,6 +74,21 @@ export class RacesService {
       electionDateFrom: today,
       electionDateTo,
     })
+  }
+
+  async getRaceByPositionAndDate(params: {
+    brPositionId: string
+    zip: string
+    electionDate: string
+  }): Promise<RaceFull> {
+    const node =
+      await this.ballotReadyService.fetchRaceByPositionAndDate(params)
+    if (!node) {
+      throw new NotFoundException(
+        `No race found for position ${params.brPositionId}, zip ${params.zip}, date ${params.electionDate}`,
+      )
+    }
+    return node as unknown as RaceFull
   }
 
   private normalizeGeoId(geoId?: string | null): string | null {
