@@ -25,8 +25,9 @@ import { OutreachPurchaseHandlerService } from './services/outreachPurchase.serv
     FilesModule,
     PaymentsModule,
     forwardRef(() => PeerlyModule),
-    // forwardRef is required by the file-level cycle Outreach → Voters → Peerly → Outreach
-    // (peerly.module.ts:8 imports OutreachModule). The Nest dependency graph itself is acyclic.
+    // Outreach → Voters → Peerly → Outreach is a 3-cycle in both the file-import
+    // graph and the Nest module DI graph. forwardRef defers resolution on this
+    // edge so Nest can complete bootstrap.
     forwardRef(() => VotersModule),
     GoogleModule,
     AiModule,
