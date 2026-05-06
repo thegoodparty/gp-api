@@ -27,11 +27,14 @@ export class ElectionsController {
   @Get('races-by-year')
   @ResponseSchema(RaceListItemArraySchema)
   async getRacesByZipcode(
-    @Query() { zipcode, level, electionDate }: RacesByZipSchema,
+    @Query()
+    { zipcode, level, name, officeType, electionDate }: RacesByZipSchema,
   ) {
     return await this.racesService.getRacesByZip({
       zipcode,
       level,
+      name,
+      officeType,
       electionDate,
     })
   }

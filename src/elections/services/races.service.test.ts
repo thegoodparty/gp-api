@@ -12,7 +12,7 @@ import { RacesService } from './races.service'
 
 describe('RacesService', () => {
   let service: RacesService
-  let electionsService: { getZipToPositions: ReturnType<typeof vi.fn> }
+  let electionsService: { searchPositions: ReturnType<typeof vi.fn> }
   let ballotReadyService: {
     fetchRaceById: ReturnType<typeof vi.fn>
     fetchRaceNormalizedPosition: ReturnType<typeof vi.fn>
@@ -22,7 +22,7 @@ describe('RacesService', () => {
 
   beforeEach(async () => {
     electionsService = {
-      getZipToPositions: vi.fn(),
+      searchPositions: vi.fn(),
     }
     ballotReadyService = {
       fetchRaceById: vi.fn(),
@@ -74,11 +74,11 @@ describe('RacesService', () => {
         city: 'Beverly Hills',
         district: null,
       }
-      electionsService.getZipToPositions.mockResolvedValue([sampleRow])
+      electionsService.searchPositions.mockResolvedValue([sampleRow])
 
       const result = await service.getRacesByZip({ zipcode: '90210' })
 
-      expect(electionsService.getZipToPositions).toHaveBeenCalledWith(
+      expect(electionsService.searchPositions).toHaveBeenCalledWith(
         expect.objectContaining({
           zip: '90210',
           displayOfficeLevels: undefined,
@@ -88,9 +88,9 @@ describe('RacesService', () => {
     })
 
     it('passes expanded displayOfficeLevels for level=Local', async () => {
-      electionsService.getZipToPositions.mockResolvedValue([])
+      electionsService.searchPositions.mockResolvedValue([])
       await service.getRacesByZip({ zipcode: '90210', level: 'Local' })
-      expect(electionsService.getZipToPositions).toHaveBeenCalledWith(
+      expect(electionsService.searchPositions).toHaveBeenCalledWith(
         expect.objectContaining({
           displayOfficeLevels: ['Local', 'Township', 'Village'],
         }),
@@ -98,15 +98,34 @@ describe('RacesService', () => {
     })
 
     it('uses electionDate as electionDateTo when provided', async () => {
-      electionsService.getZipToPositions.mockResolvedValue([])
+      electionsService.searchPositions.mockResolvedValue([])
       await service.getRacesByZip({
         zipcode: '90210',
         electionDate: '2027-06-30',
       })
-      expect(electionsService.getZipToPositions).toHaveBeenCalledWith(
+      expect(electionsService.searchPositions).toHaveBeenCalledWith(
         expect.objectContaining({
           electionDateTo: '2027-06-30',
         }),
+      )
+    })
+
+    it('passes name through to searchPositions', async () => {
+      electionsService.searchPositions.mockResolvedValue([])
+      await service.getRacesByZip({ zipcode: '90210', name: 'mayor' })
+      expect(electionsService.searchPositions).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'mayor' }),
+      )
+    })
+
+    it('passes officeType through to searchPositions', async () => {
+      electionsService.searchPositions.mockResolvedValue([])
+      await service.getRacesByZip({
+        zipcode: '90210',
+        officeType: ['Mayor'],
+      })
+      expect(electionsService.searchPositions).toHaveBeenCalledWith(
+        expect.objectContaining({ officeType: ['Mayor'] }),
       )
     })
   })
