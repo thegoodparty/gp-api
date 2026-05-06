@@ -132,7 +132,7 @@ export class OutreachNotificationService {
         crmCompanyId,
         voterFileUrl,
         type: outreach.outreachType,
-        date: outreach.date!,
+        date: outreach.date ?? undefined,
         script,
         ...(outreach.imageUrl ? { imageUrl: outreach.imageUrl } : {}),
         message: outreach.message ? sanitizeHtml(outreach.message) : '',

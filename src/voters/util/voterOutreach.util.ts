@@ -195,7 +195,7 @@ export function buildSlackBlocks({
                 },
                 {
                   type: SlackMessageType.TEXT,
-                  text: String(date),
+                  text: date ? String(date) : 'Not available',
                 },
               ],
             },
