@@ -1,4 +1,5 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { McpTool } from '@/agentMcp/decorators/McpTool.decorator'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
@@ -71,6 +72,13 @@ export class CampaignsController {
   }
 
   @Get('mine')
+  @ResponseSchema(CampaignWithLiveContextSchema)
+  @McpTool({
+    description:
+      "Read the calling user's active campaign, including organization and live status. " +
+      'Use this on startup to understand who the user is, what office they are running for, ' +
+      'and what state the campaign is in.',
+  })
   @UseCampaign({ include: { organization: true } })
   async findMine(
     @ReqCampaign()

@@ -1,0 +1,136 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
+// Test fixtures define decorated controller stubs whose method bodies don't matter.
+import { describe, expect, it } from 'vitest'
+import { Test } from '@nestjs/testing'
+import { Body, Controller, Get, Patch, Module } from '@nestjs/common'
+import { DiscoveryModule } from '@nestjs/core'
+import { z } from 'zod'
+import { createZodDto } from 'nestjs-zod'
+import { McpTool } from '../decorators/McpTool.decorator'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { McpRegistryService } from './mcpRegistry.service'
+
+@Module({
+  imports: [DiscoveryModule],
+  providers: [McpRegistryService],
+  exports: [McpRegistryService],
+})
+class McpRegistryTestModule {}
+
+const buildModule = (imports: unknown[]) =>
+  Test.createTestingModule({ imports: imports as never[] })
+
+const InSchema = z.object({ slogan: z.string() })
+class InDto extends createZodDto(InSchema) {}
+const OutSchema = z.object({ ok: z.boolean() })
+
+@Controller('campaigns')
+class FakeController {
+  @Get('mine')
+  @ResponseSchema(OutSchema)
+  @McpTool({ description: "Read the calling user's campaign." })
+  read() {}
+
+  @Patch('mine')
+  @McpTool({ description: "Update the calling user's campaign." })
+  @ResponseSchema(OutSchema)
+  update(@Body() _b: InDto) {}
+
+  @Get('untagged')
+  notATool() {}
+
+  @Get(':id')
+  @ResponseSchema(OutSchema)
+  @McpTool({ description: 'Read by id with no @Param decorator.' })
+  readById() {}
+}
+
+@Module({ imports: [McpRegistryTestModule], controllers: [FakeController] })
+class FakeApp {}
+
+describe('McpRegistryService', () => {
+  it('discovers @McpTool-decorated handlers and builds tool entries', async () => {
+    const moduleRef = await buildModule([FakeApp]).compile()
+    await moduleRef.init()
+
+    const registry = moduleRef.get(McpRegistryService)
+    const tools = registry.getAll()
+
+    expect(tools).toHaveLength(3)
+
+    const read = tools.find((t) => t.toolName === 'GET_campaigns_mine')!
+    expect(read).toBeDefined()
+    expect(read.description).toBe("Read the calling user's campaign.")
+    expect(read.outputSchema).toBe(OutSchema)
+    expect(read.inputDeclarations.body.declared).toBe(false)
+    expect(read.inputDeclarations.body.schema).toBeNull()
+    expect(read.inputDeclarations.query.declared).toBe(false)
+    expect(read.inputDeclarations.params.declared).toBe(false)
+
+    const update = tools.find((t) => t.toolName === 'PATCH_campaigns_mine')!
+    expect(update).toBeDefined()
+    expect(update.outputSchema).toBe(OutSchema)
+    expect(update.inputDeclarations.body.declared).toBe(true)
+    expect(update.inputDeclarations.body.schema).toBe(InSchema)
+    expect(update.inputDeclarations.params.declared).toBe(false)
+  })
+
+  it('marks params declared from path :placeholder even when @Param is missing', async () => {
+    const moduleRef = await buildModule([FakeApp]).compile()
+    await moduleRef.init()
+
+    const tools = moduleRef.get(McpRegistryService).getAll()
+    const readById = tools.find((t) => t.handlerName === 'readById')!
+    expect(readById).toBeDefined()
+    expect(readById.inputDeclarations.params.declared).toBe(true)
+    expect(readById.inputDeclarations.params.schema).toBeNull()
+  })
+
+  it('does not include handlers without @McpTool', async () => {
+    const moduleRef = await buildModule([FakeApp]).compile()
+    await moduleRef.init()
+
+    const tools = moduleRef.get(McpRegistryService).getAll()
+    expect(tools.find((t) => t.handlerName === 'notATool')).toBeUndefined()
+  })
+
+  it('throws when @McpTool is applied to a handler with no HTTP method decorator', async () => {
+    @Controller('campaigns')
+    class NoHttpController {
+      @McpTool({ description: 'helper, not a route' })
+      helper() {}
+    }
+
+    @Module({
+      imports: [McpRegistryTestModule],
+      controllers: [NoHttpController],
+    })
+    class NoHttpApp {}
+
+    const moduleRef = await buildModule([NoHttpApp]).compile()
+
+    await expect(moduleRef.init()).rejects.toThrow(
+      /has no HTTP method decorator/,
+    )
+  })
+
+  it('throws when two handlers map to the same tool name', async () => {
+    @Controller('campaigns')
+    class DupController {
+      @Get('mine')
+      @McpTool({ description: 'First handler.' })
+      first() {}
+
+      @Get('mine')
+      @McpTool({ description: 'Duplicate handler.' })
+      second() {}
+    }
+
+    @Module({ imports: [McpRegistryTestModule], controllers: [DupController] })
+    class DupApp {}
+
+    const moduleRef = await buildModule([DupApp]).compile()
+
+    await expect(moduleRef.init()).rejects.toThrow(/Duplicate MCP tool name/)
+  })
+})
