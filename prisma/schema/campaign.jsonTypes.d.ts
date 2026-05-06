@@ -80,7 +80,7 @@ declare global {
       slug?: string
       hubSpotUpdates?: Partial<Record<HubSpot.IncomingProperty, string>>
       currentStep?: OnboardingStep
-      onboarding?: NewOnboardingAnswers
+      onboarding?: OnboardingAnswers
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number
       claimProfile?: string
@@ -93,21 +93,21 @@ declare global {
       name?: string
     }
 
-    export type NewOnboardingBallotStatus =
+    export type OnboardingBallotStatus =
       | 'on-ballot'
       | 'qualified-not-filed'
       | 'considering'
       | 'testing'
 
-    export type NewOnboardingPartyAffiliation =
+    export type OnboardingPartyAffiliation =
       | 'nonpartisan'
       | 'independent-or-non-major'
       | 'democrat'
       | 'republican'
 
-    export type NewOnboardingOfficePath = 'structured' | 'manual'
+    export type OnboardingOfficePath = 'structured' | 'manual'
 
-    export type NewOnboardingSelectedOffice = {
+    export type OnboardingSelectedOffice = {
       raceId: string
       positionId?: string
       positionName: string
@@ -125,7 +125,7 @@ declare global {
       filingPeriodsEnd?: string
     }
 
-    export type NewOnboardingManualOfficeForm = {
+    export type OnboardingManualOfficeForm = {
       office: string
       state: string
       city: string
@@ -134,15 +134,15 @@ declare global {
       electionDate: string
     }
 
-    export type NewOnboardingAnswers = {
-      officePath?: NewOnboardingOfficePath
+    export type OnboardingAnswers = {
+      officePath?: OnboardingOfficePath
       manualOffice?: boolean
       unmatchedOffice?: boolean
-      ballotStatus?: NewOnboardingBallotStatus
-      partyAffiliation?: NewOnboardingPartyAffiliation
+      ballotStatus?: OnboardingBallotStatus
+      partyAffiliation?: OnboardingPartyAffiliation
       officeZip?: string
-      structuredOffice?: NewOnboardingSelectedOffice
-      manualOfficeForm?: NewOnboardingManualOfficeForm
+      structuredOffice?: OnboardingSelectedOffice
+      manualOfficeForm?: OnboardingManualOfficeForm
     }
 
     export type CampaignAiContent = {
