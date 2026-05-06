@@ -45,6 +45,7 @@ type GetChatToolCompletionArgs = {
   tool?: ChatCompletionTool // list of functions that could be called.
   toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
+  models?: string[] // override PARSED_AI_MODELS for this call (tried in order)
 }
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
@@ -224,8 +225,10 @@ export class AiService {
     tool,
     toolChoice,
     timeout = 300000,
+    models,
   }: GetChatToolCompletionArgs) {
-    for (const model of PARSED_AI_MODELS) {
+    const modelsToTry = models?.length ? models : PARSED_AI_MODELS
+    for (const model of modelsToTry) {
       this.logger.debug({ model }, 'model')
       const client = this.buildOpenAiClient(model)
 
