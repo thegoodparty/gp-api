@@ -1,10 +1,6 @@
 /**
  * Integration tests for the merged outreach flow.
  *
- * These tests are written against the FUTURE single-call contract (described in
- * docs/plan-merge-outreach-endpoints.md). They will FAIL today against the current
- * two-call implementation and PASS once the refactor is complete.
- *
  * Contract under test:
  *   - A single `POST /v1/outreach` produces a Slack notification, an Outreach DB
  *     row, a Peerly job (for p2p), an incremented textCampaignCount, and a
@@ -13,8 +9,7 @@
  *     Slack notification — distinct template, no counter increment, no HubSpot.
  *   - Slack delivery itself failing must not change the HTTP response.
  *
- * What is NOT tested here:
- *   - The legacy `POST /v1/voters/voter-file/schedule` endpoint (deleted in refactor).
+ * Out of scope:
  *   - Stripe / promo / payment ordering — separate ticket.
  */
 
