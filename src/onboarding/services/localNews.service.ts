@@ -6,8 +6,11 @@ import { AiService } from '@/ai/ai.service'
 import type { AiChatMessage } from '@/campaigns/ai/chat/aiChat.types'
 import {
   LocalNewsResponse,
+  localNewsOutletSchema,
   localNewsResponseSchema,
 } from '../schemas/getLocalNews.schema'
+
+const OUTLET_TYPES = localNewsOutletSchema.shape.type.options
 
 const SYSTEM_PROMPT = `You are a local media research assistant helping political candidates identify news outlets to monitor during their campaign.
 
@@ -59,7 +62,7 @@ const tool: ChatCompletionTool = {
               },
               type: {
                 type: 'string',
-                enum: ['TV', 'print', 'radio'],
+                enum: OUTLET_TYPES,
               },
               description: {
                 type: 'string',
@@ -118,7 +121,7 @@ export class OnboardingLocalNewsService {
       },
       temperature: 0.2,
       topP: 0.1,
-      models: ['deepseek-ai/DeepSeek-V4-Pro'],
+      rawJson: true,
     })
 
     const raw = completion.content?.trim()
@@ -128,9 +131,9 @@ export class OnboardingLocalNewsService {
       )
     }
 
-    let parsed: unknown
+    let validated: ReturnType<typeof localNewsResponseSchema.safeParse>
     try {
-      parsed = JSON.parse(raw)
+      validated = localNewsResponseSchema.safeParse(JSON.parse(raw))
     } catch (error) {
       this.logger.error(
         { error, raw },
@@ -139,10 +142,9 @@ export class OnboardingLocalNewsService {
       throw new BadGatewayException('AI service returned invalid JSON')
     }
 
-    const validated = localNewsResponseSchema.safeParse(parsed)
     if (!validated.success) {
       this.logger.error(
-        { issues: validated.error.issues, parsed },
+        { issues: validated.error.issues },
         'AI local news response failed schema validation',
       )
       throw new BadGatewayException('AI service returned an unexpected shape')

@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 const getLocalNewsQuerySchema = z.object({
   city: z.string().min(1).optional(),
-  state: z.string().min(2).max(2),
+  state: z.string().regex(/^[A-Z]{2}$/),
   office: z.string().min(1),
 })
 

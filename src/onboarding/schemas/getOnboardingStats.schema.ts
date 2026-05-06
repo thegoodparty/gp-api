@@ -8,7 +8,6 @@ const getOnboardingStatsQuerySchema = z
   })
   .refine((value) => Boolean(value.districtId || value.ballotReadyPositionId), {
     message: 'Either districtId or ballotReadyPositionId is required',
-    path: ['districtId'],
   })
 
 export class GetOnboardingStatsQueryDTO extends createZodDto(

@@ -42,10 +42,11 @@ type GetChatToolCompletionArgs = {
   messages?: AiChatMessage[]
   temperature?: number
   topP?: number
-  tool?: ChatCompletionTool // list of functions that could be called.
-  toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
-  timeout?: number // timeout request after 5 minutes
-  models?: string[] // override PARSED_AI_MODELS for this call (tried in order)
+  tool?: ChatCompletionTool
+  toolChoice?: ChatCompletionNamedToolChoice
+  timeout?: number
+  models?: string[]
+  rawJson?: boolean
 }
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
@@ -226,6 +227,7 @@ export class AiService {
     toolChoice,
     timeout = 300000,
     models,
+    rawJson = false,
   }: GetChatToolCompletionArgs) {
     const modelsToTry = models?.length ? models : PARSED_AI_MODELS
     for (const model of modelsToTry) {
@@ -250,10 +252,12 @@ export class AiService {
         const message = completion.choices[0]?.message
         let content = message ? this.extractToolContent(message) : ''
         content = content.trim()
-        content = this.applyToolResponseFallback(content)
 
-        content = AiService.stripHtmlFences(content)
-        content = content.replace(/\n/g, '<br/><br/>')
+        if (!rawJson) {
+          content = this.applyToolResponseFallback(content)
+          content = AiService.stripHtmlFences(content)
+          content = content.replace(/\n/g, '<br/><br/>')
+        }
 
         this.logger.debug({ content }, 'completion success')
         return {

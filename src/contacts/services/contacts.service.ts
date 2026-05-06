@@ -274,35 +274,7 @@ export class ContactsService {
     )
   }
 
-  async getDistrictStatsByDistrictOrPosition({
-    districtId,
-    ballotReadyPositionId,
-  }: {
-    districtId?: string
-    ballotReadyPositionId?: string
-  }): Promise<StatsResponse> {
-    let resolvedDistrictId = districtId
-
-    if (!resolvedDistrictId && ballotReadyPositionId) {
-      const position = await this.elections.getPositionByBallotReadyId(
-        ballotReadyPositionId,
-        { includeDistrict: true },
-      )
-      resolvedDistrictId = position?.district?.id ?? undefined
-    }
-
-    if (!resolvedDistrictId) {
-      throw new BadRequestException(
-        'Could not resolve a district from the provided districtId or ballotReadyPositionId',
-      )
-    }
-
-    return this.fetchStatsByDistrictId(resolvedDistrictId)
-  }
-
-  private async fetchStatsByDistrictId(
-    districtId: string,
-  ): Promise<StatsResponse> {
+  async fetchStatsByDistrictId(districtId: string): Promise<StatsResponse> {
     const token = this.getValidS2SToken()
 
     const response = await lastValueFrom(
