@@ -152,9 +152,7 @@ export {
   type ReadCampaignOutput,
 } from './campaigns/Campaign.schema'
 
-export {
-  ReadCampaignOutputSchema,
-} from './campaigns/ReadCampaignOutput.schema'
+export { ReadCampaignOutputSchema } from './campaigns/ReadCampaignOutput.schema'
 
 export {
   SetDistrictOutputSchema,
@@ -175,6 +173,11 @@ export {
   CampaignWithLiveContextSchema,
   type CampaignWithLiveContext,
 } from './campaigns/CampaignWithLiveContext.schema'
+
+export {
+  OrganizationSchema,
+  type Organization,
+} from './campaigns/Organization.schema'
 
 export {
   CAMPAIGN_SORT_KEYS,
