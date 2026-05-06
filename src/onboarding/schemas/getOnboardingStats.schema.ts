@@ -21,20 +21,18 @@ const districtStatsBucketSchema = z.object({
   percent: z.number(),
 })
 
-const districtStatSummarySchema = z.object({
-  buckets: z.array(districtStatsBucketSchema),
-})
+const districtStatCategorySchema = z.array(districtStatsBucketSchema)
 
 export const onboardingStatsResponseSchema = z.object({
   districtId: z.string(),
-  computedAt: z.string(),
+  computedAt: z.string().optional(),
   totalConstituents: z.number(),
   totalConstituentsWithCellPhone: z.number(),
   buckets: z.object({
-    age: districtStatSummarySchema,
-    homeowner: districtStatSummarySchema,
-    education: districtStatSummarySchema,
-    presenceOfChildren: districtStatSummarySchema,
-    estimatedIncomeRange: districtStatSummarySchema,
+    age: districtStatCategorySchema,
+    homeowner: districtStatCategorySchema,
+    education: districtStatCategorySchema,
+    presenceOfChildren: districtStatCategorySchema,
+    estimatedIncomeRange: districtStatCategorySchema,
   }),
 })
