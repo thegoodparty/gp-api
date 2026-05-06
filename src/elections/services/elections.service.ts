@@ -177,14 +177,16 @@ export class ElectionsService {
     return this.electionApiGet<District, object>(`districts/${id}`, {})
   }
 
-  async getZipToPositions(query: {
-    zip: string
+  async searchPositions(query: {
+    zip?: string
+    name?: string
+    officeType?: string[]
     displayOfficeLevels?: string[]
     electionDateFrom?: string
     electionDateTo?: string
   }): Promise<RaceListItem[]> {
     const result = await this.electionApiGet<RaceListItem[], typeof query>(
-      'positions/by-zip',
+      'positions/search',
       query,
     )
     return RaceListItemArraySchema.parse(result ?? [])

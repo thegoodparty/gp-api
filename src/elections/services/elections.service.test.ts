@@ -221,8 +221,8 @@ describe('ElectionsService', () => {
     })
   })
 
-  describe('getZipToPositions', () => {
-    it('getZipToPositions calls /v1/positions/by-zip with the right params and parses the response', async () => {
+  describe('searchPositions', () => {
+    it('searchPositions calls /v1/positions/search with the right params and parses the response', async () => {
       const sampleRow = {
         id: 'ztp-1',
         brPositionId: 'br-pos-1',
@@ -233,7 +233,7 @@ describe('ElectionsService', () => {
       }
       mockHttpGet.mockReturnValue(of({ data: [sampleRow], status: 200 }))
 
-      const result = await service.getZipToPositions({
+      const result = await service.searchPositions({
         zip: '90210',
         displayOfficeLevels: ['City'],
         electionDateFrom: '2026-01-01',
@@ -242,7 +242,7 @@ describe('ElectionsService', () => {
 
       expect(result).toEqual([sampleRow])
       expect(mockHttpGet).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/positions/by-zip'),
+        expect.stringContaining('/v1/positions/search'),
         expect.objectContaining({
           params: {
             zip: '90210',
@@ -250,6 +250,34 @@ describe('ElectionsService', () => {
             electionDateFrom: '2026-01-01',
             electionDateTo: '2027-12-31',
           },
+        }),
+      )
+    })
+
+    it('forwards name-only queries', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({ name: 'mayor' })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/search'),
+        expect.objectContaining({
+          params: expect.objectContaining({ name: 'mayor' }),
+        }),
+      )
+    })
+
+    it('forwards officeType arrays', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({ officeType: ['Mayor', 'Sheriff'] })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/search'),
+        expect.objectContaining({
+          params: expect.objectContaining({
+            officeType: ['Mayor', 'Sheriff'],
+          }),
         }),
       )
     })
