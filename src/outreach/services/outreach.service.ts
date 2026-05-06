@@ -1,10 +1,9 @@
 import {
   BadRequestException,
-  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -18,6 +17,8 @@ import {
   type P2pJobGeographyResult,
 } from '../util/campaignGeography.util'
 import { resolveScriptContent } from '../util/resolveScriptContent.util'
+import { OutreachStepError } from '../types/outreachStepError'
+import { OutreachNotificationService } from './outreachNotification.service'
 
 export type { P2pJobGeographyResult } from '../util/campaignGeography.util'
 
@@ -35,6 +36,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     private readonly areaCodeFromZipService: AreaCodeFromZipService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
+    private readonly notificationService: OutreachNotificationService,
   ) {
     super()
   }
@@ -47,35 +49,45 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     script: string,
     phoneListId: number,
   ) {
+    let peerlyIdentityId: string | null
     try {
-      const { peerlyIdentityId } =
-        await this.tcrComplianceService.findFirstOrThrow({
-          where: {
-            campaignId: campaign.id,
-          },
-        })
+      ;({ peerlyIdentityId } = await this.tcrComplianceService.findFirstOrThrow(
+        {
+          where: { campaignId: campaign.id },
+        },
+      ))
+    } catch (err) {
+      throw new OutreachStepError('tcrLookup', err)
+    }
 
-      if (!peerlyIdentityId) {
-        throw new BadRequestException(
-          'TCR Compliance Peerly identity ID is required for P2P outreach',
-        )
-      }
+    if (!peerlyIdentityId) {
+      throw new BadRequestException(
+        'TCR Compliance Peerly identity ID is required for P2P outreach',
+      )
+    }
 
-      const name = `${campaign.slug}${
-        createOutreachDto.date
-          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
-          : ''
-      }`
+    const name = `${campaign.slug}${
+      createOutreachDto.date
+        ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+        : ''
+    }`
 
-      const { aiContent = {} } = campaign
-      const resolvedScriptText = resolveScriptContent(script, aiContent)
+    const { aiContent = {} } = campaign
+    const resolvedScriptText = resolveScriptContent(script, aiContent)
 
-      const resolvedGeography = await this.resolveP2pJobGeography(campaign)
-      const didState = createOutreachDto.didState ?? resolvedGeography.didState
-      const didNpaSubset =
-        createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
+    let resolvedGeography: P2pJobGeographyResult
+    try {
+      resolvedGeography = await this.resolveP2pJobGeography(campaign)
+    } catch (err) {
+      throw new OutreachStepError('geographyResolution', err)
+    }
+    const didState = createOutreachDto.didState ?? resolvedGeography.didState
+    const didNpaSubset =
+      createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
 
-      const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
+    let jobId: string
+    try {
+      jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: phoneListId,
         imageInfo: {
@@ -91,37 +103,30 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         didNpaSubset,
         scheduledDate: createOutreachDto.date,
       })
-
-      return await this.createRecord(
-        {
-          ...createOutreachDto,
-          script: resolvedScriptText,
-          projectId: jobId,
-          status: OutreachStatus.pending,
-          didState,
-          didNpaSubset,
-        },
-        imageUrl,
-      )
-    } catch (error) {
-      this.logger.error({ error }, 'Failed to create P2P outreach')
-      if (error instanceof HttpException) {
-        throw error
-      }
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      throw new BadRequestException(
-        `Failed to create P2P outreach: ${message}`,
-        { cause: error },
-      )
+    } catch (err) {
+      throw new OutreachStepError('peerlyJobCreation', err)
     }
+
+    return await this.createRecord(
+      {
+        ...createOutreachDto,
+        script: resolvedScriptText,
+        projectId: jobId,
+        status: OutreachStatus.pending,
+        didState,
+        didNpaSubset,
+      },
+      imageUrl,
+    )
   }
 
   /**
    * Single entry point for creating outreach (text or P2P).
-   * When outreachType is p2p, imageUrl and p2pImage are required and the TCR/geography/Peerly flow runs.
-   * Guard: never create a plain record for P2P — require p2pImage so TCR, geography, and Peerly job run.
+   * On success, fires the CAS Slack notification inline (awaited, with
+   * internal try/catch so a Slack failure can't break the response).
    */
   async create(
+    user: User,
     campaign: Campaign,
     createOutreachDto: CreateOutreachSchema,
     imageUrl?: string,
@@ -146,17 +151,34 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           'Phone list ID is required for P2P outreach',
         )
       }
-      return this.createP2pOutreach(
+    }
+
+    const outreach = isP2p
+      ? await this.createP2pOutreach(
+          campaign,
+          createOutreachDto,
+          p2pImage!,
+          imageUrl!,
+          createOutreachDto.script!,
+          createOutreachDto.phoneListId!,
+        )
+      : await this.createRecord(createOutreachDto, imageUrl)
+
+    try {
+      await this.notificationService.notifySuccess({
+        user,
         campaign,
-        createOutreachDto,
-        p2pImage,
-        imageUrl,
-        createOutreachDto.script,
-        createOutreachDto.phoneListId,
+        outreach,
+        audienceRequest: createOutreachDto.audienceRequest,
+      })
+    } catch (err) {
+      this.logger.error(
+        { err, outreachId: outreach.id, campaignId: campaign.id },
+        'CAS success notification failed',
       )
     }
 
-    return this.createRecord(createOutreachDto, imageUrl)
+    return outreach
   }
 
   /** Persists a single outreach record. Used by both non-P2P and P2P flows. */
