@@ -8,14 +8,9 @@ const getVoterIssuesQuerySchema = z
     state: z.string().min(2).max(2).optional(),
     city: z.string().min(1).optional(),
   })
-  .refine(
-    (v) =>
-      Boolean(v.districtId || v.ballotReadyPositionId || v.state || v.city),
-    {
-      message:
-        'At least one of districtId, ballotReadyPositionId, state, or city is required',
-    },
-  )
+  .refine((v) => Boolean(v.districtId || v.ballotReadyPositionId), {
+    message: 'At least one of districtId or ballotReadyPositionId is required',
+  })
 
 export class GetVoterIssuesQueryDTO extends createZodDto(
   getVoterIssuesQuerySchema,
