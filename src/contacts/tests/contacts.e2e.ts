@@ -197,9 +197,9 @@ test.describe('Contacts and Segments', () => {
       totalConstituents: number
       totalConstituentsWithCellPhone?: number
       buckets: Record<string, unknown> & {
-        age?: { buckets?: unknown[] }
-        homeowner?: { buckets?: unknown[] }
-        education?: { buckets?: unknown[] }
+        age?: unknown[]
+        homeowner?: unknown[]
+        education?: unknown[]
       }
     }
     // District id comes from election-api for CONTACTS_TEST_POSITION_ID, not the legacy People seed id.
@@ -217,8 +217,8 @@ test.describe('Contacts and Segments', () => {
     expect(stats.buckets).toHaveProperty('age')
     expect(stats.buckets).toHaveProperty('homeowner')
     expect(stats.buckets).toHaveProperty('education')
-    if (stats.buckets.age?.buckets) {
-      expect(stats.buckets.age.buckets.length).toBeGreaterThan(0)
+    if (stats.buckets.age) {
+      expect(stats.buckets.age.length).toBeGreaterThan(0)
     }
   })
 
