@@ -2,7 +2,7 @@
 // Test fixtures define decorated controller stubs whose method bodies don't matter.
 import { describe, expect, it, vi } from 'vitest'
 import { Test } from '@nestjs/testing'
-import { Body, Controller, Get, Patch, Module } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Module } from '@nestjs/common'
 import { DiscoveryModule, HttpAdapterHost } from '@nestjs/core'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
@@ -47,6 +47,8 @@ const buildAppModule = (controllers: unknown[], inject: InjectFn) => {
 
 const InSchema = z.object({ slogan: z.string() })
 class InDto extends createZodDto(InSchema) {}
+const ParamSchema = z.object({ id: z.string() })
+class ParamDto extends createZodDto(ParamSchema) {}
 const OutSchema = z.object({ ok: z.boolean() })
 
 @Controller('campaigns')
@@ -66,12 +68,8 @@ class FakeController {
 
   @Get(':id')
   @ResponseSchema(OutSchema)
-  @McpTool({ description: 'Read by id with no @Param decorator.' })
-  readById() {}
-
-  @Get('no-output')
-  @McpTool({ description: 'no @ResponseSchema' })
-  noOutput() {}
+  @McpTool({ description: 'Read by id with @Param Zod DTO.' })
+  readById(@Param() _p: ParamDto) {}
 }
 
 const noopInject: InjectFn = async () => ({
@@ -107,7 +105,7 @@ describe('McpServerService.gatherTools', () => {
     expect(update.inputDeclarations.params.declared).toBe(false)
   })
 
-  it('marks params declared from path :placeholder even when @Param is missing', async () => {
+  it('marks params declared from path :placeholder and binds the @Param Zod DTO', async () => {
     const moduleRef = await buildAppModule(
       [FakeController],
       noopInject,
@@ -118,7 +116,7 @@ describe('McpServerService.gatherTools', () => {
     const readById = tools.find((t) => t.handlerName === 'readById')!
     expect(readById).toBeDefined()
     expect(readById.inputDeclarations.params.declared).toBe(true)
-    expect(readById.inputDeclarations.params.schema).toBeNull()
+    expect(readById.inputDeclarations.params.schema).toBe(ParamSchema)
   })
 
   it('does not include handlers without @McpTool', async () => {
@@ -132,17 +130,66 @@ describe('McpServerService.gatherTools', () => {
     expect(tools.find((t) => t.handlerName === 'notATool')).toBeUndefined()
   })
 
-  it('registers tools without @ResponseSchema with outputSchema null', async () => {
+  it('throws when an @McpTool handler is missing @ResponseSchema', async () => {
+    @Controller('campaigns')
+    class NoOutputController {
+      @Get('no-output')
+      @McpTool({ description: 'no @ResponseSchema' })
+      noOutput() {}
+    }
+
     const moduleRef = await buildAppModule(
-      [FakeController],
+      [NoOutputController],
       noopInject,
     ).compile()
     await moduleRef.init()
 
-    const tools = moduleRef.get(McpServerService).getTools()
-    const noOutput = tools.find((t) => t.handlerName === 'noOutput')!
-    expect(noOutput).toBeDefined()
-    expect(noOutput.outputSchema).toBeNull()
+    expect(() => moduleRef.get(McpServerService).getTools()).toThrow(
+      /Invalid @McpTool configuration/,
+    )
+    expect(() => moduleRef.get(McpServerService).getTools()).toThrow(
+      /missing @ResponseSchema/,
+    )
+  })
+
+  it('throws when an @McpTool handler declares @Body without a Zod DTO', async () => {
+    @Controller('bad')
+    class BadBodyController {
+      @Patch('thing')
+      @ResponseSchema(OutSchema)
+      @McpTool({ description: 'body declared without a Zod DTO' })
+      bad(@Body() _b: object) {}
+    }
+
+    const moduleRef = await buildAppModule(
+      [BadBodyController],
+      noopInject,
+    ).compile()
+    await moduleRef.init()
+
+    expect(() => moduleRef.get(McpServerService).getTools()).toThrow(
+      /@Body declared but is not a nestjs-zod createZodDto class/,
+    )
+  })
+
+  it('throws when path :placeholder lacks a @Param Zod DTO', async () => {
+    @Controller('bad')
+    class BadParamController {
+      @Get(':id')
+      @ResponseSchema(OutSchema)
+      @McpTool({ description: 'path placeholder without @Param Zod DTO' })
+      badParam() {}
+    }
+
+    const moduleRef = await buildAppModule(
+      [BadParamController],
+      noopInject,
+    ).compile()
+    await moduleRef.init()
+
+    expect(() => moduleRef.get(McpServerService).getTools()).toThrow(
+      /@Param or path :placeholder is present but no nestjs-zod createZodDto provides a Zod schema/,
+    )
   })
 
   it('throws when @McpTool is applied to a handler with no HTTP method decorator', async () => {

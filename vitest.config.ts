@@ -25,9 +25,6 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'json'],
     },
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
-    exclude: process.env.VITEST_RUN_CI_TESTS
-      ? ['**/node_modules/**', '**/dist/**']
-      : ['**/node_modules/**', '**/dist/**', '**/*.ci.test.ts'],
     env: dotenv.parse(readFileSync(`${__dirname}/.env.test`)),
     clearMocks: true,
   },

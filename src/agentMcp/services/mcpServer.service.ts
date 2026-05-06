@@ -207,6 +207,42 @@ export class McpServerService {
       byName.set(t.toolName, t)
     }
 
+    const violations: string[] = []
+    for (const t of collected) {
+      if (!t.outputSchema) {
+        violations.push(`${t.toolName}: missing @ResponseSchema(...)`)
+      }
+      if (
+        t.inputDeclarations.body.declared &&
+        !t.inputDeclarations.body.schema
+      ) {
+        violations.push(
+          `${t.toolName}: @Body declared but is not a nestjs-zod createZodDto class`,
+        )
+      }
+      if (
+        t.inputDeclarations.query.declared &&
+        !t.inputDeclarations.query.schema
+      ) {
+        violations.push(
+          `${t.toolName}: @Query declared but is not a nestjs-zod createZodDto class`,
+        )
+      }
+      if (
+        t.inputDeclarations.params.declared &&
+        !t.inputDeclarations.params.schema
+      ) {
+        violations.push(
+          `${t.toolName}: @Param or path :placeholder is present but no nestjs-zod createZodDto provides a Zod schema`,
+        )
+      }
+    }
+    if (violations.length > 0) {
+      throw new Error(
+        `Invalid @McpTool configuration:\n  ${violations.join('\n  ')}`,
+      )
+    }
+
     return collected
   }
 
