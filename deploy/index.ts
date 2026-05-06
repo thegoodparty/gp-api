@@ -335,12 +335,27 @@ export = async () => {
       qa: 'arn:aws:acm:us-west-2:333022194791:certificate/29de1de7-6ab0-4f62-baf1-235c2a92cfe2',
       prod: 'arn:aws:acm:us-west-2:333022194791:certificate/e1969507-2514-4585-a225-917883d8ffef',
     }),
-    secrets: Object.fromEntries(
-      Object.keys(secret).map((key) => [
-        key,
-        pulumi.interpolate`${secretInfo.arn}:${key}::`,
-      ]),
-    ),
+    secrets: {
+      ...Object.fromEntries(
+        Object.keys(secret).map((key) => [
+          key,
+          pulumi.interpolate`${secretInfo.arn}:${key}::`,
+        ]),
+      ),
+      // Inngest POC: only wired up in dev. Preview is ephemeral and doesn't
+      // need POC credentials; qa/prod wait for env-specific SSM parameters.
+      ...select<Record<string, string>>({
+        preview: {},
+        dev: {
+          INNGEST_EVENT_KEY:
+            'arn:aws:ssm:us-west-2:333022194791:parameter/swain-inngest-poc-event-key',
+          INNGEST_SIGNING_KEY:
+            'arn:aws:ssm:us-west-2:333022194791:parameter/swain-inngest-poc-signing-key',
+        },
+        qa: {},
+        prod: {},
+      }),
+    },
     environmentVariables: {
       PORT: '80',
       HOST: '0.0.0.0',

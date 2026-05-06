@@ -236,11 +236,13 @@ export const createGrafanaResources = async ({
   })
 
   for (const controller of CONTROLLER_NAMES) {
+    const alerts = controllerAlerts(controller)
+    if (alerts.length === 0) continue
     new grafana.alerting.RuleGroup(`${controller}-rules`, {
       name: `${controller} routes`,
       folderUid: alertFolder.uid,
       intervalSeconds: 60,
-      rules: controllerAlerts(controller).map(alertToRule),
+      rules: alerts.map(alertToRule),
     })
   }
 
