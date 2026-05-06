@@ -151,19 +151,30 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           'Phone list ID is required for P2P outreach',
         )
       }
+
+      const outreach = await this.createP2pOutreach(
+        campaign,
+        createOutreachDto,
+        p2pImage,
+        imageUrl,
+        createOutreachDto.script,
+        createOutreachDto.phoneListId,
+      )
+      await this.tryNotifySuccess(user, campaign, outreach, createOutreachDto)
+      return outreach
     }
 
-    const outreach = isP2p
-      ? await this.createP2pOutreach(
-          campaign,
-          createOutreachDto,
-          p2pImage!,
-          imageUrl!,
-          createOutreachDto.script!,
-          createOutreachDto.phoneListId!,
-        )
-      : await this.createRecord(createOutreachDto, imageUrl)
+    const outreach = await this.createRecord(createOutreachDto, imageUrl)
+    await this.tryNotifySuccess(user, campaign, outreach, createOutreachDto)
+    return outreach
+  }
 
+  private async tryNotifySuccess(
+    user: User,
+    campaign: Campaign,
+    outreach: Awaited<ReturnType<OutreachService['createRecord']>>,
+    createOutreachDto: CreateOutreachSchema,
+  ) {
     try {
       await this.notificationService.notifySuccess({
         user,
@@ -177,8 +188,6 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         'CAS success notification failed',
       )
     }
-
-    return outreach
   }
 
   /** Persists a single outreach record. Used by both non-P2P and P2P flows. */
