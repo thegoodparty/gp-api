@@ -1,8 +1,5 @@
-import { ControllerName, Endpoint } from '../../src/generated/route-types'
-import { Alert, EndpointOverride, SlackGroup } from './alerting/alerts.types'
-
-export const DEFAULT_P95_READ_LATENCY_MS = 1000
-export const DEFAULT_P95_WRITE_LATENCY_MS = 3000
+import { ControllerName } from '../../src/generated/route-types'
+import { Alert, SlackGroup } from './alerting/alerts.types'
 
 /** Map of slack group to controllers */
 export const ALERT_OWNERSHIP: Record<SlackGroup, ControllerName[]> = {
@@ -14,18 +11,6 @@ export const ALERT_OWNERSHIP: Record<SlackGroup, ControllerName[]> = {
     'organizations',
   ],
   'win-bugs': [],
-}
-
-export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
-  'GET /v1/contacts': {
-    p95LatencyMs: 999_999,
-  },
-  'GET /v1/contacts/download': {
-    p95LatencyMs: 999_999,
-  },
-  'POST /v1/polls/analyze-bias': {
-    p95LatencyMs: 999_999,
-  },
 }
 
 export const GLOBAL_ALERTS: Alert[] = [
