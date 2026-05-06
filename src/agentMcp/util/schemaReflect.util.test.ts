@@ -2,17 +2,20 @@
 // Test fixtures define decorated controller stubs whose method bodies don't matter.
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
-import { Body, Query } from '@nestjs/common'
+import { Body, Param, Query } from '@nestjs/common'
 import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
-import { reflectInputSchema, reflectOutputSchema } from './schemaReflect.util'
+import {
+  reflectInputDeclarations,
+  reflectOutputSchema,
+} from './schemaReflect.util'
 
 const BodySchema = z.object({ slogan: z.string().max(255) })
 class BodyDto extends createZodDto(BodySchema) {}
 
-const QuerySchema = z.object({ limit: z.coerce.number().int().positive() })
-class QueryDto extends createZodDto(QuerySchema) {}
+const ParamsSchema = z.object({ id: z.string() })
+class ParamsDto extends createZodDto(ParamsSchema) {}
 
 const OutputSchema = z.object({ id: z.string(), updated: z.boolean() })
 
@@ -33,27 +36,55 @@ describe('reflectOutputSchema', () => {
   })
 })
 
-describe('reflectInputSchema', () => {
-  it('combines body + query DTO schemas into a single object schema', () => {
+describe('reflectInputDeclarations', () => {
+  it('marks body declared and captures its schema when @Body is present', () => {
     class C {
-      handler(@Body() _b: BodyDto, @Query() _q: QueryDto) {}
+      handler(@Body() _b: BodyDto) {}
     }
-    const schema = reflectInputSchema(C.prototype, 'handler')
-    expect(schema).not.toBeNull()
-    const parsed = schema!.parse({
-      body: { slogan: 'Vote for me' },
-      query: { limit: 10 },
-    })
-    expect(parsed).toEqual({
-      body: { slogan: 'Vote for me' },
-      query: { limit: 10 },
-    })
+    const decls = reflectInputDeclarations(C.prototype, 'handler', '/foo')
+    expect(decls.body.declared).toBe(true)
+    expect(decls.body.schema).toBe(BodySchema)
+    expect(decls.query.declared).toBe(false)
+    expect(decls.params.declared).toBe(false)
   })
 
-  it('returns null when handler has no Zod-DTO parameters', () => {
+  it('returns all-undeclared when handler has no params and path has no placeholder', () => {
     class C {
-      handler(_a: string) {}
+      handler() {}
     }
-    expect(reflectInputSchema(C.prototype, 'handler')).toBeNull()
+    const decls = reflectInputDeclarations(C.prototype, 'handler', '/foo')
+    expect(decls.body.declared).toBe(false)
+    expect(decls.body.schema).toBeNull()
+    expect(decls.query.declared).toBe(false)
+    expect(decls.query.schema).toBeNull()
+    expect(decls.params.declared).toBe(false)
+    expect(decls.params.schema).toBeNull()
+  })
+
+  it('marks params declared (schema=null) when path contains :placeholder but @Param is missing', () => {
+    class C {
+      handler() {}
+    }
+    const decls = reflectInputDeclarations(C.prototype, 'handler', '/foo/:id')
+    expect(decls.params.declared).toBe(true)
+    expect(decls.params.schema).toBeNull()
+  })
+
+  it('marks params declared and captures schema when @Param Zod DTO is present alongside :placeholder', () => {
+    class C {
+      handler(@Param() _p: ParamsDto) {}
+    }
+    const decls = reflectInputDeclarations(C.prototype, 'handler', '/foo/:id')
+    expect(decls.params.declared).toBe(true)
+    expect(decls.params.schema).toBe(ParamsSchema)
+  })
+
+  it('marks query declared without a schema when @Query has no Zod DTO', () => {
+    class C {
+      handler(@Query() _q: object) {}
+    }
+    const decls = reflectInputDeclarations(C.prototype, 'handler', '/foo')
+    expect(decls.query.declared).toBe(true)
+    expect(decls.query.schema).toBeNull()
   })
 })

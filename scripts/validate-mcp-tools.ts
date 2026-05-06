@@ -15,9 +15,31 @@ export const findMissingSchemas = (
   tools
     .map((t) => {
       const reasons: string[] = []
-      if (!t.inputSchema)
-        reasons.push('missing input schema (no @Body/@Query/@Param Zod DTO)')
       if (!t.outputSchema) reasons.push('missing @ResponseSchema(...)')
+      if (
+        t.inputDeclarations.body.declared &&
+        !t.inputDeclarations.body.schema
+      ) {
+        reasons.push(
+          '@Body declared but is not a nestjs-zod createZodDto class',
+        )
+      }
+      if (
+        t.inputDeclarations.query.declared &&
+        !t.inputDeclarations.query.schema
+      ) {
+        reasons.push(
+          '@Query declared but is not a nestjs-zod createZodDto class',
+        )
+      }
+      if (
+        t.inputDeclarations.params.declared &&
+        !t.inputDeclarations.params.schema
+      ) {
+        reasons.push(
+          '@Param or path :placeholder is present but no nestjs-zod createZodDto provides a Zod schema',
+        )
+      }
       return reasons.length ? { tool: t, reasons } : null
     })
     .filter((x): x is MissingEntry => x !== null)

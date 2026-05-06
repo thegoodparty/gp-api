@@ -2,10 +2,11 @@
 // Reflection-driven schema extraction: Reflect.getMetadata returns `any`, so casting to the
 // expected metadata shape (ROUTE_ARGS_METADATA, design:paramtypes) is unavoidable here.
 import 'reflect-metadata'
-import { ZodSchema, z } from 'zod'
+import { ZodSchema } from 'zod'
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants'
 import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum'
 import { RESPONSE_SCHEMA_KEY } from '@/shared/decorators/ResponseSchema.decorator'
+import { RegisteredMcpTool } from '../agentMcp.types'
 
 type ZodDtoClass = { schema?: ZodSchema } & (new (
   ...args: unknown[]
@@ -24,17 +25,28 @@ export const reflectOutputSchema = (
   return (schema as ZodSchema | undefined) ?? null
 }
 
-export const reflectInputSchema = (
+export const reflectInputDeclarations = (
   controllerProto: object,
   methodName: string,
-): ZodSchema | null => {
+  routePath: string,
+): RegisteredMcpTool['inputDeclarations'] => {
+  const result: RegisteredMcpTool['inputDeclarations'] = {
+    body: { declared: false, schema: null },
+    query: { declared: false, schema: null },
+    params: { declared: false, schema: null },
+  }
+
+  if (/[/](:)[a-zA-Z]/.test(routePath)) {
+    result.params.declared = true
+  }
+
   const paramMeta = Reflect.getMetadata(
     ROUTE_ARGS_METADATA,
     controllerProto.constructor,
     methodName,
   ) as Record<string, { index: number; pipes?: unknown[] }> | undefined
 
-  if (!paramMeta) return null
+  if (!paramMeta) return result
 
   const paramTypes = (Reflect.getMetadata(
     'design:paramtypes',
@@ -42,22 +54,20 @@ export const reflectInputSchema = (
     methodName,
   ) ?? []) as ZodDtoClass[]
 
-  const collected: Partial<Record<'body' | 'query' | 'params', ZodSchema>> = {}
-
   for (const key of Object.keys(paramMeta)) {
     const [paramTypeStr] = key.split(':')
     const paramType = Number(paramTypeStr)
     const inputKey = PARAM_TYPE_TO_INPUT_KEY[paramType]
     if (!inputKey) continue
 
+    result[inputKey].declared = true
+
     const { index } = paramMeta[key]
     const dto = paramTypes[index]
-    if (!dto?.schema) continue
-
-    collected[inputKey] = dto.schema
+    if (dto?.schema) {
+      result[inputKey].schema = dto.schema
+    }
   }
 
-  if (Object.keys(collected).length === 0) return null
-
-  return z.object(collected as Record<string, ZodSchema>)
+  return result
 }

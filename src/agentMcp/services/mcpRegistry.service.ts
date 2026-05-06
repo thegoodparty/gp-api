@@ -7,7 +7,7 @@ import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core'
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants'
 import { MCP_TOOL_KEY, McpToolMetadata } from '../decorators/McpTool.decorator'
 import {
-  reflectInputSchema,
+  reflectInputDeclarations,
   reflectOutputSchema,
 } from '../util/schemaReflect.util'
 import { deriveToolName } from '../util/toolName.util'
@@ -89,7 +89,7 @@ export class McpRegistryService implements OnModuleInit {
           description: meta.description,
           method,
           path,
-          inputSchema: reflectInputSchema(proto, methodName),
+          inputDeclarations: reflectInputDeclarations(proto, methodName, path),
           outputSchema: reflectOutputSchema(handler),
           controllerClassName: metatype.name,
           handlerName: methodName,

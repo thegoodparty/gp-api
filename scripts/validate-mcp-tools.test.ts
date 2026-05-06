@@ -3,13 +3,20 @@
 import { describe, expect, it } from 'vitest'
 import { Test } from '@nestjs/testing'
 import { Body, Controller, Get, Module } from '@nestjs/common'
+import { DiscoveryModule } from '@nestjs/core'
 import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { McpTool } from '../src/agentMcp/decorators/McpTool.decorator'
 import { ResponseSchema } from '../src/shared/decorators/ResponseSchema.decorator'
-import { AgentMcpModule } from '../src/agentMcp/agentMcp.module'
 import { McpRegistryService } from '../src/agentMcp/services/mcpRegistry.service'
 import { findMissingSchemas } from './validate-mcp-tools'
+
+@Module({
+  imports: [DiscoveryModule],
+  providers: [McpRegistryService],
+  exports: [McpRegistryService],
+})
+class McpRegistryTestModule {}
 
 const Out = z.object({ ok: z.boolean() })
 const In = z.object({ x: z.string() })
@@ -19,7 +26,7 @@ class InDto extends createZodDto(In) {}
 class GoodController {
   @Get('one')
   @ResponseSchema(Out)
-  @McpTool({ description: 'fine' })
+  @McpTool({ description: 'fine, no inputs' })
   one() {}
 
   @Get('two')
@@ -33,12 +40,22 @@ class BadController {
   @Get('no-output')
   @McpTool({ description: 'missing output' })
   noOutput() {}
+
+  @Get('untyped-body')
+  @ResponseSchema(Out)
+  @McpTool({ description: 'body declared without a Zod DTO' })
+  untypedBody(@Body() _b: object) {}
+
+  @Get(':id')
+  @ResponseSchema(Out)
+  @McpTool({ description: 'path placeholder without @Param Zod DTO' })
+  paramFromPath() {}
 }
 
 describe('validate-mcp-tools logic', () => {
-  it('flags a tool missing @ResponseSchema', async () => {
+  it('flags handlers missing @ResponseSchema and ones whose declared inputs lack a Zod DTO', async () => {
     @Module({
-      imports: [AgentMcpModule],
+      imports: [McpRegistryTestModule],
       controllers: [GoodController, BadController],
     })
     class TestApp {}
@@ -49,19 +66,28 @@ describe('validate-mcp-tools logic', () => {
     await moduleRef.init()
     const registry = moduleRef.get(McpRegistryService)
     const result = findMissingSchemas(registry.getAll())
-    expect(result).toHaveLength(2)
+
     const noOutput = result.find((r) => r.tool.handlerName === 'noOutput')
     expect(noOutput).toBeDefined()
     expect(noOutput!.reasons).toContain('missing @ResponseSchema(...)')
-    const one = result.find((r) => r.tool.handlerName === 'one')
-    expect(one).toBeDefined()
-    expect(one!.reasons).toContain(
-      'missing input schema (no @Body/@Query/@Param Zod DTO)',
+
+    const untypedBody = result.find((r) => r.tool.handlerName === 'untypedBody')
+    expect(untypedBody).toBeDefined()
+    expect(untypedBody!.reasons).toContain(
+      '@Body declared but is not a nestjs-zod createZodDto class',
+    )
+
+    const paramFromPath = result.find(
+      (r) => r.tool.handlerName === 'paramFromPath',
+    )
+    expect(paramFromPath).toBeDefined()
+    expect(paramFromPath!.reasons).toContain(
+      '@Param or path :placeholder is present but no nestjs-zod createZodDto provides a Zod schema',
     )
   })
 
-  it('does not flag a handler that has both input and output schemas', async () => {
-    @Module({ imports: [AgentMcpModule], controllers: [GoodController] })
+  it('does not flag a handler with no inputs at all and a valid @ResponseSchema', async () => {
+    @Module({ imports: [McpRegistryTestModule], controllers: [GoodController] })
     class TestApp {}
 
     const moduleRef = await Test.createTestingModule({
@@ -70,6 +96,7 @@ describe('validate-mcp-tools logic', () => {
     await moduleRef.init()
     const registry = moduleRef.get(McpRegistryService)
     const result = findMissingSchemas(registry.getAll())
+    expect(result.find((r) => r.tool.handlerName === 'one')).toBeUndefined()
     expect(result.find((r) => r.tool.handlerName === 'two')).toBeUndefined()
   })
 })

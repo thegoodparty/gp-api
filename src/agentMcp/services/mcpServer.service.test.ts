@@ -11,7 +11,11 @@ const fakeReadTool: RegisteredMcpTool = {
   description: 'read foo',
   method: 'GET',
   path: '/v1/foo',
-  inputSchema: null,
+  inputDeclarations: {
+    body: { declared: false, schema: null },
+    query: { declared: false, schema: null },
+    params: { declared: false, schema: null },
+  },
   outputSchema: z.object({ ok: z.boolean() }),
   controllerClassName: 'FooController',
   handlerName: 'read',
@@ -22,7 +26,11 @@ const fakeWriteTool: RegisteredMcpTool = {
   description: 'write foo',
   method: 'POST',
   path: '/v1/foo',
-  inputSchema: z.object({ body: z.object({ value: z.string() }) }),
+  inputDeclarations: {
+    body: { declared: true, schema: z.object({ value: z.string() }) },
+    query: { declared: false, schema: null },
+    params: { declared: false, schema: null },
+  },
   outputSchema: z.object({ ok: z.boolean() }),
   controllerClassName: 'FooController',
   handlerName: 'write',
@@ -84,12 +92,23 @@ describe('McpServerService', () => {
       method: 'tools/list',
       params: {},
     })) as {
-      tools: Array<{ name: string; description: string; inputSchema: unknown }>
+      tools: Array<{
+        name: string
+        description: string
+        inputSchema: { type: string; properties?: Record<string, unknown> }
+      }>
     }
     expect(result.tools).toHaveLength(2)
+
+    const get = result.tools.find((t) => t.name === 'GET_v1_foo')!
+    expect(get.inputSchema.type).toBe('object')
+    expect(get.inputSchema.properties).toEqual({})
+
     const post = result.tools.find((t) => t.name === 'POST_v1_foo')!
     expect(post.description).toBe('write foo')
-    expect((post.inputSchema as { type: string }).type).toBe('object')
+    expect(post.inputSchema.type).toBe('object')
+    expect(post.inputSchema.properties).toBeDefined()
+    expect(Object.keys(post.inputSchema.properties!)).toContain('body')
   })
 
   it('routes call_tool through fastify.inject with method + path and forwards Authorization', async () => {

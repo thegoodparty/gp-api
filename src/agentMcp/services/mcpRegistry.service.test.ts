@@ -38,6 +38,11 @@ class FakeController {
 
   @Get('untagged')
   notATool() {}
+
+  @Get(':id')
+  @ResponseSchema(OutSchema)
+  @McpTool({ description: 'Read by id with no @Param decorator.' })
+  readById() {}
 }
 
 @Module({ imports: [McpRegistryTestModule], controllers: [FakeController] })
@@ -51,18 +56,34 @@ describe('McpRegistryService', () => {
     const registry = moduleRef.get(McpRegistryService)
     const tools = registry.getAll()
 
-    expect(tools).toHaveLength(2)
+    expect(tools).toHaveLength(3)
 
     const read = tools.find((t) => t.toolName === 'GET_campaigns_mine')!
     expect(read).toBeDefined()
     expect(read.description).toBe("Read the calling user's campaign.")
     expect(read.outputSchema).toBe(OutSchema)
-    expect(read.inputSchema).toBeNull()
+    expect(read.inputDeclarations.body.declared).toBe(false)
+    expect(read.inputDeclarations.body.schema).toBeNull()
+    expect(read.inputDeclarations.query.declared).toBe(false)
+    expect(read.inputDeclarations.params.declared).toBe(false)
 
     const update = tools.find((t) => t.toolName === 'PATCH_campaigns_mine')!
     expect(update).toBeDefined()
-    expect(update.inputSchema).not.toBeNull()
     expect(update.outputSchema).toBe(OutSchema)
+    expect(update.inputDeclarations.body.declared).toBe(true)
+    expect(update.inputDeclarations.body.schema).toBe(InSchema)
+    expect(update.inputDeclarations.params.declared).toBe(false)
+  })
+
+  it('marks params declared from path :placeholder even when @Param is missing', async () => {
+    const moduleRef = await buildModule([FakeApp]).compile()
+    await moduleRef.init()
+
+    const tools = moduleRef.get(McpRegistryService).getAll()
+    const readById = tools.find((t) => t.handlerName === 'readById')!
+    expect(readById).toBeDefined()
+    expect(readById.inputDeclarations.params.declared).toBe(true)
+    expect(readById.inputDeclarations.params.schema).toBeNull()
   })
 
   it('does not include handlers without @McpTool', async () => {

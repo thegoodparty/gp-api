@@ -16,6 +16,7 @@ import {
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { McpRegistryService } from './mcpRegistry.service'
 import { RegisteredMcpTool } from '../agentMcp.types'
+import { buildCombinedInputSchema } from '../util/inputSchema.util'
 
 type FastifyInjectResponse = {
   statusCode: number
@@ -99,8 +100,9 @@ export class McpServerService {
   }
 
   private toMcpTool(t: RegisteredMcpTool): Tool {
-    const inputSchema = t.inputSchema
-      ? (zodToJsonSchema(t.inputSchema) as unknown as Tool['inputSchema'])
+    const combined = buildCombinedInputSchema(t.inputDeclarations)
+    const inputSchema = combined
+      ? (zodToJsonSchema(combined) as unknown as Tool['inputSchema'])
       : ({ type: 'object', properties: {} } as Tool['inputSchema'])
 
     return {
