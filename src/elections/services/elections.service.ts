@@ -1,3 +1,4 @@
+import { RaceListItem, RaceListItemArraySchema } from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -174,6 +175,19 @@ export class ElectionsService {
 
   async getDistrict(id: string): Promise<District | null> {
     return this.electionApiGet<District, object>(`districts/${id}`, {})
+  }
+
+  async getZipToPositions(query: {
+    zip: string
+    displayOfficeLevels?: string[]
+    electionDateFrom?: string
+    electionDateTo?: string
+  }): Promise<RaceListItem[]> {
+    const result = await this.electionApiGet<RaceListItem[], typeof query>(
+      'positions/by-zip',
+      query,
+    )
+    return RaceListItemArraySchema.parse(result ?? [])
   }
 
   async getDistrictId(

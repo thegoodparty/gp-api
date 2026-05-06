@@ -221,6 +221,40 @@ describe('ElectionsService', () => {
     })
   })
 
+  describe('getZipToPositions', () => {
+    it('getZipToPositions calls /v1/positions/by-zip with the right params and parses the response', async () => {
+      const sampleRow = {
+        id: 'ztp-1',
+        brPositionId: 'br-pos-1',
+        position: { name: 'Mayor', level: 'City', state: 'CA' },
+        election: { electionDay: '2026-11-03' },
+        city: 'Beverly Hills',
+        district: null,
+      }
+      mockHttpGet.mockReturnValue(of({ data: [sampleRow], status: 200 }))
+
+      const result = await service.getZipToPositions({
+        zip: '90210',
+        displayOfficeLevels: ['City'],
+        electionDateFrom: '2026-01-01',
+        electionDateTo: '2027-12-31',
+      })
+
+      expect(result).toEqual([sampleRow])
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/by-zip'),
+        expect.objectContaining({
+          params: {
+            zip: '90210',
+            displayOfficeLevels: ['City'],
+            electionDateFrom: '2026-01-01',
+            electionDateTo: '2027-12-31',
+          },
+        }),
+      )
+    })
+  })
+
   describe('getDistrictId', () => {
     it('returns district id when API returns results', async () => {
       mockHttpGet.mockReturnValue(
