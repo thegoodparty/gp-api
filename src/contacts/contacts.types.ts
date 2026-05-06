@@ -4,20 +4,18 @@ export type DistrictStatsBucket = {
   percent: number
 }
 
-export type DistrictStatSummary = {
-  buckets: DistrictStatsBucket[]
-}
+export type DistrictStatCategory = DistrictStatsBucket[]
 
 export type StatsResponse = {
   districtId: string
-  computedAt: string
+  computedAt?: string
   totalConstituents: number
   totalConstituentsWithCellPhone: number
   buckets: {
-    age: DistrictStatSummary
-    homeowner: DistrictStatSummary
-    education: DistrictStatSummary
-    presenceOfChildren: DistrictStatSummary
-    estimatedIncomeRange: DistrictStatSummary
+    age: DistrictStatCategory
+    homeowner: DistrictStatCategory
+    education: DistrictStatCategory
+    presenceOfChildren: DistrictStatCategory
+    estimatedIncomeRange: DistrictStatCategory
   }
 }
