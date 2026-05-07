@@ -145,8 +145,33 @@ describe('RacesService', () => {
     it('returns the BR race node when found', async () => {
       const fakeNode = {
         id: 'race-1',
-        position: { id: 'p', name: 'Mayor' },
-        election: { electionDay: '2026-11-03' },
+        isPrimary: false,
+        filingPeriods: [],
+        position: {
+          id: 'p',
+          name: 'Mayor',
+          level: 'CITY',
+          state: 'CA',
+          partisanType: 'nonpartisan',
+          hasPrimary: false,
+          electionFrequencies: [{ frequency: [4] }],
+          normalizedPosition: { name: 'Mayor' },
+          mtfcc: null,
+          geoId: null,
+          subAreaName: null,
+          subAreaValue: null,
+          tier: null,
+        },
+        election: {
+          id: 'e-1',
+          electionDay: '2026-11-03',
+          name: 'General',
+          state: 'CA',
+          timezone: 'America/Los_Angeles',
+          primaryElectionDate: null,
+          primaryElectionId: null,
+        },
+        city: null,
       }
       ballotReadyService.fetchRaceByPositionAndDate.mockResolvedValue(
         fakeNode as unknown as RaceNode,
@@ -157,6 +182,8 @@ describe('RacesService', () => {
         electionDate: '2026-11-03',
       })
       expect(result.id).toBe('race-1')
+      expect(result.position.name).toBe('Mayor')
+      expect(result.election.electionDay).toBe('2026-11-03')
     })
   })
 })
