@@ -84,6 +84,19 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
     expect(result).toBeNull()
   })
 
+  it('rethrows when the GraphQL request fails', async () => {
+    const brError = new Error('BR upstream 502')
+    mockRequest.mockRejectedValue(brError)
+
+    await expect(
+      service.fetchRaceByPositionAndDate({
+        brPositionId: 'br-pos-1',
+        zip: '90210',
+        electionDate: '2024-11-05',
+      }),
+    ).rejects.toBe(brError)
+  })
+
   it('attaches primaryElectionDate and primaryElectionId from a sibling primary race', async () => {
     const generalNode = {
       id: 'race-general',

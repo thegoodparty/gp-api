@@ -222,7 +222,7 @@ export class BallotReadyService {
       return target
     } catch (error) {
       this.logger.error({ error }, 'Error at fetchRaceByPositionAndDate:')
-      return null
+      throw error
     }
   }
 
