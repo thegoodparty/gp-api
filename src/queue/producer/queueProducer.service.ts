@@ -8,7 +8,11 @@ import {
 } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
-import { campaignPlanQueueConfig, queueConfig } from '../queue.config'
+import {
+  campaignPlanQueueConfig,
+  meetingPipelineDiscoverQueueConfig,
+  queueConfig,
+} from '../queue.config'
 import { MessageGroup, QueueMessage } from '../queue.types'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -132,5 +136,27 @@ export class QueueProducerService {
       body,
       `campaign-plan-${body.campaignId}`,
     )
+  }
+
+  /**
+   * Triggers meeting-pipeline discover (Fargate) for a city slug.
+   * Queue must be FIFO (MessageGroupId / MessageDeduplicationId).
+   */
+  async sendToMeetingPipelineDiscoverQueue(body: {
+    slug: string
+    city: string
+    state: string
+    reason: 'onboard' | 'rediscovery'
+  }): Promise<void> {
+    const { queueUrl } = meetingPipelineDiscoverQueueConfig
+
+    if (!queueUrl) {
+      throw new BadGatewayException(
+        'Meeting pipeline discover queue URL not configured',
+      )
+    }
+
+    const messageGroupId = `meeting-pipeline-discover-${body.slug}-${body.reason}`
+    await this.sendToExternalQueue(queueUrl, body, messageGroupId)
   }
 }

@@ -385,6 +385,13 @@ export = async () => {
       }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
+      // TODO(ENG-7588): fill in once meeting-pipeline-discover queue is provisioned per env
+      MEETING_PIPELINE_DISCOVER_QUEUE_URL: select({
+        preview: '',
+        dev: '',
+        qa: '',
+        prod: '',
+      }),
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       DB_HOST: rdsCluster.endpoint,
