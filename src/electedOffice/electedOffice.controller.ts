@@ -1,11 +1,14 @@
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { MeetingsService } from '@/meetings/services/meetings.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import {
   Body,
   Controller,
   ForbiddenException,
+  forwardRef,
   Get,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -16,6 +19,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { ElectedOffice, Organization, Prisma, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
@@ -38,7 +42,12 @@ export class ElectedOfficeController {
   constructor(
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly organizationsService: OrganizationsService,
-  ) {}
+    @Inject(forwardRef(() => MeetingsService))
+    private readonly meetingsService: MeetingsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ElectedOfficeController.name)
+  }
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
@@ -98,6 +107,18 @@ export class ElectedOfficeController {
         overrideDistrictId: organization.overrideDistrictId,
       },
     })
+
+    // Fire-and-forget: kick off the meeting briefings pipeline if the
+    // position is city-level. Failures must never fail elected-office creation.
+    void this.meetingsService
+      .triggerOnboardingIfCityLevel(created.id)
+      .catch((err: unknown) =>
+        this.logger.error(
+          { err, electedOfficeId: created.id },
+          'Briefing kickoff failed',
+        ),
+      )
+
     return this.toApi(created)
   }
 

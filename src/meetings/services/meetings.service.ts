@@ -7,9 +7,11 @@ import { Organization } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
+import { ElectionsService } from '@/elections/services/elections.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { QueueProducerService } from '@/queue/producer/queueProducer.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { PositionLevel } from 'src/generated/graphql.types'
 import { BriefingSchema } from '../types/briefing.schema'
 import { BriefingListItem } from '../types/briefing.types'
 import { extractBodyFromPositionName } from '../util/extractBodyFromPositionName.util'
@@ -19,13 +21,6 @@ const MEETING_PIPELINE_BUCKET =
 const OUTPUT_PREFIX = 'meeting_pipeline/output'
 const SOURCES_PREFIX = 'meeting_pipeline/sources'
 
-export type MeetingBriefingsOnboardingPreview = {
-  citySlug: string
-  city: string
-  state: string
-  expectedBody: string
-}
-
 export type OnboardElectedOfficeResult = {
   citySlug: string
   manifestKey: string
@@ -34,12 +29,13 @@ export type OnboardElectedOfficeResult = {
 
 @Injectable()
 export class MeetingsService {
-  /* eslint-disable max-params -- onboarding needs S3, org, elected office, queue, logger */
+  /* eslint-disable max-params -- onboarding needs S3, org, elected office, queue, elections, logger */
   constructor(
     private readonly s3Service: S3Service,
     private readonly organizationsService: OrganizationsService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly queueProducerService: QueueProducerService,
+    private readonly electionsService: ElectionsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(MeetingsService.name)
@@ -130,38 +126,71 @@ export class MeetingsService {
   }
 
   /**
-   * Preview manifest fields for admin onboarding (no S3 / SQS writes).
+   * Onboard the elected office to the meeting briefings pipeline only if the
+   * underlying position has `PositionLevel.CITY`. Intended to be called
+   * fire-and-forget from the elected-office creation flow; never throws.
    */
-  async getOnboardingPreview(
-    electedOfficeId: string,
-  ): Promise<MeetingBriefingsOnboardingPreview> {
-    const { parts, derivedExpectedBody } =
-      await this.resolveOnboardingContext(electedOfficeId)
-    return {
-      citySlug: parts.citySlug,
-      city: parts.city,
-      state: parts.state,
-      expectedBody: derivedExpectedBody,
+  async triggerOnboardingIfCityLevel(electedOfficeId: string): Promise<void> {
+    try {
+      const orgSlug = OrganizationsService.electedOfficeOrgSlug(electedOfficeId)
+      const org = await this.organizationsService.findUnique({
+        where: { slug: orgSlug },
+      })
+      if (!org?.positionId) {
+        this.logger.info(
+          { electedOfficeId, orgSlug },
+          'Skipping briefing onboarding: org missing positionId',
+        )
+        return
+      }
+
+      const position = await this.electionsService.getPositionById(
+        org.positionId,
+      )
+      const positionLevel = position?.level ?? null
+      if (!positionLevel) {
+        this.logger.info(
+          { electedOfficeId, positionId: org.positionId },
+          'Skipping briefing onboarding: position has no level',
+        )
+        return
+      }
+
+      if (positionLevel !== PositionLevel.CITY) {
+        this.logger.info(
+          {
+            electedOfficeId,
+            positionId: org.positionId,
+            level: positionLevel,
+          },
+          'Skipping briefing onboarding: position is not city-level',
+        )
+        return
+      }
+
+      await this.onboardElectedOffice(electedOfficeId)
+    } catch (err) {
+      this.logger.error(
+        { err, electedOfficeId },
+        'Briefing onboarding trigger failed',
+      )
     }
   }
 
   /**
    * Publish manifest.json to S3 and enqueue meeting-pipeline discover.
+   *
+   * Called internally from `triggerOnboardingIfCityLevel` after the elected
+   * office is created and the position is confirmed to be city-level. Not
+   * exposed as an HTTP endpoint.
    */
   async onboardElectedOffice(
     electedOfficeId: string,
-    input?: { expectedBody?: string },
   ): Promise<OnboardElectedOfficeResult> {
     const { parts, derivedExpectedBody } =
       await this.resolveOnboardingContext(electedOfficeId)
 
-    const trimmedOverride = input?.expectedBody?.trim()
-    const finalBody =
-      trimmedOverride && trimmedOverride.length > 0
-        ? trimmedOverride
-        : derivedExpectedBody
-
-    if (!finalBody?.trim()) {
+    if (!derivedExpectedBody?.trim()) {
       throw new UnprocessableEntityException(
         'expected_body is required after trimming.',
       )
@@ -171,7 +200,7 @@ export class MeetingsService {
       city_slug: parts.citySlug,
       expected_city: parts.city,
       expected_state: parts.state,
-      expected_body: finalBody,
+      expected_body: derivedExpectedBody,
       created_at: new Date().toISOString(),
     }
 
@@ -197,7 +226,7 @@ export class MeetingsService {
         electedOfficeId,
         citySlug: parts.citySlug,
         manifestKey,
-        expectedBody: finalBody,
+        expectedBody: derivedExpectedBody,
       },
       'Onboarded elected office to meeting briefings pipeline',
     )
@@ -205,7 +234,7 @@ export class MeetingsService {
     return {
       citySlug: parts.citySlug,
       manifestKey,
-      expectedBody: finalBody,
+      expectedBody: derivedExpectedBody,
     }
   }
 

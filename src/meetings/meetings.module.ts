@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
+import { ElectionsModule } from '@/elections/elections.module'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { QueueProducerModule } from '@/queue/producer/queueProducer.module'
 import { AwsModule } from '@/vendors/aws/aws.module'
@@ -8,7 +9,8 @@ import { MeetingsService } from './services/meetings.service'
 
 @Module({
   imports: [
-    ElectedOfficeModule,
+    forwardRef(() => ElectedOfficeModule),
+    ElectionsModule,
     OrganizationsModule,
     AwsModule,
     QueueProducerModule,

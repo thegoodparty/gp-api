@@ -22,6 +22,7 @@ describe('GET /v1/organizations', () => {
       brDatabaseId: 'br-db-123',
       state: 'CA',
       name: 'Mayor',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -136,6 +137,7 @@ describe('GET /v1/organizations', () => {
       brDatabaseId: 'br-db-pn1',
       state: 'CA',
       name: 'Mayor',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -211,6 +213,7 @@ describe('GET /v1/organizations', () => {
       brDatabaseId: 'br-db-pn2',
       state: 'NY',
       name: 'City Council',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -289,6 +292,7 @@ describe('GET /v1/organizations', () => {
       brDatabaseId: 'br-db-456',
       state: 'NY',
       name: 'City Council',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -415,6 +419,7 @@ describe('GET /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-eo',
       state: 'FL',
       name: 'School Board',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -447,6 +452,7 @@ describe('GET /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-eo-custom',
       state: 'TX',
       name: 'County Judge',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -571,6 +577,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-new',
       state: 'TX',
       name: 'Governor',
+      level: null,
     })
     vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
       id: 'pos-new',
@@ -578,6 +585,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-new',
       state: 'TX',
       name: 'Governor',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -647,6 +655,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-dist2',
       state: 'CA',
       name: 'Mayor',
+      level: null,
       district: {
         id: 'district-xyz',
         L2DistrictType: 'City',
@@ -660,6 +669,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-dist2',
       state: 'CA',
       name: 'Mayor',
+      level: null,
       district: {
         id: 'district-xyz',
         L2DistrictType: 'City',
@@ -827,6 +837,7 @@ describe('PATCH /v1/organizations/:slug', () => {
         brDatabaseId: 'br-db-inc',
         state: 'CA',
         name: 'Mayor',
+        level: null,
         district: {
           id: 'dist-inc',
           L2DistrictType: 'City',
@@ -840,6 +851,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       brDatabaseId: 'br-db-inc',
       state: 'CA',
       name: 'Mayor',
+      level: null,
     })
 
     await service.prisma.organization.create({
@@ -971,6 +983,7 @@ describe('GET /v1/organizations/admin/:slug', () => {
       brDatabaseId: 'br-db-eo-admin',
       state: 'CO',
       name: 'County Commissioner',
+      level: null,
     })
 
     const otherUser = await service.prisma.user.create({
@@ -1091,6 +1104,7 @@ describe('PATCH /v1/organizations/admin/:slug', () => {
       brDatabaseId: 'br-db-admin-patch',
       state: 'CA',
       name: 'Mayor',
+      level: null,
     })
     vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
       id: 'pos-admin-patch',
@@ -1098,6 +1112,7 @@ describe('PATCH /v1/organizations/admin/:slug', () => {
       brDatabaseId: 'br-db-admin-patch',
       state: 'CA',
       name: 'Mayor',
+      level: null,
     })
 
     const otherUser = await service.prisma.user.create({
