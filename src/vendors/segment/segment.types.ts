@@ -17,6 +17,7 @@ export const EVENTS = {
   Account: {
     PasswordResetRequested: 'Account - Password Reset Requested',
     ProSubscriptionConfirmed: 'Account - Pro Subscription Confirmed',
+    ProUpgradeComplete: 'pro_upgrade_complete',
     UserDeleted: 'Account - User Deleted',
   },
   Onboarding: {

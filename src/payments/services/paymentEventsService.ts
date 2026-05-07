@@ -23,6 +23,7 @@ import { OrganizationsService } from '../../organizations/services/organizations
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { PurchaseService } from './purchase.service'
 import { PinoLogger } from 'nestjs-pino'
@@ -264,6 +265,17 @@ export class PaymentEventsService {
         `[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`,
       )
       // Don't throw - we don't want to fail the webhook for analytics issues
+    }
+
+    try {
+      await this.analytics.track(user.id, EVENTS.Account.ProUpgradeComplete, {
+        pro: true,
+      })
+    } catch (error) {
+      this.logger.error(
+        { error },
+        `[WEBHOOK] Failed to track pro_upgrade_complete - User: ${user.id}, Session: ${session.id}`,
+      )
     }
 
     // Critical: Update user metadata with customerId - must succeed
