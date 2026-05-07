@@ -16,7 +16,8 @@ const PriorityIssueAnalysisSchema = z.object({
   actionItem: z.string(),
   askThis: z.string(),
   tryThis: z.string().nullable(),
-  whoIsPresenting: z.string(),
+  // The pipeline emits null when no presenter is named on the agenda.
+  whoIsPresenting: z.string().nullable(),
   supportingContext: z.string().nullable(),
   supportingDocuments: z.array(z.object({ name: z.string(), url: z.string() })),
 })
@@ -33,7 +34,11 @@ const PriorityIssueSchema = z.object({
 const FullAgendaItemSchema = z.object({
   number: z.string(),
   title: z.string(),
-  description: z.string(),
+  // The pipeline emits `null` for procedural items (Call to Order, Roll
+  // Call, etc.) where there's no agenda description to give. A non-nullable
+  // string here causes Zod to throw on every real briefing, which
+  // listBriefings silently swallows — and the UI shows nothing.
+  description: z.string().nullable(),
   category: z.string(),
   isPriority: z.boolean().optional(),
   priorityNumber: z.number().optional(),

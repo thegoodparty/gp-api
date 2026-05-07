@@ -19,7 +19,7 @@ export type PriorityIssueAnalysis = {
   actionItem: string
   askThis: string
   tryThis: string | null
-  whoIsPresenting: string
+  whoIsPresenting: string | null
   supportingContext: string | null
   supportingDocuments: { name: string; url: string }[]
 }
@@ -38,7 +38,7 @@ export type PriorityIssue = {
 export type FullAgendaItem = {
   number: string
   title: string
-  description: string
+  description: string | null
   category: string
   isPriority?: boolean
   priorityNumber?: number
