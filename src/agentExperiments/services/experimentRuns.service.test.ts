@@ -55,7 +55,7 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       const result = await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-1',
         params: {
           state: 'CA',
@@ -68,7 +68,7 @@ describe('ExperimentRunsService', () => {
       expect(mockModel.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           runId: expect.any(String),
-          experimentType: 'district_intel',
+          experimentType: 'district_issue_pulse',
           organizationSlug: 'org-1',
           status: ExperimentRunStatus.RUNNING,
           params: {
@@ -98,13 +98,13 @@ describe('ExperimentRunsService', () => {
           l2DistrictName: 'San Francisco',
         },
         organization_slug: 'org-1',
-        experiment_type: 'district_intel',
+        experiment_type: 'district_issue_pulse',
         run_id: expect.any(String),
       })
 
       expect(result).toMatchObject({
         runId: expect.any(String),
-        experimentType: 'district_intel',
+        experimentType: 'district_issue_pulse',
         organizationSlug: 'org-1',
         status: ExperimentRunStatus.RUNNING,
       })
@@ -114,7 +114,7 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-1',
         params: {
           state: 'CA',
@@ -136,7 +136,7 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-alpha',
         params: {
           state: 'CA',
@@ -146,7 +146,7 @@ describe('ExperimentRunsService', () => {
         },
       })
       await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-beta',
         params: {
           state: 'CA',
@@ -170,7 +170,7 @@ describe('ExperimentRunsService', () => {
 
       await expect(
         service.dispatchRun({
-          type: 'district_intel',
+          type: 'district_issue_pulse',
           organizationSlug: 'org-1',
           params: {
             state: 'CA',
@@ -193,7 +193,7 @@ describe('ExperimentRunsService', () => {
 
       await expect(
         service.dispatchRun({
-          type: 'district_intel',
+          type: 'district_issue_pulse',
           organizationSlug: 'org-1',
           params: {
             state: 'CA',
@@ -211,7 +211,7 @@ describe('ExperimentRunsService', () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
 
       await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-1',
         params: {
           state: 'CA',
@@ -221,7 +221,7 @@ describe('ExperimentRunsService', () => {
         },
       })
       await service.dispatchRun({
-        type: 'district_intel',
+        type: 'district_issue_pulse',
         organizationSlug: 'org-1',
         params: {
           state: 'CA',
