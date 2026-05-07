@@ -152,9 +152,7 @@ export {
   type ReadCampaignOutput,
 } from './campaigns/Campaign.schema'
 
-export {
-  ReadCampaignOutputSchema,
-} from './campaigns/ReadCampaignOutput.schema'
+export { ReadCampaignOutputSchema } from './campaigns/ReadCampaignOutput.schema'
 
 export {
   SetDistrictOutputSchema,
@@ -224,3 +222,11 @@ export {
   UpdateSurveyQuestionInputSchema,
   type UpdateSurveyQuestionInput,
 } from './ecanvasser/UpdateSurveyQuestionInput.schema'
+
+export {
+  RaceListItemSchema,
+  RaceListItemArraySchema,
+  type RaceListItem,
+} from './elections/raceListItem'
+
+export { RaceFullSchema, type RaceFull } from './elections/raceFull'
