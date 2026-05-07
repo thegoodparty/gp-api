@@ -119,7 +119,6 @@ export class BallotReadyService {
 
   async fetchRaceByPositionAndDate(params: {
     brPositionId: string
-    zip: string
     electionDate: string
   }): Promise<RaceNode | null> {
     const { brPositionId, electionDate } = params

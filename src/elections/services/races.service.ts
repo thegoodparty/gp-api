@@ -86,14 +86,13 @@ export class RacesService {
 
   async getRaceByPositionAndDate(params: {
     brPositionId: string
-    zip: string
     electionDate: string
   }): Promise<RaceFull> {
     const node =
       await this.ballotReadyService.fetchRaceByPositionAndDate(params)
     if (!node) {
       throw new NotFoundException(
-        `No race found for position ${params.brPositionId}, zip ${params.zip}, date ${params.electionDate}`,
+        `No race found for position ${params.brPositionId}, date ${params.electionDate}`,
       )
     }
     return RaceFullSchema.parse(node)

@@ -136,7 +136,6 @@ describe('RacesService', () => {
       await expect(
         service.getRaceByPositionAndDate({
           brPositionId: 'x',
-          zip: '90210',
           electionDate: '2026-11-03',
         }),
       ).rejects.toBeInstanceOf(NotFoundException)
@@ -178,7 +177,6 @@ describe('RacesService', () => {
       )
       const result = await service.getRaceByPositionAndDate({
         brPositionId: 'p',
-        zip: '90210',
         electionDate: '2026-11-03',
       })
       expect(result.id).toBe('race-1')

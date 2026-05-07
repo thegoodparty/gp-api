@@ -52,7 +52,6 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
 
     const result = await service.fetchRaceByPositionAndDate({
       brPositionId: 'br-pos-1',
-      zip: '90210',
       electionDate: '2024-11-05',
     })
 
@@ -77,7 +76,6 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
 
     const result = await service.fetchRaceByPositionAndDate({
       brPositionId: 'br-pos-1',
-      zip: '90210',
       electionDate: '2024-11-05',
     })
 
@@ -91,7 +89,6 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
     await expect(
       service.fetchRaceByPositionAndDate({
         brPositionId: 'br-pos-1',
-        zip: '90210',
         electionDate: '2024-11-05',
       }),
     ).rejects.toBe(brError)
@@ -148,7 +145,6 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
 
     const result = await service.fetchRaceByPositionAndDate({
       brPositionId: 'br-pos-1',
-      zip: '90210',
       electionDate: '2024-11-05',
     })
 
