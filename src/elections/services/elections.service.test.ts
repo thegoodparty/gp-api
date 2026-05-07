@@ -221,6 +221,95 @@ describe('ElectionsService', () => {
     })
   })
 
+  describe('searchPositions', () => {
+    it('searchPositions calls /v1/positions/search with the right params and parses the response', async () => {
+      const sampleRow = {
+        id: 'ztp-1',
+        brPositionId: 'br-pos-1',
+        position: { name: 'Mayor', level: 'City', state: 'CA' },
+        election: { electionDay: '2026-11-03' },
+        city: 'Beverly Hills',
+        district: null,
+      }
+      mockHttpGet.mockReturnValue(of({ data: [sampleRow], status: 200 }))
+
+      const result = await service.searchPositions({
+        zip: '90210',
+        displayOfficeLevels: ['City'],
+        electionDateFrom: '2026-01-01',
+        electionDateTo: '2027-12-31',
+      })
+
+      expect(result).toEqual([sampleRow])
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/search'),
+        expect.objectContaining({
+          params: {
+            zip: '90210',
+            displayOfficeLevels: ['City'],
+            electionDateFrom: '2026-01-01',
+            electionDateTo: '2027-12-31',
+          },
+        }),
+      )
+    })
+
+    it('forwards name-only queries', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({ name: 'mayor' })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/search'),
+        expect.objectContaining({
+          params: expect.objectContaining({ name: 'mayor' }),
+        }),
+      )
+    })
+
+    it('forwards officeType arrays', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({ officeType: ['Mayor', 'Sheriff'] })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/search'),
+        expect.objectContaining({
+          params: expect.objectContaining({
+            officeType: ['Mayor', 'Sheriff'],
+          }),
+        }),
+      )
+    })
+
+    it('serializes array params as repeated keys (not comma-joined)', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({
+        zip: '90210',
+        displayOfficeLevels: ['Local', 'Township', 'Village'],
+      })
+
+      const callArgs = mockHttpGet.mock.calls[0] as [
+        string,
+        {
+          paramsSerializer: (params: Record<string, unknown>) => string
+        },
+      ]
+      const { paramsSerializer } = callArgs[1]
+      const serialized = paramsSerializer({
+        zip: '90210',
+        displayOfficeLevels: ['Local', 'Township', 'Village'],
+      })
+
+      expect(serialized).toContain('displayOfficeLevels=Local')
+      expect(serialized).toContain('displayOfficeLevels=Township')
+      expect(serialized).toContain('displayOfficeLevels=Village')
+      expect(serialized).not.toContain('Local%2CTownship')
+      expect(serialized).not.toContain('Local,Township')
+    })
+  })
+
   describe('getDistrictId', () => {
     it('returns district id when API returns results', async () => {
       mockHttpGet.mockReturnValue(

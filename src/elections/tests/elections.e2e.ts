@@ -9,29 +9,22 @@ test.describe('Elections', () => {
 
     expect(response.status()).toBe(HttpStatus.OK)
 
-    const elections = (await response.json()) as {
+    const races = (await response.json()) as {
       id: string
-      isPrimary: boolean
-      election: { id: string }
-      position: { id: string }
+      brPositionId: string
+      election: { electionDay: string }
+      position: { name: string; level: string; state: string }
     }[]
-    expect(Array.isArray(elections)).toBe(true)
-    expect(elections.length).toBeGreaterThan(0)
+    expect(Array.isArray(races)).toBe(true)
+    expect(races.length).toBeGreaterThan(0)
 
-    const firstElection = elections[0]
-    expect(firstElection).toHaveProperty('id')
-    expect(typeof firstElection.id).toBe('string')
-    expect(firstElection).toHaveProperty('isPrimary')
-    expect(typeof firstElection.isPrimary).toBe('boolean')
-    expect(firstElection).toHaveProperty('election')
-    expect(typeof firstElection.election).toBe('object')
-    expect(firstElection).toHaveProperty('position')
-    expect(typeof firstElection.position).toBe('object')
-
-    expect(firstElection.election).toHaveProperty('id')
-    expect(typeof firstElection.election.id).toBe('string')
-    expect(firstElection.position).toHaveProperty('id')
-    expect(typeof firstElection.position.id).toBe('string')
+    const firstRace = races[0]
+    expect(typeof firstRace.id).toBe('string')
+    expect(typeof firstRace.brPositionId).toBe('string')
+    expect(typeof firstRace.election.electionDay).toBe('string')
+    expect(typeof firstRace.position.name).toBe('string')
+    expect(typeof firstRace.position.level).toBe('string')
+    expect(typeof firstRace.position.state).toBe('string')
   })
 
   test('should get valid district types', async ({ request }) => {
