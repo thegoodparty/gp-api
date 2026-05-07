@@ -49,7 +49,7 @@ export class ElectionsService {
     const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
     const rawParams = (query ?? {}) as Record<
       string,
-      string | number | boolean | null | undefined
+      string | number | boolean | string[] | null | undefined
     >
     // Object.keys/fromEntries returns string[] — TypeScript deliberately widens key types
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -57,7 +57,7 @@ export class ElectionsService {
       Object.entries(rawParams).filter(
         ([, v]) => v !== undefined && v !== null,
       ),
-    ) as Record<string, string | number | boolean>
+    ) as Record<string, string | number | boolean | string[]>
     this.logger.debug({ filteredParams }, `Election API GET ${path} params: `)
     try {
       const { data, status } = (await lastValueFrom(
@@ -66,7 +66,11 @@ export class ElectionsService {
           paramsSerializer: (params) =>
             Object.entries(params)
               .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+              .flatMap(([k, v]) =>
+                Array.isArray(v)
+                  ? v.map((item) => `${k}=${encodeURIComponent(String(item))}`)
+                  : [`${k}=${encodeURIComponent(String(v))}`],
+              )
               .join('&'),
         }),
       )) as { data: Res; status: number }

@@ -281,6 +281,33 @@ describe('ElectionsService', () => {
         }),
       )
     })
+
+    it('serializes array params as repeated keys (not comma-joined)', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.searchPositions({
+        zip: '90210',
+        displayOfficeLevels: ['Local', 'Township', 'Village'],
+      })
+
+      const callArgs = mockHttpGet.mock.calls[0] as [
+        string,
+        {
+          paramsSerializer: (params: Record<string, unknown>) => string
+        },
+      ]
+      const { paramsSerializer } = callArgs[1]
+      const serialized = paramsSerializer({
+        zip: '90210',
+        displayOfficeLevels: ['Local', 'Township', 'Village'],
+      })
+
+      expect(serialized).toContain('displayOfficeLevels=Local')
+      expect(serialized).toContain('displayOfficeLevels=Township')
+      expect(serialized).toContain('displayOfficeLevels=Village')
+      expect(serialized).not.toContain('Local%2CTownship')
+      expect(serialized).not.toContain('Local,Township')
+    })
   })
 
   describe('getDistrictId', () => {
