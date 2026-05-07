@@ -9,7 +9,7 @@ This module is intentionally thin — it is a **transport layer**, not a product
 ```
 caller (gp-api service)
    │
-   │  ExperimentRunsService.dispatchRun({ experimentType, organizationSlug, params })
+   │  ExperimentRunsService.dispatchRun({ type, organizationSlug, params })
    ▼
 DB: INSERT experiment_run (status=RUNNING)      SQS: agent-dispatch-{env}.fifo
                                                          │
@@ -52,6 +52,30 @@ Three terminal states only. `contract_violation` at the queue boundary collapses
 | `services/experimentRuns.service.ts` | `dispatchRun()`, `sweepStaleRuns()` (`@Cron`), + inherited Prisma CRUD |
 
 No controller, no schemas, no other services. HTTP surface is a caller concern.
+
+## Typed dispatch contracts
+
+`dispatchRun` is generic over `type`, and `params` is typed against the generated `AgentJobContracts` interface in `src/generated/agent-job-contracts.ts`:
+
+```ts
+await experimentRuns.dispatchRun({
+  type: 'district_intel',          // keyof AgentJobContracts
+  organizationSlug,
+  params: { state, city, ... },    // AgentJobContracts['district_intel']['Input']
+})
+```
+
+`agent-job-contracts.ts` is generated from the per-experiment `manifest.json` files in the `agent-experiment-metadata-dev` S3 bucket (one entry per experiment in `index.json`, each with an `input_schema` and `output_schema`). The PMF Engine writes these manifests; gp-api consumes them as the source of truth for dispatch params and result artifact shapes.
+
+Regenerate after the agent side adds or changes a manifest:
+
+```bash
+tsx scripts/generate-agent-job-types.ts
+```
+
+The script syncs the bucket to `scripts/output/agent-metadata/`, compiles each `{ Input, Output }` JSON Schema to TypeScript via `json-schema-to-typescript`, and writes `src/generated/agent-job-contracts.ts`. Requires AWS credentials with read access to `agent-experiment-metadata-dev`.
+
+The `experimentType` column on `experiment_run` is still `String` at the DB level — the typing is a compile-time guard on callers, not a DB constraint.
 
 ## SQS message shapes
 
