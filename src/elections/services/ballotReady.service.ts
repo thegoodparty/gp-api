@@ -6,6 +6,7 @@ import { truncateZip } from 'src/shared/util/zipcodes.util'
 import zipcodes from 'zipcodes'
 import { ElectionLevels } from '../../shared/constants/governmentLevels'
 import {
+  RaceNode,
   RacesByIdNode,
   RacesByZipcode,
   RacesWithElectionDates,
@@ -113,6 +114,114 @@ export class BallotReadyService {
     } catch (error) {
       this.logger.error({ error }, 'Error at fetchRaceById:')
       return null
+    }
+  }
+
+  async fetchRaceByPositionAndDate(params: {
+    brPositionId: string
+    electionDate: string
+  }): Promise<RaceNode | null> {
+    const { brPositionId, electionDate } = params
+    const year = electionDate.slice(0, 4)
+    const rangeStart = `${year}-01-01`
+    const rangeEnd = `${year}-12-31`
+    const query = gql`
+      query RaceByPositionAndDate(
+        $positionId: ID!
+        $rangeStart: ISO8601Date!
+        $rangeEnd: ISO8601Date!
+      ) {
+        node(id: $positionId) {
+          ... on Position {
+            races(
+              filterBy: { electionDay: { gte: $rangeStart, lte: $rangeEnd } }
+              first: 50
+            ) {
+              edges {
+                node {
+                  id
+                  isPrimary
+                  filingPeriods {
+                    startOn
+                    endOn
+                  }
+                  election {
+                    id
+                    electionDay
+                    name
+                    originalElectionDate
+                    state
+                    timezone
+                  }
+                  position {
+                    id
+                    appointed
+                    geoId
+                    mtfcc
+                    hasPrimary
+                    partisanType
+                    level
+                    name
+                    salary
+                    state
+                    subAreaName
+                    subAreaValue
+                    electionFrequencies {
+                      frequency
+                    }
+                    normalizedPosition {
+                      name
+                    }
+                    tier
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<
+        {
+          node: {
+            races?: { edges: { node: RaceNode }[] }
+          } | null
+        },
+        { positionId: string; rangeStart: string; rangeEnd: string }
+      >(query, {
+        positionId: brPositionId,
+        rangeStart,
+        rangeEnd,
+      })
+      const edges = result?.node?.races?.edges ?? []
+      const target = edges.find(
+        (e) => e.node.election.electionDay === electionDate,
+      )?.node
+      if (!target) {
+        return null
+      }
+      const primary = edges
+        .filter(
+          (e) =>
+            e.node.isPrimary && e.node.election.electionDay !== electionDate,
+        )
+        .map((e) => e.node)
+        .sort((a, b) =>
+          String(a.election.electionDay).localeCompare(
+            String(b.election.electionDay),
+          ),
+        )[0]
+      if (primary) {
+        target.election.primaryElectionDate = String(
+          primary.election.electionDay,
+        )
+        target.election.primaryElectionId = String(primary.election.id)
+      }
+      return target
+    } catch (error) {
+      this.logger.error({ error }, 'Error at fetchRaceByPositionAndDate:')
+      throw error
     }
   }
 

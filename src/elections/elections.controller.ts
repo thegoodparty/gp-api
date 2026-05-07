@@ -1,6 +1,19 @@
-import { Controller, Get, Query, UsePipes } from '@nestjs/common'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
+import {
+  RaceFullSchema,
+  RaceListItemArraySchema,
+} from '@goodparty_org/contracts'
+import {
+  Controller,
+  Get,
+  Query,
+  UseInterceptors,
+  UsePipes,
+} from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
+import { RaceByPositionSchema } from './schemas/RaceByPosition.schema'
 import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 import {
   GetDistrictNamesDTO,
@@ -12,6 +25,7 @@ import { RacesService } from './services/races.service'
 @Controller('elections')
 @PublicAccess()
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(ZodResponseInterceptor)
 export class ElectionsController {
   constructor(
     private readonly racesService: RacesService,
@@ -19,14 +33,24 @@ export class ElectionsController {
   ) {}
 
   @Get('races-by-year')
+  @ResponseSchema(RaceListItemArraySchema)
   async getRacesByZipcode(
-    @Query() { zipcode, level, electionDate }: RacesByZipSchema,
+    @Query()
+    { zipcode, level, name, officeType, electionDate }: RacesByZipSchema,
   ) {
     return await this.racesService.getRacesByZip({
       zipcode,
       level,
+      name,
+      officeType,
       electionDate,
     })
+  }
+
+  @Get('race-by-position')
+  @ResponseSchema(RaceFullSchema)
+  async getRaceByPosition(@Query() dto: RaceByPositionSchema) {
+    return this.racesService.getRaceByPositionAndDate(dto)
   }
 
   @Get('districts/types')
