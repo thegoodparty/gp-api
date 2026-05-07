@@ -58,6 +58,16 @@ describe('BallotReadyService.fetchRaceByPositionAndDate', () => {
 
     expect(result).toEqual(raceNode)
     expect(mockRequest).toHaveBeenCalledTimes(1)
+    const [queryArg, variablesArg] = mockRequest.mock.calls[0] as [
+      string,
+      Record<string, string>,
+    ]
+    expect(queryArg).not.toContain('br-pos-1')
+    expect(variablesArg).toEqual({
+      positionId: 'br-pos-1',
+      rangeStart: '2024-01-01',
+      rangeEnd: '2024-12-31',
+    })
   })
 
   it('returns null when BR returns an empty edges array', async () => {

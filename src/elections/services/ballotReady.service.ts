@@ -127,11 +127,15 @@ export class BallotReadyService {
     const rangeStart = `${year}-01-01`
     const rangeEnd = `${year}-12-31`
     const query = gql`
-      query {
-        node(id: "${brPositionId}") {
+      query RaceByPositionAndDate(
+        $positionId: ID!
+        $rangeStart: ISO8601Date!
+        $rangeEnd: ISO8601Date!
+      ) {
+        node(id: $positionId) {
           ... on Position {
             races(
-              filterBy: { electionDay: { gte: "${rangeStart}", lte: "${rangeEnd}" } }
+              filterBy: { electionDay: { gte: $rangeStart, lte: $rangeEnd } }
               first: 50
             ) {
               edges {
@@ -179,11 +183,18 @@ export class BallotReadyService {
       }
     `
     try {
-      const result = await this.graphQLClient.request<{
-        node: {
-          races?: { edges: { node: RaceNode }[] }
-        } | null
-      }>(query)
+      const result = await this.graphQLClient.request<
+        {
+          node: {
+            races?: { edges: { node: RaceNode }[] }
+          } | null
+        },
+        { positionId: string; rangeStart: string; rangeEnd: string }
+      >(query, {
+        positionId: brPositionId,
+        rangeStart,
+        rangeEnd,
+      })
       const edges = result?.node?.races?.edges ?? []
       const target = edges.find(
         (e) => e.node.election.electionDay === electionDate,
