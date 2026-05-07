@@ -79,7 +79,7 @@ export class RacesService {
       name,
       officeType,
       displayOfficeLevels: expandLevelToDisplayLevels(level),
-      electionDateFrom: today,
+      electionDateFrom: electionDate ?? today,
       electionDateTo,
     })
   }
