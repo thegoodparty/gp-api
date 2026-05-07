@@ -21,6 +21,7 @@ import {
   ProjectedTurnout,
   RaceTargetDetailsResult,
   RaceTargetMetrics,
+  VoterIssue,
 } from '../types/elections.types'
 
 @Injectable()
@@ -194,6 +195,15 @@ export class ElectionsService {
       query,
     )
     return RaceListItemArraySchema.parse(result ?? [])
+  }
+
+  async getVoterIssues(params: {
+    districtId: string
+  }): Promise<VoterIssue[] | null> {
+    return this.electionApiGet<VoterIssue[], { districtId: string }>(
+      'voter-issues',
+      params,
+    )
   }
 
   async getDistrictId(

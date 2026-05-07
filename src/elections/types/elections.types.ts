@@ -68,6 +68,12 @@ export type RaceTargetMetrics = {
 
 export type RaceTargetDetailsResult = RaceTargetMetrics
 
+export type VoterIssue = {
+  label: string
+  score: number
+  priority: 'high' | 'medium' | 'low'
+}
+
 export enum ProjectedTurnoutSourceColumns {
   id = 'id',
   createdAt = 'createdAt',
