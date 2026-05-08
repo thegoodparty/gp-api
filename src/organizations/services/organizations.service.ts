@@ -339,9 +339,7 @@ export class OrganizationsService extends createPrismaBase(
    * Resolves city display name, 2-letter state, and meeting-pipeline city slug
    * (e.g. chapel-hill-NC). Returns null when position/district cannot yield a city.
    */
-  async resolveCityManifestParts(
-    org: Organization,
-  ): Promise<{
+  async resolveCityManifestParts(org: Organization): Promise<{
     citySlug: string
     city: string
     state: string
