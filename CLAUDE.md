@@ -42,6 +42,25 @@ npm run infra deploy <env>     # deploy via Pulumi
 | Why a thing is the way it is | `docs/adr/`                                      |
 | AI rule-by-rule code review  | `ai-rules/` (git submodule)                      |
 
+## Module pointers
+
+Per-area `CLAUDE.md` files cover purpose, key files, patterns, and gotchas for the dirs you'll touch most:
+
+| Working in                        | Read                                        |
+| --------------------------------- | ------------------------------------------- |
+| Campaigns / plans / tasks         | `src/campaigns/CLAUDE.md`                   |
+| Voter file / L2 lookups           | `src/voters/CLAUDE.md`                      |
+| Stripe payments / pro upgrades    | `src/payments/CLAUDE.md`                    |
+| Campaign websites / domains       | `src/websites/CLAUDE.md`                    |
+| SQS producer/consumer / async     | `src/queue/CLAUDE.md`                       |
+| Auth, JWT, Clerk M2M, roles       | `src/authentication/CLAUDE.md`              |
+| Agent experiments                 | `src/agentExperiments/CLAUDE.md`            |
+| Schema / migrations               | `prisma/CLAUDE.md`                          |
+| `@goodparty_org/contracts`        | `contracts/CLAUDE.md` + `docs/contracts.md` |
+| Pulumi / Docker / Grafana         | `deploy/CLAUDE.md`                          |
+| One-off / build scripts           | `scripts/CLAUDE.md`                         |
+| Seed data / factories / scenarios | `seed/CLAUDE.md`                            |
+
 ## Code style
 
 - **No semicolons**, single quotes, trailing commas (`.prettierrc`)
@@ -86,7 +105,7 @@ Provides `this.model`, `this.client`, `this.logger`, bound passthroughs (`findMa
 Three global guards run in order:
 
 1. `ClerkM2MAuthGuard` — accepts `mt_*` tokens via Clerk M2M
-2. `JwtAuthGuard` — accepts user JWTs from cookies
+2. `SessionGuard` — accepts user JWTs from cookies
 3. `RolesGuard` — enforces `@Roles(...)`
 
 Decorators: `@PublicAccess()`, `@Roles(UserRole.X)`, `@ReqUser()`. Route-level guards: `AdminOrM2MGuard`, `M2MOnly`. ADR: `docs/adr/0004-clerk-m2m-auth.md`.
