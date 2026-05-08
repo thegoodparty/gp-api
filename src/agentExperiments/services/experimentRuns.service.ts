@@ -5,13 +5,16 @@ import { SQS } from '@aws-sdk/client-sqs'
 import { ExperimentRunStatus } from '@prisma/client'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
+import { AgentJobContracts } from '@/generated/agent-job-contracts'
 
 const sqs = new SQS({})
 
-export type ExperimentRunDispatchInput = {
-  experimentType: string
+export type ExperimentRunDispatchInput<
+  ExperimentType extends keyof AgentJobContracts,
+> = {
+  type: ExperimentType
   organizationSlug: string
-  params: Record<string, unknown>
+  params: AgentJobContracts[ExperimentType]['Input']
 }
 
 const STALE_THRESHOLD_MINUTES = 45
@@ -31,7 +34,9 @@ export class ExperimentRunsService extends createPrismaBase(
     return QueueUrl
   }
 
-  async dispatchRun(input: ExperimentRunDispatchInput) {
+  async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
+    input: ExperimentRunDispatchInput<ExperimentType>,
+  ) {
     const QueueUrl = await this.resolveQueueUrl()
     if (!QueueUrl) {
       this.logger.warn(
@@ -45,7 +50,7 @@ export class ExperimentRunsService extends createPrismaBase(
     const result = await this.model.create({
       data: {
         runId,
-        experimentType: input.experimentType,
+        experimentType: input.type,
         organizationSlug: input.organizationSlug,
         status: ExperimentRunStatus.RUNNING,
         params: input.params,
@@ -56,7 +61,7 @@ export class ExperimentRunsService extends createPrismaBase(
       run_id: runId,
       params: input.params,
       organization_slug: input.organizationSlug,
-      experiment_type: input.experimentType,
+      experiment_type: input.type,
     }
 
     const deduplicationId = randomUUID()
@@ -73,7 +78,7 @@ export class ExperimentRunsService extends createPrismaBase(
         {
           error,
           runId,
-          experimentType: input.experimentType,
+          experimentType: input.type,
           organizationSlug: input.organizationSlug,
         },
         'Failed to send dispatch message to SQS',
@@ -90,7 +95,7 @@ export class ExperimentRunsService extends createPrismaBase(
     this.logger.info(
       {
         runId,
-        experimentType: input.experimentType,
+        experimentType: input.type,
         organizationSlug: input.organizationSlug,
       },
       'Experiment dispatched',
