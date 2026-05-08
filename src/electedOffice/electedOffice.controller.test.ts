@@ -1,6 +1,7 @@
 import { useTestService } from '@/test-service'
+import { MeetingsService } from '@/meetings/services/meetings.service'
 import { Campaign } from '@prisma/client'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const service = useTestService()
 
@@ -249,6 +250,32 @@ describe('ElectedOfficeController', () => {
       const result = await createElectedOffice()
 
       expect(result.status).toBe(403)
+    })
+
+    it('fires meeting briefings onboarding trigger after create', async () => {
+      const meetingsService = service.app.get(MeetingsService)
+      const triggerSpy = vi
+        .spyOn(meetingsService, 'triggerOnboardingIfCityLevel')
+        .mockResolvedValue()
+
+      const result = await createElectedOffice({ swornInDate: '2024-01-15' })
+
+      expect(result.status).toBe(201)
+      expect(triggerSpy).toHaveBeenCalledTimes(1)
+      expect(triggerSpy).toHaveBeenCalledWith(result.data.id)
+    })
+
+    it('still returns 201 even when the briefings trigger rejects', async () => {
+      const meetingsService = service.app.get(MeetingsService)
+      vi.spyOn(
+        meetingsService,
+        'triggerOnboardingIfCityLevel',
+      ).mockRejectedValue(new Error('boom'))
+
+      const result = await createElectedOffice({ swornInDate: '2024-01-15' })
+
+      expect(result.status).toBe(201)
+      expect(result.data).toMatchObject({ id: expect.any(String) })
     })
   })
 

@@ -6,6 +6,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PositionLevel } from 'src/generated/graphql.types'
 import { PositionWithOptionalDistrict } from '../types/elections.types'
 import { ElectionsService } from './elections.service'
 
@@ -17,6 +18,7 @@ const makePosition = (
   brDatabaseId: 'br-db-1',
   state: 'TX',
   name: 'State House 005',
+  level: PositionLevel.STATE,
   district: {
     id: 'district-1',
     L2DistrictType: 'State_House',
@@ -148,6 +150,7 @@ describe('ElectionsService', () => {
         brDatabaseId: 'br-db-1',
         state: 'TX',
         name: 'State House 005',
+        level: PositionLevel.STATE,
       }
       mockHttpGet.mockReturnValue(of({ data: positionNoDistrict, status: 200 }))
 
@@ -198,6 +201,7 @@ describe('ElectionsService', () => {
         brDatabaseId: 'br-db-1',
         state: 'TX',
         name: 'State House 005',
+        level: PositionLevel.STATE,
       }
       mockHttpGet.mockReturnValue(of({ data: position, status: 200 }))
 

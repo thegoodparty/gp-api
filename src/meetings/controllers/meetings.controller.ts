@@ -15,6 +15,10 @@ import { MeetingsService } from '../services/meetings.service'
  *
  * The organization is used to derive citySlug via election-api, which is then
  * used to look up briefing JSON files from S3.
+ *
+ * The meeting-pipeline kickoff is no longer exposed as an HTTP endpoint; it is
+ * triggered automatically from `POST /v1/elected-office` when the official's
+ * position has `PositionLevel.CITY` (see `MeetingsService.triggerOnboardingIfCityLevel`).
  */
 @Controller('meetings')
 export class MeetingsController {

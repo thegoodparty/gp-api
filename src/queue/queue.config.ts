@@ -9,3 +9,7 @@ export const campaignPlanQueueConfig = {
   resultsBucket: process.env.CAMPAIGN_PLAN_RESULTS_BUCKET || '',
   localUrl: process.env.CAMPAIGN_PLAN_LOCAL_URL || '',
 }
+
+export const meetingPipelineDiscoverQueueConfig = {
+  queueUrl: process.env.MEETING_PIPELINE_DISCOVER_QUEUE_URL || '',
+}

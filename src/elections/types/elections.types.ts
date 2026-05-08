@@ -1,3 +1,5 @@
+import { PositionLevel } from 'src/generated/graphql.types'
+
 export type BDElection = {
   id: string
   electionDay: string
@@ -143,6 +145,7 @@ export type PositionWithOptionalDistrict = {
   brDatabaseId: string
   state: string
   name: string
+  level: PositionLevel | null
   district?: District
 }
 

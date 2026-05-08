@@ -335,7 +335,15 @@ export class OrganizationsService extends createPrismaBase(
    * Callers should treat a null return as "city not resolvable" and fall back
    * to a stored value or manual configuration.
    */
-  async resolveCitySlug(org: Organization): Promise<string | null> {
+  /**
+   * Resolves city display name, 2-letter state, and meeting-pipeline city slug
+   * (e.g. chapel-hill-NC). Returns null when position/district cannot yield a city.
+   */
+  async resolveCityManifestParts(org: Organization): Promise<{
+    citySlug: string
+    city: string
+    state: string
+  } | null> {
     const [district, position] = await Promise.all([
       this.resolveDistrict(org),
       org.positionId
@@ -353,11 +361,20 @@ export class OrganizationsService extends createPrismaBase(
     )
     if (!city) return null
 
-    const citySlug = city
+    const citySlugBase = city
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[.']/g, '')
-    return `${citySlug}-${state.toUpperCase()}`
+    return {
+      citySlug: `${citySlugBase}-${state.toUpperCase()}`,
+      city,
+      state: state.toUpperCase(),
+    }
+  }
+
+  async resolveCitySlug(org: Organization): Promise<string | null> {
+    const parts = await this.resolveCityManifestParts(org)
+    return parts?.citySlug ?? null
   }
 
   /**
