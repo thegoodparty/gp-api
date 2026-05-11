@@ -7,7 +7,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Domain, DomainStatus, User } from '@prisma/client'
+import { Campaign, Domain, DomainStatus, User } from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -36,9 +36,18 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
-import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
+import {
+  DomainPurchaseMetadata,
+  DomainSearchResult,
+  PatternedDomainCandidate,
+  PatternedDomainSearchResult,
+} from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { expandDomainPatterns } from '../util/domainPatterns.util'
+import { parseISO } from 'date-fns'
+
+const MAX_PATTERN_CANDIDATES = 50
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -390,6 +399,96 @@ export class DomainsService
 
   async getDomainDetails(domainName: string) {
     return this.vercel.getDomainDetails(domainName)
+  }
+
+  async searchDomainsForCampaign(
+    campaign: Campaign & { user: User },
+    patterns: string[],
+    maxPrice: number,
+  ): Promise<PatternedDomainSearchResult> {
+    const electionDateStr = campaign.details?.electionDate
+    const electionDate = electionDateStr
+      ? parseISO(electionDateStr)
+      : new Date()
+    if (!electionDateStr) {
+      this.logger.warn(
+        { campaignId: campaign.id, fn: 'searchDomainsForCampaign' },
+        'no electionDate on campaign; falling back to current date',
+      )
+    }
+
+    const candidates = expandDomainPatterns(patterns, {
+      firstName: campaign.user.firstName ?? '',
+      lastName: campaign.user.lastName ?? '',
+      electionDate,
+    })
+
+    if (candidates.length > MAX_PATTERN_CANDIDATES) {
+      throw new BadRequestException(
+        `Patterns expand to ${candidates.length} candidates ` +
+          `(max ${MAX_PATTERN_CANDIDATES})`,
+      )
+    }
+
+    const checked = await Promise.allSettled(
+      candidates.map((domain) =>
+        this.checkPatternedCandidate(domain, maxPrice),
+      ),
+    )
+
+    const found = checked.flatMap((r) => {
+      if (r.status === 'fulfilled' && r.value !== null) return [r.value]
+      if (r.status === 'rejected') {
+        const err =
+          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
+        this.logger.warn(
+          { err, fn: 'searchDomainsForCampaign' },
+          'candidate availability check failed; skipping',
+        )
+      }
+      return []
+    })
+
+    return { candidates: found }
+  }
+
+  private async checkPatternedCandidate(
+    domain: string,
+    maxPrice: number,
+  ): Promise<PatternedDomainCandidate | null> {
+    let availability: DomainAvailability | undefined
+    try {
+      const resp = await this.route53.checkDomainAvailability(domain)
+      availability = resp.Availability
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error
+      }
+      throw new BadGatewayException('Route53 availability check failed', {
+        cause: error instanceof Error ? error : new Error(String(error)),
+      })
+    }
+
+    if (availability !== DomainAvailability.AVAILABLE) {
+      return null
+    }
+
+    let price: number
+    try {
+      const resp = await this.vercel.checkDomainPrice(domain)
+      price = resp.price
+    } catch (error) {
+      this.logger.warn(
+        { err: error, domain },
+        'Vercel price lookup failed; skipping candidate',
+      )
+      return null
+    }
+
+    if (price > maxPrice) {
+      return null
+    }
+    return { domain, price }
   }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {

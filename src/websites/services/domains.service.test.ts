@@ -16,7 +16,12 @@ import { DomainsService } from './domains.service'
 import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
-import { createMockUser } from '@/shared/test-utils/mockData.util'
+import {
+  createMockCampaign,
+  createMockUser,
+} from '@/shared/test-utils/mockData.util'
+import { BadRequestException } from '@nestjs/common'
+import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 
 const mockUser = createMockUser()
 
@@ -41,6 +46,8 @@ describe('DomainsService', () => {
     getValidatedSessionUser: ReturnType<typeof vi.fn>
     retrievePayment: ReturnType<typeof vi.fn>
   }
+  let mockRoute53: { checkDomainAvailability: ReturnType<typeof vi.fn> }
+  let mockVercel: { checkDomainPrice: ReturnType<typeof vi.fn> }
   let mockPrisma: {
     domain: {
       findMany: ReturnType<typeof vi.fn>
@@ -50,6 +57,8 @@ describe('DomainsService', () => {
   }
 
   beforeEach(async () => {
+    mockRoute53 = { checkDomainAvailability: vi.fn() }
+    mockVercel = { checkDomainPrice: vi.fn() }
     mockAnalytics = {
       track: vi.fn().mockResolvedValue(undefined),
     }
@@ -81,8 +90,8 @@ describe('DomainsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: AwsRoute53Service, useValue: {} },
-        { provide: VercelService, useValue: {} },
+        { provide: AwsRoute53Service, useValue: mockRoute53 },
+        { provide: VercelService, useValue: mockVercel },
         { provide: PaymentsService, useValue: mockPayments },
         { provide: StripeService, useValue: mockStripe },
         { provide: ForwardEmailService, useValue: {} },
@@ -181,6 +190,178 @@ describe('DomainsService', () => {
 
       expect(result).toHaveProperty('domain')
       expect(result).toHaveProperty('message')
+    })
+  })
+
+  describe('searchDomainsForCampaign', () => {
+    const campaignWithUser = {
+      ...createMockCampaign({
+        details: { electionDate: '2026-11-03' },
+      }),
+      user: createMockUser({ firstName: 'Mary', lastName: "O'Neill" }),
+    }
+
+    it('expands patterns, queries registrar, returns available + under cap', async () => {
+      mockRoute53.checkDomainAvailability.mockImplementation(
+        (domain: string) => ({
+          Availability:
+            domain === 'vote-oneill-nov-2026.bio'
+              ? DomainAvailability.UNAVAILABLE
+              : DomainAvailability.AVAILABLE,
+        }),
+      )
+      mockVercel.checkDomainPrice.mockImplementation((domain: string) => ({
+        price: domain === 'vote-oneill-nov-2026.win' ? 25 : 8,
+      }))
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}-{month_abbreviation}-{yyyy}.(run|bio|win)'],
+        10,
+      )
+
+      expect(result.candidates.map((c) => c.domain).sort()).toEqual(
+        ['vote-oneill-nov-2026.run'].sort(),
+      )
+      expect(result.candidates[0]).toEqual({
+        domain: 'vote-oneill-nov-2026.run',
+        price: 8,
+      })
+    })
+
+    it('normalizes the candidate last name (handles apostrophes)', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.run'],
+        10,
+      )
+
+      expect(mockRoute53.checkDomainAvailability).toHaveBeenCalledWith(
+        'vote-oneill.run',
+      )
+      expect(result.candidates).toHaveLength(1)
+    })
+
+    it('deduplicates identical expansions across patterns', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.run', 'vote-{last_name}.(run|bio)'],
+        10,
+      )
+
+      expect(mockRoute53.checkDomainAvailability).toHaveBeenCalledTimes(2)
+    })
+
+    it('excludes domains over the price cap', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockImplementation((domain: string) => ({
+        price: domain.endsWith('.bio') ? 50 : 7,
+      }))
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.(run|bio)'],
+        10,
+      )
+
+      expect(result.candidates.map((c) => c.domain)).toEqual([
+        'vote-oneill.run',
+      ])
+    })
+
+    it('returns empty list when no candidates expanded', async () => {
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        [],
+        10,
+      )
+
+      expect(result.candidates).toEqual([])
+      expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
+    })
+
+    it('falls back to current date when campaign has no electionDate', async () => {
+      const campaignNoDate = {
+        ...createMockCampaign({ details: {} }),
+        user: createMockUser({ firstName: 'Mary', lastName: "O'Neill" }),
+      }
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignNoDate,
+        ['vote-{last_name}-{yyyy}.run'],
+        10,
+      )
+
+      expect(result.candidates).toHaveLength(1)
+      expect(result.candidates[0].domain).toMatch(/^vote-oneill-\d{4}\.run$/)
+    })
+
+    it('skips (does not fail the whole request) when one availability call fails', async () => {
+      mockRoute53.checkDomainAvailability.mockImplementation(
+        (domain: string) => {
+          if (domain.endsWith('.bio')) {
+            throw new Error('route53 boom')
+          }
+          return { Availability: DomainAvailability.AVAILABLE }
+        },
+      )
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.(run|bio)'],
+        10,
+      )
+
+      expect(result.candidates.map((c) => c.domain)).toEqual([
+        'vote-oneill.run',
+      ])
+    })
+
+    it('skips a candidate whose price lookup fails (does not fail the whole request)', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockImplementation((domain: string) => {
+        if (domain.endsWith('.bio')) throw new Error('vercel boom')
+        return { price: 7 }
+      })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.(run|bio)'],
+        10,
+      )
+
+      expect(result.candidates.map((c) => c.domain)).toEqual([
+        'vote-oneill.run',
+      ])
+    })
+
+    it('rejects with BadRequest when patterns expand past the candidate cap', async () => {
+      const huge =
+        '(a|b|c|d|e|f|g|h|i|j)(a|b|c|d|e|f|g|h|i|j){last_name}.(run|bio)'
+
+      await expect(
+        service.searchDomainsForCampaign(campaignWithUser, [huge], 10),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
   })
 })
