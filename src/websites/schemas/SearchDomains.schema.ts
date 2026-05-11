@@ -12,7 +12,7 @@ export const SearchDomainsResponseSchema = z.object({
 
 export class SearchDomainsBodySchema extends createZodDto(
   z.object({
-    patterns: z.array(z.string().min(1)).min(1).max(20),
+    patterns: z.array(z.string().min(1).max(200)).min(1).max(20),
     maxPrice: z.number().positive(),
   }),
 ) {}
