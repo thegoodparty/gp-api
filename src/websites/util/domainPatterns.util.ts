@@ -122,14 +122,21 @@ const hasUnresolvedPlaceholder = (s: string): boolean => {
   return false
 }
 
+/**
+ * Invariant: at most `options.maxCandidates` candidate strings are ever
+ * materialized in memory across the entire call, regardless of how
+ * "explosive" the input patterns are (e.g. `(a|b|...|j){7}` would yield
+ * 10^7 candidates uncapped). The shared `Budget` is decremented at every
+ * leaf inside `expandAlternations`; the recursion throws
+ * `PatternExpansionLimitError` the moment the (limit + 1)-th leaf is
+ * about to be emitted, so the cross-product never fully materializes.
+ */
 export const expandDomainPatterns = (
   patterns: string[],
   ctx: DomainPatternContext,
   options?: { maxCandidates?: number },
 ): string[] => {
   const limit = options?.maxCandidates ?? Number.POSITIVE_INFINITY
-  // One shared budget across patterns so the *total* candidate count caps,
-  // not the per-pattern count.
   const budget: Budget = { left: limit, limit }
   const all = patterns.flatMap((p) => substituteAndExpand(p, ctx, budget))
   return Array.from(new Set(all))

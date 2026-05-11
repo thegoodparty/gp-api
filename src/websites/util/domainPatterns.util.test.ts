@@ -182,14 +182,32 @@ describe('expandDomainPatterns', () => {
     expect(expandDomainPatterns([], context)).toEqual([])
   })
 
-  it('aborts early instead of materializing 1M intermediate candidates', () => {
+  it('aborts early instead of materializing 10^7 intermediate candidates', () => {
     const opts = '(a|b|c|d|e|f|g|h|i|j)'
-    // 6 groups of 10 options = 1,000,000 candidates without a cap.
-    const huge = `${opts}${opts}${opts}${opts}${opts}${opts}.run`
+    // 7 groups of 10 options = 10,000,000 candidates without a cap —
+    // the worst-case scenario flagged by static analysis.
+    const huge = `${opts.repeat(7)}.run`
 
     const start = performance.now()
     expect(() =>
       expandDomainPatterns([huge], context, { maxCandidates: 50 }),
+    ).toThrowError(PatternExpansionLimitError)
+    const elapsed = performance.now() - start
+
+    // If the cross-product had actually materialized this would take
+    // multiple seconds and likely OOM. < 50ms proves early abort.
+    expect(elapsed).toBeLessThan(50)
+  })
+
+  it('aborts early on 20 max-explosive patterns (schema upper bound)', () => {
+    // 20 patterns × 10^7 candidates each = 2 * 10^8 leaves uncapped.
+    const opts = '(a|b|c|d|e|f|g|h|i|j)'
+    const huge = `${opts.repeat(7)}.run`
+    const patterns = Array.from({ length: 20 }, () => huge)
+
+    const start = performance.now()
+    expect(() =>
+      expandDomainPatterns(patterns, context, { maxCandidates: 50 }),
     ).toThrowError(PatternExpansionLimitError)
     const elapsed = performance.now() - start
 
