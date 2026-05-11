@@ -4,6 +4,7 @@ import {
   expandDomainPattern,
   expandDomainPatterns,
   normalizeName,
+  PatternExpansionLimitError,
 } from './domainPatterns.util'
 
 describe('normalizeName', () => {
@@ -126,6 +127,36 @@ describe('expandDomainPattern', () => {
       }),
     ).toEqual(['x-01.run'])
   })
+
+  it('returns input unchanged for unmatched parens (no ReDoS on "(((...")', () => {
+    const adversarial = '('.repeat(10_000)
+    const start = performance.now()
+    const result = expandDomainPattern(adversarial, context)
+    const elapsed = performance.now() - start
+    expect(result).toEqual([adversarial])
+    expect(elapsed).toBeLessThan(50)
+  })
+
+  it('returns empty for unmatched braces (no ReDoS on "{{{...")', () => {
+    const adversarial = '{'.repeat(10_000)
+    const start = performance.now()
+    const result = expandDomainPattern(adversarial, context)
+    const elapsed = performance.now() - start
+    expect(result).toEqual([adversarial])
+    expect(elapsed).toBeLessThan(50)
+  })
+
+  it('treats empty parens "()" as a literal (no expansion)', () => {
+    expect(expandDomainPattern('a().run', context)).toEqual(['a().run'])
+  })
+
+  it('treats empty braces "{}" as a literal (does not trigger bail-out)', () => {
+    expect(expandDomainPattern('a{}.run', context)).toEqual(['a{}.run'])
+  })
+
+  it('returns empty when an unresolved placeholder follows an empty "{}"', () => {
+    expect(expandDomainPattern('a{}{wat}.run', context)).toEqual([])
+  })
 })
 
 describe('expandDomainPatterns', () => {
@@ -149,5 +180,27 @@ describe('expandDomainPatterns', () => {
 
   it('returns empty array for empty input', () => {
     expect(expandDomainPatterns([], context)).toEqual([])
+  })
+
+  it('aborts early instead of materializing 1M intermediate candidates', () => {
+    const opts = '(a|b|c|d|e|f|g|h|i|j)'
+    // 6 groups of 10 options = 1,000,000 candidates without a cap.
+    const huge = `${opts}${opts}${opts}${opts}${opts}${opts}.run`
+
+    const start = performance.now()
+    expect(() =>
+      expandDomainPatterns([huge], context, { maxCandidates: 50 }),
+    ).toThrowError(PatternExpansionLimitError)
+    const elapsed = performance.now() - start
+
+    expect(elapsed).toBeLessThan(50)
+  })
+
+  it('caps the total across patterns, not per-pattern', () => {
+    // Each pattern alone (5 options) fits under the cap; the sum exceeds it.
+    const p = '(a|b|c|d|e).run'
+    expect(() =>
+      expandDomainPatterns([p, p, p], context, { maxCandidates: 10 }),
+    ).toThrowError(PatternExpansionLimitError)
   })
 })

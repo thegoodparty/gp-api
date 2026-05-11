@@ -44,7 +44,10 @@ import {
 } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
-import { expandDomainPatterns } from '../util/domainPatterns.util'
+import {
+  expandDomainPatterns,
+  PatternExpansionLimitError,
+} from '../util/domainPatterns.util'
 import { parseISO } from 'date-fns'
 
 const MAX_PATTERN_CANDIDATES = 50
@@ -417,17 +420,24 @@ export class DomainsService
       )
     }
 
-    const candidates = expandDomainPatterns(patterns, {
-      firstName: campaign.user.firstName ?? '',
-      lastName: campaign.user.lastName ?? '',
-      electionDate,
-    })
-
-    if (candidates.length > MAX_PATTERN_CANDIDATES) {
-      throw new BadRequestException(
-        `Patterns expand to ${candidates.length} candidates ` +
-          `(max ${MAX_PATTERN_CANDIDATES})`,
+    let candidates: string[]
+    try {
+      candidates = expandDomainPatterns(
+        patterns,
+        {
+          firstName: campaign.user.firstName ?? '',
+          lastName: campaign.user.lastName ?? '',
+          electionDate,
+        },
+        { maxCandidates: MAX_PATTERN_CANDIDATES },
       )
+    } catch (error) {
+      if (error instanceof PatternExpansionLimitError) {
+        throw new BadRequestException(
+          `Patterns expand to more than ${MAX_PATTERN_CANDIDATES} candidates`,
+        )
+      }
+      throw error
     }
 
     const checked = await Promise.allSettled(

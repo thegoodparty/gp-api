@@ -42,18 +42,45 @@ const buildSubstitutions = (
   }
 }
 
-const expandAlternations = (input: string): string[] => {
-  const match = input.match(/\(([^)]+)\)/)
-  if (!match) return [input]
-  const [whole, group] = match
-  return group
-    .split('|')
-    .flatMap((opt) => expandAlternations(input.replace(whole, opt)))
+export class PatternExpansionLimitError extends Error {
+  constructor(public readonly limit: number) {
+    super(`pattern expansion exceeded ${limit} candidate(s)`)
+    this.name = 'PatternExpansionLimitError'
+  }
 }
 
-export const expandDomainPattern = (
+type Budget = { left: number; limit: number }
+
+const consumeOne = (input: string, budget: Budget): string[] => {
+  budget.left -= 1
+  if (budget.left < 0) {
+    throw new PatternExpansionLimitError(budget.limit)
+  }
+  return [input]
+}
+
+const expandAlternations = (input: string, budget: Budget): string[] => {
+  // Linear-time scan instead of /\(([^)]+)\)/ — the regex form has
+  // O(n^2) backtracking on adversarial inputs like '(((((' (CodeQL ReDoS).
+  const open = input.indexOf('(')
+  if (open === -1) return consumeOne(input, budget)
+  const close = input.indexOf(')', open + 1)
+  if (close === -1 || close === open + 1) return consumeOne(input, budget)
+  const whole = input.slice(open, close + 1)
+  const group = input.slice(open + 1, close)
+  // Budget is decremented at each leaf, so the recursion aborts the moment
+  // the cap is hit — preventing the cross-product from materializing
+  // (e.g. 6 groups of 10 options would otherwise yield 1M intermediate
+  // strings before any post-hoc check could fire).
+  return group
+    .split('|')
+    .flatMap((opt) => expandAlternations(input.replace(whole, opt), budget))
+}
+
+const substituteAndExpand = (
   pattern: string,
   ctx: DomainPatternContext,
+  budget: Budget,
 ): string[] => {
   const subs = buildSubstitutions(ctx)
   let substituted = pattern
@@ -64,16 +91,46 @@ export const expandDomainPattern = (
     }
     substituted = substituted.replace(m[0], value)
   }
-  if (/\{[^}]+\}/.test(substituted)) {
+  if (hasUnresolvedPlaceholder(substituted)) {
     return []
   }
-  return expandAlternations(substituted)
+  return expandAlternations(substituted, budget)
+}
+
+export const expandDomainPattern = (
+  pattern: string,
+  ctx: DomainPatternContext,
+  options?: { maxCandidates?: number },
+): string[] => {
+  const limit = options?.maxCandidates ?? Number.POSITIVE_INFINITY
+  return substituteAndExpand(pattern, ctx, { left: limit, limit })
+}
+
+// Linear-time check for any '{...}' group with ≥1 char inside. Avoids the
+// O(n^2) backtracking of /\{[^}]+\}/.test() on adversarial inputs like
+// '{{{{{' (CodeQL ReDoS).
+const hasUnresolvedPlaceholder = (s: string): boolean => {
+  let from = 0
+  while (from < s.length) {
+    const open = s.indexOf('{', from)
+    if (open === -1) return false
+    const close = s.indexOf('}', open + 1)
+    if (close === -1) return false
+    if (close > open + 1) return true
+    from = close + 1
+  }
+  return false
 }
 
 export const expandDomainPatterns = (
   patterns: string[],
   ctx: DomainPatternContext,
+  options?: { maxCandidates?: number },
 ): string[] => {
-  const all = patterns.flatMap((p) => expandDomainPattern(p, ctx))
+  const limit = options?.maxCandidates ?? Number.POSITIVE_INFINITY
+  // One shared budget across patterns so the *total* candidate count caps,
+  // not the per-pattern count.
+  const budget: Budget = { left: limit, limit }
+  const all = patterns.flatMap((p) => substituteAndExpand(p, ctx, budget))
   return Array.from(new Set(all))
 }
