@@ -292,6 +292,31 @@ describe('DomainsService', () => {
       expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
 
+    it('uses UTC-anchored date components for boundary date-only strings', async () => {
+      // Jan 1 is the worst case: a TZ-naive parser would render local
+      // 2026-01-01 as Dec 31, 2025 in UTC, producing 'dec-2025' instead
+      // of 'jan-2026'. This test fails on any TZ-east-of-UTC server
+      // unless the parser anchors to UTC midnight.
+      const campaignBoundary = {
+        ...createMockCampaign({ details: { electionDate: '2026-01-01' } }),
+        user: createMockUser({ firstName: 'Mary', lastName: "O'Neill" }),
+      }
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignBoundary,
+        ['vote-{last_name}-{month_abbreviation}-{yyyy}.run'],
+        10,
+      )
+
+      expect(result.candidates.map((c) => c.domain)).toEqual([
+        'vote-oneill-jan-2026.run',
+      ])
+    })
+
     it('falls back to current date when campaign has no electionDate', async () => {
       const campaignNoDate = {
         ...createMockCampaign({ details: {} }),

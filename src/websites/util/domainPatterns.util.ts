@@ -1,6 +1,15 @@
 export type DomainPatternContext = {
   firstName: string
   lastName: string
+  /**
+   * Must be a Date whose UTC components (year/month/day) represent the
+   * intended calendar date. The substitution code reads
+   * `getUTCFullYear()` / `getUTCMonth()` to render `{yyyy}` / `{mm}` /
+   * `{month_abbreviation}`, so a Date constructed in local time would
+   * wrap month/year on servers east of UTC. Use
+   * `parseIsoDateAsUTC` (in `shared/util/date.util.ts`) to parse
+   * 'YYYY-MM-DD' strings safely.
+   */
   electionDate: Date
 }
 
