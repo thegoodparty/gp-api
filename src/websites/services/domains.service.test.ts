@@ -388,5 +388,20 @@ describe('DomainsService', () => {
       ).rejects.toBeInstanceOf(BadRequestException)
       expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
+
+    it('propagates BadRequest from Route53 (e.g. UnsupportedTLD) instead of silencing it', async () => {
+      mockRoute53.checkDomainAvailability.mockImplementation(() => {
+        throw new BadRequestException('UnsupportedTLD')
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      await expect(
+        service.searchDomainsForCampaign(
+          campaignWithUser,
+          ['vote-{last_name}.xyz'],
+          10,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+    })
   })
 })
