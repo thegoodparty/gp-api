@@ -711,21 +711,6 @@ export class DomainsService
     // that payment-confirmation leg is wired up, or domains will stall in
     // DomainStatus.pending with no recovery path.
 
-    try {
-      await this.analytics.track(
-        campaign.user.id,
-        EVENTS.CandidateWebsite.PurchasedDomain,
-        {
-          domainSelected: domainName,
-          priceOfSelectedDomain: createdDomain.price?.toNumber() ?? null,
-        },
-      )
-    } catch (analyticsError) {
-      this.logger.error(
-        { analyticsError },
-        `Failed to track domain purchased event for user ${campaign.user.id}`,
-      )
-    }
 
     const updatedDomain = await this.model.findUniqueOrThrow({
       where: { id: createdDomain.id },
