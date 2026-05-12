@@ -910,6 +910,14 @@ describe('DomainsService', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).backfillDomainEmailRedirects()
 
+      expect(mockPrisma.domain.findMany).toHaveBeenCalledWith({
+        where: {
+          emailForwardingDomainId: null,
+          status: {
+            in: [DomainStatus.submitted, DomainStatus.registered],
+          },
+        },
+      })
       expect(mockQueue.sendMessage).toHaveBeenCalledTimes(2)
       expect(mockQueue.sendMessage).toHaveBeenNthCalledWith(
         1,

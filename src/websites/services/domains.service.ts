@@ -93,6 +93,9 @@ export class DomainsService
     const domains = await this.model.findMany({
       where: {
         emailForwardingDomainId: null,
+        status: {
+          in: [DomainStatus.submitted, DomainStatus.registered],
+        },
       },
     })
 
