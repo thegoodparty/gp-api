@@ -1,11 +1,34 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect, vi } from 'vitest'
+import { UnauthorizedException } from '@nestjs/common'
+import jwt from 'jsonwebtoken'
+import {
+  AUTH_PROVIDER_TOKEN,
+  AuthProvider,
+} from '@/authentication/interfaces/auth-provider.interface'
 import { useTestService } from '@/test-service'
 
 const service = useTestService()
 
 const MCP_ACCEPT = 'application/json, text/event-stream'
 
+const verifyTestJwt = (token: string): string => {
+  const decoded = jwt.verify(token, process.env.AUTH_SECRET!)
+  const sub = typeof decoded === 'object' ? decoded.sub : undefined
+  if (!sub) throw new UnauthorizedException('Invalid test token')
+  return sub
+}
+
 describe('POST /v1/mcp (JSON-RPC over HTTP)', () => {
+  beforeAll(() => {
+    const authProvider = service.app.get<AuthProvider>(AUTH_PROVIDER_TOKEN)
+    vi.spyOn(authProvider, 'verifySessionToken').mockImplementation(
+      async (token) => ({
+        externalUserId: verifyTestJwt(token),
+        actor: { sub: process.env.AGENT_FLEET_CLERK_ID! },
+      }),
+    )
+  })
+
   it('lists registered MCP tools', async () => {
     const res = await service.client.post(
       '/v1/mcp',
@@ -100,5 +123,26 @@ describe('POST /v1/mcp (JSON-RPC over HTTP)', () => {
       statusCode: 401,
       message: 'Unauthorized',
     })
+  })
+
+  it('rejects sessions without the agent-fleet actor', async () => {
+    const authProvider = service.app.get<AuthProvider>(AUTH_PROVIDER_TOKEN)
+    vi.spyOn(authProvider, 'verifySessionToken').mockImplementationOnce(
+      async (token) => ({ externalUserId: verifyTestJwt(token) }),
+    )
+
+    const res = await service.client.post(
+      '/v1/mcp',
+      {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/list',
+        params: {},
+      },
+      { headers: { Accept: MCP_ACCEPT } },
+    )
+
+    expect(res.status).toBe(403)
+    expect(res.data).toMatchObject({ statusCode: 403 })
   })
 })

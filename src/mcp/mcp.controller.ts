@@ -1,9 +1,11 @@
-import { Controller, All, Req, Res } from '@nestjs/common'
+import { Controller, All, Req, Res, UseGuards } from '@nestjs/common'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { McpServerService } from './services/mcpServer.service'
+import { AgentActorGuard } from './guards/AgentActor.guard'
 
 @Controller('mcp')
+@UseGuards(AgentActorGuard)
 export class McpController {
   constructor(private readonly mcp: McpServerService) {}
 
