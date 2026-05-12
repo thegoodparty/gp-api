@@ -83,8 +83,12 @@ const expandAlternations = (input: string, budget: Budget): string[] => {
   // strings before any post-hoc check could fire).
   return group
     .split('|')
-    .flatMap((opt) => expandAlternations(input.replace(whole, opt), budget))
-}
+    .flatMap((opt) =>
+      expandAlternations(
+        input.slice(0, open) + opt + input.slice(close + 1),
+        budget,
+      ),
+    )
 
 const substituteAndExpand = (
   pattern: string,
