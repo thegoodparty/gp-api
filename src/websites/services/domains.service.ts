@@ -457,9 +457,12 @@ export class DomainsService
       if (r.status === 'fulfilled' && r.value !== null) {
         found.push(r.value)
       } else if (r.status === 'rejected') {
-        if (r.reason instanceof BadRequestException) {
-          throw r.reason
-        }
+        const err =
+          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
+        this.logger.warn(
+          { err, fn: 'searchDomainsForCampaign' },
+          'candidate availability check failed; skipping',
+        )
         const err =
           r.reason instanceof Error ? r.reason : new Error(String(r.reason))
         this.logger.warn(
