@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-type-assertion */
 // zod-to-json-schema returns a JSONSchema-shaped object that the MCP SDK accepts as
 // Tool['inputSchema'], but its return type is broader than the SDK's tighter declaration.
 // The fastify adapter is loosely typed via HttpAdapterHost, so member access on the

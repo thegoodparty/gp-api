@@ -19,6 +19,11 @@ import {
   SearchDomainsBodySchema,
   SearchDomainsResponseSchema,
 } from '../schemas/SearchDomains.schema'
+import {
+  PurchaseDomainBodySchema,
+  PurchaseDomainResponse,
+  PurchaseDomainResponseSchema,
+} from '../schemas/PurchaseDomain.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
@@ -60,6 +65,17 @@ export class DomainsController {
     @Body() { patterns, maxPrice }: SearchDomainsBodySchema,
   ): Promise<PatternedDomainSearchResult> {
     return this.domains.searchDomainsForCampaign(campaign, patterns, maxPrice)
+  }
+
+  @Post('purchase')
+  @UseCampaign({ include: { user: true } })
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(PurchaseDomainResponseSchema)
+  async purchaseDomain(
+    @ReqCampaign() campaign: Campaign & { user: User },
+    @Body() { domain }: PurchaseDomainBodySchema,
+  ): Promise<PurchaseDomainResponse> {
+    return this.domains.purchaseDomainForCampaign(campaign, domain)
   }
 
   @Get('status')

@@ -5,9 +5,10 @@ import {
   ConflictException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Campaign, Domain, DomainStatus, User } from '@prisma/client'
+import { Campaign, Domain, DomainStatus, User, Website } from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -51,6 +52,8 @@ import {
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
+
+const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -267,7 +270,7 @@ export class DomainsService
     user: User
     websiteId: string | number
     domainName: string
-    paymentId: string
+    paymentId: string | null
   }): Promise<{
     domain: Domain
     registrationResult: {
@@ -305,7 +308,7 @@ export class DomainsService
         `Creating new domain record for website id ${validWebsiteId}: `,
       )
       domain = await this.model.create({ data: domainParams })
-    } else if (domain.paymentId !== paymentId) {
+    } else if (paymentId && domain.paymentId !== paymentId) {
       // Update the existing domain with the new payment ID
       // This handles cases where a previous payment failed or the domain
       // was created without a paymentId
@@ -509,6 +512,185 @@ export class DomainsService
       return null
     }
     return { domain, price }
+  }
+
+  // Serializes per-campaign with a Postgres advisory lock so two concurrent
+  // purchase calls cannot both pass the availability check and double-charge
+  // Vercel. Holds the lock across the route53/vercel reads and the
+  // placeholder-row insert — the long Vercel registration runs outside.
+  private async reserveDomainForCampaign(
+    campaignId: number,
+    domainName: string,
+  ): Promise<
+    | {
+        kind: 'idempotent'
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Pick<Domain, 'id' | 'name' | 'status'> & {
+          price: number | null
+        }
+      }
+    | {
+        kind: 'created'
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Domain
+      }
+  > {
+    return this.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DOMAIN_PURCHASE_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
+
+      const website = await tx.website.findUnique({
+        where: { campaignId },
+        include: { domain: true },
+      })
+
+      if (!website) {
+        throw new NotFoundException('No website found for this campaign')
+      }
+
+      const websiteSummary = {
+        id: website.id,
+        vanityPath: website.vanityPath,
+        status: website.status,
+        campaignId: website.campaignId,
+      }
+
+      if (website.domain) {
+        if (website.domain.status !== DomainStatus.inactive) {
+          if (website.domain.name === domainName) {
+            return {
+              kind: 'idempotent',
+              websiteSummary,
+              domain: {
+                id: website.domain.id,
+                name: website.domain.name,
+                status: website.domain.status,
+                price: website.domain.price?.toNumber() ?? null,
+              },
+            }
+          }
+          throw new ConflictException(
+            `A different domain (${website.domain.name}) is already in progress for this campaign`,
+          )
+        }
+
+        await tx.domain.delete({ where: { id: website.domain.id } })
+      }
+
+      const availabilityResp =
+        await this.route53.checkDomainAvailability(domainName)
+      if (availabilityResp.Availability !== DomainAvailability.AVAILABLE) {
+        throw new ConflictException(
+          `Domain ${domainName} is no longer available`,
+        )
+      }
+
+      let price: number
+      try {
+        const priceResp = await this.vercel.checkDomainPrice(domainName)
+        price = priceResp.price
+      } catch (error) {
+        throw new BadGatewayException(
+          `Could not get price for ${domainName}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        )
+      }
+
+      const created = await tx.domain.create({
+        data: {
+          websiteId: website.id,
+          name: domainName,
+          price,
+          paymentId: null,
+          status: DomainStatus.pending,
+        },
+      })
+
+      return { kind: 'created', websiteSummary, domain: created }
+    })
+  }
+
+  async purchaseDomainForCampaign(
+    campaign: Campaign & { user: User },
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+    alreadyExisted: boolean
+    message: string
+  }> {
+    const locked = await this.reserveDomainForCampaign(campaign.id, domainName)
+
+    if (locked.kind === 'idempotent') {
+      return {
+        website: locked.websiteSummary,
+        domain: locked.domain,
+        alreadyExisted: true,
+        message: 'Domain registration already in progress for this campaign',
+      }
+    }
+
+    const { websiteSummary, domain: createdDomain } = locked
+
+    const websiteContent = await this.client.website.findUniqueOrThrow({
+      where: { id: createdDomain.websiteId },
+      select: { content: true },
+    })
+    const contactInfo = this.buildContactInfo(
+      campaign.user,
+      websiteContent.content,
+    )
+
+    try {
+      await this.completeDomainRegistration(
+        createdDomain.websiteId,
+        contactInfo,
+      )
+    } catch (error) {
+      throw new BadGatewayException(
+        `Failed to register domain with Vercel: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+
+    try {
+      await this.analytics.track(
+        campaign.user.id,
+        EVENTS.CandidateWebsite.PurchasedDomain,
+        {
+          domainSelected: domainName,
+          priceOfSelectedDomain: createdDomain.price?.toNumber() ?? null,
+        },
+      )
+    } catch (analyticsError) {
+      this.logger.error(
+        { analyticsError },
+        `Failed to track domain purchased event for user ${campaign.user.id}`,
+      )
+    }
+
+    const updatedDomain = await this.model.findUniqueOrThrow({
+      where: { id: createdDomain.id },
+    })
+
+    return {
+      website: websiteSummary,
+      domain: {
+        id: updatedDomain.id,
+        name: updatedDomain.name,
+        status: updatedDomain.status,
+        price: updatedDomain.price?.toNumber() ?? null,
+      },
+      alreadyExisted: false,
+      message: 'Domain registration initiated with Vercel',
+    }
   }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
@@ -716,19 +898,16 @@ export class DomainsService
       where: { websiteId },
     })
 
-    if (!domain.paymentId) {
-      throw new BadRequestException({
-        message: 'No payment ID found for domain',
-        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
-      })
-    }
-
-    const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
-
-    if (paymentIntent.status !== 'succeeded') {
-      throw new BadRequestException(
-        `Payment not completed. Current status: ${paymentIntent.status}`,
+    if (domain.paymentId) {
+      const paymentIntent = await this.payments.retrievePayment(
+        domain.paymentId,
       )
+
+      if (paymentIntent.status !== 'succeeded') {
+        throw new BadRequestException(
+          `Payment not completed. Current status: ${paymentIntent.status}`,
+        )
+      }
     }
 
     if (!domain.price) {
