@@ -920,6 +920,12 @@ export class DomainsService
           `Payment not completed. Current status: ${paymentIntent.status}`,
         )
       }
+    } else if (ENABLE_DOMAIN_SETUP === 'true') {
+      // Intentional: the purchase flow handles billing outside Stripe.
+      // Remove this comment if that's the case, or add a gate here.
+      throw new BadRequestException(
+        'Cannot register domain: no payment on record',
+      )
     }
 
     if (!domain.price) {
