@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { Reflector } from '@nestjs/core'
 import { RequestMethod } from '@nestjs/common'
+import { DomainStatus, WebsiteStatus } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DomainsController } from './domains.controller'
 import { DomainsService } from '../services/domains.service'
@@ -85,13 +86,13 @@ describe('DomainsController.purchaseDomain', () => {
         website: {
           id: 10,
           vanityPath: 'mary-oneill',
-          status: 'unpublished',
+          status: WebsiteStatus.unpublished,
           campaignId: 42,
         },
         domain: {
           id: 1,
           name: 'vote-oneill.run',
-          status: 'pending',
+          status: DomainStatus.pending,
           price: 12,
         },
         alreadyExisted: false,

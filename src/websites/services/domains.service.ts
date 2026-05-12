@@ -514,13 +514,10 @@ export class DomainsService
     return { domain, price }
   }
 
-  // Serializes per-campaign with a Postgres advisory lock so two concurrent
-  // purchase calls cannot both pass the availability check and double-charge
-  // Vercel. Holds the lock across the route53/vercel reads and the
-  // placeholder-row insert — the long Vercel registration runs outside.
   private async reserveDomainForCampaign(
     campaignId: number,
     domainName: string,
+    price: number,
   ): Promise<
     | {
         kind: 'idempotent'
@@ -582,26 +579,6 @@ export class DomainsService
         await tx.domain.delete({ where: { id: website.domain.id } })
       }
 
-      const availabilityResp =
-        await this.route53.checkDomainAvailability(domainName)
-      if (availabilityResp.Availability !== DomainAvailability.AVAILABLE) {
-        throw new ConflictException(
-          `Domain ${domainName} is no longer available`,
-        )
-      }
-
-      let price: number
-      try {
-        const priceResp = await this.vercel.checkDomainPrice(domainName)
-        price = priceResp.price
-      } catch (error) {
-        throw new BadGatewayException(
-          `Could not get price for ${domainName}: ${
-            error instanceof Error ? error.message : 'Unknown error'
-          }`,
-        )
-      }
-
       const created = await tx.domain.create({
         data: {
           websiteId: website.id,
@@ -616,6 +593,61 @@ export class DomainsService
     })
   }
 
+  private async preflightDomainPurchase(
+    campaignId: number,
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+  } | null> {
+    const preflight = await this.client.website.findUnique({
+      where: { campaignId },
+      include: { domain: true },
+    })
+    if (!preflight) {
+      throw new NotFoundException('No website found for this campaign')
+    }
+    if (
+      !preflight.domain ||
+      preflight.domain.status === DomainStatus.inactive
+    ) {
+      return null
+    }
+    const websiteSummary = {
+      id: preflight.id,
+      vanityPath: preflight.vanityPath,
+      status: preflight.status,
+      campaignId: preflight.campaignId,
+    }
+    if (preflight.domain.name !== domainName) {
+      throw new ConflictException(
+        `A different domain (${preflight.domain.name}) is already in progress for this campaign`,
+      )
+    }
+    return {
+      website: websiteSummary,
+      domain: {
+        id: preflight.domain.id,
+        name: preflight.domain.name,
+        status: preflight.domain.status,
+        price: preflight.domain.price?.toNumber() ?? null,
+      },
+    }
+  }
+
+  private async lookupDomainPrice(domainName: string): Promise<number> {
+    try {
+      const priceResp = await this.vercel.checkDomainPrice(domainName)
+      return priceResp.price
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not get price for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+  }
+
   async purchaseDomainForCampaign(
     campaign: Campaign & { user: User },
     domainName: string,
@@ -625,7 +657,41 @@ export class DomainsService
     alreadyExisted: boolean
     message: string
   }> {
-    const locked = await this.reserveDomainForCampaign(campaign.id, domainName)
+    const preflightHit = await this.preflightDomainPurchase(
+      campaign.id,
+      domainName,
+    )
+    if (preflightHit) {
+      return {
+        ...preflightHit,
+        alreadyExisted: true,
+        message: 'Domain registration already in progress for this campaign',
+      }
+    }
+
+    let availabilityResp: Awaited<
+      ReturnType<typeof this.route53.checkDomainAvailability>
+    >
+    try {
+      availabilityResp = await this.route53.checkDomainAvailability(domainName)
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not check availability for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+    if (availabilityResp.Availability !== DomainAvailability.AVAILABLE) {
+      throw new ConflictException(`Domain ${domainName} is no longer available`)
+    }
+
+    const price = await this.lookupDomainPrice(domainName)
+
+    const locked = await this.reserveDomainForCampaign(
+      campaign.id,
+      domainName,
+      price,
+    )
 
     if (locked.kind === 'idempotent') {
       return {
@@ -653,18 +719,17 @@ export class DomainsService
         contactInfo,
       )
     } catch (error) {
-      // Mark the domain inactive so subsequent calls don't treat it as idempotent
-      await this.model
-        .update({
+      try {
+        await this.model.update({
           where: { id: createdDomain.id },
           data: { status: DomainStatus.inactive },
         })
-        .catch((updateErr) =>
-          this.logger.error(
-            { updateErr },
-            `Failed to mark domain ${createdDomain.id} inactive after registration failure`,
-          ),
+      } catch (updateErr) {
+        this.logger.error(
+          { updateErr },
+          `Failed to mark domain ${createdDomain.id} inactive after registration failure`,
         )
+      }
       throw new BadGatewayException(
         `Failed to register domain with Vercel: ${
           error instanceof Error ? error.message : 'Unknown error'
@@ -915,14 +980,14 @@ export class DomainsService
         domain.paymentId,
       )
 
-      if (paymentIntent.status !== 'succeeded') {
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
         throw new BadRequestException(
           `Payment not completed. Current status: ${paymentIntent.status}`,
         )
       }
-    } else if (ENABLE_DOMAIN_SETUP === 'true') {
-      // Intentional: the purchase flow handles billing outside Stripe.
-      // Remove this comment if that's the case, or add a gate here.
+    } else if (this.shouldEnableDomainPurchase()) {
       throw new BadRequestException(
         'Cannot register domain: no payment on record',
       )

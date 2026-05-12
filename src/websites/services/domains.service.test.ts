@@ -108,8 +108,10 @@ describe('DomainsService', () => {
         findUnique: vi.fn().mockResolvedValue(null),
       },
       $executeRaw: vi.fn().mockResolvedValue(0),
-      $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
-        callback(mockPrisma),
+      $transaction: vi.fn(
+        async <R>(
+          callback: (tx: typeof mockPrisma) => Promise<R>,
+        ): Promise<R> => callback(mockPrisma),
       ),
     }
 
@@ -510,19 +512,80 @@ describe('DomainsService', () => {
       },
     )
 
-    it('takes the per-campaign advisory lock before reading website state', async () => {
-      mockPrisma.website.findUnique.mockResolvedValue({
-        ...baseWebsite,
-        domain: { ...mockDomain, status: DomainStatus.pending },
+    it('takes the per-campaign advisory lock during the reservation transaction', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      mockPrisma.domain.create.mockResolvedValue({
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      })
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+        status: DomainStatus.submitted,
+      })
+      vi.spyOn(service, 'completeDomainRegistration').mockResolvedValue({
+        vercelResult: null,
+        projectResult: null,
+        message: 'Disabled',
       })
 
-      await service.purchaseDomainForCampaign(campaignWithUser, mockDomain.name)
+      await service.purchaseDomainForCampaign(campaignWithUser, domainName)
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
       expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1)
       const lockArgs = mockPrisma.$executeRaw.mock.calls[0]
       expect(lockArgs[0].join('?')).toContain('pg_advisory_xact_lock')
       expect(lockArgs).toContain(campaign.id)
+    })
+
+    it('does NOT hold the advisory lock during external HTTP calls', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      mockPrisma.domain.create.mockResolvedValue({
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      })
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+        status: DomainStatus.submitted,
+      })
+      vi.spyOn(service, 'completeDomainRegistration').mockResolvedValue({
+        vercelResult: null,
+        projectResult: null,
+        message: 'Disabled',
+      })
+
+      await service.purchaseDomainForCampaign(campaignWithUser, domainName)
+
+      const route53Order =
+        mockRoute53.checkDomainAvailability.mock.invocationCallOrder[0]
+      const vercelPriceOrder =
+        mockVercel.checkDomainPrice.mock.invocationCallOrder[0]
+      const txOrder = mockPrisma.$transaction.mock.invocationCallOrder[0]
+      expect(route53Order).toBeLessThan(txOrder)
+      expect(vercelPriceOrder).toBeLessThan(txOrder)
     })
 
     it('deletes the inactive Domain row before creating a fresh one with the new name', async () => {
