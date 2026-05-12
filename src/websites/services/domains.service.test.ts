@@ -711,7 +711,7 @@ describe('DomainsService', () => {
 
       expect(result.alreadyExisted).toBe(false)
       expect(result.domain.name).toBe(domainName)
-      expect(result.domain.status).toBe(DomainStatus.pending)
+      expect(result.domain.status).toBe(DomainStatus.submitted)
       expect(result.website.campaignId).toBe(campaign.id)
       expect(result.website.campaignId).toBe(campaign.id)
       expect(mockPrisma.domain.create).toHaveBeenCalledWith({
