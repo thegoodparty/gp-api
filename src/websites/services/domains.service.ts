@@ -711,7 +711,6 @@ export class DomainsService
     // that payment-confirmation leg is wired up, or domains will stall in
     // DomainStatus.pending with no recovery path.
 
-
     return {
       website: websiteSummary,
       domain: {
@@ -723,8 +722,6 @@ export class DomainsService
       alreadyExisted: false,
       message:
         'Domain reserved; registration will complete after payment confirmation',
-    }
-
     }
   }
 
