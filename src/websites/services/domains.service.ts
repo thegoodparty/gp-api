@@ -467,12 +467,6 @@ export class DomainsService
           { err, fn: 'searchDomainsForCampaign' },
           'candidate availability check failed; skipping',
         )
-        const err =
-          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
-        this.logger.warn(
-          { err, fn: 'searchDomainsForCampaign' },
-          'candidate availability check failed; skipping',
-        )
       }
     }
 
