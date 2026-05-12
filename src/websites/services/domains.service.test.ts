@@ -761,7 +761,7 @@ describe('DomainsService', () => {
 
       await expect(
         service.completeDomainRegistration(10, contact),
-      ).resolves.toBeDefined()
+      ).rejects.toBeInstanceOf(BadRequestException)
 
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
     })
