@@ -712,23 +712,18 @@ export class DomainsService
     // DomainStatus.pending with no recovery path.
 
 
-    const updatedDomain = await this.model.findUniqueOrThrow({
-      where: { id: createdDomain.id },
-    })
-
     return {
       website: websiteSummary,
       domain: {
-        id: updatedDomain.id,
-        name: updatedDomain.name,
-        status: updatedDomain.status,
-        price: updatedDomain.price?.toNumber() ?? null,
+        id: createdDomain.id,
+        name: createdDomain.name,
+        status: createdDomain.status,
+        price: createdDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
       message:
         'Domain reserved; registration will complete after payment confirmation',
     }
-  }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
     // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
