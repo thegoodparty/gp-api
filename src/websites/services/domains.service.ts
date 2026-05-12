@@ -7,7 +7,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Domain, DomainStatus, User } from '@prisma/client'
+import { Campaign, Domain, DomainStatus, User } from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -36,9 +36,21 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
-import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
+import {
+  DomainPurchaseMetadata,
+  DomainSearchResult,
+  PatternedDomainCandidate,
+  PatternedDomainSearchResult,
+} from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import {
+  expandDomainPatterns,
+  PatternExpansionLimitError,
+} from '../util/domainPatterns.util'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+
+const MAX_PATTERN_CANDIDATES = 50
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -390,6 +402,113 @@ export class DomainsService
 
   async getDomainDetails(domainName: string) {
     return this.vercel.getDomainDetails(domainName)
+  }
+
+  async searchDomainsForCampaign(
+    campaign: Campaign & { user: User },
+    patterns: string[],
+    maxPrice: number,
+  ): Promise<PatternedDomainSearchResult> {
+    const electionDateStr = campaign.details?.electionDate
+    let electionDate = electionDateStr
+      ? parseIsoDateAsUTC(electionDateStr)
+      : new Date()
+    if (!electionDateStr) {
+      this.logger.warn(
+        { campaignId: campaign.id, fn: 'searchDomainsForCampaign' },
+        'no electionDate on campaign; falling back to current date',
+      )
+    } else if (isNaN(electionDate.getTime())) {
+      this.logger.warn(
+        {
+          campaignId: campaign.id,
+          electionDateStr,
+          fn: 'searchDomainsForCampaign',
+        },
+        'invalid electionDate stored on campaign; falling back to current date',
+      )
+      electionDate = new Date()
+    }
+
+    let candidates: string[]
+    try {
+      candidates = expandDomainPatterns(
+        patterns,
+        {
+          firstName: campaign.user.firstName ?? '',
+          lastName: campaign.user.lastName ?? '',
+          electionDate,
+        },
+        { maxCandidates: MAX_PATTERN_CANDIDATES },
+      )
+    } catch (error) {
+      if (error instanceof PatternExpansionLimitError) {
+        throw new BadRequestException(
+          `Patterns expand to more than ${MAX_PATTERN_CANDIDATES} candidates`,
+        )
+      }
+      throw error
+    }
+
+    const checked = await Promise.allSettled(
+      candidates.map((domain) =>
+        this.checkPatternedCandidate(domain, maxPrice),
+      ),
+    )
+
+    const found: PatternedDomainCandidate[] = []
+    for (const r of checked) {
+      if (r.status === 'fulfilled' && r.value !== null) {
+        found.push(r.value)
+      } else if (r.status === 'rejected') {
+        const err =
+          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
+        this.logger.warn(
+          { err, fn: 'searchDomainsForCampaign' },
+          'candidate availability check failed; skipping',
+        )
+      }
+    }
+
+    return { candidates: found }
+  }
+
+  private async checkPatternedCandidate(
+    domain: string,
+    maxPrice: number,
+  ): Promise<PatternedDomainCandidate | null> {
+    let availability: DomainAvailability | undefined
+    try {
+      const resp = await this.route53.checkDomainAvailability(domain)
+      availability = resp.Availability
+    } catch (error) {
+      this.logger.warn(
+        { err: error, domain, fn: 'checkPatternedCandidate' },
+        'Route53 availability check failed; skipping candidate',
+      )
+      return null
+    }
+
+    if (availability !== DomainAvailability.AVAILABLE) {
+      return null
+    }
+
+    let price: number
+    try {
+      const resp = await this.vercel.checkDomainPrice(domain)
+      price = resp.price
+    } catch (error) {
+      this.logger.warn(
+        { err: error, domain },
+        'Vercel price lookup failed; skipping candidate',
+      )
+      return null
+    }
+
+    if (price > maxPrice) {
+      return null
+    }
+    return { domain, price }
   }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
