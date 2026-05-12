@@ -704,37 +704,45 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-    const websiteContent = await this.client.website.findUniqueOrThrow({
-      where: { id: createdDomain.websiteId },
-      select: { content: true },
-    })
-    const contactInfo = this.buildContactInfo(
-      campaign.user,
-      websiteContent.content,
-    )
+    const { websiteSummary, domain: createdDomain } = locked
 
     // TODO: completeDomainRegistration requires a non-null paymentId when
     // ENABLE_DOMAIN_SETUP is true. This path has no payment — registration
     // must be triggered after payment is confirmed (e.g. via webhook).
     // Calling it here breaks the happy path on production.
-    } catch (error) {
-      try {
-        await this.model.update({
-          where: { id: createdDomain.id },
-          data: { status: DomainStatus.inactive },
-        })
-      } catch (updateErr) {
-        this.logger.error(
-          { updateErr },
-          `Failed to mark domain ${createdDomain.id} inactive after registration failure`,
-        )
-      }
-      throw new BadGatewayException(
-        `Failed to register domain with Vercel: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
+
+    try {
+      await this.analytics.track(
+        campaign.user.id,
+        EVENTS.CandidateWebsite.PurchasedDomain,
+        {
+          domainSelected: domainName,
+          priceOfSelectedDomain: createdDomain.price?.toNumber() ?? null,
+        },
+      )
+    } catch (analyticsError) {
+      this.logger.error(
+        { analyticsError },
+        `Failed to track domain purchased event for user ${campaign.user.id}`,
       )
     }
+
+    const updatedDomain = await this.model.findUniqueOrThrow({
+      where: { id: createdDomain.id },
+    })
+
+    return {
+      website: websiteSummary,
+      domain: {
+        id: updatedDomain.id,
+        name: updatedDomain.name,
+        status: updatedDomain.status,
+        price: updatedDomain.price?.toNumber() ?? null,
+      },
+      alreadyExisted: false,
+      message: 'Domain registration initiated with Vercel',
+    }
+  }
 
     try {
       await this.analytics.track(
