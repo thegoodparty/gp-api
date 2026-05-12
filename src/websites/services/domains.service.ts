@@ -410,7 +410,7 @@ export class DomainsService
     maxPrice: number,
   ): Promise<PatternedDomainSearchResult> {
     const electionDateStr = campaign.details?.electionDate
-    const electionDate = electionDateStr
+    let electionDate = electionDateStr
       ? parseIsoDateAsUTC(electionDateStr)
       : new Date()
     if (!electionDateStr) {
@@ -418,6 +418,12 @@ export class DomainsService
         { campaignId: campaign.id, fn: 'searchDomainsForCampaign' },
         'no electionDate on campaign; falling back to current date',
       )
+    } else if (isNaN(electionDate.getTime())) {
+      this.logger.warn(
+        { campaignId: campaign.id, electionDateStr, fn: 'searchDomainsForCampaign' },
+        'invalid electionDate stored on campaign; falling back to current date',
+      )
+      electionDate = new Date()
     }
 
     let candidates: string[]
