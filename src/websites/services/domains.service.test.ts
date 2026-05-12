@@ -403,6 +403,5 @@ describe('DomainsService', () => {
 
       expect(result).toEqual({ candidates: [] })
     })
-    })
   })
 })
