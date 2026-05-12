@@ -949,18 +949,21 @@ export class DomainsService
       where: { websiteId },
     })
 
-    if (domain.paymentId) {
-      const paymentIntent = await this.payments.retrievePayment(
-        domain.paymentId,
-      )
+    if (!domain.paymentId) {
+      throw new BadRequestException({
+        message: 'No payment ID found for domain',
+        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
+      })
+    }
 
-      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
-        throw new BadRequestException(
-          `Payment not completed. Current status: ${paymentIntent.status}`,
-        )
-      }
+    const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
+
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
+      throw new BadRequestException(
+        `Payment not completed. Current status: ${paymentIntent.status}`,
+      )
     }
 
     if (!domain.price) {
