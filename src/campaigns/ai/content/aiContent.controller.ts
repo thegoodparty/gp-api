@@ -33,6 +33,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from '../../../vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { FORBIDDEN_KEYS } from '../schemas/forbiddenKeys'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -108,7 +109,7 @@ export class AiContentController {
   @Delete(':key')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
-    if (['__proto__', 'constructor', 'prototype'].includes(key)) {
+    if (FORBIDDEN_KEYS.has(key)) {
       throw new BadRequestException('Invalid key')
     }
 

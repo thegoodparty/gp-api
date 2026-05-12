@@ -1,7 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+import { FORBIDDEN_KEYS } from './forbiddenKeys'
 
 export class CreateAiContentSchema extends createZodDto(
   z.object({
