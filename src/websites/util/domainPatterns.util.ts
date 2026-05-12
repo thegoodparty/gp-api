@@ -102,7 +102,7 @@ const substituteAndExpand = (
     if (value === undefined || value === '') {
       return []
     }
-    substituted = substituted.replace(m[0], value)
+    substituted = substituted.replaceAll(m[0], value)
   }
   if (hasUnresolvedPlaceholder(substituted)) {
     return []
