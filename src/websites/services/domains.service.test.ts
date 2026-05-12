@@ -769,6 +769,5 @@ describe('DomainsService', () => {
       })
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
     })
-
   })
 })

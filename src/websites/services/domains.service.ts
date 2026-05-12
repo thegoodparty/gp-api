@@ -55,6 +55,14 @@ const MAX_PATTERN_CANDIDATES = 50
 
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
+const DOMAIN_RESERVATION_KIND = {
+  IDEMPOTENT: 'idempotent',
+  CREATED: 'created',
+} as const
+
+const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
+  'Domain registration already in progress for this campaign'
+
 const { ENABLE_DOMAIN_SETUP } = process.env
 
 @Injectable()
@@ -520,7 +528,7 @@ export class DomainsService
     price: number,
   ): Promise<
     | {
-        kind: 'idempotent'
+        kind: typeof DOMAIN_RESERVATION_KIND.IDEMPOTENT
         websiteSummary: Pick<
           Website,
           'id' | 'vanityPath' | 'status' | 'campaignId'
@@ -530,7 +538,7 @@ export class DomainsService
         }
       }
     | {
-        kind: 'created'
+        kind: typeof DOMAIN_RESERVATION_KIND.CREATED
         websiteSummary: Pick<
           Website,
           'id' | 'vanityPath' | 'status' | 'campaignId'
@@ -561,7 +569,7 @@ export class DomainsService
         if (website.domain.status !== DomainStatus.inactive) {
           if (website.domain.name === domainName) {
             return {
-              kind: 'idempotent',
+              kind: DOMAIN_RESERVATION_KIND.IDEMPOTENT,
               websiteSummary,
               domain: {
                 id: website.domain.id,
@@ -589,7 +597,11 @@ export class DomainsService
         },
       })
 
-      return { kind: 'created', websiteSummary, domain: created }
+      return {
+        kind: DOMAIN_RESERVATION_KIND.CREATED,
+        websiteSummary,
+        domain: created,
+      }
     })
   }
 
@@ -665,7 +677,7 @@ export class DomainsService
       return {
         ...preflightHit,
         alreadyExisted: true,
-        message: 'Domain registration already in progress for this campaign',
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
       }
     }
 
@@ -693,12 +705,12 @@ export class DomainsService
       price,
     )
 
-    if (locked.kind === 'idempotent') {
+    if (locked.kind === DOMAIN_RESERVATION_KIND.IDEMPOTENT) {
       return {
         website: locked.websiteSummary,
         domain: locked.domain,
         alreadyExisted: true,
-        message: 'Domain registration already in progress for this campaign',
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
       }
     }
 
