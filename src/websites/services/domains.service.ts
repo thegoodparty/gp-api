@@ -725,6 +725,9 @@ export class DomainsService
         'Domain reserved; registration will complete after payment confirmation',
     }
 
+    }
+  }
+
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
     // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
     const [availabilityResp, suggestionsResp] = await Promise.all([
