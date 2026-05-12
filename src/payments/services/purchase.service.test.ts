@@ -105,6 +105,7 @@ describe('PurchaseService', () => {
     tier: null,
     formattedAddress: null,
     placeId: null,
+    campaignEmail: null,
     data: {},
     details: {},
     aiContent: {},

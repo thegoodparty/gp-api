@@ -41,6 +41,7 @@ export const createMockCampaign = (
   details: {},
   formattedAddress: null,
   placeId: null,
+  campaignEmail: null,
   aiContent: {},
   vendorTsData: {},
   canDownloadFederal: false,

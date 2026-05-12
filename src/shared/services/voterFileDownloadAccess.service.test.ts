@@ -367,6 +367,7 @@ function createMockCampaign(
     tier: null,
     formattedAddress: null,
     placeId: null,
+    campaignEmail: null,
     userId: 1,
     data: {},
     aiContent: {},

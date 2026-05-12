@@ -14,9 +14,8 @@ import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DomainsService } from './domains.service'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
-import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import {
   createMockCampaign,
   createMockUser,
@@ -55,7 +54,20 @@ describe('DomainsService', () => {
     checkDomainAvailability: ReturnType<typeof vi.fn>
     getDomainSuggestions: ReturnType<typeof vi.fn>
   }
-  let mockVercel: { checkDomainPrice: ReturnType<typeof vi.fn> }
+  let mockVercel: {
+    checkDomainPrice: ReturnType<typeof vi.fn>
+    listDnsRecords: ReturnType<typeof vi.fn>
+    createMXRecords: ReturnType<typeof vi.fn>
+    createTXTVerificationRecord: ReturnType<typeof vi.fn>
+  }
+  let mockForwardEmail: {
+    getDomain: ReturnType<typeof vi.fn>
+    addDomain: ReturnType<typeof vi.fn>
+    getCatchAllDomainAliases: ReturnType<typeof vi.fn>
+    createCatchAllAlias: ReturnType<typeof vi.fn>
+    updateDomainAlias: ReturnType<typeof vi.fn>
+  }
+  let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
   let mockPrisma: {
     domain: {
       findMany: ReturnType<typeof vi.fn>
@@ -67,6 +79,10 @@ describe('DomainsService', () => {
     website: {
       findUniqueOrThrow: ReturnType<typeof vi.fn>
       findUnique: ReturnType<typeof vi.fn>
+      update: ReturnType<typeof vi.fn>
+    }
+    campaign: {
+      update: ReturnType<typeof vi.fn>
     }
     $transaction: ReturnType<typeof vi.fn>
     $executeRaw: ReturnType<typeof vi.fn>
@@ -77,7 +93,24 @@ describe('DomainsService', () => {
       checkDomainAvailability: vi.fn(),
       getDomainSuggestions: vi.fn().mockResolvedValue({ SuggestionsList: [] }),
     }
-    mockVercel = { checkDomainPrice: vi.fn() }
+    mockVercel = {
+      checkDomainPrice: vi.fn(),
+      listDnsRecords: vi.fn().mockResolvedValue([]),
+      createMXRecords: vi.fn().mockResolvedValue(undefined),
+      createTXTVerificationRecord: vi.fn().mockResolvedValue(undefined),
+    }
+    mockForwardEmail = {
+      getDomain: vi.fn().mockResolvedValue(null),
+      addDomain: vi.fn().mockResolvedValue({
+        id: 'fed_1',
+        verification_record: 'vr',
+        name: mockDomain.name,
+      }),
+      getCatchAllDomainAliases: vi.fn().mockResolvedValue([]),
+      createCatchAllAlias: vi.fn().mockResolvedValue({ id: 'alias_1' }),
+      updateDomainAlias: vi.fn().mockResolvedValue({ id: 'alias_1' }),
+    }
+    mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
     mockAnalytics = {
       track: vi.fn().mockResolvedValue(undefined),
     }
@@ -107,6 +140,10 @@ describe('DomainsService', () => {
           domain: mockDomain,
         }),
         findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
+      campaign: {
+        update: vi.fn().mockResolvedValue(undefined),
       },
       $executeRaw: vi.fn().mockResolvedValue(0),
       $transaction: vi.fn(
@@ -123,13 +160,9 @@ describe('DomainsService', () => {
         { provide: VercelService, useValue: mockVercel },
         { provide: PaymentsService, useValue: mockPayments },
         { provide: StripeService, useValue: mockStripe },
-        { provide: ForwardEmailService, useValue: {} },
-        { provide: QueueProducerService, useValue: {} },
+        { provide: ForwardEmailService, useValue: mockForwardEmail },
+        { provide: QueueProducerService, useValue: mockQueue },
         { provide: AnalyticsService, useValue: mockAnalytics },
-        {
-          provide: ClerkUserEnricherService,
-          useValue: createMockClerkEnricher(),
-        },
         { provide: PinoLogger, useValue: createMockLogger() },
         DomainsService,
       ],
@@ -768,6 +801,120 @@ describe('DomainsService', () => {
         errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
       })
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('setupDomainEmailForwarding', () => {
+    it('always forwards to the candidate-domains@goodparty.org alias', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: { contact: { phone: '555' } },
+      })
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockForwardEmail.createCatchAllAlias).toHaveBeenCalledWith(
+        'candidate-domains@goodparty.org',
+        expect.objectContaining({ id: 'fed_1' }),
+      )
+      expect(mockForwardEmail.updateDomainAlias).not.toHaveBeenCalled()
+    })
+
+    it('updates existing aliases to point at the GP alias', async () => {
+      mockForwardEmail.getCatchAllDomainAliases.mockResolvedValue([
+        { id: 'existing_alias' },
+      ])
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: {},
+      })
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockForwardEmail.updateDomainAlias).toHaveBeenCalledWith(
+        'existing_alias',
+        'candidate-domains@goodparty.org',
+        expect.objectContaining({ id: 'fed_1' }),
+      )
+      expect(mockForwardEmail.createCatchAllAlias).not.toHaveBeenCalled()
+    })
+
+    it('persists info@<domain> on Website.content.contact.email, preserving other content', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: {
+          main: { title: 'keep me' },
+          contact: { phone: '555-555-5555' },
+        },
+        campaignId: 42,
+      })
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockPrisma.website.findUnique).toHaveBeenCalledWith({
+        where: { id: mockDomain.websiteId },
+        select: { content: true, campaignId: true },
+      })
+      expect(mockPrisma.website.update).toHaveBeenCalledWith({
+        where: { id: mockDomain.websiteId },
+        data: {
+          content: {
+            main: { title: 'keep me' },
+            contact: {
+              phone: '555-555-5555',
+              email: `info@${mockDomain.name}`,
+            },
+          },
+        },
+      })
+    })
+
+    it('persists campaignEmail on the Campaign row', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: {},
+        campaignId: 42,
+      })
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockPrisma.campaign.update).toHaveBeenCalledWith({
+        where: { id: 42 },
+        data: { campaignEmail: `info@${mockDomain.name}` },
+      })
+    })
+
+    it('skips persistence when no Website row exists for the domain', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(null)
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockPrisma.website.update).not.toHaveBeenCalled()
+      expect(mockPrisma.campaign.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('backfillDomainEmailRedirects', () => {
+    it('enqueues a message without forwardingEmailAddress', async () => {
+      vi.spyOn(service, 'shouldEnableDomainPurchase').mockReturnValue(true)
+      mockPrisma.domain.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).backfillDomainEmailRedirects()
+
+      expect(mockQueue.sendMessage).toHaveBeenCalledTimes(2)
+      expect(mockQueue.sendMessage).toHaveBeenNthCalledWith(
+        1,
+        {
+          type: QueueType.DOMAIN_EMAIL_FORWARDING,
+          data: { domainId: 1 },
+        },
+        MessageGroup.domainEmailRedirect,
+      )
+      expect(mockQueue.sendMessage).toHaveBeenNthCalledWith(
+        2,
+        {
+          type: QueueType.DOMAIN_EMAIL_FORWARDING,
+          data: { domainId: 2 },
+        },
+        MessageGroup.domainEmailRedirect,
+      )
     })
   })
 })

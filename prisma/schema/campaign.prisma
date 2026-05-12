@@ -20,6 +20,7 @@ model Campaign {
   tier                  CampaignTier?
   formattedAddress      String?                 @map("formatted_address")
   placeId               String?                 @map("place_id")
+  campaignEmail         String?                 @map("campaign_email")
   /// [CampaignData]
   data                     Json                    @default("{}") @db.JsonB
   /// [CampaignDetails]

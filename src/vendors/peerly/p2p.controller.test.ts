@@ -22,6 +22,7 @@ const mockCampaign: Campaign = {
   tier: null,
   formattedAddress: null,
   placeId: null,
+  campaignEmail: null,
   aiContent: {},
   vendorTsData: {},
   canDownloadFederal: false,
