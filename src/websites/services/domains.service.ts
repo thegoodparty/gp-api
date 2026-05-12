@@ -48,9 +48,7 @@ import {
   expandDomainPatterns,
   PatternExpansionLimitError,
 } from '../util/domainPatterns.util'
-import { parseISO } from 'date-fns'
-
-const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
 
@@ -412,16 +410,8 @@ export class DomainsService
     maxPrice: number,
   ): Promise<PatternedDomainSearchResult> {
     const electionDateStr = campaign.details?.electionDate
-    // Anchor date-only strings to UTC midnight — bare 'YYYY-MM-DD' would
-    // otherwise be parsed as LOCAL midnight by parseISO, causing
-    // getUTCMonth/getUTCFullYear in the pattern util to wrap on servers
-    // east of UTC (e.g. local 2026-01-01 → UTC 2025-12-31).
     const electionDate = electionDateStr
-      ? parseISO(
-          ISO_DATE_ONLY_RE.test(electionDateStr)
-            ? `${electionDateStr}T00:00:00Z`
-            : electionDateStr,
-        )
+      ? parseIsoDateAsUTC(electionDateStr)
       : new Date()
     if (!electionDateStr) {
       this.logger.warn(

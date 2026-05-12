@@ -75,7 +75,6 @@ const expandAlternations = (input: string, budget: Budget): string[] => {
   if (open === -1) return consumeOne(input, budget)
   const close = input.indexOf(')', open + 1)
   if (close === -1 || close === open + 1) return consumeOne(input, budget)
-  const whole = input.slice(open, close + 1)
   const group = input.slice(open + 1, close)
   // Budget is decremented at each leaf, so the recursion aborts the moment
   // the cap is hit — preventing the cross-product from materializing
@@ -89,6 +88,7 @@ const expandAlternations = (input: string, budget: Budget): string[] => {
         budget,
       ),
     )
+}
 
 const substituteAndExpand = (
   pattern: string,
