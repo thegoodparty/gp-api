@@ -25,16 +25,13 @@ import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.de
 import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { userHasRole } from 'src/users/util/users.util'
-import { OutreachService } from '../../outreach/services/outreach.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { CreateVoterFileFilterSchema } from '../schemas/CreateVoterFileFilterSchema'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 import { VoterFileFilterService } from '../services/voterFileFilter.service'
-import { VoterOutreachService } from '../services/voterOutreach.service'
 import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
-import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
 import { VoterFileService } from './voterFile.service'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -43,11 +40,9 @@ import { PinoLogger } from 'nestjs-pino'
 export class VoterFileController {
   constructor(
     private readonly voterFileService: VoterFileService,
-    private readonly voterOutreachService: VoterOutreachService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
-    private readonly outreachService: OutreachService,
     private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
@@ -87,40 +82,6 @@ export class VoterFileController {
   @Get('wake-up')
   wakeUp() {
     return this.voterFileService.wakeUp()
-  }
-
-  // TODO: this should maybe live alongside future campaign planning feature
-  //  UPDATE: yes, it should. Move it to the OutreachController
-  @Post('schedule')
-  @UseCampaign()
-  @UseGuards(CanDownloadVoterFileGuard)
-  async scheduleOutreachCampaign(
-    @ReqUser() user: User,
-    @ReqCampaign() campaign: Campaign,
-    @Body()
-    {
-      outreachId,
-      audienceRequest,
-      campaignPlanDueDate,
-    }: ScheduleOutreachCampaignSchema,
-  ) {
-    const outreach = await this.outreachService.model.findFirst({
-      where: { id: outreachId, campaignId: campaign.id },
-      include: { voterFileFilter: true },
-    })
-    if (!outreach) {
-      this.logger.warn(
-        `Outreach not found for schedule: outreachId=${outreachId}, campaignId=${campaign.id}. Ensure the client uses the outreach id from the POST /outreach 201 response.`,
-      )
-      throw new NotFoundException('Outreach not found')
-    }
-    return this.voterOutreachService.scheduleOutreachCampaign(
-      user,
-      campaign,
-      outreach,
-      audienceRequest,
-      campaignPlanDueDate,
-    )
   }
 
   @Post('help-message')

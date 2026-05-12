@@ -116,6 +116,7 @@ export class BraintrustService {
       span.log({
         input: options?.input,
         output,
+        // TODO(ENG-10165): CURRENT_ENVIRONMENT is 'production' in every deploy; for accurate Braintrust env tagging use `process.env.OTEL_SERVICE_ENVIRONMENT`. See appEnvironment.util.ts.
         metadata: { environment: CURRENT_ENVIRONMENT, ...options?.metadata },
       })
     } catch (err) {

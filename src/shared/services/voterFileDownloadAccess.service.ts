@@ -55,6 +55,7 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
         {
           text: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}\nvisit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data\n${alertSlackMessage}`,
         },
+        // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
         IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
       )
     }

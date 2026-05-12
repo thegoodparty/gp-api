@@ -1,5 +1,5 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { Campaign, Organization, VoterFileFilter } from '@prisma/client'
+import { BadRequestException } from '@nestjs/common'
+import { Organization, VoterFileFilter } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { VoterFileController } from './voterFile.controller'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -7,7 +7,6 @@ import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 describe('VoterFileController', () => {
   let controller: VoterFileController
   let mockVoterFileService: Record<string, ReturnType<typeof vi.fn>>
-  let mockVoterOutreachService: Record<string, ReturnType<typeof vi.fn>>
   let mockVoterFileDownloadAccess: Record<string, ReturnType<typeof vi.fn>>
   let mockCampaignsService: Record<string, ReturnType<typeof vi.fn>>
   let mockVoterFileFilterService: {
@@ -18,16 +17,6 @@ describe('VoterFileController', () => {
     updateByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
     deleteByIdAndOrganizationSlug: ReturnType<typeof vi.fn>
   }
-  let mockOutreachService: {
-    model: { findFirst: ReturnType<typeof vi.fn> }
-  }
-
-  const baseCampaign = {
-    id: 1,
-    userId: 100,
-    isPro: false,
-    organizationSlug: 'campaign-1',
-  } as Campaign
 
   const baseOrg = { slug: 'campaign-1' } as Organization
 
@@ -38,7 +27,6 @@ describe('VoterFileController', () => {
 
   beforeEach(() => {
     mockVoterFileService = {}
-    mockVoterOutreachService = {}
     mockVoterFileDownloadAccess = {}
     mockCampaignsService = {}
     mockVoterFileFilterService = {
@@ -49,17 +37,12 @@ describe('VoterFileController', () => {
       updateByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
       deleteByIdAndOrganizationSlug: vi.fn().mockResolvedValue(mockFilter),
     }
-    mockOutreachService = {
-      model: { findFirst: vi.fn() },
-    }
 
     controller = new VoterFileController(
       mockVoterFileService as never,
-      mockVoterOutreachService as never,
       mockVoterFileDownloadAccess as never,
       mockCampaignsService as never,
       mockVoterFileFilterService as never,
-      mockOutreachService as never,
       {} as never,
       createMockLogger(),
     )
@@ -196,58 +179,6 @@ describe('VoterFileController', () => {
       expect(
         mockVoterFileFilterService.deleteByIdAndOrganizationSlug,
       ).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('scheduleOutreachCampaign', () => {
-    const mockUser = { id: 1, email: 'user@example.com' } as never
-
-    it('queries outreach scoped to campaign ID and delegates to voterOutreachService', async () => {
-      const mockOutreach = {
-        id: 10,
-        campaignId: 1,
-        voterFileFilter: null,
-      }
-      mockOutreachService.model.findFirst.mockResolvedValue(mockOutreach)
-      mockVoterOutreachService.scheduleOutreachCampaign = vi
-        .fn()
-        .mockResolvedValue({ success: true })
-
-      const result = await controller.scheduleOutreachCampaign(
-        mockUser,
-        baseCampaign,
-        { outreachId: 10, audienceRequest: 'all voters' },
-      )
-
-      expect(mockOutreachService.model.findFirst).toHaveBeenCalledWith({
-        where: { id: 10, campaignId: baseCampaign.id },
-        include: { voterFileFilter: true },
-      })
-      expect(
-        mockVoterOutreachService.scheduleOutreachCampaign,
-      ).toHaveBeenCalledWith(
-        mockUser,
-        baseCampaign,
-        mockOutreach,
-        'all voters',
-        undefined,
-      )
-      expect(result).toEqual({ success: true })
-    })
-
-    it('throws NotFoundException when outreach does not exist for campaign', async () => {
-      mockOutreachService.model.findFirst.mockResolvedValue(null)
-
-      await expect(
-        controller.scheduleOutreachCampaign(mockUser, baseCampaign, {
-          outreachId: 999,
-        }),
-      ).rejects.toThrow(NotFoundException)
-      await expect(
-        controller.scheduleOutreachCampaign(mockUser, baseCampaign, {
-          outreachId: 999,
-        }),
-      ).rejects.toThrow('Outreach not found')
     })
   })
 })
