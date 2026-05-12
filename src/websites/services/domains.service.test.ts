@@ -874,6 +874,7 @@ describe('DomainsService', () => {
 
       await service.setupDomainEmailForwarding(mockDomain)
 
+      expect(mockPrisma.$transaction).toHaveBeenCalledOnce()
       expect(mockPrisma.campaign.update).toHaveBeenCalledWith({
         where: { id: 42 },
         data: { campaignEmail: `info@${mockDomain.name}` },

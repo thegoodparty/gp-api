@@ -929,22 +929,24 @@ export class DomainsService
     const campaignEmail = `info@${domain.name}`
     const content = website.content ?? {}
 
-    await this.client.website.update({
-      where: { id: domain.websiteId },
-      data: {
-        content: {
-          ...content,
-          contact: {
-            ...(content.contact ?? {}),
-            email: campaignEmail,
+    await this.client.$transaction(async (tx) => {
+      await tx.website.update({
+        where: { id: domain.websiteId },
+        data: {
+          content: {
+            ...content,
+            contact: {
+              ...(content.contact ?? {}),
+              email: campaignEmail,
+            },
           },
         },
-      },
-    })
+      })
 
-    await this.client.campaign.update({
-      where: { id: website.campaignId },
-      data: { campaignEmail },
+      await tx.campaign.update({
+        where: { id: website.campaignId },
+        data: { campaignEmail },
+      })
     })
   }
 
