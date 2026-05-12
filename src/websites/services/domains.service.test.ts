@@ -770,7 +770,5 @@ describe('DomainsService', () => {
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
     })
 
-      expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
-    })
   })
 })
