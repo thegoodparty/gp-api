@@ -904,7 +904,14 @@ export class DomainsService
       )
     }
 
-    await this.persistCampaignEmail(domain)
+    try {
+      await this.persistCampaignEmail(domain)
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to persist campaign email for domain ${domain.name}`,
+      )
+    }
 
     return forwardEmailDomain
   }

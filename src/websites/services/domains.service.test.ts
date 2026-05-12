@@ -888,6 +888,18 @@ describe('DomainsService', () => {
       expect(mockPrisma.website.update).not.toHaveBeenCalled()
       expect(mockPrisma.campaign.update).not.toHaveBeenCalled()
     })
+
+    it('returns ForwardEmail domain even when campaign email persistence fails', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: {},
+        campaignId: 42,
+      })
+      mockPrisma.website.update.mockRejectedValue(new Error('db write failed'))
+
+      const result = await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(result).toMatchObject({ id: 'fed_1' })
+    })
   })
 
   describe('backfillDomainEmailRedirects', () => {
