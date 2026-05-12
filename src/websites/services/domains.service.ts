@@ -653,6 +653,18 @@ export class DomainsService
         contactInfo,
       )
     } catch (error) {
+      // Mark the domain inactive so subsequent calls don't treat it as idempotent
+      await this.model
+        .update({
+          where: { id: createdDomain.id },
+          data: { status: DomainStatus.inactive },
+        })
+        .catch((updateErr) =>
+          this.logger.error(
+            { updateErr },
+            `Failed to mark domain ${createdDomain.id} inactive after registration failure`,
+          ),
+        )
       throw new BadGatewayException(
         `Failed to register domain with Vercel: ${
           error instanceof Error ? error.message : 'Unknown error'
