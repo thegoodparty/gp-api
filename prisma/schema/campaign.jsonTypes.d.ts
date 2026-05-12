@@ -34,6 +34,7 @@ declare global {
         | 'testing'
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
+      proUpgradeSlackNotifiedAt?: number
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
       geoLocation?: {

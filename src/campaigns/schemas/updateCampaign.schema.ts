@@ -26,6 +26,7 @@ const CampaignDetailsSchema = z
     runForOffice: z.enum(['yes', 'no']),
     pledged: z.boolean(),
     isProUpdatedAt: z.number(),
+    proUpgradeSlackNotifiedAt: z.number(),
     customIssues: z.array(
       z.object({
         title: z.string(),

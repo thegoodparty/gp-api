@@ -1,4 +1,10 @@
-import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common'
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  MessageEvent,
+  NotFoundException,
+} from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import {
   addDays,
@@ -23,6 +29,7 @@ import {
   parseIsoDateString,
 } from 'src/shared/util/date.util'
 import { sleep } from 'src/shared/util/sleep.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   SlackChannel,
@@ -49,6 +56,7 @@ import { generalDefaultTasks } from '../fixtures/defaultTasks'
 import { primaryDefaultTasks } from '../fixtures/defaultTasksForPrimary'
 import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiGenerationService } from './aiGeneration.service'
+import { CampaignsService } from '../../services/campaigns.service'
 
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
@@ -56,6 +64,7 @@ const MAX_TASK_WINDOW_DAYS = 49
 const SHORTENED_WINDOW_BUFFER_DAYS = 7
 const FULL_WINDOW_THRESHOLD_DAYS = 56
 const SIGNUP_AWARENESS_MIN_DAYS_TO_ELECTION = 42
+const SLACK_RETRY_BASE_DELAY_MS = 500
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -64,6 +73,8 @@ export class CampaignTasksService extends createPrismaBase(
   constructor(
     private readonly aiGenerationService: AiGenerationService,
     private readonly slackService: SlackService,
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaignsService: WrapperType<CampaignsService>,
   ) {
     super()
   }
@@ -365,69 +376,131 @@ export class CampaignTasksService extends createPrismaBase(
       created = true
     })
 
-    if (created) {
+    if (created && campaign.isPro) {
       void this.notifySlackDefaultTasksCreated(campaign.id)
+    }
+  }
+
+  async notifySlackOnProUpgrade(campaignId: number) {
+    try {
+      const campaign = await this.client.campaign.findUnique({
+        where: { id: campaignId },
+        select: { details: true },
+      })
+      if (!campaign?.details) return
+
+      if (campaign.details.proUpgradeSlackNotifiedAt) {
+        return
+      }
+
+      const defaultTasksCount = await this.model.count({
+        where: { campaignId, isDefaultTask: true },
+      })
+      if (defaultTasksCount === 0) return
+
+      await this.sendCampaignPlanSlackMessage(campaignId)
+
+      await this.campaignsService.patchCampaignDetails(campaignId, {
+        proUpgradeSlackNotifiedAt: Date.now(),
+      })
+    } catch (error) {
+      this.logger.error(
+        { error, campaignId },
+        'Failed to send Slack notification on Pro upgrade',
+      )
     }
   }
 
   async notifySlackDefaultTasksCreated(campaignId: number) {
     try {
-      const campaign = await this.client.campaign.findUniqueOrThrow({
-        where: { id: campaignId },
-        include: { user: true, campaignTasks: true },
-      })
-
-      const candidateName =
-        [campaign.user?.firstName, campaign.user?.lastName]
-          .filter((value): value is string => Boolean(value))
-          .join(' ') ||
-        campaign.data.name ||
-        'Unknown'
-
-      const outreachTasks = campaign.campaignTasks.filter(
-        (task) =>
-          task.flowType === CampaignTaskType.text ||
-          task.flowType === CampaignTaskType.robocall,
-      )
-
-      const taskLines = outreachTasks.map((task) => {
-        const dueDate = task.date
-          ? format(task.date, 'MMM d, yyyy')
-          : 'No date set'
-        return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
-      })
-
-      const { hubspotId } = campaign.data
-
-      const slackBody = [
-        ':white_check_mark: *AI Campaign Plan Created*',
-        `Candidate: ${candidateName}`,
-        `HubSpot ID: ${hubspotId ?? 'N/A'}`,
-        '',
-        `*Outreach Tasks (${outreachTasks.length}):*`,
-        ...(taskLines.length > 0 ? taskLines : ['None']),
-      ].join('\n')
-
-      await this.slackService.message(
-        {
-          blocks: [
-            {
-              type: SlackMessageType.SECTION,
-              text: {
-                type: SlackMessageType.MRKDWN,
-                text: slackBody,
-              },
-            },
-          ],
-        },
-        SlackChannel.casClickupTasks,
-      )
+      await this.sendCampaignPlanSlackMessage(campaignId)
     } catch (error) {
       this.logger.error(
         { error, campaignId },
         'Failed to send Slack notification for default tasks',
       )
     }
+  }
+
+  private async sendCampaignPlanSlackMessage(campaignId: number) {
+    const campaign = await this.client.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+      include: { user: true, campaignTasks: true },
+    })
+
+    const candidateName =
+      [campaign.user?.firstName, campaign.user?.lastName]
+        .filter((value): value is string => Boolean(value))
+        .join(' ') ||
+      campaign.data.name ||
+      'Unknown'
+
+    const outreachTasks = campaign.campaignTasks.filter(
+      (task) =>
+        task.flowType === CampaignTaskType.text ||
+        task.flowType === CampaignTaskType.robocall,
+    )
+
+    const taskLines = outreachTasks.map((task) => {
+      const dueDate = task.date
+        ? format(task.date, 'MMM d, yyyy')
+        : 'No date set'
+      return `- ${task.flowType!.toUpperCase()}: ${task.title} (Due: ${dueDate})`
+    })
+
+    const { hubspotId } = campaign.data
+
+    const slackBody = [
+      ':white_check_mark: *AI Campaign Plan Created*',
+      `Candidate: ${candidateName}`,
+      `HubSpot ID: ${hubspotId ?? 'N/A'}`,
+      '',
+      `*Outreach Tasks (${outreachTasks.length}):*`,
+      ...(taskLines.length > 0 ? taskLines : ['None']),
+    ].join('\n')
+
+    await this.sendSlackWithRetry(
+      {
+        blocks: [
+          {
+            type: SlackMessageType.SECTION,
+            text: {
+              type: SlackMessageType.MRKDWN,
+              text: slackBody,
+            },
+          },
+        ],
+      },
+      SlackChannel.casClickupTasks,
+    )
+  }
+
+  private async sendSlackWithRetry(
+    message: Parameters<SlackService['message']>[0],
+    channel: SlackChannel,
+    maxAttempts = 3,
+  ) {
+    // SlackService.message() swallows axios errors and returns undefined on
+    // failure, so we have to treat a falsy return as a failure ourselves —
+    // a thrown error here would only happen for misconfiguration.
+    let lastError: unknown
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await this.slackService.message(message, channel)
+        if (result) return
+        lastError = new Error('Slack message returned no data')
+      } catch (error) {
+        lastError = error
+      }
+      if (attempt === maxAttempts) break
+      const delayMs = 2 ** (attempt - 1) * SLACK_RETRY_BASE_DELAY_MS
+      this.logger.warn(
+        { error: lastError, attempt, channel, delayMs },
+        'Slack send failed, retrying',
+      )
+      await sleep(delayMs)
+    }
+    throw lastError
   }
 
   private orderDefaultTasksForCampaign(
