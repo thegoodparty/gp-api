@@ -475,12 +475,11 @@ export class DomainsService
       const resp = await this.route53.checkDomainAvailability(domain)
       availability = resp.Availability
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error
-      }
-      throw new BadGatewayException('Route53 availability check failed', {
-        cause: error instanceof Error ? error : new Error(String(error)),
-      })
+      this.logger.warn(
+        { err: error, domain, fn: 'checkPatternedCandidate' },
+        'Route53 availability check failed; skipping candidate',
+      )
+      return null
     }
 
     if (availability !== DomainAvailability.AVAILABLE) {
