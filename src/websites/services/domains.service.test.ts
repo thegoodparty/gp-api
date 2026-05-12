@@ -13,6 +13,7 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DomainsService } from './domains.service'
+import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
@@ -720,6 +721,48 @@ describe('DomainsService', () => {
           status: DomainStatus.pending,
         }),
       })
+    })
+  })
+
+  describe('completeDomainRegistration', () => {
+    const contact: RegisterDomainSchema = {
+      firstName: 'Mary',
+      lastName: "O'Neill",
+      email: 'mary@example.com',
+      phoneNumber: '+15555555555',
+      addressLine1: '1 Main St',
+      city: 'New York',
+      state: 'NY',
+      zipCode: '10001',
+    }
+
+    it('does NOT throw "no payment on record" when paymentId is null and domain purchase is enabled (regression for purchaseDomainForCampaign)', async () => {
+      Object.assign(mockPrisma.domain, {
+        findFirst: vi.fn(),
+        findFirstOrThrow: vi.fn(),
+        findUnique: vi.fn(),
+        count: vi.fn(),
+      })
+      service.onModuleInit()
+      vi.spyOn(service, 'shouldEnableDomainPurchase').mockReturnValue(true)
+      Object.assign(mockVercel, {
+        getDomainDetails: vi.fn().mockRejectedValue(new Error('not found')),
+        isVercelNotFoundError: vi.fn().mockReturnValue(true),
+        purchaseDomain: vi.fn().mockResolvedValue({}),
+        getProjectDomain: vi.fn().mockRejectedValue(new Error('not found')),
+        addDomainToProject: vi.fn().mockResolvedValue({}),
+      })
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...mockDomain,
+        paymentId: null,
+        price: new Decimal(12),
+      })
+
+      await expect(
+        service.completeDomainRegistration(10, contact),
+      ).resolves.toBeDefined()
+
+      expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
     })
   })
 })

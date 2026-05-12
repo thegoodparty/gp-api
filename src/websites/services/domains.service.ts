@@ -987,10 +987,6 @@ export class DomainsService
           `Payment not completed. Current status: ${paymentIntent.status}`,
         )
       }
-    } else if (this.shouldEnableDomainPurchase()) {
-      throw new BadRequestException(
-        'Cannot register domain: no payment on record',
-      )
     }
 
     if (!domain.price) {
