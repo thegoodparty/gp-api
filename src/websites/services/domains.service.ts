@@ -743,38 +743,6 @@ export class DomainsService
     }
   }
 
-    try {
-      await this.analytics.track(
-        campaign.user.id,
-        EVENTS.CandidateWebsite.PurchasedDomain,
-        {
-          domainSelected: domainName,
-          priceOfSelectedDomain: createdDomain.price?.toNumber() ?? null,
-        },
-      )
-    } catch (analyticsError) {
-      this.logger.error(
-        { analyticsError },
-        `Failed to track domain purchased event for user ${campaign.user.id}`,
-      )
-    }
-
-    const updatedDomain = await this.model.findUniqueOrThrow({
-      where: { id: createdDomain.id },
-    })
-
-    return {
-      website: websiteSummary,
-      domain: {
-        id: updatedDomain.id,
-        name: updatedDomain.name,
-        status: updatedDomain.status,
-        price: updatedDomain.price?.toNumber() ?? null,
-      },
-      alreadyExisted: false,
-      message: 'Domain registration initiated with Vercel',
-    }
-  }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
     // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
