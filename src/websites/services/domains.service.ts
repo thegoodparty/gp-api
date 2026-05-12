@@ -420,7 +420,11 @@ export class DomainsService
       )
     } else if (isNaN(electionDate.getTime())) {
       this.logger.warn(
-        { campaignId: campaign.id, electionDateStr, fn: 'searchDomainsForCampaign' },
+        {
+          campaignId: campaign.id,
+          electionDateStr,
+          fn: 'searchDomainsForCampaign',
+        },
         'invalid electionDate stored on campaign; falling back to current date',
       )
       electionDate = new Date()
