@@ -737,7 +737,7 @@ describe('DomainsService', () => {
       zipCode: '10001',
     }
 
-    it('does NOT throw "no payment on record" when paymentId is null and domain purchase is enabled (regression for purchaseDomainForCampaign)', async () => {
+    it('throws BILLING_DOMAIN_PAYMENT_ID_MISSING (not a retrieval error) when paymentId is null', async () => {
       Object.assign(mockPrisma.domain, {
         findFirst: vi.fn(),
         findFirstOrThrow: vi.fn(),
@@ -759,9 +759,16 @@ describe('DomainsService', () => {
         price: new Decimal(12),
       })
 
-      await expect(
-        service.completeDomainRegistration(10, contact),
-      ).rejects.toBeInstanceOf(BadRequestException)
+      const err = await service
+        .completeDomainRegistration(10, contact)
+        .catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(BadRequestException)
+      expect((err as BadRequestException).getResponse()).toMatchObject({
+        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
+      })
+      expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
+    })
 
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
     })
