@@ -11,6 +11,7 @@ const sqs = new SQS({})
 export type ExperimentRunDispatchInput = {
   experimentType: string
   organizationSlug: string
+  clerkUserId: string
   params: Record<string, unknown>
 }
 
@@ -57,6 +58,7 @@ export class ExperimentRunsService extends createPrismaBase(
       params: input.params,
       organization_slug: input.organizationSlug,
       experiment_type: input.experimentType,
+      clerk_user_id: input.clerkUserId,
     }
 
     const deduplicationId = randomUUID()
