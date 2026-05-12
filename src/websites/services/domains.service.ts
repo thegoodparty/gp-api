@@ -446,9 +446,14 @@ export class DomainsService
       ),
     )
 
-    const found = checked.flatMap((r) => {
-      if (r.status === 'fulfilled' && r.value !== null) return [r.value]
-      if (r.status === 'rejected') {
+    const found: PatternedDomainCandidate[] = []
+    for (const r of checked) {
+      if (r.status === 'fulfilled' && r.value !== null) {
+        found.push(r.value)
+      } else if (r.status === 'rejected') {
+        if (r.reason instanceof BadRequestException) {
+          throw r.reason
+        }
         const err =
           r.reason instanceof Error ? r.reason : new Error(String(r.reason))
         this.logger.warn(
@@ -456,8 +461,7 @@ export class DomainsService
           'candidate availability check failed; skipping',
         )
       }
-      return []
-    })
+    }
 
     return { candidates: found }
   }
