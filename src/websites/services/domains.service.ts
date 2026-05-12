@@ -713,11 +713,10 @@ export class DomainsService
       websiteContent.content,
     )
 
-    try {
-      await this.completeDomainRegistration(
-        createdDomain.websiteId,
-        contactInfo,
-      )
+    // TODO: completeDomainRegistration requires a non-null paymentId when
+    // ENABLE_DOMAIN_SETUP is true. This path has no payment — registration
+    // must be triggered after payment is confirmed (e.g. via webhook).
+    // Calling it here breaks the happy path on production.
     } catch (error) {
       try {
         await this.model.update({
