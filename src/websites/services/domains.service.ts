@@ -739,7 +739,7 @@ export class DomainsService
         price: updatedDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
-      message: 'Domain registration initiated with Vercel',
+      message: 'Domain reserved; registration will complete after payment confirmation',
     }
   }
 
