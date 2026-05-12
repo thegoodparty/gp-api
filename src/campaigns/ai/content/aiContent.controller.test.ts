@@ -23,9 +23,9 @@ describe('AiContentController.delete', () => {
   it.each(['__proto__', 'constructor', 'prototype'])(
     'rejects forbidden key: %s',
     async (key) => {
-      await expect(
-        controller.delete(campaignWith({}), key),
-      ).rejects.toThrow(BadRequestException)
+      await expect(controller.delete(campaignWith({}), key)).rejects.toThrow(
+        BadRequestException,
+      )
     },
   )
 
@@ -43,7 +43,9 @@ describe('AiContentController.delete', () => {
 
     expect(mockCampaigns.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { aiContent: expect.not.objectContaining({ bio: expect.anything() }) },
+      data: {
+        aiContent: expect.not.objectContaining({ bio: expect.anything() }),
+      },
     })
   })
 })
