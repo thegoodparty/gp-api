@@ -704,11 +704,12 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-
-    // TODO: completeDomainRegistration requires a non-null paymentId when
-    // ENABLE_DOMAIN_SETUP is true. This path has no payment — registration
-    // must be triggered after payment is confirmed (e.g. via webhook).
-    // Calling it here breaks the happy path on production.
+    // NOTE: this method only reserves the Domain row (status=pending) and
+    // does NOT call completeDomainRegistration — that requires a non-null
+    // paymentId and must be invoked after payment is confirmed (e.g. via a
+    // Stripe webhook). No HTTP route should call this method directly until
+    // that payment-confirmation leg is wired up, or domains will stall in
+    // DomainStatus.pending with no recovery path.
 
     try {
       await this.analytics.track(
@@ -739,10 +740,10 @@ export class DomainsService
         price: updatedDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
-      message: 'Domain reserved; registration will complete after payment confirmation',
+      message:
+        'Domain reserved; registration will complete after payment confirmation',
     }
   }
-
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
     // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
