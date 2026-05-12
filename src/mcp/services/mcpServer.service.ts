@@ -119,7 +119,26 @@ export class McpServerService {
         }
       }
 
-      const args = (req.params.arguments ?? {}) as {
+      // Validate the inbound arguments against the tool's own declared schema —
+      // same schema we expose via tools/list. Keeps untrusted callers from
+      // smuggling non-strings into URL path params or arbitrary shapes into
+      // routes whose Zod DTO would later reject them anyway.
+      const inputSchema = buildCombinedInputSchema(tool.inputDeclarations)
+      const parsed = inputSchema
+        ? inputSchema.safeParse(req.params.arguments ?? {})
+        : { success: true as const, data: {} }
+      if (!parsed.success) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `Invalid arguments: ${parsed.error.message}`,
+            },
+          ],
+        }
+      }
+      const args = parsed.data as {
         body?: unknown
         query?: Record<string, string>
         params?: Record<string, string>

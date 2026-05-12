@@ -380,6 +380,32 @@ describe('McpServerService MCP request handlers', () => {
     expect(result.isError).toBe(true)
   })
 
+  it('rejects call_tool arguments that fail the tool input schema', async () => {
+    const inject = vi.fn(async () => ({
+      statusCode: 200,
+      body: '{}',
+      headers: { 'content-type': 'application/json' },
+    }))
+    const moduleRef = await buildAppModule([FooController], inject).compile()
+    await moduleRef.init()
+
+    const svc = moduleRef.get(McpServerService)
+    const server = svc.createServer() as unknown as {
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
+    }
+    const callHandler = server._requestHandlers.get('tools/call')!
+    const result = (await callHandler({
+      method: 'tools/call',
+      params: { name: 'PATCH_v1_foo', arguments: { body: { slogan: 123 } } },
+    })) as { isError: boolean; content: Array<{ text: string }> }
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toMatch(/Invalid arguments/)
+    expect(inject).not.toHaveBeenCalled()
+  })
+
   it('returns isError for unknown tool', async () => {
     const moduleRef = await buildAppModule(
       [FooController],
