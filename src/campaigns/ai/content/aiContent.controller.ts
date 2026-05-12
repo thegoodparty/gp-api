@@ -108,6 +108,10 @@ export class AiContentController {
   @Delete(':key')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
+    if (['__proto__', 'constructor', 'prototype'].includes(key)) {
+      throw new BadRequestException('Invalid key')
+    }
+
     const aiContent = campaign.aiContent
 
     if (!aiContent?.[key]) {

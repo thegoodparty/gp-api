@@ -1,9 +1,13 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 export class CreateAiContentSchema extends createZodDto(
   z.object({
-    key: z.string(),
+    key: z
+      .string()
+      .refine((k) => !FORBIDDEN_KEYS.has(k), { message: 'Invalid key' }),
     regenerate: z.boolean().optional(),
     editMode: z.boolean().optional(),
     // TODO: more exact types for the below inputs
