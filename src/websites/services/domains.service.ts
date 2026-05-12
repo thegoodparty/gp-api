@@ -5,9 +5,10 @@ import {
   ConflictException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Campaign, Domain, DomainStatus, User } from '@prisma/client'
+import { Campaign, Domain, DomainStatus, User, Website } from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -51,6 +52,16 @@ import {
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
+
+const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
+
+const DOMAIN_RESERVATION_KIND = {
+  IDEMPOTENT: 'idempotent',
+  CREATED: 'created',
+} as const
+
+const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
+  'Domain registration already in progress for this campaign'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -267,7 +278,7 @@ export class DomainsService
     user: User
     websiteId: string | number
     domainName: string
-    paymentId: string
+    paymentId: string | null
   }): Promise<{
     domain: Domain
     registrationResult: {
@@ -305,7 +316,7 @@ export class DomainsService
         `Creating new domain record for website id ${validWebsiteId}: `,
       )
       domain = await this.model.create({ data: domainParams })
-    } else if (domain.paymentId !== paymentId) {
+    } else if (paymentId && domain.paymentId !== paymentId) {
       // Update the existing domain with the new payment ID
       // This handles cases where a previous payment failed or the domain
       // was created without a paymentId
@@ -509,6 +520,221 @@ export class DomainsService
       return null
     }
     return { domain, price }
+  }
+
+  private async reserveDomainForCampaign(
+    campaignId: number,
+    domainName: string,
+    price: number,
+  ): Promise<
+    | {
+        kind: typeof DOMAIN_RESERVATION_KIND.IDEMPOTENT
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Pick<Domain, 'id' | 'name' | 'status'> & {
+          price: number | null
+        }
+      }
+    | {
+        kind: typeof DOMAIN_RESERVATION_KIND.CREATED
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Domain
+      }
+  > {
+    return this.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DOMAIN_PURCHASE_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
+
+      const website = await tx.website.findUnique({
+        where: { campaignId },
+        include: { domain: true },
+      })
+
+      if (!website) {
+        throw new NotFoundException('No website found for this campaign')
+      }
+
+      const websiteSummary = {
+        id: website.id,
+        vanityPath: website.vanityPath,
+        status: website.status,
+        campaignId: website.campaignId,
+      }
+
+      if (website.domain) {
+        if (website.domain.status !== DomainStatus.inactive) {
+          if (website.domain.name === domainName) {
+            return {
+              kind: DOMAIN_RESERVATION_KIND.IDEMPOTENT,
+              websiteSummary,
+              domain: {
+                id: website.domain.id,
+                name: website.domain.name,
+                status: website.domain.status,
+                price: website.domain.price?.toNumber() ?? null,
+              },
+            }
+          }
+          throw new ConflictException(
+            `A different domain (${website.domain.name}) is already in progress for this campaign`,
+          )
+        }
+
+        await tx.domain.delete({ where: { id: website.domain.id } })
+      }
+
+      const created = await tx.domain.create({
+        data: {
+          websiteId: website.id,
+          name: domainName,
+          price,
+          paymentId: null,
+          status: DomainStatus.pending,
+        },
+      })
+
+      return {
+        kind: DOMAIN_RESERVATION_KIND.CREATED,
+        websiteSummary,
+        domain: created,
+      }
+    })
+  }
+
+  private async preflightDomainPurchase(
+    campaignId: number,
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+  } | null> {
+    const preflight = await this.client.website.findUnique({
+      where: { campaignId },
+      include: { domain: true },
+    })
+    if (!preflight) {
+      throw new NotFoundException('No website found for this campaign')
+    }
+    if (
+      !preflight.domain ||
+      preflight.domain.status === DomainStatus.inactive
+    ) {
+      return null
+    }
+    const websiteSummary = {
+      id: preflight.id,
+      vanityPath: preflight.vanityPath,
+      status: preflight.status,
+      campaignId: preflight.campaignId,
+    }
+    if (preflight.domain.name !== domainName) {
+      throw new ConflictException(
+        `A different domain (${preflight.domain.name}) is already in progress for this campaign`,
+      )
+    }
+    return {
+      website: websiteSummary,
+      domain: {
+        id: preflight.domain.id,
+        name: preflight.domain.name,
+        status: preflight.domain.status,
+        price: preflight.domain.price?.toNumber() ?? null,
+      },
+    }
+  }
+
+  private async lookupDomainPrice(domainName: string): Promise<number> {
+    try {
+      const priceResp = await this.vercel.checkDomainPrice(domainName)
+      return priceResp.price
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not get price for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+  }
+
+  async purchaseDomainForCampaign(
+    campaign: Campaign & { user: User },
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+    alreadyExisted: boolean
+    message: string
+  }> {
+    const preflightHit = await this.preflightDomainPurchase(
+      campaign.id,
+      domainName,
+    )
+    if (preflightHit) {
+      return {
+        ...preflightHit,
+        alreadyExisted: true,
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
+      }
+    }
+
+    let availabilityResp: Awaited<
+      ReturnType<typeof this.route53.checkDomainAvailability>
+    >
+    try {
+      availabilityResp = await this.route53.checkDomainAvailability(domainName)
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not check availability for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+    if (availabilityResp.Availability !== DomainAvailability.AVAILABLE) {
+      throw new ConflictException(`Domain ${domainName} is no longer available`)
+    }
+
+    const price = await this.lookupDomainPrice(domainName)
+
+    const locked = await this.reserveDomainForCampaign(
+      campaign.id,
+      domainName,
+      price,
+    )
+
+    if (locked.kind === DOMAIN_RESERVATION_KIND.IDEMPOTENT) {
+      return {
+        website: locked.websiteSummary,
+        domain: locked.domain,
+        alreadyExisted: true,
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
+      }
+    }
+
+    const { websiteSummary, domain: createdDomain } = locked
+
+    // NOTE: this method only reserves the Domain row (status=pending) and
+    // does NOT call completeDomainRegistration — that requires a non-null
+    // paymentId and must be invoked after payment is confirmed (e.g. via a
+    // Stripe webhook). No HTTP route should call this method directly until
+    // that payment-confirmation leg is wired up, or domains will stall in
+    // DomainStatus.pending with no recovery path.
+
+    return {
+      website: websiteSummary,
+      domain: {
+        id: createdDomain.id,
+        name: createdDomain.name,
+        status: createdDomain.status,
+        price: createdDomain.price?.toNumber() ?? null,
+      },
+      alreadyExisted: false,
+      message:
+        'Domain reserved; registration will complete after payment confirmation',
+    }
   }
 
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
@@ -725,7 +951,9 @@ export class DomainsService
 
     const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
 
-    if (paymentIntent.status !== 'succeeded') {
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
       throw new BadRequestException(
         `Payment not completed. Current status: ${paymentIntent.status}`,
       )
