@@ -704,7 +704,6 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-    const { websiteSummary, domain: createdDomain } = locked
 
     // TODO: completeDomainRegistration requires a non-null paymentId when
     // ENABLE_DOMAIN_SETUP is true. This path has no payment — registration
