@@ -12,7 +12,9 @@ import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { PinoLogger } from 'nestjs-pino'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
-const FETCH_REDIRECT_ERROR = 'error' as const
+const FETCH_REDIRECT_FOLLOW = 'follow' as const
+const HTTPS_PROTOCOL = 'https:'
+const VERCEL_DOMAIN = 'vercel.com'
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   throw new Error(
@@ -104,7 +106,7 @@ export class VercelService {
   }
 
   async submitDomainRegistrantVerification(verificationUrl: string) {
-    if (!verificationUrl.startsWith('https://vercel.com/')) {
+    if (!this.isAllowedVercelUrl(verificationUrl)) {
       throw new Error(
         `Refusing to submit non-vercel.com verification URL: ${verificationUrl}`,
       )
@@ -112,8 +114,13 @@ export class VercelService {
     try {
       const response = await fetch(verificationUrl, {
         method: Methods.GET,
-        redirect: FETCH_REDIRECT_ERROR,
+        redirect: FETCH_REDIRECT_FOLLOW,
       })
+      if (!this.isAllowedVercelUrl(response.url)) {
+        throw new Error(
+          `Refusing redirected registrant verification URL: ${response.url}`,
+        )
+      }
       if (!response.ok) {
         throw new Error(
           `Vercel returned ${response.status} for registrant verification URL`,
@@ -126,6 +133,19 @@ export class VercelService {
         'Error submitting Vercel domain registrant verification:',
       )
       throw error
+    }
+  }
+
+  private isAllowedVercelUrl(urlString: string) {
+    try {
+      const url = new URL(urlString)
+      return (
+        url.protocol === HTTPS_PROTOCOL &&
+        (url.hostname === VERCEL_DOMAIN ||
+          url.hostname.endsWith(`.${VERCEL_DOMAIN}`))
+      )
+    } catch {
+      return false
     }
   }
 
