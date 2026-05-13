@@ -1178,17 +1178,31 @@ export class DomainsService
       )
     }
 
-    const updated = await this.model.update({
-      where: { id: domain.id },
+    const { count } = await this.model.updateMany({
+      where: { id: domain.id, registrantVerifiedAt: null },
       data: { registrantVerifiedAt: new Date() },
     })
 
-    return {
-      domain: updated.name,
-      alreadyVerified: false,
-      registrantVerifiedAt: updated.registrantVerifiedAt,
+    if (count === 0) {
+      const current = await this.model.findUniqueOrThrow({
+        where: { id: domain.id },
+      })
+      return {
+        domain: current.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: current.registrantVerifiedAt,
+      }
     }
-  }
+
+    const stamped = await this.model.findUniqueOrThrow({
+      where: { id: domain.id },
+    })
+
+    return {
+      domain: stamped.name,
+      alreadyVerified: false,
+      registrantVerifiedAt: stamped.registrantVerifiedAt,
+    }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
     try {
