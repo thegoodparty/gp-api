@@ -186,8 +186,6 @@ const listAllAliases = async (
       await sleep(FE_RETRY_BACKOFF_MS)
     }
   }
-    }
-  }
   return all
 }
 
