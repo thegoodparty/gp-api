@@ -9,17 +9,12 @@ import {
   Post,
   Req,
   UnauthorizedException,
-  UsePipes,
 } from '@nestjs/common'
-import { ZodValidationPipe } from 'nestjs-zod'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PinoLogger } from 'nestjs-pino'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { DomainsService } from '../services/domains.service'
-import {
-  InboundDomainVerificationEmailSchema,
-  InboundDomainVerificationEmailZ,
-} from '../schemas/InboundDomainVerificationEmail.schema'
+import { InboundDomainVerificationEmailZ } from '../schemas/InboundDomainVerificationEmail.schema'
 import { VercelDomainEmailParserService } from '../services/vercelDomainEmailParser.service'
 
 const { INBOUND_DOMAIN_EMAIL_WEBHOOK_SECRET } = process.env
@@ -37,11 +32,10 @@ export class InboundDomainVerificationController {
   @Post()
   @PublicAccess()
   @HttpCode(HttpStatus.OK)
-  @UsePipes(ZodValidationPipe)
   async receive(
     @Req() req: { rawBody?: Buffer | string },
     @Headers('x-webhook-signature') signature: string | undefined,
-    @Body() body: InboundDomainVerificationEmailSchema,
+    @Body() body: unknown,
   ) {
     this.assertSignature(req.rawBody, signature)
 

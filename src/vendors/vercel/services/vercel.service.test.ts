@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { VercelService } from './vercel.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
+const VERCEL_VERIFY_URL = 'https://vercel.com/verify-domain?token=t'
+
 describe('VercelService', () => {
   let service: VercelService
   const fetchMock =
@@ -49,9 +51,7 @@ describe('VercelService', () => {
     } as Response)
 
     await expect(
-      service.submitDomainRegistrantVerification(
-        'https://vercel.com/verify-domain?token=t',
-      ),
+      service.submitDomainRegistrantVerification(VERCEL_VERIFY_URL),
     ).rejects.toThrow('Refusing redirected registrant verification URL')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -60,9 +60,7 @@ describe('VercelService', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
 
     await expect(
-      service.submitDomainRegistrantVerification(
-        'https://vercel.com/verify-domain?token=t',
-      ),
+      service.submitDomainRegistrantVerification(VERCEL_VERIFY_URL),
     ).rejects.toThrow('Vercel returned 404 for registrant verification URL')
   })
 
@@ -70,9 +68,7 @@ describe('VercelService', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 200 }))
 
     await expect(
-      service.submitDomainRegistrantVerification(
-        'https://vercel.com/verify-domain?token=t',
-      ),
+      service.submitDomainRegistrantVerification(VERCEL_VERIFY_URL),
     ).resolves.toEqual({ status: 200 })
   })
 })

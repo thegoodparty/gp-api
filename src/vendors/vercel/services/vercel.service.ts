@@ -18,6 +18,8 @@ const VERCEL_DOMAIN = 'vercel.com'
 const LOCATION_HEADER = 'location'
 const MAX_VERIFICATION_REDIRECTS = 10
 const HTTP_STATUS_MULTIPLE_CHOICES = 300
+const HTTP_STATUS_BAD_REQUEST = 400
+const VERIFICATION_FETCH_TIMEOUT_MS = 10_000
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   throw new Error(
@@ -140,6 +142,7 @@ export class VercelService {
       const response = await fetch(currentUrl, {
         method: Methods.GET,
         redirect: FETCH_REDIRECT_MANUAL,
+        signal: AbortSignal.timeout(VERIFICATION_FETCH_TIMEOUT_MS),
       })
 
       const location = response.headers.get(LOCATION_HEADER)
@@ -167,7 +170,7 @@ export class VercelService {
 
   private isRedirectResponse(status: number) {
     return (
-      status >= HTTP_STATUS_MULTIPLE_CHOICES && status < HttpStatus.BAD_REQUEST
+      status >= HTTP_STATUS_MULTIPLE_CHOICES && status < HTTP_STATUS_BAD_REQUEST
     )
   }
 
