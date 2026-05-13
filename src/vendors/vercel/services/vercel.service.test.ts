@@ -5,7 +5,12 @@ import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 describe('VercelService', () => {
   let service: VercelService
   const fetchMock =
-    vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    vi.fn<
+      (
+        input: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1],
+      ) => ReturnType<typeof fetch>
+    >()
 
   beforeEach(() => {
     fetchMock.mockReset()
