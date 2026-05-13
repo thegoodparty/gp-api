@@ -103,16 +103,6 @@ Per-area `CLAUDE.md` files cover purpose, key files, patterns, and gotchas for t
 | One-off / build scripts           | `scripts/CLAUDE.md`                         |
 | Seed data / factories / scenarios | `seed/CLAUDE.md`                            |
 
-## Code style
-
-- **No semicolons**, single quotes, trailing commas (`.prettierrc`)
-- **No comments** unless the WHY is non-obvious
-- `@typescript-eslint/no-explicit-any` is an **error** — never use `any`
-- `unused-imports/no-unused-imports` is an **error**
-- Path alias: `@/*` → `src/*`
-- Arrow functions over `function` declarations
-- Bias to WET over premature DRY
-
 ## Module shape (enforced by `.cursor/rules/rules.mdc` Rule 7)
 
 ```
