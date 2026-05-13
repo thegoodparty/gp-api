@@ -96,6 +96,36 @@ describe('VercelDomainEmailParserService', () => {
     expect(result?.verificationUrl).toBe(verifyUrl)
   })
 
+  it('prefers plain-text URL when html href encodes query separators as &amp;', () => {
+    const htmlEncodedUrl = verifyUrl.replaceAll('&', '&amp;')
+    const result = parser.parse({
+      from: 'no-reply@vercel.com',
+      subject: 'Verify foo.com',
+      text: `Click ${verifyUrl}`,
+      html: `<a href="${htmlEncodedUrl}">Verify</a>`,
+    })
+
+    expect(result).toEqual({
+      domain: 'candidate-jones.com',
+      verificationUrl: verifyUrl,
+    })
+  })
+
+  it('decodes &amp; in html URL when text body is empty', () => {
+    const htmlEncodedUrl = verifyUrl.replaceAll('&', '&amp;')
+    const result = parser.parse({
+      from: 'no-reply@vercel.com',
+      subject: 'Verify foo.com',
+      text: '',
+      html: `<a href="${htmlEncodedUrl}">Verify</a>`,
+    })
+
+    expect(result).toEqual({
+      domain: 'candidate-jones.com',
+      verificationUrl: verifyUrl,
+    })
+  })
+
   it('rejects spoofed lookalike domains that merely include "@vercel.com" as a substring', () => {
     const spoofs = [
       'attacker@vercel.com.evil.tld',

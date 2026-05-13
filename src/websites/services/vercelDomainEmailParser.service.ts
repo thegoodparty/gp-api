@@ -69,15 +69,19 @@ export class VercelDomainEmailParserService {
   }
 
   private extractVerificationUrl(html: string, text: string): string | null {
-    const sources = [html, text]
+    const sources = [text, html]
     for (const source of sources) {
       VERIFICATION_URL_REGEX.lastIndex = 0
       const match = VERIFICATION_URL_REGEX.exec(source)
       if (match) {
-        return match[0]
+        return this.normalizeVerificationUrl(match[0])
       }
     }
     return null
+  }
+
+  private normalizeVerificationUrl(url: string): string {
+    return url.replaceAll('&amp;', '&')
   }
 
   private extractDomain(
