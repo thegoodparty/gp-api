@@ -1,5 +1,5 @@
 const EXPANSION: Record<string, string[]> = {
-  LOCAL: ['Local', 'Township', 'Village'],
+  LOCAL: ['Local', 'Township'],
   COUNTY: ['County', 'Regional'],
   STATE: ['State'],
   FEDERAL: ['Federal'],

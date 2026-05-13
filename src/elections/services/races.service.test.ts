@@ -92,7 +92,7 @@ describe('RacesService', () => {
       await service.getRacesByZip({ zipcode: '90210', level: 'Local' })
       expect(electionsService.searchPositions).toHaveBeenCalledWith(
         expect.objectContaining({
-          displayOfficeLevels: ['Local', 'Township', 'Village'],
+          displayOfficeLevels: ['Local', 'Township'],
         }),
       )
     })
