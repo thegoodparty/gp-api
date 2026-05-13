@@ -881,6 +881,21 @@ describe('DomainsService', () => {
       })
     })
 
+    it('reads website content after transaction starts', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        content: {},
+        campaignId: 42,
+      })
+
+      await service.setupDomainEmailForwarding(mockDomain)
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledOnce()
+      expect(mockPrisma.website.findUnique).toHaveBeenCalledOnce()
+      expect(
+        mockPrisma.website.findUnique.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(mockPrisma.$transaction.mock.invocationCallOrder[0])
+    })
+
     it('skips persistence when no Website row exists for the domain', async () => {
       mockPrisma.website.findUnique.mockResolvedValue(null)
 

@@ -921,16 +921,16 @@ export class DomainsService
   }
 
   private async persistCampaignEmail(domain: Domain) {
-    const website = await this.client.website.findUnique({
-      where: { id: domain.websiteId },
-      select: { content: true, campaignId: true },
-    })
-    if (!website) return
-
-    const campaignEmail = `info@${domain.name}`
-    const content = website.content ?? {}
-
     await this.client.$transaction(async (tx) => {
+      const website = await tx.website.findUnique({
+        where: { id: domain.websiteId },
+        select: { content: true, campaignId: true },
+      })
+      if (!website) return
+
+      const campaignEmail = `info@${domain.name}`
+      const content = website.content ?? {}
+
       await tx.website.update({
         where: { id: domain.websiteId },
         data: {
