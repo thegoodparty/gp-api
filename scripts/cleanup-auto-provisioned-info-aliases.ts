@@ -183,8 +183,9 @@ const listAllAliases = async (
     hasMore = hasHeaderPagination || response.data.length === FE_PAGE_LIMIT
     if (hasMore) {
       page += 1
-      await sleep(backoff)
-      backoff = Math.min(backoff * 2, FE_RETRY_MAX_BACKOFF_MS)
+      await sleep(FE_RETRY_BACKOFF_MS)
+    }
+  }
     }
   }
   return all
