@@ -315,7 +315,7 @@ const processDomain = async (
 
   for (const info of legacyInfoAliases) {
     entry.steps!.push(
-      `delete legacy info alias (${info.id}) recipients=[${info.recipients.join(', ')}]`,
+      `delete legacy info alias (${info.id}) recipients=[${info.recipients.length} address(es) redacted]`,
     )
     if (!isDryRun) await deleteAlias(fe, domainRow.name, info.id)
   }
