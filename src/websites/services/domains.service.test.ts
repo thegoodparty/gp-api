@@ -23,6 +23,7 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
@@ -75,6 +76,7 @@ describe('DomainsService', () => {
     domain: {
       findMany: ReturnType<typeof vi.fn>
       update: ReturnType<typeof vi.fn>
+      updateMany: ReturnType<typeof vi.fn>
       create: ReturnType<typeof vi.fn>
       delete: ReturnType<typeof vi.fn>
       findUnique: ReturnType<typeof vi.fn>
@@ -104,7 +106,7 @@ describe('DomainsService', () => {
       createTXTVerificationRecord: vi.fn().mockResolvedValue(undefined),
       submitDomainRegistrantVerification: vi
         .fn()
-        .mockResolvedValue({ status: 200 }),
+        .mockResolvedValue({ status: HttpStatus.OK }),
       getDomainDetails: vi.fn().mockResolvedValue({
         domain: { verified: true, name: 'test-domain.com' },
       }),
@@ -140,6 +142,7 @@ describe('DomainsService', () => {
       domain: {
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockResolvedValue(mockDomain),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         create: vi.fn().mockResolvedValue(mockDomain),
         delete: vi.fn().mockResolvedValue(mockDomain),
         findUnique: vi.fn().mockResolvedValue(mockDomain),
@@ -940,7 +943,7 @@ describe('DomainsService', () => {
       mockVercel.getDomainDetails.mockResolvedValue({
         domain: { verified: true, name: 'foo.com' },
       })
-      mockPrisma.domain.update.mockResolvedValue({
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
         ...unverified,
         registrantVerifiedAt: verifiedAt,
       })
@@ -957,8 +960,8 @@ describe('DomainsService', () => {
         mockVercel.submitDomainRegistrantVerification,
       ).toHaveBeenCalledWith(verifyUrl)
       expect(mockVercel.getDomainDetails).toHaveBeenCalledWith('foo.com')
-      expect(mockPrisma.domain.update).toHaveBeenCalledWith({
-        where: { id: unverified.id },
+      expect(mockPrisma.domain.updateMany).toHaveBeenCalledWith({
+        where: { id: unverified.id, registrantVerifiedAt: null },
         data: { registrantVerifiedAt: expect.any(Date) },
       })
       expect(result).toMatchObject({
@@ -977,10 +980,10 @@ describe('DomainsService', () => {
 
       await expect(
         service.submitRegistrantVerification('foo.com', verifyUrl),
-      ).rejects.toMatchObject({ status: 502 })
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
 
       expect(mockVercel.submitDomainRegistrantVerification).toHaveBeenCalled()
-      expect(mockPrisma.domain.update).not.toHaveBeenCalled()
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
     })
 
     it('wraps getDomainDetails failures as BadGatewayException without stamping', async () => {
@@ -994,8 +997,8 @@ describe('DomainsService', () => {
 
       await expect(
         service.submitRegistrantVerification('foo.com', verifyUrl),
-      ).rejects.toMatchObject({ status: 502 })
-      expect(mockPrisma.domain.update).not.toHaveBeenCalled()
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
     })
 
     it('is idempotent — already-verified domains are not re-submitted', async () => {
@@ -1014,7 +1017,7 @@ describe('DomainsService', () => {
       expect(
         mockVercel.submitDomainRegistrantVerification,
       ).not.toHaveBeenCalled()
-      expect(mockPrisma.domain.update).not.toHaveBeenCalled()
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
       expect(result).toEqual({
         domain: 'foo.com',
         alreadyVerified: true,
@@ -1044,8 +1047,8 @@ describe('DomainsService', () => {
 
       await expect(
         service.submitRegistrantVerification('foo.com', verifyUrl),
-      ).rejects.toMatchObject({ status: 502 })
-      expect(mockPrisma.domain.update).not.toHaveBeenCalled()
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
     })
   })
 

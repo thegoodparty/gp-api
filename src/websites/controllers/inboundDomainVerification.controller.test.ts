@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { NotFoundException } from '@nestjs/common'
+import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { createHmac } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -94,7 +94,7 @@ describe('InboundDomainVerificationController', () => {
 
     await expect(
       controller.receive({ rawBody: Buffer.from(raw) }, undefined, body),
-    ).rejects.toMatchObject({ status: 400 })
+    ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST })
     expect(mockDomains.submitRegistrantVerification).not.toHaveBeenCalled()
   })
 
@@ -105,7 +105,7 @@ describe('InboundDomainVerificationController', () => {
 
     await expect(
       controller.receive({ rawBody: Buffer.from(raw) }, tampered, body),
-    ).rejects.toMatchObject({ status: 401 })
+    ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED })
     expect(mockDomains.submitRegistrantVerification).not.toHaveBeenCalled()
   })
 
@@ -115,7 +115,7 @@ describe('InboundDomainVerificationController', () => {
 
     await expect(
       controller.receive({ rawBody: Buffer.from(raw) }, 'not-hex-at-all', body),
-    ).rejects.toMatchObject({ status: 401 })
+    ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED })
   })
 
   it('rejects requests with no raw body (400)', async () => {
@@ -124,7 +124,7 @@ describe('InboundDomainVerificationController', () => {
 
     await expect(
       controller.receive({ rawBody: undefined }, signPayload(raw), body),
-    ).rejects.toMatchObject({ status: 400 })
+    ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST })
   })
 
   it('propagates NotFoundException when the parsed domain is not managed', async () => {

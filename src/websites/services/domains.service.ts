@@ -1203,6 +1203,7 @@ export class DomainsService
       alreadyVerified: false,
       registrantVerifiedAt: stamped.registrantVerifiedAt,
     }
+  }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
     try {

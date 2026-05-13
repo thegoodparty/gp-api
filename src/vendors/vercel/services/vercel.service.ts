@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
+import { Methods } from 'http-constants-ts'
 import type {
   GetRecordsResponseBody,
   Records as VercelDNSRecord,
@@ -11,6 +12,7 @@ import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { PinoLogger } from 'nestjs-pino'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
+const FETCH_REDIRECT_ERROR = 'error' as const
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   throw new Error(
@@ -109,8 +111,8 @@ export class VercelService {
     }
     try {
       const response = await fetch(verificationUrl, {
-        method: 'GET',
-        redirect: 'error',
+        method: Methods.GET,
+        redirect: FETCH_REDIRECT_ERROR,
       })
       if (!response.ok) {
         throw new Error(
