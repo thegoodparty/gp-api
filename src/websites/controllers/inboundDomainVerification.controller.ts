@@ -70,9 +70,10 @@ export class InboundDomainVerificationController {
     signature: string | undefined,
   ): void {
     if (!INBOUND_DOMAIN_EMAIL_WEBHOOK_SECRET) {
-      throw new UnauthorizedException(
-        'Inbound domain verification webhook secret is not configured',
+      throw new InternalServerErrorException(
+        'INBOUND_DOMAIN_EMAIL_WEBHOOK_SECRET is not configured',
       )
+    }
     }
     if (!signature) {
       throw new BadRequestException('Missing x-webhook-signature header')
