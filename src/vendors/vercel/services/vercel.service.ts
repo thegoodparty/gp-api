@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
+import { Methods } from 'http-constants-ts'
 import type {
   GetRecordsResponseBody,
   Records as VercelDNSRecord,
@@ -11,6 +12,14 @@ import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { PinoLogger } from 'nestjs-pino'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
+const FETCH_REDIRECT_MANUAL = 'manual' as const
+const HTTPS_PROTOCOL = 'https:'
+const VERCEL_DOMAIN = 'vercel.com'
+const LOCATION_HEADER = 'location'
+const MAX_VERIFICATION_REDIRECTS = 10
+const HTTP_STATUS_MULTIPLE_CHOICES = 300
+const HTTP_STATUS_BAD_REQUEST = 400
+const VERIFICATION_FETCH_TIMEOUT_MS = 10_000
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   throw new Error(
@@ -98,6 +107,91 @@ export class VercelService {
     } catch (error) {
       this.logger.error({ error }, `Error verifying domain ${domainName}:`)
       throw error
+    }
+  }
+
+  async submitDomainRegistrantVerification(verificationUrl: string) {
+    if (!this.isAllowedVercelUrl(verificationUrl)) {
+      throw new Error(
+        `Refusing to submit non-vercel.com verification URL: ${verificationUrl}`,
+      )
+    }
+    try {
+      const response =
+        await this.fetchVerificationUrlWithSafeRedirects(verificationUrl)
+      if (!response.ok) {
+        throw new Error(
+          `Vercel returned ${response.status} for registrant verification URL`,
+        )
+      }
+      return { status: response.status }
+    } catch (error) {
+      this.logger.error(
+        { error, verificationUrlHost: this.safeHostname(verificationUrl) },
+        'Error submitting Vercel domain registrant verification:',
+      )
+      throw error
+    }
+  }
+
+  private async fetchVerificationUrlWithSafeRedirects(initialUrl: string) {
+    let currentUrl = initialUrl
+    let redirectCount = 0
+
+    while (true) {
+      const response = await fetch(currentUrl, {
+        method: Methods.GET,
+        redirect: FETCH_REDIRECT_MANUAL,
+        signal: AbortSignal.timeout(VERIFICATION_FETCH_TIMEOUT_MS),
+      })
+
+      const location = response.headers.get(LOCATION_HEADER)
+      if (!this.isRedirectResponse(response.status) || !location) {
+        return response
+      }
+
+      if (redirectCount >= MAX_VERIFICATION_REDIRECTS) {
+        throw new Error(
+          `Too many redirects for registrant verification URL: ${initialUrl}`,
+        )
+      }
+
+      const nextUrl = new URL(location, currentUrl).toString()
+      if (!this.isAllowedVercelUrl(nextUrl)) {
+        throw new Error(
+          `Refusing redirected registrant verification URL: ${nextUrl}`,
+        )
+      }
+
+      currentUrl = nextUrl
+      redirectCount += 1
+    }
+  }
+
+  private isRedirectResponse(status: number) {
+    return (
+      status >= HTTP_STATUS_MULTIPLE_CHOICES && status < HTTP_STATUS_BAD_REQUEST
+    )
+  }
+
+  private safeHostname(urlString: string) {
+    try {
+      return new URL(urlString).hostname
+    } catch {
+      return 'invalid-url'
+    }
+  }
+
+  private isAllowedVercelUrl(urlString: string) {
+    try {
+      const url = new URL(urlString)
+      return (
+        url.protocol === HTTPS_PROTOCOL &&
+        (url.hostname === VERCEL_DOMAIN ||
+          url.hostname.endsWith(`.${VERCEL_DOMAIN}`))
+      )
+    } catch {
+      return false
     }
   }
 
