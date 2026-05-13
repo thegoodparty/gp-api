@@ -56,6 +56,53 @@ const WEBSITE_CONTENT_INCLUDES = {
   },
 }
 
+const isNonEmpty = (value: string | undefined | null) =>
+  typeof value === 'string' && value.trim().length > 0
+
+type WebsiteIssueForPublish = {
+  title?: string | null
+  description?: string | null
+}
+
+const isIssueReadyToPublish = (
+  issue: WebsiteIssueForPublish,
+): issue is { title: string; description: string } =>
+  isNonEmpty(issue.title) && isNonEmpty(issue.description)
+
+const REQUIRED_PUBLISH_FIELDS: Array<{
+  path: string
+  check: (content: PrismaJson.WebsiteContent) => boolean
+}> = [
+  { path: 'main.title', check: (c) => isNonEmpty(c.main?.title) },
+  { path: 'about.bio', check: (c) => isNonEmpty(c.about?.bio) },
+  {
+    path: 'about.issues',
+    check: (c) =>
+      Array.isArray(c.about?.issues) &&
+      c.about.issues.length > 0 &&
+      c.about.issues.every(
+        (issue) =>
+          typeof issue === 'object' &&
+          issue !== null &&
+          isIssueReadyToPublish(issue as WebsiteIssueForPublish),
+      ),
+  },
+  { path: 'contact.address', check: (c) => isNonEmpty(c.contact?.address) },
+  { path: 'contact.email', check: (c) => isNonEmpty(c.contact?.email) },
+  { path: 'contact.phone', check: (c) => isNonEmpty(c.contact?.phone) },
+]
+
+const assertReadyToPublish = (content: PrismaJson.WebsiteContent) => {
+  const missing = REQUIRED_PUBLISH_FIELDS.filter(
+    ({ check }) => !check(content),
+  ).map(({ path }) => path)
+  if (missing.length > 0) {
+    throw new BadRequestException(
+      `Website content is missing required fields for publishing: ${missing.join(', ')}`,
+    )
+  }
+}
+
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
 export class WebsitesController {
@@ -206,6 +253,13 @@ export class WebsitesController {
       updatedContent.about.issues = body.about.issues
     }
 
+    if (body.status === WebsiteStatus.published) {
+      assertReadyToPublish(updatedContent)
+    }
+
+    const isFirstPublish =
+      body.status === WebsiteStatus.published && !hasEverBeenPublished
+
     const [logo, hero] = await Promise.all([
       logoFile ? this.files.uploadFile(logoFile, 'uploads') : null,
       heroFile ? this.files.uploadFile(heroFile, 'uploads') : null,
@@ -224,9 +278,6 @@ export class WebsitesController {
       updatedContent.main ||= {}
       updatedContent.main.image = undefined
     }
-
-    const isFirstPublish =
-      body.status === WebsiteStatus.published && !hasEverBeenPublished
 
     const result = await this.websites.update({
       where: { campaignId },
