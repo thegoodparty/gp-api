@@ -732,6 +732,108 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   })
 })
 
+describe('QueueConsumerService - handleDomainEmailForwardingMessage', () => {
+  let service: QueueConsumerService
+  let domainsService: {
+    shouldEnableDomainPurchase: ReturnType<typeof vi.fn>
+    setupDomainEmailForwarding: ReturnType<typeof vi.fn>
+    model: {
+      findUniqueOrThrow: ReturnType<typeof vi.fn>
+      update: ReturnType<typeof vi.fn>
+    }
+  }
+
+  const domain = { id: 123, name: 'example.org' }
+
+  beforeEach(() => {
+    domainsService = {
+      shouldEnableDomainPurchase: vi.fn().mockReturnValue(true),
+      setupDomainEmailForwarding: vi.fn().mockResolvedValue({
+        id: 'fed_123',
+        name: domain.name,
+        verification_record: 'verify_123',
+      }),
+      model: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue(domain),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
+    }
+
+    service = new QueueConsumerService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      domainsService as unknown as DomainsService,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      createMockLogger(),
+    )
+  })
+
+  it('persists emailForwardingDomainId when setupDomainEmailForwarding succeeds', async () => {
+    const message: Message = {
+      MessageId: 'msg-domain-success',
+      Body: JSON.stringify({
+        type: QueueType.DOMAIN_EMAIL_FORWARDING,
+        data: { domainId: domain.id },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(domainsService.setupDomainEmailForwarding).toHaveBeenCalledWith(
+      domain,
+    )
+    expect(domainsService.model.update).toHaveBeenCalledWith({
+      where: { id: domain.id },
+      data: { emailForwardingDomainId: 'fed_123' },
+    })
+  })
+
+  it('throws when shouldEnableDomainPurchase is false', async () => {
+    domainsService.shouldEnableDomainPurchase.mockReturnValue(false)
+    const handler = Reflect.get(
+      service,
+      'handleDomainEmailForwardingMessage',
+    ) as ((data: { domainId: number }) => Promise<boolean>) | undefined
+
+    await expect(
+      Reflect.apply(handler!, service, [{ domainId: domain.id }]),
+    ).rejects.toThrow(
+      `Domain purchasing is disabled - skipping backfill for domainId: ${domain.id}`,
+    )
+  })
+
+  it('re-throws expected error message when setupDomainEmailForwarding fails', async () => {
+    domainsService.setupDomainEmailForwarding.mockRejectedValue(
+      new Error('forwarding provider failed'),
+    )
+    const handler = Reflect.get(
+      service,
+      'handleDomainEmailForwardingMessage',
+    ) as ((data: { domainId: number }) => Promise<boolean>) | undefined
+
+    await expect(
+      Reflect.apply(handler!, service, [{ domainId: domain.id }]),
+    ).rejects.toThrow(
+      `Error setting up email forwarding for domain *@${domain.name}`,
+    )
+  })
+})
+
 describe('QueueConsumerService - triggerPollExecution', () => {
   let service: QueueConsumerService
   let pollsService: {

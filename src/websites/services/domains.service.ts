@@ -44,7 +44,6 @@ import {
   PatternedDomainSearchResult,
 } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import {
   expandDomainPatterns,
   PatternExpansionLimitError,
@@ -63,6 +62,8 @@ const DOMAIN_RESERVATION_KIND = {
 const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
   'Domain registration already in progress for this campaign'
 
+const GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS = 'candidate-domains@goodparty.org'
+
 const { ENABLE_DOMAIN_SETUP } = process.env
 
 @Injectable()
@@ -78,7 +79,6 @@ export class DomainsService
     private readonly forwardEmailService: ForwardEmailService,
     private queueService: QueueProducerService,
     private readonly analytics: AnalyticsService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
   ) {
     super()
   }
@@ -93,30 +93,14 @@ export class DomainsService
     const domains = await this.model.findMany({
       where: {
         emailForwardingDomainId: null,
-      },
-      include: {
-        website: {
-          include: {
-            campaign: {
-              include: {
-                user: true,
-              },
-            },
-          },
+        status: {
+          in: [DomainStatus.submitted, DomainStatus.registered],
         },
       },
     })
 
-    for (const { id: domainId, website } of domains) {
-      const { campaign } = website
-      const enrichedUser = campaign.user
-        ? await this.clerkEnricher.enrichUser(campaign.user)
-        : campaign.user
-      const { email: forwardingEmailAddress } = enrichedUser!
-      const messageData = {
-        domainId,
-        forwardingEmailAddress,
-      }
+    for (const { id: domainId } of domains) {
+      const messageData = { domainId }
       this.logger.debug(
         { messageData },
         'Found domain with no email forwarding, enqueuing task:',
@@ -124,10 +108,7 @@ export class DomainsService
       await this.queueService.sendMessage(
         {
           type: QueueType.DOMAIN_EMAIL_FORWARDING,
-          data: {
-            domainId,
-            forwardingEmailAddress,
-          },
+          data: { domainId },
         },
         MessageGroup.domainEmailRedirect,
       )
@@ -789,10 +770,8 @@ export class DomainsService
     }
   }
 
-  async setupDomainEmailForwarding(
-    domain: Domain,
-    forwardingEmailAddress: string,
-  ) {
+  async setupDomainEmailForwarding(domain: Domain) {
+    const forwardingEmailAddress = GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS
     let forwardEmailDomain: ForwardEmailDomainResponse | null = null
     let existingForwardEmailDomain: ForwardEmailDomainResponse | null = null
     try {
@@ -927,7 +906,48 @@ export class DomainsService
         { cause: e },
       )
     }
+
+    try {
+      await this.persistCampaignEmail(domain)
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to persist campaign email for domain ${domain.name}`,
+      )
+    }
+
     return forwardEmailDomain
+  }
+
+  private async persistCampaignEmail(domain: Domain) {
+    await this.client.$transaction(async (tx) => {
+      const website = await tx.website.findUnique({
+        where: { id: domain.websiteId },
+        select: { content: true, campaignId: true },
+      })
+      if (!website) return
+
+      const campaignEmail = `info@${domain.name}`
+      const content = website.content ?? {}
+
+      await tx.website.update({
+        where: { id: domain.websiteId },
+        data: {
+          content: {
+            ...content,
+            contact: {
+              ...(content.contact ?? {}),
+              email: campaignEmail,
+            },
+          },
+        },
+      })
+
+      await tx.campaign.update({
+        where: { id: website.campaignId },
+        data: { campaignEmail },
+      })
+    })
   }
 
   // called after payment is accepted, send registration request to Vercel
@@ -1042,16 +1062,11 @@ export class DomainsService
       }
 
       try {
-        forwardEmailDomain = await this.setupDomainEmailForwarding(
-          domain,
-          contact.email,
-        )
-        this.logger.debug(
-          `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
-        )
+        forwardEmailDomain = await this.setupDomainEmailForwarding(domain)
+        this.logger.debug(`Email forwarding set up for domain *@${domain.name}`)
       } catch (e) {
         this.logger.error(
-          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} : ${e instanceof Error ? e.message : 'error unknown while attempting to setup email forwarding'}`,
+          `Error setting up email forwarding for domain *@${domain.name} : ${e instanceof Error ? e.message : 'error unknown while attempting to setup email forwarding'}`,
         )
         // Not throwing an error here to allow for continued execution
       }
