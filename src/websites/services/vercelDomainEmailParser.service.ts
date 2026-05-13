@@ -15,7 +15,8 @@ type EmailInput = {
 const VERCEL_SENDER_DOMAIN = 'vercel.com'
 
 const VERIFICATION_URL_REGEX =
-  /https:\/\/vercel\.com\/[^\s"'<>]*verify[^\s"'<>]*/gi
+const VERIFICATION_URL_REGEX =
+  /https:\/\/vercel\.com\/[^\s"'<>]*verify[^\s"'<>]*/i
 
 const DOMAIN_IN_SUBJECT_REGEX = /([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i
 
