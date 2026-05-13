@@ -914,7 +914,7 @@ export class DomainsService
         { e },
         `Failed to persist campaign email for domain ${domain.name}`,
       )
-      throw e
+    }
     }
 
     return forwardEmailDomain
