@@ -1152,11 +1152,9 @@ export class DomainsService
 
     try {
       await this.vercel.submitDomainRegistrantVerification(verificationUrl)
-    } catch (error) {
+    } catch {
       throw new BadGatewayException(
-        `Failed to submit registrant verification: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
+        `Failed to submit registrant verification for ${normalized}`,
       )
     }
 

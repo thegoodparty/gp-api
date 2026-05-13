@@ -127,7 +127,7 @@ export class VercelService {
       return { status: response.status }
     } catch (error) {
       this.logger.error(
-        { error, verificationUrl },
+        { error, verificationUrlHost: this.safeHostname(verificationUrl) },
         'Error submitting Vercel domain registrant verification:',
       )
       throw error
@@ -172,6 +172,14 @@ export class VercelService {
     return (
       status >= HTTP_STATUS_MULTIPLE_CHOICES && status < HTTP_STATUS_BAD_REQUEST
     )
+  }
+
+  private safeHostname(urlString: string) {
+    try {
+      return new URL(urlString).hostname
+    } catch {
+      return 'invalid-url'
+    }
   }
 
   private isAllowedVercelUrl(urlString: string) {
