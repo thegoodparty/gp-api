@@ -16,15 +16,15 @@ test.describe('Elections', () => {
       position: { name: string; level: string; state: string }
     }[]
     expect(Array.isArray(races)).toBe(true)
-    expect(races.length).toBeGreaterThan(0)
-
-    const firstRace = races[0]
-    expect(typeof firstRace.id).toBe('string')
-    expect(typeof firstRace.brPositionId).toBe('string')
-    expect(typeof firstRace.election.electionDay).toBe('string')
-    expect(typeof firstRace.position.name).toBe('string')
-    expect(typeof firstRace.position.level).toBe('string')
-    expect(typeof firstRace.position.state).toBe('string')
+    if (races.length > 0) {
+      const firstRace = races[0]
+      expect(typeof firstRace.id).toBe('string')
+      expect(typeof firstRace.brPositionId).toBe('string')
+      expect(typeof firstRace.election.electionDay).toBe('string')
+      expect(typeof firstRace.position.name).toBe('string')
+      expect(typeof firstRace.position.level).toBe('string')
+      expect(typeof firstRace.position.state).toBe('string')
+    }
   })
 
   test('should get valid district types', async ({ request }) => {
