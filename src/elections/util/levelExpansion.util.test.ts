@@ -3,10 +3,7 @@ import { expandLevelToDisplayLevels } from './levelExpansion.util'
 
 describe('expandLevelToDisplayLevels', () => {
   it('expands LOCAL', () => {
-    expect(expandLevelToDisplayLevels('Local')).toEqual([
-      'Local',
-      'Township',
-    ])
+    expect(expandLevelToDisplayLevels('Local')).toEqual(['Local', 'Township'])
   })
   it('expands COUNTY', () => {
     expect(expandLevelToDisplayLevels('County')).toEqual(['County', 'Regional'])
