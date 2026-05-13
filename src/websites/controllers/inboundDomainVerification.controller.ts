@@ -5,6 +5,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
   Post,
   Req,
   UnauthorizedException,
@@ -73,7 +74,6 @@ export class InboundDomainVerificationController {
       throw new InternalServerErrorException(
         'INBOUND_DOMAIN_EMAIL_WEBHOOK_SECRET is not configured',
       )
-    }
     }
     if (!signature) {
       throw new BadRequestException('Missing x-webhook-signature header')
