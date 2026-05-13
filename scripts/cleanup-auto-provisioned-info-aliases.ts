@@ -347,6 +347,10 @@ const main = async () => {
   const prisma = new PrismaClient()
   const fe = buildFeClient()
   const detailStream = createWriteStream(DETAIL_PATH, { flags: 'w' })
+  detailStream.on('error', (err) => {
+    console.error('Detail stream error:', err)
+    process.exitCode = 1
+  })
   const stats: Stats = {
     total: 0,
     fixed: 0,
