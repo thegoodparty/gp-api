@@ -110,7 +110,7 @@ export class VercelService {
     try {
       const response = await fetch(verificationUrl, {
         method: 'GET',
-        redirect: 'follow',
+        redirect: 'error',
       })
       if (!response.ok) {
         throw new Error(
