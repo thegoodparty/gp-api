@@ -6,7 +6,6 @@ describe('expandLevelToDisplayLevels', () => {
     expect(expandLevelToDisplayLevels('Local')).toEqual([
       'Local',
       'Township',
-      'Village',
     ])
   })
   it('expands COUNTY', () => {
