@@ -26,7 +26,7 @@ export class VercelDomainEmailParserService {
       return null
     }
 
-    const verificationUrl = this.extractVerificationUrl(email.html, email.text)
+    const verificationUrl = this.extractVerificationUrl(email.text, email.html)
     if (!verificationUrl) {
       return null
     }
@@ -68,7 +68,7 @@ export class VercelDomainEmailParserService {
     return candidate
   }
 
-  private extractVerificationUrl(html: string, text: string): string | null {
+  private extractVerificationUrl(text: string, html: string): string | null {
     const sources = [text, html]
     for (const source of sources) {
       VERIFICATION_URL_REGEX.lastIndex = 0

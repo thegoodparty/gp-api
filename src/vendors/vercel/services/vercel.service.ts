@@ -12,9 +12,12 @@ import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { PinoLogger } from 'nestjs-pino'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
-const FETCH_REDIRECT_FOLLOW = 'follow' as const
+const FETCH_REDIRECT_MANUAL = 'manual' as const
 const HTTPS_PROTOCOL = 'https:'
 const VERCEL_DOMAIN = 'vercel.com'
+const LOCATION_HEADER = 'location'
+const MAX_VERIFICATION_REDIRECTS = 10
+const HTTP_STATUS_MULTIPLE_CHOICES = 300
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   throw new Error(
@@ -112,15 +115,8 @@ export class VercelService {
       )
     }
     try {
-      const response = await fetch(verificationUrl, {
-        method: Methods.GET,
-        redirect: FETCH_REDIRECT_FOLLOW,
-      })
-      if (!this.isAllowedVercelUrl(response.url)) {
-        throw new Error(
-          `Refusing redirected registrant verification URL: ${response.url}`,
-        )
-      }
+      const response =
+        await this.fetchVerificationUrlWithSafeRedirects(verificationUrl)
       if (!response.ok) {
         throw new Error(
           `Vercel returned ${response.status} for registrant verification URL`,
@@ -134,6 +130,45 @@ export class VercelService {
       )
       throw error
     }
+  }
+
+  private async fetchVerificationUrlWithSafeRedirects(initialUrl: string) {
+    let currentUrl = initialUrl
+    let redirectCount = 0
+
+    while (true) {
+      const response = await fetch(currentUrl, {
+        method: Methods.GET,
+        redirect: FETCH_REDIRECT_MANUAL,
+      })
+
+      const location = response.headers.get(LOCATION_HEADER)
+      if (!this.isRedirectResponse(response.status) || !location) {
+        return response
+      }
+
+      if (redirectCount >= MAX_VERIFICATION_REDIRECTS) {
+        throw new Error(
+          `Too many redirects for registrant verification URL: ${initialUrl}`,
+        )
+      }
+
+      const nextUrl = new URL(location, currentUrl).toString()
+      if (!this.isAllowedVercelUrl(nextUrl)) {
+        throw new Error(
+          `Refusing redirected registrant verification URL: ${nextUrl}`,
+        )
+      }
+
+      currentUrl = nextUrl
+      redirectCount += 1
+    }
+  }
+
+  private isRedirectResponse(status: number) {
+    return (
+      status >= HTTP_STATUS_MULTIPLE_CHOICES && status < HttpStatus.BAD_REQUEST
+    )
   }
 
   private isAllowedVercelUrl(urlString: string) {
