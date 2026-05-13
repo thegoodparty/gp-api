@@ -101,6 +101,32 @@ export class VercelService {
     }
   }
 
+  async submitDomainRegistrantVerification(verificationUrl: string) {
+    if (!verificationUrl.startsWith('https://vercel.com/')) {
+      throw new Error(
+        `Refusing to submit non-vercel.com verification URL: ${verificationUrl}`,
+      )
+    }
+    try {
+      const response = await fetch(verificationUrl, {
+        method: 'GET',
+        redirect: 'follow',
+      })
+      if (!response.ok) {
+        throw new Error(
+          `Vercel returned ${response.status} for registrant verification URL`,
+        )
+      }
+      return { status: response.status }
+    } catch (error) {
+      this.logger.error(
+        { error, verificationUrl },
+        'Error submitting Vercel domain registrant verification:',
+      )
+      throw error
+    }
+  }
+
   /**
    * Check the price for a domain
    * @see https://vercel.com/docs/domains/registrar-api

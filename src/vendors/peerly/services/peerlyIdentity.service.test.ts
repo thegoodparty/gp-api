@@ -84,6 +84,7 @@ const createMockDomain = (overrides: Partial<Domain> = {}): Domain => {
     price: null,
     paymentId: null,
     emailForwardingDomainId: null,
+    registrantVerifiedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

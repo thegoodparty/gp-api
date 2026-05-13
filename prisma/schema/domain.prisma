@@ -18,6 +18,7 @@ model Domain {
   price                   Decimal?
   paymentId               String?      @map("payment_id")
   emailForwardingDomainId String?      @map("email_forwarding_domain_id")
+  registrantVerifiedAt    DateTime?    @map("registrant_verified_at")
 
   @@map("domain")
 }

@@ -164,4 +164,71 @@ describe('WebsitesController', () => {
       expect(result).toEqual(expectedResult)
     })
   })
+
+  describe('updateWebsite - domain registrant verification gate', () => {
+    it('blocks publishing when an attached domain has not been registrant-verified', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: {},
+        hasEverBeenPublished: false,
+        domain: { registrantVerifiedAt: null, name: 'foo.com' },
+      })
+
+      const body = new UpdateWebsiteSchema()
+      body.status = WebsiteStatus.published
+
+      await expect(
+        controller.updateWebsite(mockUser, mockCampaign, body),
+      ).rejects.toMatchObject({ status: 400 })
+
+      expect(mockWebsitesService.update).not.toHaveBeenCalled()
+    })
+
+    it('allows publishing when the attached domain has been registrant-verified', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: {},
+        hasEverBeenPublished: false,
+        domain: {
+          registrantVerifiedAt: new Date('2026-05-13T00:00:00.000Z'),
+          name: 'foo.com',
+        },
+      })
+
+      const body = new UpdateWebsiteSchema()
+      body.status = WebsiteStatus.published
+
+      await controller.updateWebsite(mockUser, mockCampaign, body)
+
+      expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+
+    it('allows publishing when no custom domain is attached', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: {},
+        hasEverBeenPublished: false,
+        domain: null,
+      })
+
+      const body = new UpdateWebsiteSchema()
+      body.status = WebsiteStatus.published
+
+      await controller.updateWebsite(mockUser, mockCampaign, body)
+
+      expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+
+    it('does not gate non-published status transitions', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: {},
+        hasEverBeenPublished: false,
+        domain: { registrantVerifiedAt: null, name: 'foo.com' },
+      })
+
+      const body = new UpdateWebsiteSchema()
+      body.status = WebsiteStatus.unpublished
+
+      await controller.updateWebsite(mockUser, mockCampaign, body)
+
+      expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+  })
 })

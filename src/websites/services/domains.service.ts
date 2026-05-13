@@ -1128,6 +1128,68 @@ export class DomainsService
     }
   }
 
+  async submitRegistrantVerification(
+    domainName: string,
+    verificationUrl: string,
+  ) {
+    const normalized = domainName.toLowerCase()
+    const domain = await this.model.findUnique({
+      where: { name: normalized },
+    })
+    if (!domain) {
+      throw new NotFoundException(
+        `No managed domain found matching ${normalized}`,
+      )
+    }
+
+    if (domain.registrantVerifiedAt) {
+      return {
+        domain: domain.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: domain.registrantVerifiedAt,
+      }
+    }
+
+    try {
+      await this.vercel.submitDomainRegistrantVerification(verificationUrl)
+    } catch (error) {
+      throw new BadGatewayException(
+        `Failed to submit registrant verification: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+
+    let confirmedVerified: boolean
+    try {
+      const detail = await this.vercel.getDomainDetails(domain.name)
+      confirmedVerified = detail.domain.verified === true
+    } catch (error) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but failed to confirm Vercel domain state: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+
+    if (!confirmedVerified) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but Vercel still reports the domain as unverified; retry expected via webhook redelivery.`,
+      )
+    }
+
+    const updated = await this.model.update({
+      where: { id: domain.id },
+      data: { registrantVerifiedAt: new Date() },
+    })
+
+    return {
+      domain: updated.name,
+      alreadyVerified: false,
+      registrantVerifiedAt: updated.registrantVerifiedAt,
+    }
+  }
+
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
     try {
       const paymentIntent = await this.payments.retrievePayment(paymentId)
