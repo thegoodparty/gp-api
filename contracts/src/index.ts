@@ -245,3 +245,28 @@ export {
 } from './elections/raceListItem'
 
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
+
+export {
+  MeetingScheduleSourceSchema,
+  type MeetingScheduleSource,
+  MeetingScheduleArtifactSchema,
+  type MeetingScheduleArtifact,
+} from './meetings/MeetingScheduleArtifact.schema'
+
+export {
+  MeetingItemSchema,
+  type MeetingItem,
+  MeetingsListResponseSchema,
+  type MeetingsListResponse,
+} from './meetings/MeetingsListResponse.schema'
+
+export {
+  BriefingSourceSchema,
+  type BriefingSource,
+  BriefingAgendaItemSchema,
+  type BriefingAgendaItem,
+  BriefingActionItemSchema,
+  type BriefingActionItem,
+  MeetingBriefingResponseSchema,
+  type MeetingBriefingResponse,
+} from './meetings/MeetingBriefingResponse.schema'

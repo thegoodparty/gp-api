@@ -145,6 +145,7 @@
     "pino-http": "^11.0.0",
     "prisma": "^6.3.0",
     "reflect-metadata": "^0.2.0",
+    "rrule": "^2.8.1",
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.14.0",
     "serialize-error": "^12.0.0",
