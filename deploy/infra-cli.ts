@@ -109,23 +109,38 @@ const setupStack = async (env: string) => {
   GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
   GRAFANA_SM_ACCESS_TOKEN = await getSSMParameter('grafana-sm-access-token')
 
-  run('pulumi login s3://goodparty-iac-state', {
-    // Ignore stdio -- we need the output to be pure JSON for diffs in CI
-    stdio: process.env.CI ? ['inherit', 'ignore', 'inherit'] : 'inherit',
+  // In CI, every setup pulumi command must keep stdout pure so that the
+  // subsequent `pulumi preview --json` output can be parsed by jq in the
+  // infrastructure-diffs workflow. Each setup command otherwise prints a
+  // confirmation line ("Created stack ...", "Configuration:", etc.) that
+  // gets prepended to the JSON file and breaks the parser.
+  const setupStdio: ExecSyncOptions['stdio'] = process.env.CI
+    ? ['inherit', 'ignore', 'inherit']
+    : 'inherit'
+
+  run('pulumi login s3://goodparty-iac-state', { stdio: setupStdio })
+  run(`pulumi stack select ${stack} --create`, { stdio: setupStdio })
+  run(`pulumi config set aws:region ${AWS_REGION}`, { stdio: setupStdio })
+  run(`pulumi config set environment ${env}`, { stdio: setupStdio })
+  run(`pulumi config set imageUri ${imageUri}`, { stdio: setupStdio })
+  run('pulumi config set grafana:url https://goodparty.grafana.net', {
+    stdio: setupStdio,
   })
-  run(`pulumi stack select ${stack} --create`)
-  run(`pulumi config set aws:region ${AWS_REGION}`)
-  run(`pulumi config set environment ${env}`)
-  run(`pulumi config set imageUri ${imageUri}`)
-  run('pulumi config set grafana:url https://goodparty.grafana.net')
   run(
     'pulumi config set grafana:smUrl https://synthetic-monitoring-api-us-east-3.grafana.net',
+    { stdio: setupStdio },
   )
   if (env === 'preview') {
-    run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`)
+    run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`, {
+      stdio: setupStdio,
+    })
   }
-  run(`pulumi config set --path aws:defaultTags.tags.Environment ${env}`)
-  run(`pulumi config set --path aws:defaultTags.tags.Project gp-api`)
+  run(`pulumi config set --path aws:defaultTags.tags.Environment ${env}`, {
+    stdio: setupStdio,
+  })
+  run(`pulumi config set --path aws:defaultTags.tags.Project gp-api`, {
+    stdio: setupStdio,
+  })
 }
 
 yargs(hideBin(process.argv))
