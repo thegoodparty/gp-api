@@ -172,7 +172,21 @@ yargs(hideBin(process.argv))
         }),
     async (argv) => {
       await setupStack(argv.environment)
-      run(argv.json ? 'pulumi preview --json' : 'pulumi preview --diff')
+      // In CI, the `--json` variant is consumed by `jq` (see
+      // .github/workflows/infrastructure-diffs.yml). The workflow redirects
+      // with `> file 2>&1`, so any pulumi stderr (progress lines like
+      // "Previewing update (env):", a result table, "warning: ..." lines)
+      // would land in the file alongside the JSON and break jq parsing.
+      // Pulumi reports actual preview failures via .diagnostics in the JSON
+      // body (the workflow checks that on line 66), so silencing stderr is
+      // safe and necessary for CI parsing.
+      const previewStdio: ExecSyncOptions['stdio'] =
+        argv.json && process.env.CI
+          ? ['inherit', 'inherit', 'ignore']
+          : 'inherit'
+      run(argv.json ? 'pulumi preview --json' : 'pulumi preview --diff', {
+        stdio: previewStdio,
+      })
     },
   )
   .command(
