@@ -585,6 +585,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         this.clerkClient.users.getUserList({
           limit: 500,
           query: TEST_USER_DOMAIN,
+          orderBy: '+created_at',
         }),
       )
 
