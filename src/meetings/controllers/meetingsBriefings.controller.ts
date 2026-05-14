@@ -18,8 +18,8 @@ import { MeetingBriefingsService } from '../services/meetingBriefings.service'
 import { MeetingScheduleService } from '../services/meetingSchedule.service'
 import { MeetingProjectionService } from '../services/meetingProjection.service'
 
-@Controller('v1/meetings')
-export class MeetingsV1Controller {
+@Controller('meetings')
+export class MeetingsBriefingsController {
   constructor(
     private readonly meetingBriefings: MeetingBriefingsService,
     private readonly schedules: MeetingScheduleService,

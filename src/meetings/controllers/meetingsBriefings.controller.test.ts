@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ElectedOffice } from '@prisma/client'
-import { MeetingsV1Controller } from './meetings.v1.controller'
+import { MeetingsBriefingsController } from './meetingsBriefings.controller'
 import { MeetingProjectionService } from '../services/meetingProjection.service'
 
 const electedOffice = {
@@ -43,7 +43,7 @@ const makeController = (overrides: {
   const s3 = {
     getFile: vi.fn().mockResolvedValue(overrides.s3Body),
   }
-  return new MeetingsV1Controller(
+  return new MeetingsBriefingsController(
     meetingBriefings as never,
     schedules as never,
     new MeetingProjectionService(),
@@ -51,7 +51,7 @@ const makeController = (overrides: {
   )
 }
 
-describe('MeetingsV1Controller.list', () => {
+describe('MeetingsBriefingsController.list', () => {
   it('returns schedule_known:false when no schedule exists', async () => {
     const ctrl = makeController({ schedule: null })
     const res = await ctrl.list(electedOffice)
@@ -135,7 +135,7 @@ const validBriefingArtifact = {
   action_items: [],
 }
 
-describe('MeetingsV1Controller.getBriefing', () => {
+describe('MeetingsBriefingsController.getBriefing', () => {
   it('throws 404 when no briefing row exists for that date', async () => {
     const ctrl = makeController({ briefingRow: null })
     await expect(
