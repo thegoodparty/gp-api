@@ -2,6 +2,7 @@ import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice } from '@prisma/client'
 import { addMonths, subMonths } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import {
   MeetingBriefingResponseSchema,
   MeetingsListResponseSchema,
@@ -49,7 +50,9 @@ export class MeetingsBriefingsController {
       select: { meetingDate: true },
     })
     const haveBriefing = new Set(
-      briefings.map((b) => b.meetingDate.toISOString().slice(0, 10)),
+      briefings.map((b) =>
+        formatInTimeZone(b.meetingDate, 'UTC', 'yyyy-MM-dd'),
+      ),
     )
 
     return {
