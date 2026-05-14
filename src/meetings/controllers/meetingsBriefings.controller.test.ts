@@ -1,115 +1,210 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ElectedOffice } from '@prisma/client'
-import { MeetingsBriefingsController } from './meetingsBriefings.controller'
-import { MeetingProjectionService } from '../services/meetingProjection.service'
+import { ExperimentRunStatus } from '@prisma/client'
+import { S3Service } from '@/vendors/aws/services/s3.service'
+import { useTestService } from '@/test-service'
 
-const electedOffice = {
-  id: 'eo-1',
-  organizationSlug: 'org-1',
-} as ElectedOffice
+const service = useTestService()
+
+const seedElectedOffice = async (orgSlug: string) => {
+  await service.prisma.organization.create({
+    data: { slug: orgSlug, ownerId: service.user.id },
+  })
+  return service.prisma.electedOffice.create({
+    data: {
+      organizationSlug: orgSlug,
+      userId: service.user.id,
+    },
+  })
+}
+
+const seedScheduleRun = async (
+  organizationSlug: string,
+  options?: { artifactBucket?: string; artifactKey?: string },
+) =>
+  service.prisma.experimentRun.create({
+    data: {
+      organizationSlug,
+      experimentType: 'meeting_schedule',
+      status: ExperimentRunStatus.COMPLETED,
+      artifactBucket: options?.artifactBucket ?? 'schedule-bucket',
+      artifactKey: options?.artifactKey ?? 'schedule-key.json',
+    },
+  })
 
 const foundSchedule = {
-  status: 'found' as const,
+  status: 'found',
   rrule: 'FREQ=MONTHLY;BYDAY=2MO,4MO',
   human: '2nd and 4th Monday',
   time: '19:00',
   timezone: 'America/Denver',
   duration_minutes: 180,
-  sources: [],
+  sources: [{ url: 'https://example.gov' }],
 }
 
-const makeController = (overrides: {
-  schedule?: unknown
-  briefings?: Array<{ meetingDate: Date }>
-  briefingRow?: {
-    artifactBucket: string
-    artifactKey: string
-  } | null
-  s3Body?: string
-}) => {
-  const schedules = {
-    loadLatestForOrg: vi.fn().mockResolvedValue(overrides.schedule ?? null),
-  }
-  const meetingBriefings = {
-    findMany: vi.fn().mockResolvedValue(overrides.briefings ?? []),
-    model: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(
-          overrides.briefingRow === undefined ? null : overrides.briefingRow,
-        ),
-    },
-  }
-  const s3 = {
-    getFile: vi.fn().mockResolvedValue(overrides.s3Body),
-  }
-  return new MeetingsBriefingsController(
-    meetingBriefings as never,
-    schedules as never,
-    new MeetingProjectionService(),
-    s3 as never,
+const mockS3 = (responses: Record<string, string | undefined>) => {
+  const s3 = service.app.get(S3Service)
+  vi.spyOn(s3, 'getFile').mockImplementation(
+    async (_bucket, key) => responses[key],
   )
 }
 
-describe('MeetingsBriefingsController.list', () => {
-  it('returns schedule_known:false when no schedule exists', async () => {
-    const ctrl = makeController({ schedule: null })
-    const res = await ctrl.list(electedOffice)
-    expect(res).toEqual({ schedule_known: false, meetings: [] })
+describe('GET /v1/meetings', () => {
+  it('returns 404 when user has no elected office', async () => {
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': 'nonexistent' },
+    })
+
+    expect(result.status).toBe(404)
   })
 
-  it('returns schedule_known:false when schedule status is not_found', async () => {
-    const ctrl = makeController({
-      schedule: { status: 'not_found', sources: [] },
+  it('returns schedule_known:false when no completed schedule run exists', async () => {
+    const orgSlug = 'eo-no-schedule'
+    await seedElectedOffice(orgSlug)
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
     })
-    const res = await ctrl.list(electedOffice)
-    expect(res).toEqual({ schedule_known: false, meetings: [] })
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ schedule_known: false, meetings: [] })
+  })
+
+  it('returns schedule_known:false when schedule artifact is not_found', async () => {
+    const orgSlug = 'eo-not-found-schedule'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({
+      'schedule-key.json': JSON.stringify({
+        status: 'not_found',
+        sources: [],
+      }),
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ schedule_known: false, meetings: [] })
   })
 
   it('returns projected meetings with has_briefing:false when no briefings exist', async () => {
-    const ctrl = makeController({ schedule: foundSchedule, briefings: [] })
-    const res = await ctrl.list(electedOffice)
-    expect(res.schedule_known).toBe(true)
-    expect(res.meetings.length).toBeGreaterThan(0)
+    const orgSlug = 'eo-projected'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data.schedule_known).toBe(true)
+    expect(result.data.meetings.length).toBeGreaterThan(0)
     expect(
-      res.meetings.every(
+      result.data.meetings.every(
         (m: { has_briefing: boolean }) => m.has_briefing === false,
       ),
     ).toBe(true)
   })
 
-  it('marks dates with existing briefings as has_briefing:true', async () => {
-    const projection = new MeetingProjectionService()
-    const sampleDates = projection.project({
-      schedule: foundSchedule,
-      from: new Date(),
-      to: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-    })
-    const flagged = sampleDates[0]
-    const ctrl = makeController({
-      schedule: foundSchedule,
-      briefings: [{ meetingDate: new Date(flagged) }],
-    })
-    const res = await ctrl.list(electedOffice)
-    expect(
-      res.meetings.find((m) => m.meeting_date === flagged)?.has_briefing,
-    ).toBe(true)
-    expect(
-      res.meetings
-        .filter((m) => m.meeting_date !== flagged)
-        .every((m) => !m.has_briefing),
-    ).toBe(true)
-  })
-
   it('every returned item carries schedule time/timezone/duration', async () => {
-    const ctrl = makeController({ schedule: foundSchedule })
-    const res = await ctrl.list(electedOffice)
-    res.meetings.forEach((m) => {
+    const orgSlug = 'eo-item-shape'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    for (const m of result.data.meetings as Array<{
+      meeting_date: string
+      meeting_time: string
+      meeting_timezone: string
+      duration_minutes: number
+    }>) {
       expect(m.meeting_time).toBe('19:00')
       expect(m.meeting_timezone).toBe('America/Denver')
       expect(m.duration_minutes).toBe(180)
       expect(m.meeting_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
+  })
+
+  it('handles a weekly schedule', async () => {
+    const orgSlug = 'eo-weekly'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({
+      'schedule-key.json': JSON.stringify({
+        ...foundSchedule,
+        rrule: 'FREQ=WEEKLY;BYDAY=TU',
+        human: 'every Tuesday',
+      }),
     })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data.meetings.length).toBeGreaterThan(0)
+    for (const m of result.data.meetings as Array<{ meeting_date: string }>) {
+      const day = new Date(m.meeting_date + 'T00:00:00Z').getUTCDay()
+      expect(day).toBe(2)
+    }
+  })
+
+  it('marks dates with existing briefings as has_briefing:true', async () => {
+    const orgSlug = 'eo-briefings'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const probe = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+    const targetDate = (
+      probe.data.meetings as Array<{ meeting_date: string }>
+    )[0].meeting_date
+
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date(targetDate + 'T00:00:00Z'),
+        meetingTime: '19:00',
+        meetingTimezone: 'America/Denver',
+        experimentRunId: briefingRun.runId,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-key.json',
+      },
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    const meetings = result.data.meetings as Array<{
+      meeting_date: string
+      has_briefing: boolean
+    }>
+    expect(
+      meetings.find((m) => m.meeting_date === targetDate)?.has_briefing,
+    ).toBe(true)
+    expect(
+      meetings
+        .filter((m) => m.meeting_date !== targetDate)
+        .every((m) => !m.has_briefing),
+    ).toBe(true)
   })
 })
 
@@ -135,52 +230,137 @@ const validBriefingArtifact = {
   action_items: [],
 }
 
-describe('MeetingsBriefingsController.getBriefing', () => {
-  it('throws 404 when no briefing row exists for that date', async () => {
-    const ctrl = makeController({ briefingRow: null })
-    await expect(
-      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
-    ).rejects.toThrow('Not Found')
+const seedBriefing = async (
+  eoId: string,
+  orgSlug: string,
+  options: {
+    meetingDate: string
+    artifactBucket: string
+    artifactKey: string
+  },
+) => {
+  const briefingRun = await service.prisma.experimentRun.create({
+    data: {
+      organizationSlug: orgSlug,
+      experimentType: 'meeting_briefing',
+      status: ExperimentRunStatus.COMPLETED,
+    },
+  })
+  return service.prisma.meetingBriefing.create({
+    data: {
+      electedOfficeId: eoId,
+      meetingDate: new Date(options.meetingDate + 'T00:00:00Z'),
+      meetingTime: '19:00',
+      meetingTimezone: 'America/Denver',
+      experimentRunId: briefingRun.runId,
+      artifactBucket: options.artifactBucket,
+      artifactKey: options.artifactKey,
+    },
+  })
+}
+
+describe('GET /v1/meetings/:date/briefing', () => {
+  it('returns 400 when date param is malformed', async () => {
+    const orgSlug = 'eo-bad-date'
+    await seedElectedOffice(orgSlug)
+
+    const result = await service.client.get(
+      '/v1/meetings/06-08-2026/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(400)
   })
 
-  it('throws 404 when S3 object is missing', async () => {
-    const ctrl = makeController({
-      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
-      s3Body: undefined,
+  it('returns 404 when no briefing row exists for that date', async () => {
+    const orgSlug = 'eo-missing-briefing'
+    await seedElectedOffice(orgSlug)
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 404 when S3 object is missing', async () => {
+    const orgSlug = 'eo-missing-s3'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, {
+      meetingDate: '2026-06-08',
+      artifactBucket: 'briefing-bucket',
+      artifactKey: 'missing-key.json',
     })
-    await expect(
-      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
-    ).rejects.toThrow('Not Found')
+    mockS3({ 'missing-key.json': undefined })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 404 when artifact JSON is malformed', async () => {
+    const orgSlug = 'eo-bad-json'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, {
+      meetingDate: '2026-06-08',
+      artifactBucket: 'briefing-bucket',
+      artifactKey: 'bad-json.json',
+    })
+    mockS3({ 'bad-json.json': '{not valid json' })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 404 when artifact fails Zod validation', async () => {
+    const orgSlug = 'eo-bad-shape'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, {
+      meetingDate: '2026-06-08',
+      artifactBucket: 'briefing-bucket',
+      artifactKey: 'bad-shape.json',
+    })
+    mockS3({
+      'bad-shape.json': JSON.stringify({
+        id: 'b1',
+        status: 'briefing_ready',
+      }),
+    })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(404)
   })
 
   it('returns the parsed briefing artifact on success', async () => {
-    const ctrl = makeController({
-      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
-      s3Body: JSON.stringify(validBriefingArtifact),
+    const orgSlug = 'eo-success'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, {
+      meetingDate: '2026-06-08',
+      artifactBucket: 'briefing-bucket',
+      artifactKey: 'good.json',
     })
-    const res = await ctrl.getBriefing(electedOffice, { date: '2026-06-08' })
-    expect(res.slug).toBe('city-council-june-8-2026')
-    expect(res.reading_time_minutes).toBe(8)
-    expect(res.meeting.scheduled_at).toBe('2026-06-08T19:00:00-06:00')
-  })
+    mockS3({ 'good.json': JSON.stringify(validBriefingArtifact) })
 
-  it('throws 404 when artifact JSON is malformed', async () => {
-    const ctrl = makeController({
-      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
-      s3Body: '{not valid json',
-    })
-    await expect(
-      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
-    ).rejects.toThrow('Not Found')
-  })
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
 
-  it('throws 404 when artifact fails Zod validation', async () => {
-    const ctrl = makeController({
-      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
-      s3Body: JSON.stringify({ id: 'b1', status: 'briefing_ready' }),
-    })
-    await expect(
-      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
-    ).rejects.toThrow('Not Found')
+    expect(result.status).toBe(200)
+    expect(result.data.slug).toBe('city-council-june-8-2026')
+    expect(result.data.reading_time_minutes).toBe(8)
+    expect(result.data.meeting.scheduled_at).toBe('2026-06-08T19:00:00-06:00')
   })
 })
