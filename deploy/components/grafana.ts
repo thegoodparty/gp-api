@@ -236,11 +236,18 @@ export const createGrafanaResources = async ({
   })
 
   for (const controller of CONTROLLER_NAMES) {
+    const rules = controllerAlerts(controller).map(alertToRule)
+    // Grafana's RuleGroup schema requires `rules` to have at least 1 item:
+    // > Attribute rule requires 1 item minimum, but config has only 0 declared.
+    // CONTROLLER_NAMES is auto-generated from src and can include controllers
+    // with no public routes (currently `mcp`), which produce zero alerts.
+    // An empty RuleGroup adds no value, so skip them rather than fail preview.
+    if (rules.length === 0) continue
     new grafana.alerting.RuleGroup(`${controller}-rules`, {
       name: `${controller} routes`,
       folderUid: alertFolder.uid,
       intervalSeconds: 60,
-      rules: controllerAlerts(controller).map(alertToRule),
+      rules,
     })
   }
 
