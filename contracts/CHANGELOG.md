@@ -1,5 +1,14 @@
 # @goodparty_org/contracts
 
+## 0.3.0
+
+### Minor Changes
+
+- Add meetings module schemas for the Meeting Briefings V2 feature
+  (`MeetingScheduleArtifact`, `MeetingsListResponse`, `MeetingBriefingResponse`)
+  and their inferred types. Snake_case throughout to match the raw S3 artifact
+  shape — no transform layer.
+
 ## 0.2.0
 
 ### Minor Changes

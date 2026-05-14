@@ -12,9 +12,12 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
+import { ComplianceStateService } from './services/complianceState.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
@@ -27,6 +30,8 @@ import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { ComplianceStateOutputSchema } from '@goodparty_org/contracts'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -34,6 +39,7 @@ export class CampaignTcrComplianceController {
   constructor(
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
+    private readonly complianceStateService: ComplianceStateService,
     private readonly campaignsService: CampaignsService,
     private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,
@@ -53,6 +59,14 @@ export class CampaignTcrComplianceController {
       )
     }
     return tcrCompliance
+  }
+
+  @Get('mine/compliance-state')
+  @UseCampaign()
+  @UseInterceptors(ZodResponseInterceptor)
+  @ResponseSchema(ComplianceStateOutputSchema)
+  async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
+    return this.complianceStateService.findStateForCampaign(campaign.id)
   }
 
   @Post()
