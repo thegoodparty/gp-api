@@ -59,6 +59,32 @@ jobs:
 
             npm run --silent infra diff $env -- --json > /tmp/preview-$env.json 2>&1 || true
 
+            # DEBUG: dump diagnostics if jq is going to fail.
+            # Remove after the infrastructure-diffs failure mode is fixed.
+            if ! jq empty /tmp/preview-$env.json 2>/dev/null; then
+              echo "::group::DEBUG /tmp/preview-$env.json metadata"
+              echo "byte size: $(wc -c < /tmp/preview-$env.json)"
+              echo "line count: $(wc -l < /tmp/preview-$env.json)"
+              echo "::endgroup::"
+              echo "::group::DEBUG first 25 lines of /tmp/preview-$env.json"
+              head -25 /tmp/preview-$env.json
+              echo "::endgroup::"
+              echo "::group::DEBUG last 25 lines of /tmp/preview-$env.json"
+              tail -25 /tmp/preview-$env.json
+              echo "::endgroup::"
+              echo "::group::DEBUG jq parse error position"
+              jq empty /tmp/preview-$env.json 2>&1 || true
+              # Print 5 lines around the error position. Pull line number from jq's error.
+              ERR_LINE=$(jq empty /tmp/preview-$env.json 2>&1 | grep -oE 'line [0-9]+' | head -1 | grep -oE '[0-9]+' || echo "")
+              if [ -n "$ERR_LINE" ]; then
+                START=$(( ERR_LINE > 5 ? ERR_LINE - 5 : 1 ))
+                END=$(( ERR_LINE + 5 ))
+                echo "context around line $ERR_LINE (showing $START..$END):"
+                sed -n "${START},${END}p" /tmp/preview-$env.json | cat -An
+              fi
+              echo "::endgroup::"
+            fi
+
             # Count changes
             CHANGES=$(jq '[.changeSummary.create, .changeSummary.update, .changeSummary.delete, .changeSummary.replace | values] | add // 0' /tmp/preview-$env.json)
 
