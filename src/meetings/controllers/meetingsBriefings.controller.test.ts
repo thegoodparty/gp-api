@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus } from '@prisma/client'
+import { getDay, parseISO } from 'date-fns'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { useTestService } from '@/test-service'
 
@@ -154,9 +155,47 @@ describe('GET /v1/meetings', () => {
     )
     expect(dates.length).toBeGreaterThan(0)
     for (const d of dates) {
-      const day = new Date(d + 'T00:00:00Z').getUTCDay()
+      const day = getDay(parseISO(d))
       expect(day).toBe(1)
     }
+  })
+
+  it('returns an empty meeting list when the schedule artifact has a garbage rrule', async () => {
+    const orgSlug = 'eo-bad-rrule'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({
+      'schedule-key.json': JSON.stringify({
+        ...foundSchedule,
+        rrule: 'NOT A VALID RRULE STRING',
+      }),
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ schedule_known: true, meetings: [] })
+  })
+
+  it('returns an empty meeting list when the schedule timezone is invalid', async () => {
+    const orgSlug = 'eo-bad-tz'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({
+      'schedule-key.json': JSON.stringify({
+        ...foundSchedule,
+        timezone: 'Not/AReal_Zone',
+      }),
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ schedule_known: true, meetings: [] })
   })
 
   it('handles a weekly schedule', async () => {
@@ -178,7 +217,7 @@ describe('GET /v1/meetings', () => {
     expect(result.status).toBe(200)
     expect(result.data.meetings.length).toBeGreaterThan(0)
     for (const m of result.data.meetings as Array<{ meeting_date: string }>) {
-      const day = new Date(m.meeting_date + 'T00:00:00Z').getUTCDay()
+      const day = getDay(parseISO(m.meeting_date))
       expect(day).toBe(2)
     }
   })
