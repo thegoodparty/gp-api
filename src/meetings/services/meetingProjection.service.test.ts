@@ -7,7 +7,7 @@ const schedule = {
   human: '2nd and 4th Monday',
   time: '19:00',
   timezone: 'America/Denver',
-  durationMinutes: 180,
+  duration_minutes: 180,
   sources: [],
 }
 

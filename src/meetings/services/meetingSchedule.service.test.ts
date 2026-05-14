@@ -46,7 +46,7 @@ describe('MeetingScheduleService.loadLatestForOrg', () => {
     expect(result).toMatchObject({
       status: 'found',
       rrule: 'FREQ=MONTHLY;BYDAY=2MO,4MO',
-      durationMinutes: 180,
+      duration_minutes: 180,
     })
   })
 

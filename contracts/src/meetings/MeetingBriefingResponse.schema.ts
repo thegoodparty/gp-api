@@ -4,7 +4,7 @@ export const BriefingSourceSchema = z.object({
   id: z.string(),
   label: z.string(),
   kind: z.enum(['internal', 'official', 'news', 'other']),
-  iconInitial: z.string().length(1),
+  icon_initial: z.string().length(1),
   url: z.string().url().nullable(),
 })
 
@@ -14,7 +14,7 @@ export const BriefingAgendaItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   kind: z.enum(['procedural', 'action', 'discussion', 'other']),
-  hasBriefing: z.boolean(),
+  has_briefing: z.boolean(),
 })
 
 export type BriefingAgendaItem = z.infer<typeof BriefingAgendaItemSchema>
@@ -23,14 +23,14 @@ export const BriefingActionItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   overview: z.string(),
-  constituentSentiment: z
+  constituent_sentiment: z
     .object({
       summary: z.string(),
       detail: z.string(),
       sources: z.array(z.string()),
     })
     .optional(),
-  recentNews: z
+  recent_news: z
     .array(
       z.object({
         title: z.string(),
@@ -39,13 +39,13 @@ export const BriefingActionItemSchema = z.object({
       }),
     )
     .default([]),
-  budgetImpact: z
+  budget_impact: z
     .object({
       summary: z.string(),
       sources: z.array(BriefingSourceSchema).default([]),
     })
     .optional(),
-  talkingPoints: z.array(z.string()).default([]),
+  talking_points: z.array(z.string()).default([]),
   sources: z.array(BriefingSourceSchema).default([]),
 })
 
@@ -54,23 +54,23 @@ export type BriefingActionItem = z.infer<typeof BriefingActionItemSchema>
 export const MeetingBriefingResponseSchema = z.object({
   id: z.string(),
   slug: z.string(),
-  meetingId: z.string(),
+  meeting_id: z.string(),
   title: z.string(),
-  meetingDate: z.string(),
+  meeting_date: z.string(),
   status: z.literal('briefing_ready'),
-  readingTimeMinutes: z.number().int().min(0),
-  generatedAt: z.string(),
+  reading_time_minutes: z.number().int().min(0),
+  generated_at: z.string(),
   meeting: z.object({
     id: z.string(),
     name: z.string(),
     body: z.string(),
     type: z.string(),
-    scheduledAt: z.string(),
+    scheduled_at: z.string(),
     location: z.string(),
   }),
-  executiveSummary: z.string(),
+  executive_summary: z.string(),
   agenda: z.array(BriefingAgendaItemSchema),
-  actionItems: z.array(BriefingActionItemSchema),
+  action_items: z.array(BriefingActionItemSchema),
 })
 
 export type MeetingBriefingResponse = z.infer<

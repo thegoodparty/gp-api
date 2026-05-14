@@ -9,19 +9,6 @@ import {
 
 const EXPERIMENT_TYPE = 'meeting_schedule'
 
-const toCamel = (raw: unknown): unknown => {
-  if (Array.isArray(raw)) return raw.map(toCamel)
-  if (raw && typeof raw === 'object') {
-    return Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [
-        k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
-        toCamel(v),
-      ]),
-    )
-  }
-  return raw
-}
-
 @Injectable()
 export class MeetingScheduleService extends createPrismaBase(
   MODELS.ExperimentRun,
@@ -48,14 +35,11 @@ export class MeetingScheduleService extends createPrismaBase(
     const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
     if (!raw) return null
 
-    let parsedJson: unknown
     try {
-      parsedJson = JSON.parse(raw)
+      const parsed = MeetingScheduleArtifactSchema.safeParse(JSON.parse(raw))
+      return parsed.success ? parsed.data : null
     } catch {
       return null
     }
-
-    const parsed = MeetingScheduleArtifactSchema.safeParse(toCamel(parsedJson))
-    return parsed.success ? parsed.data : null
   }
 }

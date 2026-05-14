@@ -18,19 +18,6 @@ import { MeetingBriefingsService } from '../services/meetingBriefings.service'
 import { MeetingScheduleService } from '../services/meetingSchedule.service'
 import { MeetingProjectionService } from '../services/meetingProjection.service'
 
-const toCamel = (raw: unknown): unknown => {
-  if (Array.isArray(raw)) return raw.map(toCamel)
-  if (raw && typeof raw === 'object') {
-    return Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [
-        k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
-        toCamel(v),
-      ]),
-    )
-  }
-  return raw
-}
-
 @Controller('v1/meetings')
 export class MeetingsV1Controller {
   constructor(
@@ -48,7 +35,7 @@ export class MeetingsV1Controller {
       electedOffice.organizationSlug,
     )
     if (!schedule || schedule.status === 'not_found') {
-      return { scheduleKnown: false, meetings: [] }
+      return { schedule_known: false, meetings: [] }
     }
 
     const now = new Date()
@@ -70,13 +57,13 @@ export class MeetingsV1Controller {
     )
 
     return {
-      scheduleKnown: true,
+      schedule_known: true,
       meetings: dates.map((d) => ({
-        meetingDate: d,
-        meetingTime: schedule.time,
-        meetingTimezone: schedule.timezone,
-        durationMinutes: schedule.durationMinutes,
-        hasBriefing: haveBriefing.has(d),
+        meeting_date: d,
+        meeting_time: schedule.time,
+        meeting_timezone: schedule.timezone,
+        duration_minutes: schedule.duration_minutes,
+        has_briefing: haveBriefing.has(d),
       })),
     }
   }
@@ -102,6 +89,13 @@ export class MeetingsV1Controller {
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()
 
-    return MeetingBriefingResponseSchema.parse(toCamel(JSON.parse(raw)))
+    try {
+      const parsed = MeetingBriefingResponseSchema.safeParse(JSON.parse(raw))
+      if (!parsed.success) throw new NotFoundException()
+      return parsed.data
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err
+      throw new NotFoundException()
+    }
   }
 }

@@ -14,7 +14,7 @@ const foundSchedule = {
   human: '2nd and 4th Monday',
   time: '19:00',
   timezone: 'America/Denver',
-  durationMinutes: 180,
+  duration_minutes: 180,
   sources: [],
 }
 
@@ -52,33 +52,33 @@ const makeController = (overrides: {
 }
 
 describe('MeetingsV1Controller.list', () => {
-  it('returns scheduleKnown:false when no schedule exists', async () => {
+  it('returns schedule_known:false when no schedule exists', async () => {
     const ctrl = makeController({ schedule: null })
     const res = await ctrl.list(electedOffice)
-    expect(res).toEqual({ scheduleKnown: false, meetings: [] })
+    expect(res).toEqual({ schedule_known: false, meetings: [] })
   })
 
-  it('returns scheduleKnown:false when schedule status is not_found', async () => {
+  it('returns schedule_known:false when schedule status is not_found', async () => {
     const ctrl = makeController({
       schedule: { status: 'not_found', sources: [] },
     })
     const res = await ctrl.list(electedOffice)
-    expect(res).toEqual({ scheduleKnown: false, meetings: [] })
+    expect(res).toEqual({ schedule_known: false, meetings: [] })
   })
 
-  it('returns projected meetings with hasBriefing:false when no briefings exist', async () => {
+  it('returns projected meetings with has_briefing:false when no briefings exist', async () => {
     const ctrl = makeController({ schedule: foundSchedule, briefings: [] })
     const res = await ctrl.list(electedOffice)
-    expect(res.scheduleKnown).toBe(true)
+    expect(res.schedule_known).toBe(true)
     expect(res.meetings.length).toBeGreaterThan(0)
     expect(
       res.meetings.every(
-        (m: { hasBriefing: boolean }) => m.hasBriefing === false,
+        (m: { has_briefing: boolean }) => m.has_briefing === false,
       ),
     ).toBe(true)
   })
 
-  it('marks dates with existing briefings as hasBriefing:true', async () => {
+  it('marks dates with existing briefings as has_briefing:true', async () => {
     const projection = new MeetingProjectionService()
     const sampleDates = projection.project({
       schedule: foundSchedule,
@@ -92,12 +92,12 @@ describe('MeetingsV1Controller.list', () => {
     })
     const res = await ctrl.list(electedOffice)
     expect(
-      res.meetings.find((m) => m.meetingDate === flagged)?.hasBriefing,
+      res.meetings.find((m) => m.meeting_date === flagged)?.has_briefing,
     ).toBe(true)
     expect(
       res.meetings
-        .filter((m) => m.meetingDate !== flagged)
-        .every((m) => !m.hasBriefing),
+        .filter((m) => m.meeting_date !== flagged)
+        .every((m) => !m.has_briefing),
     ).toBe(true)
   })
 
@@ -105,10 +105,10 @@ describe('MeetingsV1Controller.list', () => {
     const ctrl = makeController({ schedule: foundSchedule })
     const res = await ctrl.list(electedOffice)
     res.meetings.forEach((m) => {
-      expect(m.meetingTime).toBe('19:00')
-      expect(m.meetingTimezone).toBe('America/Denver')
-      expect(m.durationMinutes).toBe(180)
-      expect(m.meetingDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(m.meeting_time).toBe('19:00')
+      expect(m.meeting_timezone).toBe('America/Denver')
+      expect(m.duration_minutes).toBe(180)
+      expect(m.meeting_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
   })
 })
@@ -160,7 +160,27 @@ describe('MeetingsV1Controller.getBriefing', () => {
     })
     const res = await ctrl.getBriefing(electedOffice, { date: '2026-06-08' })
     expect(res.slug).toBe('city-council-june-8-2026')
-    expect(res.readingTimeMinutes).toBe(8)
-    expect(res.meeting.scheduledAt).toBe('2026-06-08T19:00:00-06:00')
+    expect(res.reading_time_minutes).toBe(8)
+    expect(res.meeting.scheduled_at).toBe('2026-06-08T19:00:00-06:00')
+  })
+
+  it('throws 404 when artifact JSON is malformed', async () => {
+    const ctrl = makeController({
+      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
+      s3Body: '{not valid json',
+    })
+    await expect(
+      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
+    ).rejects.toThrow('Not Found')
+  })
+
+  it('throws 404 when artifact fails Zod validation', async () => {
+    const ctrl = makeController({
+      briefingRow: { artifactBucket: 'b', artifactKey: 'k' },
+      s3Body: JSON.stringify({ id: 'b1', status: 'briefing_ready' }),
+    })
+    await expect(
+      ctrl.getBriefing(electedOffice, { date: '2026-06-08' }),
+    ).rejects.toThrow('Not Found')
   })
 })
