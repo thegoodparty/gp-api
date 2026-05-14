@@ -21,7 +21,6 @@ export type CreateSessionInput = {
 @Injectable()
 export class SpeechToTextService {
   private readonly authorizers: Map<SpeechToTextTargetType, TargetAuthorizer> =
-  private readonly authorizers: Map<SpeechToTextTargetType, TargetAuthorizer> =
     new Map()
 
   constructor(
@@ -78,6 +77,5 @@ export class SpeechToTextService {
     return `${base}${TRANSCRIBE_STREAM_PATH}?ticket=${encodeURIComponent(
       ticket,
     )}`
-  }
   }
 }

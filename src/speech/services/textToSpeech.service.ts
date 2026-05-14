@@ -55,7 +55,6 @@ export class TextToSpeechService {
     }
 
     const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
-    const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
     const engine: Engine = request.options?.engine ?? 'neural'
 
     const { text, cacheKey } = await source.loadText({

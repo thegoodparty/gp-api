@@ -15,7 +15,6 @@ export const SpeechSynthesisEngineSchema = z.enum(
 )
 
 export const SPEECH_SYNTHESIS_VOICE_VALUES = [
-export const SPEECH_SYNTHESIS_VOICE_VALUES = [
   'Joanna',
   'Matthew',
   'Ivy',
