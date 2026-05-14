@@ -29,7 +29,16 @@ const getSSMParameter = async (name: string) => {
   return Parameter.Value
 }
 
-const run = (cmd: string, opts?: ExecSyncOptions) => {
+type RunOptions = ExecSyncOptions & {
+  // When true, a non-zero exit from `cmd` is swallowed: no console.error,
+  // no process.exit. Use this for commands whose stderr stream is captured
+  // into a file that must stay clean (e.g. `pulumi preview --json` in CI,
+  // see the diff handler below).
+  silentOnFailure?: boolean
+}
+
+const run = (cmd: string, opts?: RunOptions) => {
+  const { silentOnFailure, ...execOpts } = opts ?? {}
   try {
     execSync(cmd, {
       stdio: 'inherit',
@@ -41,9 +50,10 @@ const run = (cmd: string, opts?: ExecSyncOptions) => {
         GRAFANA_AUTH,
         GRAFANA_SM_ACCESS_TOKEN,
       },
-      ...opts,
+      ...execOpts,
     })
   } catch (e) {
+    if (silentOnFailure) return
     console.error(`\nCommand failed: ${cmd}`)
     // Caught error has no static type — extracting exit code for process.exit
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -172,20 +182,23 @@ yargs(hideBin(process.argv))
         }),
     async (argv) => {
       await setupStack(argv.environment)
-      // In CI, the `--json` variant is consumed by `jq` (see
+      // In CI, the `--json` variant is consumed by jq (see
       // .github/workflows/infrastructure-diffs.yml). The workflow redirects
-      // with `> file 2>&1`, so any pulumi stderr (progress lines like
-      // "Previewing update (env):", a result table, "warning: ..." lines)
-      // would land in the file alongside the JSON and break jq parsing.
-      // Pulumi reports actual preview failures via .diagnostics in the JSON
-      // body (the workflow checks that on line 66), so silencing stderr is
-      // safe and necessary for CI parsing.
-      const previewStdio: ExecSyncOptions['stdio'] =
-        argv.json && process.env.CI
-          ? ['inherit', 'inherit', 'ignore']
-          : 'inherit'
+      // with `> file 2>&1`, so any byte we let into stderr lands in the
+      // JSON file and breaks jq parsing. Two sources to silence:
+      //   1. pulumi's own stderr (progress lines, warnings).
+      //   2. our `run()` wrapper's "Command failed: ..." console.error,
+      //      which fires when pulumi exits non-zero (and pulumi exits
+      //      non-zero whenever the preview surfaces ANY error in
+      //      .diagnostics, even though the JSON it emits is well-formed
+      //      and complete).
+      // The workflow already inspects .diagnostics for errors and prints
+      // them in the PR comment (infrastructure-diffs.yml:66), so we're
+      // not losing information.
+      const isJsonInCi = argv.json && Boolean(process.env.CI)
       run(argv.json ? 'pulumi preview --json' : 'pulumi preview --diff', {
-        stdio: previewStdio,
+        stdio: isJsonInCi ? ['inherit', 'inherit', 'ignore'] : 'inherit',
+        silentOnFailure: isJsonInCi,
       })
     },
   )
