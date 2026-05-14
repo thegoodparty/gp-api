@@ -6,6 +6,8 @@ import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTcrComplianceController } from './campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
+import { ComplianceStateService } from './services/complianceState.service'
+import { ComplianceStage } from '@goodparty_org/contracts'
 import { UsersService } from '../../users/services/users.service'
 import { CampaignsService } from '../services/campaigns.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -38,6 +40,9 @@ describe('CampaignTcrComplianceController', () => {
   }
   let mockUserService: { findByCampaign: ReturnType<typeof vi.fn> }
   let mockCampaignsService: { updateJsonFields: ReturnType<typeof vi.fn> }
+  let mockComplianceStateService: {
+    findStateForCampaign: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(async () => {
     mockAnalytics = {
@@ -60,12 +65,25 @@ describe('CampaignTcrComplianceController', () => {
       updateJsonFields: vi.fn().mockResolvedValue(mockCampaign),
     }
 
+    mockComplianceStateService = {
+      findStateForCampaign: vi.fn().mockResolvedValue({
+        stage: ComplianceStage.awaiting_pin,
+        domain: null,
+        websiteId: null,
+        peerlyVerificationId: null,
+      }),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: UsersService, useValue: mockUserService },
         {
           provide: CampaignTcrComplianceService,
           useValue: mockTcrService,
+        },
+        {
+          provide: ComplianceStateService,
+          useValue: mockComplianceStateService,
         },
         { provide: CampaignsService, useValue: mockCampaignsService },
         { provide: AnalyticsService, useValue: mockAnalytics },
@@ -197,6 +215,31 @@ describe('CampaignTcrComplianceController', () => {
       )
 
       expect(result).toEqual(expectedBrand)
+    })
+  })
+
+  describe('getMyComplianceState', () => {
+    it('delegates to ComplianceStateService with the campaign id', async () => {
+      const expectedState = {
+        stage: ComplianceStage.pending_website_live,
+        domain: {
+          name: 'example.org',
+          status: 'registered' as const,
+          registrantVerifiedAt: null,
+        },
+        websiteId: 42,
+        peerlyVerificationId: null,
+      }
+      mockComplianceStateService.findStateForCampaign.mockResolvedValue(
+        expectedState,
+      )
+
+      const result = await controller.getMyComplianceState(mockCampaign)
+
+      expect(
+        mockComplianceStateService.findStateForCampaign,
+      ).toHaveBeenCalledWith(mockCampaign.id)
+      expect(result).toEqual(expectedState)
     })
   })
 })

@@ -125,6 +125,9 @@ export {
   GENERATION_STATUS_VALUES,
   GenerationStatus,
   GenerationStatusSchema,
+  COMPLIANCE_STAGE_VALUES,
+  ComplianceStage,
+  ComplianceStageSchema,
 } from './campaigns/enums'
 
 export type {
@@ -189,6 +192,13 @@ export {
   UpdateCampaignM2MSchema,
   type UpdateCampaignM2MInput,
 } from './campaigns/UpdateCampaignM2M.schema'
+
+export {
+  ComplianceStateDomainSchema,
+  type ComplianceStateDomain,
+  ComplianceStateOutputSchema,
+  type ComplianceStateOutput,
+} from './campaigns/ComplianceStateOutput.schema'
 
 export type { Ecanvasser, EcanvasserSummary } from './ecanvasser/types'
 
