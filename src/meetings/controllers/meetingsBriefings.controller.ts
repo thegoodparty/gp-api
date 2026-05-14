@@ -15,15 +15,11 @@ import {
   MeetingDateParamSchema,
 } from '../schemas/meetingDateParam.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
-import { MeetingScheduleService } from '../services/meetingSchedule.service'
-import { MeetingProjectionService } from '../services/meetingProjection.service'
 
 @Controller('meetings')
 export class MeetingsBriefingsController {
   constructor(
     private readonly meetingBriefings: MeetingBriefingsService,
-    private readonly schedules: MeetingScheduleService,
-    private readonly projections: MeetingProjectionService,
     private readonly s3: S3Service,
   ) {}
 
@@ -31,7 +27,7 @@ export class MeetingsBriefingsController {
   @Get()
   @ResponseSchema(MeetingsListResponseSchema)
   async list(@ReqElectedOffice() electedOffice: ElectedOffice) {
-    const schedule = await this.schedules.loadLatestForOrg(
+    const schedule = await this.meetingBriefings.loadLatestScheduleForOrg(
       electedOffice.organizationSlug,
     )
     if (!schedule || schedule.status === 'not_found') {
@@ -39,7 +35,7 @@ export class MeetingsBriefingsController {
     }
 
     const now = new Date()
-    const dates = this.projections.project({
+    const dates = this.meetingBriefings.projectMeetingDates({
       schedule,
       from: subMonths(now, 2),
       to: addMonths(now, 3),

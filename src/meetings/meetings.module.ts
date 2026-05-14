@@ -6,23 +6,11 @@ import { MeetingsController } from './controllers/meetings.controller'
 import { MeetingsBriefingsController } from './controllers/meetingsBriefings.controller'
 import { MeetingsService } from './services/meetings.service'
 import { MeetingBriefingsService } from './services/meetingBriefings.service'
-import { MeetingScheduleService } from './services/meetingSchedule.service'
-import { MeetingProjectionService } from './services/meetingProjection.service'
 
 @Module({
   imports: [ElectedOfficeModule, OrganizationsModule, AwsModule],
   controllers: [MeetingsController, MeetingsBriefingsController],
-  providers: [
-    MeetingsService,
-    MeetingBriefingsService,
-    MeetingScheduleService,
-    MeetingProjectionService,
-  ],
-  exports: [
-    MeetingsService,
-    MeetingBriefingsService,
-    MeetingScheduleService,
-    MeetingProjectionService,
-  ],
+  providers: [MeetingsService, MeetingBriefingsService],
+  exports: [MeetingsService, MeetingBriefingsService],
 })
 export class MeetingsModule {}
