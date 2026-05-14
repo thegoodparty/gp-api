@@ -31,6 +31,7 @@ import {
   PatternedDomainSearchResult,
 } from '../domains.types'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { McpTool } from '@/mcp/decorators/McpTool.decorator'
 
 @Controller('domains')
 @UsePipes(ZodValidationPipe)
@@ -55,6 +56,19 @@ export class DomainsController {
   @UseCampaign({ include: { user: true } })
   @HttpCode(HttpStatus.OK)
   @ResponseSchema(SearchDomainsResponseSchema)
+  @McpTool({
+    description:
+      'Find available .com / .org / .vote domains for the calling ' +
+      'campaign matching one or more name patterns, under a per-domain ' +
+      'price cap. Use during the compliance_setup flow after the ' +
+      "candidate's profile is saved, to pick a domain before purchase. " +
+      'Patterns are literal candidate domain strings without TLD ' +
+      '(e.g. ["janeforsenate", "voteforjane"]); the server checks ' +
+      'availability across supported TLDs and returns { candidates: ' +
+      '[{ domain, price }] } for ranking. Returns only available ' +
+      'domains; an empty candidates list means nothing matched under ' +
+      'the cap. Read-only; safe to retry.',
+  })
   async searchDomains(
     @ReqCampaign() campaign: Campaign & { user: User },
     @Body() { patterns, maxPrice }: SearchDomainsBodySchema,

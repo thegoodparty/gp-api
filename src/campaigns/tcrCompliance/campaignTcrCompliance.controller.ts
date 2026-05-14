@@ -31,6 +31,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { McpTool } from '@/mcp/decorators/McpTool.decorator'
 import { ComplianceStateOutputSchema } from '@goodparty_org/contracts'
 
 @Controller('campaigns/tcr-compliance')
@@ -65,6 +66,18 @@ export class CampaignTcrComplianceController {
   @UseCampaign()
   @UseInterceptors(ZodResponseInterceptor)
   @ResponseSchema(ComplianceStateOutputSchema)
+  @McpTool({
+    description:
+      "Read the calling campaign's full compliance-setup pipeline " +
+      'state: which stages are completed, in progress, or pending ' +
+      '(profile, domain purchase, domain verification, website ' +
+      'publish, TCR submission, CV PIN entry). Call this at the start ' +
+      'of every compliance_setup agent run to decide which steps to ' +
+      'skip and which still need work; the response is the canonical ' +
+      'view across Campaign, Website, Domain, and TcrCompliance ' +
+      'tables, so the agent does not have to read those individually. ' +
+      'Read-only; safe to call repeatedly during a run.',
+  })
   async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
     return this.complianceStateService.findStateForCampaign(campaign.id)
   }
