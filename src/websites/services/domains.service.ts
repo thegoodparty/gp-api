@@ -5,9 +5,10 @@ import {
   ConflictException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Domain, DomainStatus, User } from '@prisma/client'
+import { Campaign, Domain, DomainStatus, User, Website } from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -36,9 +37,32 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
-import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
+import {
+  DomainPurchaseMetadata,
+  DomainSearchResult,
+  PatternedDomainCandidate,
+  PatternedDomainSearchResult,
+} from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
-import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import {
+  expandDomainPatterns,
+  PatternExpansionLimitError,
+} from '../util/domainPatterns.util'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+
+const MAX_PATTERN_CANDIDATES = 50
+
+const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
+
+const DOMAIN_RESERVATION_KIND = {
+  IDEMPOTENT: 'idempotent',
+  CREATED: 'created',
+} as const
+
+const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
+  'Domain registration already in progress for this campaign'
+
+const GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS = 'candidate-domains@goodparty.org'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -55,7 +79,6 @@ export class DomainsService
     private readonly forwardEmailService: ForwardEmailService,
     private queueService: QueueProducerService,
     private readonly analytics: AnalyticsService,
-    private readonly clerkEnricher: ClerkUserEnricherService,
   ) {
     super()
   }
@@ -70,30 +93,14 @@ export class DomainsService
     const domains = await this.model.findMany({
       where: {
         emailForwardingDomainId: null,
-      },
-      include: {
-        website: {
-          include: {
-            campaign: {
-              include: {
-                user: true,
-              },
-            },
-          },
+        status: {
+          in: [DomainStatus.submitted, DomainStatus.registered],
         },
       },
     })
 
-    for (const { id: domainId, website } of domains) {
-      const { campaign } = website
-      const enrichedUser = campaign.user
-        ? await this.clerkEnricher.enrichUser(campaign.user)
-        : campaign.user
-      const { email: forwardingEmailAddress } = enrichedUser!
-      const messageData = {
-        domainId,
-        forwardingEmailAddress,
-      }
+    for (const { id: domainId } of domains) {
+      const messageData = { domainId }
       this.logger.debug(
         { messageData },
         'Found domain with no email forwarding, enqueuing task:',
@@ -101,10 +108,7 @@ export class DomainsService
       await this.queueService.sendMessage(
         {
           type: QueueType.DOMAIN_EMAIL_FORWARDING,
-          data: {
-            domainId,
-            forwardingEmailAddress,
-          },
+          data: { domainId },
         },
         MessageGroup.domainEmailRedirect,
       )
@@ -255,7 +259,7 @@ export class DomainsService
     user: User
     websiteId: string | number
     domainName: string
-    paymentId: string
+    paymentId: string | null
   }): Promise<{
     domain: Domain
     registrationResult: {
@@ -293,7 +297,7 @@ export class DomainsService
         `Creating new domain record for website id ${validWebsiteId}: `,
       )
       domain = await this.model.create({ data: domainParams })
-    } else if (domain.paymentId !== paymentId) {
+    } else if (paymentId && domain.paymentId !== paymentId) {
       // Update the existing domain with the new payment ID
       // This handles cases where a previous payment failed or the domain
       // was created without a paymentId
@@ -392,6 +396,328 @@ export class DomainsService
     return this.vercel.getDomainDetails(domainName)
   }
 
+  async searchDomainsForCampaign(
+    campaign: Campaign & { user: User },
+    patterns: string[],
+    maxPrice: number,
+  ): Promise<PatternedDomainSearchResult> {
+    const electionDateStr = campaign.details?.electionDate
+    let electionDate = electionDateStr
+      ? parseIsoDateAsUTC(electionDateStr)
+      : new Date()
+    if (!electionDateStr) {
+      this.logger.warn(
+        { campaignId: campaign.id, fn: 'searchDomainsForCampaign' },
+        'no electionDate on campaign; falling back to current date',
+      )
+    } else if (isNaN(electionDate.getTime())) {
+      this.logger.warn(
+        {
+          campaignId: campaign.id,
+          electionDateStr,
+          fn: 'searchDomainsForCampaign',
+        },
+        'invalid electionDate stored on campaign; falling back to current date',
+      )
+      electionDate = new Date()
+    }
+
+    let candidates: string[]
+    try {
+      candidates = expandDomainPatterns(
+        patterns,
+        {
+          firstName: campaign.user.firstName ?? '',
+          lastName: campaign.user.lastName ?? '',
+          electionDate,
+        },
+        { maxCandidates: MAX_PATTERN_CANDIDATES },
+      )
+    } catch (error) {
+      if (error instanceof PatternExpansionLimitError) {
+        throw new BadRequestException(
+          `Patterns expand to more than ${MAX_PATTERN_CANDIDATES} candidates`,
+        )
+      }
+      throw error
+    }
+
+    const checked = await Promise.allSettled(
+      candidates.map((domain) =>
+        this.checkPatternedCandidate(domain, maxPrice),
+      ),
+    )
+
+    const found: PatternedDomainCandidate[] = []
+    for (const r of checked) {
+      if (r.status === 'fulfilled' && r.value !== null) {
+        found.push(r.value)
+      } else if (r.status === 'rejected') {
+        const err =
+          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
+        this.logger.warn(
+          { err, fn: 'searchDomainsForCampaign' },
+          'candidate availability check failed; skipping',
+        )
+      }
+    }
+
+    return { candidates: found }
+  }
+
+  private async checkPatternedCandidate(
+    domain: string,
+    maxPrice: number,
+  ): Promise<PatternedDomainCandidate | null> {
+    let availability: DomainAvailability | undefined
+    try {
+      const resp = await this.route53.checkDomainAvailability(domain)
+      availability = resp.Availability
+    } catch (error) {
+      this.logger.warn(
+        { err: error, domain, fn: 'checkPatternedCandidate' },
+        'Route53 availability check failed; skipping candidate',
+      )
+      return null
+    }
+
+    if (availability !== DomainAvailability.AVAILABLE) {
+      return null
+    }
+
+    let price: number
+    try {
+      const resp = await this.vercel.checkDomainPrice(domain)
+      price = resp.price
+    } catch (error) {
+      this.logger.warn(
+        { err: error, domain },
+        'Vercel price lookup failed; skipping candidate',
+      )
+      return null
+    }
+
+    if (price > maxPrice) {
+      return null
+    }
+    return { domain, price }
+  }
+
+  private async reserveDomainForCampaign(
+    campaignId: number,
+    domainName: string,
+    price: number,
+  ): Promise<
+    | {
+        kind: typeof DOMAIN_RESERVATION_KIND.IDEMPOTENT
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Pick<Domain, 'id' | 'name' | 'status'> & {
+          price: number | null
+        }
+      }
+    | {
+        kind: typeof DOMAIN_RESERVATION_KIND.CREATED
+        websiteSummary: Pick<
+          Website,
+          'id' | 'vanityPath' | 'status' | 'campaignId'
+        >
+        domain: Domain
+      }
+  > {
+    return this.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DOMAIN_PURCHASE_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
+
+      const website = await tx.website.findUnique({
+        where: { campaignId },
+        include: { domain: true },
+      })
+
+      if (!website) {
+        throw new NotFoundException('No website found for this campaign')
+      }
+
+      const websiteSummary = {
+        id: website.id,
+        vanityPath: website.vanityPath,
+        status: website.status,
+        campaignId: website.campaignId,
+      }
+
+      if (website.domain) {
+        if (website.domain.status !== DomainStatus.inactive) {
+          if (website.domain.name === domainName) {
+            return {
+              kind: DOMAIN_RESERVATION_KIND.IDEMPOTENT,
+              websiteSummary,
+              domain: {
+                id: website.domain.id,
+                name: website.domain.name,
+                status: website.domain.status,
+                price: website.domain.price?.toNumber() ?? null,
+              },
+            }
+          }
+          throw new ConflictException(
+            `A different domain (${website.domain.name}) is already in progress for this campaign`,
+          )
+        }
+
+        await tx.domain.delete({ where: { id: website.domain.id } })
+      }
+
+      const created = await tx.domain.create({
+        data: {
+          websiteId: website.id,
+          name: domainName,
+          price,
+          paymentId: null,
+          status: DomainStatus.pending,
+        },
+      })
+
+      return {
+        kind: DOMAIN_RESERVATION_KIND.CREATED,
+        websiteSummary,
+        domain: created,
+      }
+    })
+  }
+
+  private async preflightDomainPurchase(
+    campaignId: number,
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+  } | null> {
+    const preflight = await this.client.website.findUnique({
+      where: { campaignId },
+      include: { domain: true },
+    })
+    if (!preflight) {
+      throw new NotFoundException('No website found for this campaign')
+    }
+    if (
+      !preflight.domain ||
+      preflight.domain.status === DomainStatus.inactive
+    ) {
+      return null
+    }
+    const websiteSummary = {
+      id: preflight.id,
+      vanityPath: preflight.vanityPath,
+      status: preflight.status,
+      campaignId: preflight.campaignId,
+    }
+    if (preflight.domain.name !== domainName) {
+      throw new ConflictException(
+        `A different domain (${preflight.domain.name}) is already in progress for this campaign`,
+      )
+    }
+    return {
+      website: websiteSummary,
+      domain: {
+        id: preflight.domain.id,
+        name: preflight.domain.name,
+        status: preflight.domain.status,
+        price: preflight.domain.price?.toNumber() ?? null,
+      },
+    }
+  }
+
+  private async lookupDomainPrice(domainName: string): Promise<number> {
+    try {
+      const priceResp = await this.vercel.checkDomainPrice(domainName)
+      return priceResp.price
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not get price for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+  }
+
+  async purchaseDomainForCampaign(
+    campaign: Campaign & { user: User },
+    domainName: string,
+  ): Promise<{
+    website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
+    domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
+    alreadyExisted: boolean
+    message: string
+  }> {
+    const preflightHit = await this.preflightDomainPurchase(
+      campaign.id,
+      domainName,
+    )
+    if (preflightHit) {
+      return {
+        ...preflightHit,
+        alreadyExisted: true,
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
+      }
+    }
+
+    let availabilityResp: Awaited<
+      ReturnType<typeof this.route53.checkDomainAvailability>
+    >
+    try {
+      availabilityResp = await this.route53.checkDomainAvailability(domainName)
+    } catch (error) {
+      throw new BadGatewayException(
+        `Could not check availability for ${domainName}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+    if (availabilityResp.Availability !== DomainAvailability.AVAILABLE) {
+      throw new ConflictException(`Domain ${domainName} is no longer available`)
+    }
+
+    const price = await this.lookupDomainPrice(domainName)
+
+    const locked = await this.reserveDomainForCampaign(
+      campaign.id,
+      domainName,
+      price,
+    )
+
+    if (locked.kind === DOMAIN_RESERVATION_KIND.IDEMPOTENT) {
+      return {
+        website: locked.websiteSummary,
+        domain: locked.domain,
+        alreadyExisted: true,
+        message: DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE,
+      }
+    }
+
+    const { websiteSummary, domain: createdDomain } = locked
+
+    // NOTE: this method only reserves the Domain row (status=pending) and
+    // does NOT call completeDomainRegistration — that requires a non-null
+    // paymentId and must be invoked after payment is confirmed (e.g. via a
+    // Stripe webhook). No HTTP route should call this method directly until
+    // that payment-confirmation leg is wired up, or domains will stall in
+    // DomainStatus.pending with no recovery path.
+
+    return {
+      website: websiteSummary,
+      domain: {
+        id: createdDomain.id,
+        name: createdDomain.name,
+        status: createdDomain.status,
+        price: createdDomain.price?.toNumber() ?? null,
+      },
+      alreadyExisted: false,
+      message:
+        'Domain reserved; registration will complete after payment confirmation',
+    }
+  }
+
   async searchForDomain(domainName: string): Promise<DomainSearchResult> {
     // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
     const [availabilityResp, suggestionsResp] = await Promise.all([
@@ -444,10 +770,8 @@ export class DomainsService
     }
   }
 
-  async setupDomainEmailForwarding(
-    domain: Domain,
-    forwardingEmailAddress: string,
-  ) {
+  async setupDomainEmailForwarding(domain: Domain) {
+    const forwardingEmailAddress = GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS
     let forwardEmailDomain: ForwardEmailDomainResponse | null = null
     let existingForwardEmailDomain: ForwardEmailDomainResponse | null = null
     try {
@@ -582,7 +906,48 @@ export class DomainsService
         { cause: e },
       )
     }
+
+    try {
+      await this.persistCampaignEmail(domain)
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to persist campaign email for domain ${domain.name}`,
+      )
+    }
+
     return forwardEmailDomain
+  }
+
+  private async persistCampaignEmail(domain: Domain) {
+    await this.client.$transaction(async (tx) => {
+      const website = await tx.website.findUnique({
+        where: { id: domain.websiteId },
+        select: { content: true, campaignId: true },
+      })
+      if (!website) return
+
+      const campaignEmail = `info@${domain.name}`
+      const content = website.content ?? {}
+
+      await tx.website.update({
+        where: { id: domain.websiteId },
+        data: {
+          content: {
+            ...content,
+            contact: {
+              ...(content.contact ?? {}),
+              email: campaignEmail,
+            },
+          },
+        },
+      })
+
+      await tx.campaign.update({
+        where: { id: website.campaignId },
+        data: { campaignEmail },
+      })
+    })
   }
 
   // called after payment is accepted, send registration request to Vercel
@@ -606,7 +971,9 @@ export class DomainsService
 
     const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
 
-    if (paymentIntent.status !== 'succeeded') {
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
       throw new BadRequestException(
         `Payment not completed. Current status: ${paymentIntent.status}`,
       )
@@ -695,16 +1062,11 @@ export class DomainsService
       }
 
       try {
-        forwardEmailDomain = await this.setupDomainEmailForwarding(
-          domain,
-          contact.email,
-        )
-        this.logger.debug(
-          `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
-        )
+        forwardEmailDomain = await this.setupDomainEmailForwarding(domain)
+        this.logger.debug(`Email forwarding set up for domain *@${domain.name}`)
       } catch (e) {
         this.logger.error(
-          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} : ${e instanceof Error ? e.message : 'error unknown while attempting to setup email forwarding'}`,
+          `Error setting up email forwarding for domain *@${domain.name} : ${e instanceof Error ? e.message : 'error unknown while attempting to setup email forwarding'}`,
         )
         // Not throwing an error here to allow for continued execution
       }
@@ -763,6 +1125,81 @@ export class DomainsService
       verified: verifyResult,
       status: 'configured',
       message: 'Domain configured successfully with Vercel',
+    }
+  }
+
+  async submitRegistrantVerification(
+    domainName: string,
+    verificationUrl: string,
+  ) {
+    const normalized = domainName.toLowerCase()
+    const domain = await this.model.findUnique({
+      where: { name: normalized },
+    })
+    if (!domain) {
+      throw new NotFoundException(
+        `No managed domain found matching ${normalized}`,
+      )
+    }
+
+    if (domain.registrantVerifiedAt) {
+      return {
+        domain: domain.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: domain.registrantVerifiedAt,
+      }
+    }
+
+    try {
+      await this.vercel.submitDomainRegistrantVerification(verificationUrl)
+    } catch {
+      throw new BadGatewayException(
+        `Failed to submit registrant verification for ${normalized}`,
+      )
+    }
+
+    let confirmedVerified: boolean
+    try {
+      const detail = await this.vercel.getDomainDetails(domain.name)
+      confirmedVerified = detail.domain.verified === true
+    } catch (error) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but failed to confirm Vercel domain state: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+
+    if (!confirmedVerified) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but Vercel still reports the domain as unverified; retry expected via webhook redelivery.`,
+      )
+    }
+
+    const { count } = await this.model.updateMany({
+      where: { id: domain.id, registrantVerifiedAt: null },
+      data: { registrantVerifiedAt: new Date() },
+    })
+
+    if (count === 0) {
+      const current = await this.model.findUniqueOrThrow({
+        where: { id: domain.id },
+      })
+      return {
+        domain: current.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: current.registrantVerifiedAt,
+      }
+    }
+
+    const stamped = await this.model.findUniqueOrThrow({
+      where: { id: domain.id },
+    })
+
+    return {
+      domain: stamped.name,
+      alreadyVerified: false,
+      registrantVerifiedAt: stamped.registrantVerifiedAt,
     }
   }
 

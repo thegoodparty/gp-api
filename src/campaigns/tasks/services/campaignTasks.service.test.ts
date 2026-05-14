@@ -42,6 +42,7 @@ const mockCampaignUpdateHistoryModel = {
 }
 
 const mockCampaignModel = {
+  findUnique: vi.fn(),
   findUniqueOrThrow: vi.fn(),
   update: vi.fn(),
 }
@@ -64,6 +65,10 @@ const mockAiGeneration: Partial<AiGenerationService> = {
 
 const mockSlackService: Partial<SlackService> = {
   message: vi.fn(),
+}
+
+const mockCampaignsService = {
+  patchCampaignDetails: vi.fn(),
 }
 
 type CampaignOverrides = Partial<
@@ -118,6 +123,7 @@ describe('CampaignTasksService', () => {
     service = new CampaignTasksService(
       mockAiGeneration as AiGenerationService,
       mockSlackService as SlackService,
+      mockCampaignsService as never,
     )
     Object.defineProperty(service, '_prisma', {
       get: () => ({
@@ -841,11 +847,28 @@ describe('CampaignTasksService', () => {
         ],
       })
 
-      await service.generateDefaultTasks(campaignWithFutureElection(), TODAY)
+      await service.generateDefaultTasks(
+        makeCampaign({
+          isPro: true,
+          details: { electionDate: '2026-11-03' },
+        }),
+        TODAY,
+      )
 
       expect(mockTransaction).toHaveBeenCalled()
       expect(mockTxModel.createMany).toHaveBeenCalled()
       expect(mockSlackService.message).toHaveBeenCalled()
+    })
+
+    it('does not send Slack when campaign is not Pro', async () => {
+      mockTxModel.count.mockResolvedValueOnce(0)
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
+
+      await service.generateDefaultTasks(campaignWithFutureElection(), TODAY)
+
+      expect(mockTxModel.createMany).toHaveBeenCalled()
+      expect(mockSlackService.message).not.toHaveBeenCalled()
     })
 
     it('sends Slack with correct outreach task details', async () => {
@@ -875,7 +898,13 @@ describe('CampaignTasksService', () => {
         ],
       })
 
-      await service.generateDefaultTasks(campaignWithFutureElection(), TODAY)
+      await service.generateDefaultTasks(
+        makeCampaign({
+          isPro: true,
+          details: { electionDate: '2026-11-03' },
+        }),
+        TODAY,
+      )
 
       const messageMock = vi.mocked(mockSlackService.message!)
       const slackCall = messageMock.mock.calls[0]
@@ -897,7 +926,13 @@ describe('CampaignTasksService', () => {
       )
 
       await expect(
-        service.generateDefaultTasks(campaignWithFutureElection(), TODAY),
+        service.generateDefaultTasks(
+          makeCampaign({
+            isPro: true,
+            details: { electionDate: '2026-11-03' },
+          }),
+          TODAY,
+        ),
       ).resolves.not.toThrow()
       expect(mockTxModel.createMany).toHaveBeenCalled()
     })
@@ -918,6 +953,117 @@ describe('CampaignTasksService', () => {
       expect(mockTransaction).not.toHaveBeenCalled()
       expect(mockTxModel.createMany).not.toHaveBeenCalled()
       expect(mockSlackService.message).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('notifySlackOnProUpgrade', () => {
+    const candidateMock = {
+      id: 1,
+      data: { name: 'Test Candidate', hubspotId: '12345' },
+      user: { firstName: 'Jane', lastName: 'Doe' },
+      campaignTasks: [
+        {
+          flowType: CampaignTaskType.text,
+          title: 'Introduction Text',
+          date: new Date('2025-06-15'),
+        },
+      ],
+    }
+
+    it('sends slack and persists the notified-at flag when default tasks exist', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(1)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
+      mockCampaignsService.patchCampaignDetails.mockResolvedValue({})
+      vi.mocked(mockSlackService.message!).mockResolvedValue('ok')
+
+      await service.notifySlackOnProUpgrade(1)
+
+      expect(mockSlackService.message).toHaveBeenCalledTimes(1)
+      expect(mockCampaignsService.patchCampaignDetails).toHaveBeenCalledWith(
+        1,
+        { proUpgradeSlackNotifiedAt: expect.any(Number) },
+      )
+    })
+
+    it('does nothing if proUpgradeSlackNotifiedAt is already set', async () => {
+      mockCampaignModel.findUnique = vi
+        .fn()
+        .mockResolvedValue({ details: { proUpgradeSlackNotifiedAt: 1 } })
+
+      await service.notifySlackOnProUpgrade(1)
+
+      expect(mockModel.count).not.toHaveBeenCalled()
+      expect(mockSlackService.message).not.toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
+    })
+
+    it('does not send Slack if no default tasks exist', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(0)
+
+      await service.notifySlackOnProUpgrade(1)
+
+      expect(mockSlackService.message).not.toHaveBeenCalled()
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when the campaign has no details', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue(null)
+
+      await service.notifySlackOnProUpgrade(1)
+
+      expect(mockModel.count).not.toHaveBeenCalled()
+      expect(mockSlackService.message).not.toHaveBeenCalled()
+    })
+
+    it('retries the slack send up to 3 times then succeeds', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(1)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
+      mockCampaignsService.patchCampaignDetails.mockResolvedValue({})
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      messageMock.mockReset()
+      messageMock
+        .mockRejectedValueOnce(new Error('boom1'))
+        .mockRejectedValueOnce(new Error('boom2'))
+        .mockResolvedValueOnce('ok')
+
+      await service.notifySlackOnProUpgrade(1)
+
+      expect(messageMock).toHaveBeenCalledTimes(3)
+      expect(mockCampaignsService.patchCampaignDetails).toHaveBeenCalled()
+    })
+
+    it('retries when slack returns no data (swallowed failure)', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(1)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
+      mockCampaignsService.patchCampaignDetails.mockClear()
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      messageMock.mockReset()
+      messageMock.mockResolvedValue(undefined)
+
+      await expect(service.notifySlackOnProUpgrade(1)).resolves.not.toThrow()
+      expect(messageMock).toHaveBeenCalledTimes(3)
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
+    })
+
+    it('swallows errors when slack fails on all 3 attempts', async () => {
+      mockCampaignModel.findUnique = vi.fn().mockResolvedValue({ details: {} })
+      mockModel.count.mockResolvedValueOnce(1)
+      mockCampaignModel.findUniqueOrThrow.mockResolvedValue(candidateMock)
+      mockCampaignsService.patchCampaignDetails.mockClear()
+
+      const messageMock = vi.mocked(mockSlackService.message!)
+      messageMock.mockReset()
+      messageMock.mockRejectedValue(new Error('boom'))
+
+      await expect(service.notifySlackOnProUpgrade(1)).resolves.not.toThrow()
+      expect(messageMock).toHaveBeenCalledTimes(3)
+      expect(mockCampaignsService.patchCampaignDetails).not.toHaveBeenCalled()
     })
   })
 

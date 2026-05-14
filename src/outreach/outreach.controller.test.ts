@@ -1,5 +1,5 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common'
-import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OutreachController } from './outreach.controller'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -10,6 +10,13 @@ describe('OutreachController', () => {
   let mockOutreachService: { create: ReturnType<typeof vi.fn> }
   let mockFilesService: { uploadFile: ReturnType<typeof vi.fn> }
   let mockPeerlyP2pJobService: Record<string, ReturnType<typeof vi.fn>>
+
+  const mockUser = {
+    id: 100,
+    email: 'user@example.com',
+    firstName: 'Jane',
+    lastName: 'Doe',
+  } as User
 
   const baseCampaign = {
     id: 1,
@@ -71,6 +78,7 @@ describe('OutreachController', () => {
 
       await expect(
         controller.create(
+          mockUser,
           baseCampaign,
           mismatchedDto as never,
           mockImage as never,
@@ -80,19 +88,19 @@ describe('OutreachController', () => {
 
     it('throws BadRequestException when text outreach has no image', async () => {
       await expect(
-        controller.create(baseCampaign, textDto as never, undefined),
+        controller.create(mockUser, baseCampaign, textDto as never, undefined),
       ).rejects.toThrow(BadRequestException)
       await expect(
-        controller.create(baseCampaign, textDto as never, undefined),
+        controller.create(mockUser, baseCampaign, textDto as never, undefined),
       ).rejects.toThrow(/Image is required for text outreach/)
     })
 
     it('throws BadRequestException when P2P outreach has no image', async () => {
       await expect(
-        controller.create(baseCampaign, p2pDto as never, undefined),
+        controller.create(mockUser, baseCampaign, p2pDto as never, undefined),
       ).rejects.toThrow(BadRequestException)
       await expect(
-        controller.create(baseCampaign, p2pDto as never, undefined),
+        controller.create(mockUser, baseCampaign, p2pDto as never, undefined),
       ).rejects.toThrow(/Image is required for p2p outreach/)
     })
 
@@ -101,6 +109,7 @@ describe('OutreachController', () => {
 
       await expect(
         controller.create(
+          mockUser,
           baseCampaign,
           p2pDto as never,
           noFilenameImage as never,
@@ -108,6 +117,7 @@ describe('OutreachController', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         controller.create(
+          mockUser,
           baseCampaign,
           p2pDto as never,
           noFilenameImage as never,
@@ -120,6 +130,7 @@ describe('OutreachController', () => {
 
       await expect(
         controller.create(
+          mockUser,
           baseCampaign,
           p2pDto as never,
           noMimetypeImage as never,
@@ -131,10 +142,20 @@ describe('OutreachController', () => {
       mockFilesService.uploadFile.mockResolvedValue(undefined)
 
       await expect(
-        controller.create(baseCampaign, p2pDto as never, mockImage as never),
+        controller.create(
+          mockUser,
+          baseCampaign,
+          p2pDto as never,
+          mockImage as never,
+        ),
       ).rejects.toThrow(BadRequestException)
       await expect(
-        controller.create(baseCampaign, p2pDto as never, mockImage as never),
+        controller.create(
+          mockUser,
+          baseCampaign,
+          p2pDto as never,
+          mockImage as never,
+        ),
       ).rejects.toThrow(/Failed to upload image/)
     })
 
@@ -145,6 +166,7 @@ describe('OutreachController', () => {
       mockOutreachService.create.mockResolvedValue({ id: 1, ...textDto })
 
       await controller.create(
+        mockUser,
         baseCampaign,
         textDto as never,
         mockImage as never,
@@ -155,6 +177,7 @@ describe('OutreachController', () => {
         expect.stringContaining('scheduled-campaign/jane-doe/text/'),
       )
       expect(mockOutreachService.create).toHaveBeenCalledWith(
+        mockUser,
         baseCampaign,
         textDto,
         'https://cdn.example.com/uploaded.png',
@@ -168,9 +191,15 @@ describe('OutreachController', () => {
       )
       mockOutreachService.create.mockResolvedValue({ id: 2, ...p2pDto })
 
-      await controller.create(baseCampaign, p2pDto as never, mockImage as never)
+      await controller.create(
+        mockUser,
+        baseCampaign,
+        p2pDto as never,
+        mockImage as never,
+      )
 
       expect(mockOutreachService.create).toHaveBeenCalledWith(
+        mockUser,
         baseCampaign,
         p2pDto,
         'https://cdn.example.com/p2p.png',
@@ -184,13 +213,15 @@ describe('OutreachController', () => {
 
     it('does not pass p2pImage for non-P2P outreach types', async () => {
       await controller.create(
+        mockUser,
         baseCampaign,
         textDto as never,
         mockImage as never,
       )
 
       const createCall = mockOutreachService.create.mock.calls[0]
-      expect(createCall[3]).toBeUndefined() // p2pImage arg
+      // signature: (user, campaign, dto, imageUrl, p2pImage) — position 4 is p2pImage
+      expect(createCall[4]).toBeUndefined()
     })
 
     it('creates outreach without image when outreachType does not require one', async () => {
@@ -199,10 +230,16 @@ describe('OutreachController', () => {
         outreachType: 'email' as OutreachType,
       }
 
-      await controller.create(baseCampaign, emailDto as never, undefined)
+      await controller.create(
+        mockUser,
+        baseCampaign,
+        emailDto as never,
+        undefined,
+      )
 
       expect(mockFilesService.uploadFile).not.toHaveBeenCalled()
       expect(mockOutreachService.create).toHaveBeenCalledWith(
+        mockUser,
         baseCampaign,
         emailDto,
         undefined,

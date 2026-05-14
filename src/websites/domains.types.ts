@@ -21,6 +21,15 @@ export interface DomainSearchResult extends DomainSuggestion {
   price: number | undefined
 }
 
+export interface PatternedDomainCandidate {
+  domain: string
+  price: number
+}
+
+export interface PatternedDomainSearchResult {
+  candidates: PatternedDomainCandidate[]
+}
+
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',

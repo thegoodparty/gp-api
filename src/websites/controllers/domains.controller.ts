@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -14,16 +15,22 @@ import { DomainsService } from '../services/domains.service'
 import { PaymentStatus } from 'src/payments/payments.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
+import {
+  SearchDomainsBodySchema,
+  SearchDomainsResponseSchema,
+} from '../schemas/SearchDomains.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign, DomainStatus, UserRole } from '@prisma/client'
+import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { WebsitesService } from '../services/websites.service'
 import {
   DomainOperationStatus,
   DomainOperationType,
   DomainStatusResponse,
+  PatternedDomainSearchResult,
 } from '../domains.types'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 
 @Controller('domains')
 @UsePipes(ZodValidationPipe)
@@ -42,6 +49,17 @@ export class DomainsController {
   @Get('search')
   async searchDomain(@Query() { domain }: SearchDomainSchema) {
     return this.domains.searchForDomain(domain)
+  }
+
+  @Post('search')
+  @UseCampaign({ include: { user: true } })
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(SearchDomainsResponseSchema)
+  async searchDomains(
+    @ReqCampaign() campaign: Campaign & { user: User },
+    @Body() { patterns, maxPrice }: SearchDomainsBodySchema,
+  ): Promise<PatternedDomainSearchResult> {
+    return this.domains.searchDomainsForCampaign(campaign, patterns, maxPrice)
   }
 
   @Get('status')

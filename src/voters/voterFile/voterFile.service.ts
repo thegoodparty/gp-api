@@ -195,6 +195,7 @@ export class VoterFileService {
 
     await this.slack.message(
       slackBlocks,
+      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
 

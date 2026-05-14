@@ -24,7 +24,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'json'],
     },
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
     env: dotenv.parse(readFileSync(`${__dirname}/.env.test`)),
     clearMocks: true,
   },

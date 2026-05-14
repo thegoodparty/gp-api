@@ -25,6 +25,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
     formattedAddress: null,
     placeId: null,
+    campaignEmail: null,
     data: {
       hubSpotUpdates: {
         election_results: faker.lorem.word(),

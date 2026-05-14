@@ -175,6 +175,11 @@ export {
 } from './campaigns/CampaignWithLiveContext.schema'
 
 export {
+  OrganizationSchema,
+  type Organization,
+} from './campaigns/Organization.schema'
+
+export {
   CAMPAIGN_SORT_KEYS,
   ListCampaignsPaginationSchema,
   type ListCampaignsPagination,
