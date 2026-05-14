@@ -442,7 +442,7 @@ describe('WebsitesController', () => {
 
       await expect(
         controller.updateWebsite(mockUser, mockCampaign, body, [
-          { fieldname: 'heroImage' } as FileUpload,
+          { fieldname: 'heroFile' } as FileUpload,
         ]),
       ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST })
 
