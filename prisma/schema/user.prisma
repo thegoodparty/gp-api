@@ -29,6 +29,8 @@ model User {
   passwordResetToken    String?                 @map("password_reset_token")
   aiChats               AiChat[]
   electedOffices        ElectedOffice[]
+  annotations           Annotation[]
+  chatConversations     ChatConversation[]
 
   @@index([firstName])
   @@index([lastName])

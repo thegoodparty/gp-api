@@ -1,0 +1,17 @@
+model ChatConversation {
+  id String @id @default(cuid())
+
+  ownerUserId Int  @map("owner_user_id")
+  owner       User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  messages ChatMessage[]
+
+  annotation Annotation?
+
+  @@index([ownerUserId, deletedAt])
+  @@map("chat_conversation")
+}
