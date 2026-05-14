@@ -435,6 +435,19 @@ export = async () => {
         ],
         Resource: ['*'],
       },
+      {
+        Effect: 'Allow',
+        Action: ['polly:SynthesizeSpeech'],
+        Resource: ['*'],
+      },
+      {
+        Effect: 'Allow',
+        Action: [
+          'transcribe:StartStreamTranscription',
+          'transcribe:StartStreamTranscriptionWebSocket',
+        ],
+        Resource: ['*'],
+      },
     ],
   })
 

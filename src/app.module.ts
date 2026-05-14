@@ -28,6 +28,7 @@ import { PrismaModule } from '@/prisma/prisma.module'
 import { QueueConsumerModule } from '@/queue/consumer/queueConsumer.module'
 import { ScheduledMessagingModule } from '@/scheduled-messaging/scheduled-messaging.module'
 import { SharedModule } from '@/shared/shared.module'
+import { SpeechModule } from '@/speech/speech.module'
 import { SubscribeModule } from '@/subscribe/subscribe.module'
 import { TopIssuesModule } from '@/topIssues/topIssues.module'
 import { SessionsService } from '@/users/services/sessions.service'
@@ -83,6 +84,7 @@ import { loggerModule } from './observability/logging/logger-module'
     ElectedOfficeModule,
     OrganizationsModule,
     OnboardingModule,
+    SpeechModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.
