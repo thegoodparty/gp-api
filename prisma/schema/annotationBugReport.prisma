@@ -1,0 +1,11 @@
+model AnnotationBugReport {
+  id String @id @default(cuid())
+
+  annotationId String             @unique @map("annotation_id")
+  annotation   BriefingAnnotation @relation(fields: [annotationId], references: [annotationId], onDelete: Cascade)
+
+  description String   @db.Text
+  submittedAt DateTime @default(now()) @map("submitted_at")
+
+  @@map("annotation_bug_report")
+}

@@ -1,0 +1,21 @@
+enum ChatMessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  conversationId String           @map("conversation_id")
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    ChatMessageRole
+  content String          @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("chat_message")
+}

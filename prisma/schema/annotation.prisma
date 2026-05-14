@@ -1,0 +1,28 @@
+enum AnnotationKind {
+  note
+  chat
+  bug_report
+}
+
+model Annotation {
+  id String @id @default(cuid())
+
+  authorUserId Int  @map("author_user_id")
+  author       User @relation(fields: [authorUserId], references: [id])
+
+  kind AnnotationKind
+
+  jsonPath String? @map("json_path")
+  start    Int?
+  end      Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  briefingAnnotation BriefingAnnotation?
+  note               Note?
+  conversation       ChatConversation?
+
+  @@index([authorUserId])
+  @@map("annotation")
+}

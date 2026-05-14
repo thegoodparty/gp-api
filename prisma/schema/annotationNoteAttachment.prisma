@@ -1,0 +1,16 @@
+model AnnotationNoteAttachment {
+  id String @id @default(cuid())
+
+  noteId String @map("note_id")
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  storageKey String @map("storage_key")
+  fileName   String @map("file_name")
+  mimeType   String @map("mime_type")
+  sizeBytes  Int    @map("size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([noteId])
+  @@map("annotation_note_attachment")
+}

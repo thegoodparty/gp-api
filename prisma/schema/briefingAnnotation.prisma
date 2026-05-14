@@ -1,0 +1,12 @@
+model BriefingAnnotation {
+  annotationId String     @id @map("annotation_id")
+  annotation   Annotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+
+  briefingId String          @map("briefing_id")
+  briefing   MeetingBriefing @relation(fields: [briefingId], references: [id], onDelete: Cascade)
+
+  bugReport AnnotationBugReport?
+
+  @@index([briefingId])
+  @@map("briefing_annotation")
+}
