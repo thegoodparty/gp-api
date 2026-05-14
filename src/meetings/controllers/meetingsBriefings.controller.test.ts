@@ -132,6 +132,33 @@ describe('GET /v1/meetings', () => {
     }
   })
 
+  it('emits the local date for early-morning schedules in a non-UTC timezone', async () => {
+    const orgSlug = 'eo-tz'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({
+      'schedule-key.json': JSON.stringify({
+        ...foundSchedule,
+        time: '02:00',
+        timezone: 'Pacific/Honolulu',
+      }),
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    const dates = (result.data.meetings as Array<{ meeting_date: string }>).map(
+      (m) => m.meeting_date,
+    )
+    expect(dates.length).toBeGreaterThan(0)
+    for (const d of dates) {
+      const day = new Date(d + 'T00:00:00Z').getUTCDay()
+      expect(day).toBe(1)
+    }
+  })
+
   it('handles a weekly schedule', async () => {
     const orgSlug = 'eo-weekly'
     await seedElectedOffice(orgSlug)
