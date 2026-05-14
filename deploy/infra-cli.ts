@@ -109,13 +109,22 @@ const setupStack = async (env: string) => {
   GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
   GRAFANA_SM_ACCESS_TOKEN = await getSSMParameter('grafana-sm-access-token')
 
-  // In CI, every setup pulumi command must keep stdout pure so that the
-  // subsequent `pulumi preview --json` output can be parsed by jq in the
-  // infrastructure-diffs workflow. Each setup command otherwise prints a
-  // confirmation line ("Created stack ...", "Configuration:", etc.) that
-  // gets prepended to the JSON file and breaks the parser.
+  // In CI, every setup pulumi command must keep both stdout AND stderr fully
+  // silenced. The infrastructure-diffs workflow runs the diff with
+  // `> /tmp/preview-$env.json 2>&1`, so any stream a child process inherits
+  // ends up in the JSON file and breaks jq parsing. Pulumi setup commands
+  // write success/configuration lines (the original culprit, fixed by
+  // ignoring stdout) and occasionally backend-state warnings to stderr; both
+  // need to go to /dev/null in CI.
+  //
+  // The trade-off: if a setup command fails in CI we lose pulumi's underlying
+  // error message. The `try/catch` in `run()` still surfaces the failed
+  // command and exit code via console.error, so the workflow log will still
+  // show *that* a command failed, just not pulumi's specific reason. A
+  // failed setup is also rare (these are non-mutating reads + idempotent
+  // config writes). Worth it to keep CI green.
   const setupStdio: ExecSyncOptions['stdio'] = process.env.CI
-    ? ['inherit', 'ignore', 'inherit']
+    ? ['inherit', 'ignore', 'ignore']
     : 'inherit'
 
   run('pulumi login s3://goodparty-iac-state', { stdio: setupStdio })

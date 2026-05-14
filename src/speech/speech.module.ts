@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
+import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { MeetingsModule } from '@/meetings/meetings.module'
+import { OrganizationsModule } from '@/organizations/organizations.module'
 import { AwsModule } from '@/vendors/aws/aws.module'
 import { SpeechToTextController } from './controllers/speechToText.controller'
 import { TextToSpeechController } from './controllers/textToSpeech.controller'
@@ -12,7 +14,15 @@ import { TranscriptionTicketService } from './services/transcriptionTicket.servi
 import { SpeechToTextGateway } from './ws/speechToText.gateway'
 
 @Module({
-  imports: [AwsModule, MeetingsModule],
+  // ElectedOfficeModule + OrganizationsModule provide UseElectedOfficeGuard
+  // and UseOrganizationGuard, which back the @UseElectedOffice() and
+  // @UseOrganization() decorators applied on the speech controllers.
+  imports: [
+    AwsModule,
+    MeetingsModule,
+    ElectedOfficeModule,
+    OrganizationsModule,
+  ],
   controllers: [TextToSpeechController, SpeechToTextController],
   providers: [
     TextToSpeechService,
