@@ -16,6 +16,7 @@ import { formatISO } from 'date-fns'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const DOMAIN_REGISTERED_STATUSES: DomainStatus[] = [
+  DomainStatus.submitted,
   DomainStatus.registered,
   DomainStatus.active,
 ]
