@@ -1,9 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
-// @aws-sdk/client-transcribe-streaming's `client.send` is overloaded but its
-// response (`TranscriptResultStream`) is reported as `any` to ESLint. The
-// member access on `response.TranscriptResultStream` and the iteration over
-// the stream are deliberate adapters to the documented Transcribe Streaming
-// response shape.
 import {
   AudioStream,
   LanguageCode,

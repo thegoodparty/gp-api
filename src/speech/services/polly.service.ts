@@ -1,9 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-// @aws-sdk/client-polly's `client.send` is overloaded, but ESLint cannot prove
-// the response type without an explicit annotation per call site. Member access
-// on `response.AudioStream` / `ContentType` / `RequestCharacters` and the call
-// to `transformToByteArray` therefore trip unsafe-* lints. The casts/access
-// here are deliberate adapters to the documented Polly response shape.
 import {
   Engine,
   OutputFormat,

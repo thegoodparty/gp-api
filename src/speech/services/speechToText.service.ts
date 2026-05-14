@@ -20,12 +20,7 @@ export type CreateSessionInput = {
 
 @Injectable()
 export class SpeechToTextService {
-  // v1 ships with no authorizers per the Read Aloud + Dictation plan: STT only
-  // accepts target.type='note' and the Notes module (which will register a
-  // concrete authorizer) lives in the Annotation TDD owned by another team.
-  // Until then HTTP-level decorators (@SessionGuard + @UseElectedOffice) gate
-  // the endpoint. When a Notes authorizer is registered, this map enforces the
-  // per-target write check.
+  private readonly authorizers: Map<SpeechToTextTargetType, TargetAuthorizer> =
   private readonly authorizers: Map<SpeechToTextTargetType, TargetAuthorizer> =
     new Map()
 
@@ -75,11 +70,14 @@ export class SpeechToTextService {
 
   private buildWsUrl(ticket: string): string {
     const base = PUBLIC_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '')
-    if (base.length > 0) {
-      return `${base}${TRANSCRIBE_STREAM_PATH}?ticket=${encodeURIComponent(
-        ticket,
-      )}`
+    if (base.length === 0) {
+      throw new Error(
+        'PUBLIC_API_URL env var is required but not set; cannot build WebSocket URL',
+      )
     }
-    return `${TRANSCRIBE_STREAM_PATH}?ticket=${encodeURIComponent(ticket)}`
+    return `${base}${TRANSCRIBE_STREAM_PATH}?ticket=${encodeURIComponent(
+      ticket,
+    )}`
+  }
   }
 }

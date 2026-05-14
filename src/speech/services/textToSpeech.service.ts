@@ -54,8 +54,7 @@ export class TextToSpeechService {
       )
     }
 
-    // SpeechSynthesisVoice/Engine are strict subsets of Polly's VoiceId/Engine
-    // unions, validated by the request schema.
+    const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
     const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
     const engine: Engine = request.options?.engine ?? 'neural'
 

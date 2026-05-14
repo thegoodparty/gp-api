@@ -14,9 +14,7 @@ export const SpeechSynthesisEngineSchema = z.enum(
   SPEECH_SYNTHESIS_ENGINE_VALUES,
 )
 
-// Allowlist of voices supported by Polly that we explicitly enable for v1.
-// Add to this list intentionally — anything else is rejected at the API
-// boundary so we can't accidentally bill for unbounded voices.
+export const SPEECH_SYNTHESIS_VOICE_VALUES = [
 export const SPEECH_SYNTHESIS_VOICE_VALUES = [
   'Joanna',
   'Matthew',
