@@ -1,8 +1,8 @@
 model AnnotationNoteAttachment {
   id String @id @default(cuid())
 
-  noteId String @map("note_id")
-  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  noteId String         @map("note_id")
+  note   AnnotationNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
   storageKey String @map("storage_key")
   fileName   String @map("file_name")

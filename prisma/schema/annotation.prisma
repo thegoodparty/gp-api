@@ -4,13 +4,21 @@ enum AnnotationKind {
   bug_report
 }
 
+// The type of resource about which
+enum AnnotationResourceType {
+  briefing
+}
+
 model Annotation {
   id String @id @default(cuid())
 
   authorUserId Int  @map("author_user_id")
-  author       User @relation(fields: [authorUserId], references: [id])
+  author       User @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
 
   kind AnnotationKind
+
+  resourceId   String                 @map("resource_id")
+  resourceType AnnotationResourceType @map("resource_type")
 
   jsonPath String? @map("json_path")
   start    Int?
@@ -19,9 +27,12 @@ model Annotation {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  briefingAnnotation BriefingAnnotation?
-  note               Note?
-  conversation       ChatConversation?
+  note                  AnnotationNote?      @relation(fields: [noteId], references: [id])
+  noteId                String?              @unique @map("note_id")
+  chat                  ChatConversation?    @relation(fields: [chatConversationId], references: [id])
+  chatConversationId    String?              @unique @map("chat_conversation_id")
+  bugReport             AnnotationBugReport? @relation(fields: [annotationBugReportId], references: [id])
+  annotationBugReportId String?              @unique @map("annotation_bug_report_id")
 
   @@index([authorUserId])
   @@map("annotation")

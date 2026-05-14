@@ -1,15 +1,13 @@
-model Note {
+model AnnotationNote {
   id String @id @default(cuid())
-
-  annotationId String     @unique @map("annotation_id")
-  annotation   Annotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
 
   body String @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  annotation  Annotation?
   attachments AnnotationNoteAttachment[]
 
-  @@map("note")
+  @@map("annotation_note")
 }
