@@ -57,6 +57,7 @@ describe('ExperimentRunsService', () => {
       const result = await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-1',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',
@@ -116,6 +117,7 @@ describe('ExperimentRunsService', () => {
       await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-1',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',
@@ -128,8 +130,10 @@ describe('ExperimentRunsService', () => {
       const [call] = sqsMock.commandCalls(SendMessageCommand)
       const body = JSON.parse(call.args[0].input.MessageBody as string) as {
         run_id: string
+        clerk_user_id: string
       }
       expect(body.run_id).toBe(dbRunId)
+      expect(body.clerk_user_id).toBe('user_test_dispatch')
     })
 
     it('namespaces FIFO group per organization so runs for one org serialize', async () => {
@@ -138,6 +142,7 @@ describe('ExperimentRunsService', () => {
       await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-alpha',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',
@@ -148,6 +153,7 @@ describe('ExperimentRunsService', () => {
       await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-beta',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',
@@ -172,6 +178,7 @@ describe('ExperimentRunsService', () => {
         service.dispatchRun({
           type: 'district_issue_pulse',
           organizationSlug: 'org-1',
+          clerkUserId: 'user_test_dispatch',
           params: {
             state: 'CA',
             city: 'San Francisco',
@@ -195,6 +202,7 @@ describe('ExperimentRunsService', () => {
         service.dispatchRun({
           type: 'district_issue_pulse',
           organizationSlug: 'org-1',
+          clerkUserId: 'user_test_dispatch',
           params: {
             state: 'CA',
             city: 'San Francisco',
@@ -213,6 +221,7 @@ describe('ExperimentRunsService', () => {
       await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-1',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',
@@ -223,6 +232,7 @@ describe('ExperimentRunsService', () => {
       await service.dispatchRun({
         type: 'district_issue_pulse',
         organizationSlug: 'org-1',
+        clerkUserId: 'user_test_dispatch',
         params: {
           state: 'CA',
           city: 'San Francisco',

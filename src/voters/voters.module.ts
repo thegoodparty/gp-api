@@ -3,13 +3,11 @@ import { Module } from '@nestjs/common'
 import { ClerkModule } from '@/vendors/clerk/clerk.module'
 import { FilesModule } from 'src/files/files.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
-import { OutreachModule } from 'src/outreach/outreach.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { ElectedOfficeModule } from '../electedOffice/electedOffice.module'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
 import { VoterDatabaseService } from './services/voterDatabase.service'
 import { VoterFileFilterService } from './services/voterFileFilter.service'
-import { VoterOutreachService } from './services/voterOutreach.service'
 import { VotersService } from './services/voters.service'
 import { VoterFileController } from './voterFile/voterFile.controller'
 import { VoterFileService } from './voterFile/voterFile.service'
@@ -20,7 +18,6 @@ import { VoterFileService } from './voterFile/voterFile.service'
     FilesModule,
     HttpModule,
     OrganizationsModule,
-    OutreachModule,
     PeerlyModule,
     SlackModule,
     ElectedOfficeModule,
@@ -29,7 +26,6 @@ import { VoterFileService } from './voterFile/voterFile.service'
   providers: [
     VoterFileService,
     VoterDatabaseService,
-    VoterOutreachService,
     VotersService,
     VoterFileFilterService,
   ],

@@ -497,12 +497,11 @@ export class QueueConsumerService {
 
   private async handleDomainEmailForwardingMessage({
     domainId,
-    forwardingEmailAddress,
   }: DomainEmailForwardingMessage): Promise<boolean> {
     if (!this.domainsService.shouldEnableDomainPurchase()) {
       const message = `Domain purchasing is disabled - skipping backfill for domainId: ${domainId}`
       this.logger.debug(message)
-      throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
+      throw new Error(message, { cause: { domainId } })
     }
     const domain = await this.domainsService.model.findUniqueOrThrow({
       where: { id: domainId },
@@ -510,17 +509,13 @@ export class QueueConsumerService {
 
     let forwardEmailDomain: ForwardEmailDomainResponse | null = null
     try {
-      forwardEmailDomain = await this.domainsService.setupDomainEmailForwarding(
-        domain,
-        forwardingEmailAddress,
-      )
-      this.logger.debug(
-        `Email forwarding set up for domain *@${domain.name} -> ${forwardingEmailAddress}`,
-      )
+      forwardEmailDomain =
+        await this.domainsService.setupDomainEmailForwarding(domain)
+      this.logger.debug(`Email forwarding set up for domain *@${domain.name}`)
     } catch {
-      const message = `Error setting up email forwarding for domain *@${domain.name} -> ${forwardingEmailAddress}`
+      const message = `Error setting up email forwarding for domain *@${domain.name}`
       this.logger.error(message)
-      throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
+      throw new Error(message, { cause: { domainId } })
     }
 
     forwardEmailDomain &&

@@ -1,8 +1,12 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { PinoLogger } from 'nestjs-pino'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
@@ -14,6 +18,7 @@ import type {
   ResolveP2pJobGeographyServices,
 } from '../util/campaignGeography.util'
 import type { CreateOutreachSchema } from '../schemas/createOutreachSchema'
+import { OutreachNotificationService } from './outreachNotification.service'
 import { OutreachService, type P2pOutreachImageInput } from './outreach.service'
 
 const mockOutreachCreate = vi.fn()
@@ -32,6 +37,13 @@ vi.mock('../util/campaignGeography.util', () => ({
 
 describe('OutreachService', () => {
   let service: OutreachService
+
+  const mockUser = {
+    id: 100,
+    email: 'user@example.com',
+    firstName: 'Jane',
+    lastName: 'Doe',
+  } as User
 
   const mockCampaign = {
     id: 1,
@@ -97,6 +109,10 @@ describe('OutreachService', () => {
             createPeerlyP2pJob: mockPeerlyCreateJob,
           },
         },
+        {
+          provide: OutreachNotificationService,
+          useValue: { notifySuccess: vi.fn().mockResolvedValue(undefined) },
+        },
         OutreachService,
       ],
     }).compile()
@@ -122,6 +138,7 @@ describe('OutreachService', () => {
       mockOutreachCreate.mockResolvedValue(created)
 
       const result = await service.create(
+        mockUser,
         mockCampaign,
         baseCreateDto,
         imageUrl,
@@ -140,7 +157,13 @@ describe('OutreachService', () => {
       const created = { id: 1, ...baseCreateDto, voterFileFilter: null }
       mockOutreachCreate.mockResolvedValue(created)
 
-      await service.create(mockCampaign, baseCreateDto, undefined, undefined)
+      await service.create(
+        mockUser,
+        mockCampaign,
+        baseCreateDto,
+        undefined,
+        undefined,
+      )
 
       expect(mockOutreachCreate).toHaveBeenCalledWith({
         data: baseCreateDto,
@@ -171,6 +194,7 @@ describe('OutreachService', () => {
       mockOutreachCreate.mockResolvedValue(created)
 
       const result = await service.create(
+        mockUser,
         mockCampaign,
         p2pCreateDto,
         'https://cdn.example.com/p2p.png',
@@ -221,6 +245,7 @@ describe('OutreachService', () => {
 
       await expect(
         service.create(
+          mockUser,
           mockCampaign,
           p2pCreateDto,
           'https://cdn.example.com/p2p.png',
@@ -234,14 +259,27 @@ describe('OutreachService', () => {
 
     it('throws BadRequest when P2P is requested without imageUrl or p2pImage', async () => {
       await expect(
-        service.create(mockCampaign, p2pCreateDto, undefined, p2pImage),
+        service.create(
+          mockUser,
+          mockCampaign,
+          p2pCreateDto,
+          undefined,
+          p2pImage,
+        ),
       ).rejects.toThrow(BadRequestException)
       await expect(
-        service.create(mockCampaign, p2pCreateDto, undefined, p2pImage),
+        service.create(
+          mockUser,
+          mockCampaign,
+          p2pCreateDto,
+          undefined,
+          p2pImage,
+        ),
       ).rejects.toThrow(/required for P2P outreach/)
 
       await expect(
         service.create(
+          mockUser,
           mockCampaign,
           p2pCreateDto,
           'https://cdn.example.com/p2p.png',
@@ -250,6 +288,7 @@ describe('OutreachService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(
+          mockUser,
           mockCampaign,
           p2pCreateDto,
           'https://cdn.example.com/p2p.png',
@@ -261,26 +300,28 @@ describe('OutreachService', () => {
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 
-    it('wraps P2P errors in BadRequest with message', async () => {
+    it('tags TCR lookup failures as OutreachStepError(tcrLookup)', async () => {
       mockTcrFindFirstOrThrow.mockRejectedValue(new Error('TCR not found'))
 
       await expect(
         service.create(
+          mockUser,
           mockCampaign,
           p2pCreateDto,
           'https://cdn.example.com/p2p.png',
           p2pImage,
         ),
-      ).rejects.toThrow(BadRequestException)
+      ).rejects.toThrow(BadGatewayException)
 
       await expect(
         service.create(
+          mockUser,
           mockCampaign,
           p2pCreateDto,
           'https://cdn.example.com/p2p.png',
           p2pImage,
         ),
-      ).rejects.toThrow(/Failed to create P2P outreach/)
+      ).rejects.toThrow(/step "tcrLookup"/)
     })
   })
 

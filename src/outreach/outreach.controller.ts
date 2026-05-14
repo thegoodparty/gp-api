@@ -11,15 +11,17 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, OutreachType } from '@prisma/client'
+import { Campaign, OutreachType, User } from '@prisma/client'
 import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { FilesService } from 'src/files/files.service'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { CreateOutreachSchema } from './schemas/createOutreachSchema'
+import { OutreachNotificationInterceptor } from './interceptors/outreachNotification.interceptor'
 import {
   OutreachService,
   type P2pOutreachImageInput,
@@ -28,6 +30,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(OutreachNotificationInterceptor)
 export class OutreachController {
   constructor(
     private readonly tcrComplianceService: CampaignTcrComplianceService,
@@ -52,6 +55,7 @@ export class OutreachController {
     }),
   )
   async create(
+    @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
     @Body() createOutreachDto: CreateOutreachSchema,
     @ReqFile() image?: FileUpload,
@@ -101,6 +105,7 @@ export class OutreachController {
         : undefined
 
     return this.outreachService.create(
+      user,
       campaign,
       createOutreachDto,
       imageUrl,

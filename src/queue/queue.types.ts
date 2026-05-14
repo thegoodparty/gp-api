@@ -54,7 +54,6 @@ export type TcrComplianceStatusCheckMessage = {
 
 export type DomainEmailForwardingMessage = {
   domainId: number
-  forwardingEmailAddress: string
 }
 
 export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(

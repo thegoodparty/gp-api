@@ -443,6 +443,7 @@ export class PaymentEventsService {
           slug
         }\` ended their pro subscription!`,
       },
+      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
@@ -452,6 +453,7 @@ export class PaymentEventsService {
       {
         text: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
+      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
@@ -479,6 +481,7 @@ export class PaymentEventsService {
             : 'No CRM company found'
         }`,
       },
+      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }

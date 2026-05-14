@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -172,15 +173,28 @@ export class WebsitesController {
     const logoFile = files?.find((file) => file.fieldname === LOGO_FIELDNAME)
     const heroFile = files?.find((file) => file.fieldname === HERO_FIELDNAME)
 
-    const { content: currentContent, hasEverBeenPublished } =
-      await this.websites.findUniqueOrThrow({
-        where: { campaignId },
-        select: {
-          content: true,
-          domain: true,
-          hasEverBeenPublished: true,
-        },
-      })
+    const {
+      content: currentContent,
+      domain,
+      hasEverBeenPublished,
+    } = await this.websites.findUniqueOrThrow({
+      where: { campaignId },
+      select: {
+        content: true,
+        domain: true,
+        hasEverBeenPublished: true,
+      },
+    })
+
+    if (
+      body.status === WebsiteStatus.published &&
+      domain &&
+      !domain.registrantVerifiedAt
+    ) {
+      throw new BadRequestException(
+        'Domain registrant verification is not yet complete. The site cannot be published until Vercel confirms domain ownership.',
+      )
+    }
 
     const updatedContent: PrismaJson.WebsiteContent = merge(
       currentContent || {},

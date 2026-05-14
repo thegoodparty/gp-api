@@ -14,6 +14,7 @@ export type ExperimentRunDispatchInput<
 > = {
   type: ExperimentType
   organizationSlug: string
+  clerkUserId: string
   params: AgentJobContracts[ExperimentType]['Input']
 }
 
@@ -62,6 +63,7 @@ export class ExperimentRunsService extends createPrismaBase(
       params: input.params,
       organization_slug: input.organizationSlug,
       experiment_type: input.type,
+      clerk_user_id: input.clerkUserId,
     }
 
     const deduplicationId = randomUUID()
