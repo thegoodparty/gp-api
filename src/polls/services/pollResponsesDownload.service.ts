@@ -8,15 +8,17 @@ import { requireEnv } from 'src/shared/util/env.util'
 
 const UTF8_BOM = '\uFEFF'
 
-const DATABASE_URL = requireEnv('DATABASE_URL')
-
 @Injectable()
 export class PollResponsesDownloadService implements OnModuleDestroy {
   private readonly pool: Pool
 
   constructor(private readonly logger: PinoLogger) {
     this.logger.setContext(PollResponsesDownloadService.name)
-    this.pool = new Pool({ connectionString: DATABASE_URL })
+    // Read DATABASE_URL at construction time (not module-import time) so test
+    // harnesses that swap `process.env.DATABASE_URL` after the file is loaded
+    // — e.g. `useTestService()` pointing at a testcontainers Postgres — see
+    // the correct value.
+    this.pool = new Pool({ connectionString: requireEnv('DATABASE_URL') })
   }
 
   onModuleDestroy() {
