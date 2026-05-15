@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { BadRequestException } from '@nestjs/common'
+import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { CommitteeType, OfficeLevel, TcrComplianceStatus } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ComplianceStage } from '@goodparty_org/contracts'
@@ -139,6 +139,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     )
     expect(options).toEqual({
       deduplicationId: 'agentic-compliance-tcr-new',
+      throwOnError: true,
     })
   })
 
@@ -194,6 +195,21 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     const result = await service.createAgentic(user, campaign, basePayload)
 
     expect(result).toEqual(raced)
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('throws BadGatewayException when P2002 fires but no racing record is found', async () => {
+    mockModel.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    mockModel.create.mockRejectedValueOnce(
+      new PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    )
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toThrow(BadGatewayException)
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 

@@ -370,11 +370,9 @@ export class QueueConsumerService {
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
       case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
-        this.logger.warn(
-          { messageId: message.MessageId, data: queueMessage.data },
-          'received agenticComplianceKickoff message — handler not yet wired; acking to avoid redelivery',
+        throw new Error(
+          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented',
         )
-        return true
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },

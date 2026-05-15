@@ -359,6 +359,13 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           )
           return raced
         }
+        this.logger.error(
+          { err, campaignId: campaign.id, target: err.meta?.target },
+          '[TCR Compliance] P2002 on create with no racing record found — likely a unique constraint other than campaignId',
+        )
+        throw new BadGatewayException(
+          'Failed to create TCR compliance record due to a constraint violation',
+        )
       }
       throw err
     }
@@ -373,7 +380,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         },
       },
       `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
-      { deduplicationId: `agentic-compliance-${created.id}` },
+      {
+        deduplicationId: `agentic-compliance-${created.id}`,
+        throwOnError: true,
+      },
     )
 
     this.logger.info(
