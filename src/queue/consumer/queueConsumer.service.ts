@@ -369,6 +369,12 @@ export class QueueConsumerService {
         return await this.handleAgentExperimentResult(
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
+      case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
+        this.logger.warn(
+          { messageId: message.MessageId, data: queueMessage.data },
+          'received agenticComplianceKickoff message — handler not yet wired; acking to avoid redelivery',
+        )
+        return true
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
