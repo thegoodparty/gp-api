@@ -5,10 +5,15 @@ import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
 import { PinoLogger } from 'nestjs-pino'
 
+const PRICE_PER_CONTACT_TENTH_CENTS = 35
+
+function calcAmountInCents(contactCount: number): number {
+  const totalTenthCents = contactCount * PRICE_PER_CONTACT_TENTH_CENTS
+  return Math.floor((totalTenthCents + 5) / 10)
+}
+
 @Injectable()
-export class OutreachPurchaseHandlerService
-  implements PurchaseHandler<OutreachPurchaseMetadata>
-{
+export class OutreachPurchaseHandlerService implements PurchaseHandler<OutreachPurchaseMetadata> {
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly logger: PinoLogger,
@@ -18,25 +23,19 @@ export class OutreachPurchaseHandlerService
 
   async validatePurchase({
     contactCount,
-    pricePerContact,
   }: OutreachPurchaseMetadata): Promise<void> {
     if (!contactCount) {
       throw new BadRequestException('contactCount is required')
-    }
-
-    if (pricePerContact === null || pricePerContact === undefined) {
-      throw new BadRequestException('pricePerContact is required')
     }
   }
 
   async calculateAmount({
     contactCount,
-    pricePerContact,
     campaignId,
     outreachType,
   }: OutreachPurchaseMetadata): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return contactCount * pricePerContact
+      return calcAmountInCents(contactCount)
     }
 
     const hasOffer =
@@ -47,7 +46,7 @@ export class OutreachPurchaseHandlerService
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      const finalAmount = discountedContactCount * pricePerContact
+      const finalAmount = calcAmountInCents(discountedContactCount)
 
       this.logger.info(
         `Campaign ${campaignId}: applying free texts discount (${contactCount} contacts, ${discountedContactCount} billable, amount: ${finalAmount})`,
@@ -56,12 +55,11 @@ export class OutreachPurchaseHandlerService
       return finalAmount
     }
 
-    return contactCount * pricePerContact
+    return calcAmountInCents(contactCount)
   }
 
   async calculateDiscount(
     contactCount: number,
-    pricePerContact: number,
     campaignId?: number,
     outreachType?: string,
   ): Promise<number> {
@@ -73,9 +71,8 @@ export class OutreachPurchaseHandlerService
       await this.campaignsService.checkFreeTextsEligibility(campaignId)
 
     if (hasOffer) {
-      // Calculate discount amount for up to 5,000 texts
       const freeTexts = Math.min(contactCount, FREE_TEXTS_OFFER.COUNT)
-      return freeTexts * pricePerContact
+      return calcAmountInCents(freeTexts)
     }
 
     return 0
