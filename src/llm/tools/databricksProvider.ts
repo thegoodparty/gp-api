@@ -155,15 +155,21 @@ export class DatabricksSqlProvider implements DatabricksProvider {
       host: this.opts.hostname,
       path: this.opts.httpPath,
     })
-    const session = await conn.openSession()
+    let session: DbsqlSessionInstanceLike
+    try {
+      session = await conn.openSession()
+      if (this.opts.catalog) {
+        await this.runStatement(session, `USE CATALOG ${this.opts.catalog}`)
+      }
+      if (this.opts.schema) {
+        await this.runStatement(session, `USE SCHEMA ${this.opts.schema}`)
+      }
+    } catch (err) {
+      await conn.close().catch(noop)
+      throw err
+    }
     this.clientConn = conn
     this.session = session
-    if (this.opts.catalog) {
-      await this.runStatement(session, `USE CATALOG ${this.opts.catalog}`)
-    }
-    if (this.opts.schema) {
-      await this.runStatement(session, `USE SCHEMA ${this.opts.schema}`)
-    }
   }
 
   private async runStatement(

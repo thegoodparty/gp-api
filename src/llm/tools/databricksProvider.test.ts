@@ -206,6 +206,33 @@ describe('DatabricksSqlProvider', () => {
     expect(state.executeCalls).toHaveLength(3)
   })
 
+  it('retries openSession when USE CATALOG fails on first attempt', async () => {
+    const { factory, state } = makeFactory(() =>
+      makeOperation({ rows: [{ x: 1 }], columns: ['x'] }),
+    )
+    state.failNextExecute = new Error('catalog unavailable')
+    const provider = new DatabricksSqlProvider({
+      ...baseOpts,
+      catalog: 'goodparty_data_catalog',
+      schema: 'dbt',
+      clientFactory: factory,
+    })
+
+    await expect(provider.query(SELECT_X)).rejects.toThrow(
+      'catalog unavailable',
+    )
+
+    await provider.query(SELECT_X)
+
+    expect(state.executeCalls.map((c) => c.sql)).toEqual([
+      'USE CATALOG goodparty_data_catalog',
+      'USE CATALOG goodparty_data_catalog',
+      'USE SCHEMA dbt',
+      SELECT_X,
+    ])
+    expect(state.openSessionCalls).toBe(2)
+  })
+
   it('applies catalog and schema on first query, not on subsequent', async () => {
     const { factory, state } = makeFactory(() =>
       makeOperation({ rows: [{ x: 1 }], columns: ['x'] }),
