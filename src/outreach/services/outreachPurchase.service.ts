@@ -13,7 +13,9 @@ function calcAmountInCents(contactCount: number): number {
 }
 
 @Injectable()
-export class OutreachPurchaseHandlerService implements PurchaseHandler<OutreachPurchaseMetadata> {
+export class OutreachPurchaseHandlerService
+  implements PurchaseHandler<OutreachPurchaseMetadata>
+{
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly logger: PinoLogger,
