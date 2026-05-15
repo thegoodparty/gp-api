@@ -1,5 +1,20 @@
 # @goodparty_org/contracts
 
+## 0.5.0
+
+### Minor Changes
+
+- Add annotations contracts (`AnnotationKindSchema`,
+  `AnnotationAnchorSchema`, `CreateAnnotationRequestSchema`,
+  `UpdateNoteRequestSchema`, `AnnotationSchema`,
+  `AnnotationResponseSchema`, `AnnotationsListResponseSchema`) and
+  their inferred types. Backs the briefing annotations endpoints
+  (`/v1/meeting-briefings/:briefingId/annotations`,
+  `/v1/annotations/:annotationId`). Snake_case at the API boundary.
+  Anchor allows all-set or all-null for top-level annotations;
+  `CreateAnnotationRequest` is a discriminated union on `kind`
+  (`note` and `bug_report` only; `chat` is reserved).
+
 ## 0.4.0
 
 ### Breaking Changes

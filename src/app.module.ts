@@ -23,6 +23,7 @@ import { OutreachModule } from '@/outreach/outreach.module'
 import { OnboardingModule } from '@/onboarding/onboarding.module'
 import { PaymentsModule } from '@/payments/payments.module'
 import { MeetingsModule } from '@/meetings/meetings.module'
+import { AnnotationsModule } from '@/annotations/annotations.module'
 import { PollsModule } from '@/polls/polls.module'
 import { PrismaModule } from '@/prisma/prisma.module'
 import { QueueConsumerModule } from '@/queue/consumer/queueConsumer.module'
@@ -81,6 +82,7 @@ import { loggerModule } from './observability/logging/logger-module'
     ContactEngagementModule,
     PollsModule,
     MeetingsModule,
+    AnnotationsModule,
     ElectedOfficeModule,
     OrganizationsModule,
     OnboardingModule,
