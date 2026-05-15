@@ -1,14 +1,31 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable, Optional } from '@nestjs/common'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import {
+  createOpenAICompatible,
+  OpenAICompatibleProvider,
+} from '@ai-sdk/openai-compatible'
+import {
+  stepCountIs,
+  streamText as realStreamText,
+  tool,
+  type LanguageModel,
+  type ToolSet,
+  type TypedToolCall,
+} from 'ai'
 import retry from 'async-retry'
 import { OpenAI } from 'openai'
 import {
   ChatCompletion,
+  ChatCompletionCreateParamsNonStreaming,
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
 } from 'openai/resources/chat/completions'
 import { z } from 'zod'
 import { PinoLogger } from 'nestjs-pino'
+import { toModelMessages } from './messageConversion'
+
+export { toModelMessages } from './messageConversion'
 
 export interface LlmChatCompletionOptions {
   messages: ChatCompletionMessageParam[]
@@ -46,14 +63,145 @@ export interface LlmCompletionResult {
   toolCalls?: ToolCall[]
 }
 
+export type LlmStreamTool<
+  TInput = unknown,
+  TOutput = unknown,
+> = TInput extends z.ZodTypeAny
+  ? {
+      description: string
+      inputSchema: TInput
+      execute: (input: z.infer<TInput>) => Promise<unknown> | unknown
+    }
+  : {
+      description: string
+      inputSchema: z.ZodType<TInput>
+      execute: (input: TInput) => Promise<TOutput> | TOutput
+    }
+
+export interface LlmStreamOptions {
+  messages: ChatCompletionMessageParam[]
+  tools?: Record<string, LlmStreamTool<z.ZodTypeAny>>
+  models?: string[]
+  temperature?: number
+  topP?: number
+  maxOutputTokens?: number
+  maxSteps?: number
+  userId?: string
+  retries?: number
+  abortSignal?: AbortSignal
+  onToolCallStart?: (event: { name: string; input: unknown }) => void
+  onToolCallEnd?: (event: {
+    name: string
+    input: unknown
+    output: unknown
+  }) => void
+}
+
+export interface LlmStreamUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+
+export interface LlmStreamResult {
+  textStream: AsyncIterable<string>
+  finalText: Promise<string>
+  toolCalls: Promise<ToolCall[]>
+  usage: Promise<LlmStreamUsage>
+  model: string
+}
+
+export type StreamTextFn = typeof realStreamText
+
+export interface OpenAIClientLike {
+  chat: {
+    completions: {
+      create: (
+        body: ChatCompletionCreateParamsNonStreaming,
+        options?: { timeout?: number },
+      ) => Promise<ChatCompletion>
+    }
+  }
+  baseURL: string
+}
+
+export type OpenAIClientFactory = (opts: {
+  apiKey: string
+  baseURL: string
+}) => OpenAIClientLike
+
+export type AiSdkProviderFactory = (opts: {
+  apiKey: string
+  baseURL: string
+}) => OpenAICompatibleProvider
+
+export type AnthropicChatModelResolver = (model: string) => LanguageModel
+
+export type AnthropicProviderFactory = (opts: {
+  apiKey: string
+}) => AnthropicChatModelResolver
+
+export const STREAM_TEXT_TOKEN = 'LLM_STREAM_TEXT_FN'
+export const OPENAI_CLIENT_FACTORY_TOKEN = 'LLM_OPENAI_CLIENT_FACTORY'
+export const AI_SDK_PROVIDER_FACTORY_TOKEN = 'LLM_AI_SDK_PROVIDER_FACTORY'
+export const ANTHROPIC_PROVIDER_FACTORY_TOKEN = 'LLM_ANTHROPIC_PROVIDER_FACTORY'
+
+export const defaultOpenAIClientFactory: OpenAIClientFactory = ({
+  apiKey,
+  baseURL,
+}) => {
+  const openai = new OpenAI({ apiKey, baseURL })
+  return {
+    chat: {
+      completions: {
+        create: (body, options) =>
+          openai.chat.completions.create(body, options),
+      },
+    },
+    baseURL: openai.baseURL,
+  }
+}
+
+export const defaultAiSdkProviderFactory: AiSdkProviderFactory = ({
+  apiKey,
+  baseURL,
+}) => createOpenAICompatible({ name: 'together', baseURL, apiKey })
+
+export const defaultAnthropicProviderFactory: AnthropicProviderFactory = ({
+  apiKey,
+}) => {
+  const provider = createAnthropic({ apiKey })
+  return (model: string) => provider(model)
+}
+
 @Injectable()
 export class LlmService {
   private readonly defaultModels: string[]
   private readonly defaultRetries = 3
+  private readonly defaultMaxSteps = 5
   private readonly defaultTimeout = 300000
-  private readonly client: OpenAI
+  private readonly client: OpenAIClientLike
+  private readonly aiSdkProvider: OpenAICompatibleProvider
+  private readonly anthropicProviderFactory: AnthropicProviderFactory
+  private readonly anthropicApiKey: string | undefined
+  private anthropicResolver?: AnthropicChatModelResolver
+  private readonly streamTextFn: StreamTextFn
 
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    private readonly logger: PinoLogger,
+    @Optional()
+    @Inject(STREAM_TEXT_TOKEN)
+    streamTextFn?: StreamTextFn,
+    @Optional()
+    @Inject(OPENAI_CLIENT_FACTORY_TOKEN)
+    openAIClientFactory?: OpenAIClientFactory,
+    @Optional()
+    @Inject(AI_SDK_PROVIDER_FACTORY_TOKEN)
+    aiSdkProviderFactory?: AiSdkProviderFactory,
+    @Optional()
+    @Inject(ANTHROPIC_PROVIDER_FACTORY_TOKEN)
+    anthropicProviderFactory?: AnthropicProviderFactory,
+  ) {
     this.logger.setContext(LlmService.name)
     const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
 
@@ -72,11 +220,42 @@ export class LlmService {
       throw new Error('AI_MODELS must contain at least one model')
     }
 
-    // We use the OpenAI SDK to call the TogetherAI API
-    this.client = new OpenAI({
+    const togetherBaseUrl = 'https://api.together.xyz/v1'
+
+    const clientFactory = openAIClientFactory ?? defaultOpenAIClientFactory
+    this.client = clientFactory({
       apiKey: TOGETHER_AI_KEY,
-      baseURL: 'https://api.together.xyz/v1',
+      baseURL: togetherBaseUrl,
     })
+
+    const providerFactory = aiSdkProviderFactory ?? defaultAiSdkProviderFactory
+    this.aiSdkProvider = providerFactory({
+      apiKey: TOGETHER_AI_KEY,
+      baseURL: togetherBaseUrl,
+    })
+
+    this.anthropicProviderFactory =
+      anthropicProviderFactory ?? defaultAnthropicProviderFactory
+    this.anthropicApiKey = process.env.ANTHROPIC_API_KEY
+
+    this.streamTextFn = streamTextFn ?? realStreamText
+  }
+
+  private resolveChatModel(model: string): LanguageModel {
+    if (model.startsWith('claude')) {
+      if (!this.anthropicApiKey) {
+        throw new Error(
+          `ANTHROPIC_API_KEY is not set but model "${model}" requires it`,
+        )
+      }
+      if (!this.anthropicResolver) {
+        this.anthropicResolver = this.anthropicProviderFactory({
+          apiKey: this.anthropicApiKey,
+        })
+      }
+      return this.anthropicResolver(model)
+    }
+    return this.aiSdkProvider.chatModel(model)
   }
 
   /**
@@ -216,7 +395,138 @@ export class LlmService {
   }
 
   /**
+   * Streams a chat completion as text deltas, with multi-step tool support.
+   *
+   * Model fallback applies only at connect-time (synchronous errors from
+   * streamText). Once the result object is returned, errors during stream
+   * consumption propagate without switching models — you can't restart a
+   * partially-shipped response.
+   */
+  async streamChatCompletion(
+    options: LlmStreamOptions,
+  ): Promise<LlmStreamResult> {
+    const {
+      messages,
+      tools,
+      models: providedModels,
+      temperature,
+      topP,
+      maxOutputTokens,
+      maxSteps = this.defaultMaxSteps,
+      userId,
+      retries = this.defaultRetries,
+      abortSignal,
+      onToolCallStart,
+      onToolCallEnd,
+    } = options
+
+    const models = this.prepareModelList(providedModels)
+    const toolSet = tools
+      ? this.buildToolSet(tools, { onToolCallStart, onToolCallEnd })
+      : undefined
+    const modelMessages = toModelMessages(messages)
+
+    const { model, result } = await this.withModelFallback(
+      models,
+      retries,
+      'stream chat completion',
+      (currentModel) =>
+        Promise.resolve(
+          this.streamTextFn({
+            model: this.resolveChatModel(currentModel),
+            messages: modelMessages,
+            ...(toolSet && { tools: toolSet }),
+            stopWhen: stepCountIs(maxSteps),
+            ...(abortSignal && { abortSignal }),
+            ...(temperature !== undefined && { temperature }),
+            ...(topP !== undefined && { topP }),
+            ...(maxOutputTokens !== undefined && { maxOutputTokens }),
+            ...(userId && { headers: { 'X-User-Id': userId } }),
+          }),
+        ),
+    )
+
+    return {
+      textStream: result.textStream,
+      finalText: Promise.resolve(result.text),
+      toolCalls: Promise.resolve(result.toolCalls).then((calls) =>
+        this.mapAiSdkToolCalls(calls),
+      ),
+      usage: Promise.resolve(result.totalUsage).then((u) => ({
+        inputTokens: u.inputTokens ?? 0,
+        outputTokens: u.outputTokens ?? 0,
+        totalTokens: u.totalTokens ?? 0,
+      })),
+      model,
+    }
+  }
+
+  private buildToolSet(
+    tools: Record<string, LlmStreamTool<z.ZodTypeAny>>,
+    hooks: {
+      onToolCallStart?: (event: { name: string; input: unknown }) => void
+      onToolCallEnd?: (event: {
+        name: string
+        input: unknown
+        output: unknown
+      }) => void
+    } = {},
+  ): ToolSet {
+    const set: ToolSet = {}
+    for (const [name, t] of Object.entries(tools)) {
+      set[name] = tool<unknown, unknown>({
+        description: t.description,
+        inputSchema: t.inputSchema,
+        execute: async (input) => {
+          hooks.onToolCallStart?.({ name, input })
+          try {
+            const result = await t.execute(input)
+            this.logger.info(
+              {
+                toolName: name,
+                inputPreview: safePreview(toPreviewInput(input)),
+              },
+              'LLM tool executed',
+            )
+            hooks.onToolCallEnd?.({ name, input, output: result })
+            return result
+          } catch (err) {
+            this.logger.error(
+              {
+                err,
+                toolName: name,
+                inputPreview: safePreview(toPreviewInput(input)),
+              },
+              'LLM tool execution failed',
+            )
+            throw err
+          }
+        },
+      })
+    }
+    return set
+  }
+
+  private mapAiSdkToolCalls(calls: TypedToolCall<ToolSet>[]): ToolCall[] {
+    return calls.map((c) => ({
+      id: c.toolCallId,
+      type: 'function',
+      function: {
+        name: c.toolName,
+        arguments: JSON.stringify(c.input),
+      },
+    }))
+  }
+
+  /**
    * Generic helper to run an operation with model fallbacks and retry logic.
+   *
+   * Permanent client errors (4xx) call `bail()` and return immediately —
+   * async-retry rejects the outer promise without scheduling further retries
+   * and without cascading to the next model in the list. Transient errors
+   * fall through to the next model in this attempt; if all models in the
+   * list fail with transient errors, the thrown error triggers async-retry
+   * to retry the whole loop.
    */
   private async withModelFallback<R>(
     models: string[],
@@ -225,7 +535,7 @@ export class LlmService {
     fn: (model: string) => Promise<R>,
   ): Promise<{ model: string; result: R }> {
     return retry(
-      async (bail) => {
+      async () => {
         let lastError: Error | undefined
 
         for (let i = 0; i < models.length; i++) {
@@ -243,7 +553,12 @@ export class LlmService {
                 lastError,
                 `Permanent client error for ${operationLabel} with model ${currentModel}, not retrying`,
               )
-              bail(lastError)
+              // Tag the error so async-retry's onError sees `err.bail === true`
+              // and calls `bail()` instead of scheduling a retry. This stops
+              // both the cascade to the next model AND the retry loop.
+              const bailable: Error & { bail?: boolean } = lastError
+              bailable.bail = true
+              throw bailable
             }
 
             this.logger.warn(
@@ -278,8 +593,8 @@ export class LlmService {
    * These errors indicate issues with the request itself, not transient failures.
    */
   private isPermanentClientError(error: unknown): boolean {
-    if (error && typeof error === 'object') {
-      const status = (error as { status?: number | string })?.status
+    if (error && typeof error === 'object' && 'status' in error) {
+      const status = error.status
       if (typeof status === 'number' && status >= 400 && status < 500) {
         return true
       }
@@ -335,7 +650,9 @@ export class LlmService {
       return ''
     }
 
-    const content = normalizeContent((message as { content: unknown }).content)
+    const content = normalizeContent(
+      'content' in message ? message.content : undefined,
+    )
 
     if (message.tool_calls && message.tool_calls.length > 0) {
       const toolCalls: ToolCall[] = message.tool_calls.map(
@@ -363,6 +680,38 @@ export class LlmService {
   }
 
   /**
+   * Shared helper that invokes the OpenAI client's chat.completions.create
+   * endpoint and logs failures with model + base URL context before
+   * propagating. Used by all three non-streaming completion methods.
+   */
+  private async createCompletionLogged(
+    requestParams: ChatCompletionCreateParamsNonStreaming,
+    timeout: number,
+    label: string,
+  ): Promise<ChatCompletion> {
+    try {
+      return await this.client.chat.completions.create(requestParams, {
+        timeout,
+      })
+    } catch (error) {
+      const status =
+        error != null && typeof error === 'object' && 'status' in error
+          ? error.status
+          : undefined
+      this.logger.error(
+        {
+          model: requestParams.model,
+          baseURL: this.client.baseURL,
+          error: error instanceof Error ? error.message : String(error),
+          status,
+        },
+        `TogetherAI ${label} request failed`,
+      )
+      throw error
+    }
+  }
+
+  /**
    * Internal method to make a chat completion API call.
    */
   private async callChatCompletion({
@@ -384,9 +733,7 @@ export class LlmService {
   }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
-    const requestParams: Parameters<
-      (typeof this.client.chat.completions)['create']
-    >[0] = {
+    const requestParams: ChatCompletionCreateParamsNonStreaming = {
       model,
       messages,
       temperature,
@@ -406,38 +753,19 @@ export class LlmService {
       'Making TogetherAI API request',
     )
 
-    try {
-      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const completion = (await this.client.chat.completions.create(
-        requestParams,
-        {
-          timeout,
-        },
-      )) as ChatCompletion
+    const completion = await this.createCompletionLogged(
+      requestParams,
+      timeout,
+      'chat completion',
+    )
 
-      const { content, toolCalls } = this.extractCompletionContent(completion)
-      const tokens = completion.usage?.total_tokens || 0
+    const { content, toolCalls } = this.extractCompletionContent(completion)
+    const tokens = completion.usage?.total_tokens || 0
 
-      return {
-        content: content.trim(),
-        tokens,
-        ...(toolCalls && { toolCalls }),
-      }
-    } catch (error) {
-      this.logger.error(
-        {
-          model,
-          baseURL: this.client.baseURL,
-          error: error instanceof Error ? error.message : String(error),
-          status:
-            error != null && typeof error === 'object' && 'status' in error
-              ? error.status
-              : undefined,
-        },
-        'TogetherAI API request failed',
-      )
-      throw error
+    return {
+      content: content.trim(),
+      tokens,
+      ...(toolCalls && { toolCalls }),
     }
   }
 
@@ -465,9 +793,7 @@ export class LlmService {
   }): Promise<{ object: T; tokens: number }> {
     const userIdentification = this.prepareUserIdentification(userId)
 
-    const requestParams: Parameters<
-      (typeof this.client.chat.completions)['create']
-    >[0] = {
+    const requestParams: ChatCompletionCreateParamsNonStreaming = {
       model,
       messages,
       temperature,
@@ -488,14 +814,12 @@ export class LlmService {
       'Making TogetherAI JSON-mode API request',
     )
 
-    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const completion = (await this.client.chat.completions.create(
+    const completion = await this.createCompletionLogged(
       requestParams,
-      {
-        timeout,
-      },
-    )) as ChatCompletion
+      timeout,
+      'json completion',
+    )
+
     const { content } = this.extractCompletionContent(completion)
     const tokens = completion.usage?.total_tokens || 0
 
@@ -558,9 +882,7 @@ export class LlmService {
   }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
-    const requestParams: Parameters<
-      (typeof this.client.chat.completions)['create']
-    >[0] = {
+    const requestParams: ChatCompletionCreateParamsNonStreaming = {
       model,
       messages,
       tools,
@@ -572,14 +894,11 @@ export class LlmService {
       stream: false,
     }
 
-    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const completion = (await this.client.chat.completions.create(
+    const completion = await this.createCompletionLogged(
       requestParams,
-      {
-        timeout,
-      },
-    )) as ChatCompletion
+      timeout,
+      'tool completion',
+    )
 
     const { content, toolCalls } = this.extractCompletionContent(completion)
     const tokens = completion.usage?.total_tokens || 0
@@ -589,5 +908,35 @@ export class LlmService {
       tokens,
       ...(toolCalls && { toolCalls }),
     }
+  }
+}
+
+type PreviewInput = string | number | boolean | bigint | object | null
+
+const toPreviewInput = (value: unknown): PreviewInput => {
+  if (value === undefined) return null
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint' ||
+    typeof value === 'object'
+  ) {
+    return value
+  }
+  return String(value)
+}
+
+const safePreview = (input: PreviewInput): string => {
+  try {
+    const replacer = (_key: string, value: unknown): unknown =>
+      typeof value === 'bigint' ? value.toString() : value
+    const str = JSON.stringify(input, replacer)
+    if (str === undefined) {
+      return '[unstringifiable]'
+    }
+    return str.slice(0, 500)
+  } catch {
+    return '[unstringifiable]'
   }
 }

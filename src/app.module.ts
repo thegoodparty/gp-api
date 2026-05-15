@@ -1,4 +1,5 @@
 import { AgentExperimentsModule } from '@/agentExperiments/agentExperiments.module'
+import { BriefingChatsModule } from '@/chats/briefing-chats/briefing-chats.module'
 import { McpModule } from '@/mcp/mcp.module'
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
@@ -89,6 +90,7 @@ import { loggerModule } from './observability/logging/logger-module'
     OrganizationsModule,
     OnboardingModule,
     SpeechModule,
+    BriefingChatsModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.

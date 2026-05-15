@@ -29,11 +29,12 @@ model Annotation {
 
   note                  AnnotationNote?      @relation(fields: [noteId], references: [id])
   noteId                String?              @unique @map("note_id")
-  chat                  ChatConversation?    @relation(fields: [chatConversationId], references: [id])
+  chat                  ChatConversation?    @relation(fields: [chatConversationId], references: [id], onDelete: SetNull)
   chatConversationId    String?              @unique @map("chat_conversation_id")
   bugReport             AnnotationBugReport? @relation(fields: [annotationBugReportId], references: [id])
   annotationBugReportId String?              @unique @map("annotation_bug_report_id")
 
   @@index([authorUserId])
+  @@index([authorUserId, resourceType, resourceId, kind])
   @@map("annotation")
 }
