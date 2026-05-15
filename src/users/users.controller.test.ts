@@ -368,7 +368,10 @@ describe('UsersController', () => {
       const meta = { lastVisited: 1700000000 }
       controller.updateMetadata(mockUser, { meta })
 
-      expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, meta)
+      expect(usersService.patchUserMetaData).toHaveBeenCalledWith(
+        userId,
+        meta,
+      )
     })
   })
 
