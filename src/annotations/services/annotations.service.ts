@@ -179,7 +179,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
               resourceType: 'briefing',
               resourceId: briefingId,
               ...anchorFields,
-              note: { create: { body: input.payload.body } },
+              note: { create: { body: input.payload.body ?? null } },
             },
             include: ANNOTATION_INCLUDE,
           })

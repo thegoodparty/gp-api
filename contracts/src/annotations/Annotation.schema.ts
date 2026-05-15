@@ -136,7 +136,9 @@ export const CreateAnnotationRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('note'),
     anchor: AnnotationAnchorSchema,
     payload: z.object({
-      body: noteBodySchema,
+      // Optional once attachment-only notes ship (Phase 2). When present,
+      // `noteBodySchema` still enforces min(1) so empty strings are rejected.
+      body: noteBodySchema.optional(),
     }),
   }),
   z.object({
