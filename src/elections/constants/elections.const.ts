@@ -22,5 +22,8 @@ export const ElectionApiRoutes = {
     findById: {
       path: 'positions',
     },
+    zipCodes: {
+      path: 'positions',
+    },
   },
 }

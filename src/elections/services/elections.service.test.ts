@@ -310,6 +310,30 @@ describe('ElectionsService', () => {
     })
   })
 
+  describe('getZipCodesByBrPositionId', () => {
+    it('calls /v1/positions/:brPositionId/zip-codes and returns the parsed zip array', async () => {
+      mockHttpGet.mockReturnValue(
+        of({ data: ['90210', '90211', '90212'], status: 200 }),
+      )
+
+      const result = await service.getZipCodesByBrPositionId('br-pos-1')
+
+      expect(result).toEqual(['90210', '90211', '90212'])
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/positions/br-pos-1/zip-codes'),
+        expect.any(Object),
+      )
+    })
+
+    it('returns an empty array when the API returns null/empty', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      const result = await service.getZipCodesByBrPositionId('br-pos-1')
+
+      expect(result).toEqual([])
+    })
+  })
+
   describe('getDistrictId', () => {
     it('returns district id when API returns results', async () => {
       mockHttpGet.mockReturnValue(

@@ -253,6 +253,8 @@ export {
 
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
 
+export { ZipCodesArraySchema } from './elections/zipCodes'
+
 export {
   SPEECH_SYNTHESIS_ENGINE_VALUES,
   type SpeechSynthesisEngine,

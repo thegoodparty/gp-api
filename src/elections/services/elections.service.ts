@@ -1,4 +1,8 @@
-import { RaceListItem, RaceListItemArraySchema } from '@goodparty_org/contracts'
+import {
+  RaceListItem,
+  RaceListItemArraySchema,
+  ZipCodesArraySchema,
+} from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -195,6 +199,14 @@ export class ElectionsService {
       query,
     )
     return RaceListItemArraySchema.parse(result ?? [])
+  }
+
+  async getZipCodesByBrPositionId(brPositionId: string): Promise<string[]> {
+    const result = await this.electionApiGet<string[], object>(
+      `${ElectionApiRoutes.positions.zipCodes.path}/${brPositionId}/zip-codes`,
+      {},
+    )
+    return ZipCodesArraySchema.parse(result ?? [])
   }
 
   async getVoterIssues(params: {
