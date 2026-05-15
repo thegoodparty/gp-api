@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
-export const SPEECH_SYNTHESIS_ENGINE_VALUES = ['neural', 'standard'] as const
+export const SPEECH_SYNTHESIS_ENGINE_VALUES = [
+  'neural',
+  'standard',
+  'generative',
+] as const
 export type SpeechSynthesisEngine =
   (typeof SPEECH_SYNTHESIS_ENGINE_VALUES)[number]
 export const SpeechSynthesisEngineSchema = z.enum(
@@ -18,6 +22,7 @@ export const SPEECH_SYNTHESIS_VOICE_VALUES = [
   'Justin',
   'Ruth',
   'Stephen',
+  'Amy',
 ] as const
 export type SpeechSynthesisVoice =
   (typeof SPEECH_SYNTHESIS_VOICE_VALUES)[number]
@@ -51,8 +56,8 @@ export const SynthesizeSpeechRequestSchema = z.object({
     ),
   options: z
     .object({
-      voiceId: SpeechSynthesisVoiceSchema.default('Joanna'),
-      engine: SpeechSynthesisEngineSchema.default('neural'),
+      voiceId: SpeechSynthesisVoiceSchema.default('Amy'),
+      engine: SpeechSynthesisEngineSchema.default('generative'),
     })
     .optional(),
 })
