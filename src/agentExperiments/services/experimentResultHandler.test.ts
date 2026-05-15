@@ -63,6 +63,9 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     findUnique: ReturnType<typeof vi.fn>
     optimisticLockingUpdate: ReturnType<typeof vi.fn>
   }
+  let meetingBriefings: {
+    onExperimentRunCompleted: ReturnType<typeof vi.fn>
+  }
   let logger: PinoLogger
 
   beforeEach(() => {
@@ -86,6 +89,9 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
           ) => callModifier(mod),
         ),
     }
+    meetingBriefings = {
+      onExperimentRunCompleted: vi.fn().mockResolvedValue(undefined),
+    }
 
     service = new QueueConsumerService(
       {} as never,
@@ -106,6 +112,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
       {} as never,
       {} as never,
       experimentRunsService as never,
+      meetingBriefings as never,
       logger,
     )
   })
@@ -136,6 +143,10 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     expect(patched.durationSeconds).toBe(42)
     expect(patched.costUsd).toBe(0.18)
     expect(patched.error).toBeNull()
+
+    expect(meetingBriefings.onExperimentRunCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({ status: ExperimentRunStatus.COMPLETED }),
+    )
   })
 
   it('modifier returns only writable scalars — no relation FKs or unique keys (would break Prisma update)', async () => {
@@ -275,6 +286,22 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
 
     await expect(service.processMessage(makeMessage())).rejects.toThrow(
       'db timeout',
+    )
+  })
+
+  it('does not propagate when the briefing side-effect throws after a successful run update (prevents infinite SQS retry loop)', async () => {
+    meetingBriefings.onExperimentRunCompleted.mockRejectedValue(
+      new Error('briefing dispatch failed'),
+    )
+
+    const result = await service.processMessage(
+      makeMessage({ status: 'success' }),
+    )
+
+    expect(result).toBe(true)
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      'onExperimentRunCompleted failed after run update',
     )
   })
 })

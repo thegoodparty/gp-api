@@ -8,6 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import websocket from '@fastify/websocket'
 import { AppModule } from './app.module'
 import { Logger, PinoLogger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
@@ -39,6 +40,12 @@ export const bootstrap = async (
   adapter.getInstance().addHook('onRequest', (req, _, done) => {
     req.raw.route = req.routeOptions?.url
     done()
+  })
+
+  await adapter.getInstance().register(websocket, {
+    options: {
+      maxPayload: 64 * 1024,
+    },
   })
 
   const app = await NestFactory.create<NestFastifyApplication>(

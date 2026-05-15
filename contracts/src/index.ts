@@ -247,29 +247,27 @@ export {
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
 
 export {
-  MeetingScheduleSourceSchema,
-  type MeetingScheduleSource,
-  MeetingScheduleArtifactSchema,
-  type MeetingScheduleArtifact,
-} from './meetings/MeetingScheduleArtifact.schema'
+  SPEECH_SYNTHESIS_ENGINE_VALUES,
+  type SpeechSynthesisEngine,
+  SpeechSynthesisEngineSchema,
+  SPEECH_SYNTHESIS_VOICE_VALUES,
+  type SpeechSynthesisVoice,
+  SpeechSynthesisVoiceSchema,
+  SYNTHESIZE_SPEECH_MAX_TEXT_LENGTH,
+  SynthesizeSpeechRequestSchema,
+  type SynthesizeSpeechRequest,
+  SynthesizeSpeechSegmentSchema,
+  type SynthesizeSpeechSegment,
+  SynthesizeSpeechResponseSchema,
+  type SynthesizeSpeechResponse,
+} from './speech/synthesizeSpeech.schema'
 
 export {
-  MeetingItemSchema,
-  type MeetingItem,
-  MeetingsListResponseSchema,
-  type MeetingsListResponse,
-} from './meetings/MeetingsListResponse.schema'
-
-export {
-  BriefingSourceSchema,
-  type BriefingSource,
-  BriefingAgendaItemSchema,
-  type BriefingAgendaItem,
-  BriefingActionItemSchema,
-  type BriefingActionItem,
-  MeetingBriefingResponseSchema,
-  type MeetingBriefingResponse,
-} from './meetings/MeetingBriefingResponse.schema'
+  TranscribeSessionRequestSchema,
+  type TranscribeSessionRequest,
+  TranscribeSessionResponseSchema,
+  type TranscribeSessionResponse,
+} from './speech/transcribeSession.schema'
 
 export {
   ANNOTATION_KIND_VALUES,
