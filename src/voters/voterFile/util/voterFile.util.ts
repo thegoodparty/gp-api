@@ -1,5 +1,6 @@
-import { ConflictException } from '@nestjs/common'
+import { BadRequestException, ConflictException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
+import { STATE_CODES } from '@/shared/constants/states'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
@@ -50,6 +51,10 @@ export function typeToQuery(
   limit?: number,
 ) {
   const state = campaign.details.state
+  const upperState = typeof state === 'string' ? state.toUpperCase() : ''
+  if (!STATE_CODES.some((code) => code === upperState)) {
+    throw new BadRequestException('Campaign has an invalid state value')
+  }
   const electionDate: string | undefined = campaign.details?.electionDate
   const electionYear = electionDate
     ? Number(String(electionDate).slice(0, 4))
@@ -238,7 +243,7 @@ export function typeToQuery(
 
       whereClause += ` EXISTS (
         SELECT 1
-        FROM public."Voter${state}" b
+        FROM public."Voter${upperState}" b
         WHERE a."Mailing_Families_FamilyID" = b."Mailing_Families_FamilyID"
         GROUP BY b."Mailing_Families_FamilyID"
         HAVING COUNT(*) = 1
@@ -274,7 +279,7 @@ export function typeToQuery(
     }
   }
 
-  return `SELECT ${justCount ? 'COUNT(*)' : columns} FROM public."Voter${state}" ${nestedWhereClause} ${
+  return `SELECT ${justCount ? 'COUNT(*)' : columns} FROM public."Voter${upperState}" ${nestedWhereClause} ${
     whereClause !== ''
       ? `WHERE ${whereClause} ${limit ? `LIMIT ${limit}` : ''}`
       : ''
