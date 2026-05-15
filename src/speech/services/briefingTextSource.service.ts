@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common'
-import { SpeechSynthesisTargetType } from '@goodparty_org/contracts'
-import { MeetingsService } from '@/meetings/services/meetings.service'
-import { Briefing, PriorityIssue } from '@/meetings/types/briefing.types'
+import { Injectable, NotFoundException } from '@nestjs/common'
+import {
+  MeetingBriefingResponse,
+  SpeechSynthesisTargetType,
+} from '@goodparty_org/contracts'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
 import {
   LoadedText,
   LoadTextInput,
@@ -10,50 +12,54 @@ import {
 
 export const BRIEFING_TARGET_TYPE: SpeechSynthesisTargetType = 'MeetingBriefing'
 
+type ActionItem = MeetingBriefingResponse['action_items'][number]
+
 @Injectable()
 export class BriefingTextSource
   implements TargetTextSource<SpeechSynthesisTargetType>
 {
   readonly type = BRIEFING_TARGET_TYPE
 
-  constructor(private readonly meetingsService: MeetingsService) {}
+  constructor(private readonly meetingBriefings: MeetingBriefingsService) {}
 
   async loadText(input: LoadTextInput): Promise<LoadedText> {
-    const briefing = await this.meetingsService.getBriefing(
-      input.organization,
-      input.id,
+    // input.id is the meeting date in YYYY-MM-DD form (validated upstream by
+    // the speech synth request schema). The MeetingBriefing model stores
+    // meetingDate as a midnight-UTC Date keyed by (electedOfficeId, meetingDate).
+    const meetingDate = new Date(`${input.id}T00:00:00Z`)
+    const briefing = await this.meetingBriefings.loadBriefingArtifact(
+      input.electedOffice.id,
+      meetingDate,
     )
+    if (!briefing) {
+      throw new NotFoundException(
+        `No briefing found for elected office ${input.electedOffice.id} on ${input.id}`,
+      )
+    }
     return {
       text: this.renderBriefingText(briefing),
       cacheKey: this.buildCacheKey(briefing),
     }
   }
 
-  private buildCacheKey(briefing: Briefing): string {
-    return [
-      briefing.meeting.citySlug,
-      briefing.meeting.date,
-      briefing.generatedAt,
-    ].join(':')
+  private buildCacheKey(briefing: MeetingBriefingResponse): string {
+    // slug + generated_at uniquely identifies a briefing version, so the
+    // synthesized audio is invalidated automatically when the briefing is
+    // regenerated (different generated_at).
+    return `${briefing.slug}:${briefing.generated_at}`
   }
 
-  private renderBriefingText(briefing: Briefing): string {
+  private renderBriefingText(briefing: MeetingBriefingResponse): string {
     const sections: string[] = []
 
-    sections.push(briefing.meeting.title)
+    sections.push(briefing.title)
 
-    sections.push(briefing.executiveSummary.headline)
-    if (briefing.executiveSummary.subheadline) {
-      sections.push(briefing.executiveSummary.subheadline)
+    if (briefing.executive_summary) {
+      sections.push(briefing.executive_summary)
     }
 
-    for (const issue of briefing.priorityIssues) {
-      sections.push(this.renderPriorityIssue(issue))
-    }
-
-    if (briefing.fullAgendaSummary) {
-      sections.push('Full agenda summary.')
-      sections.push(briefing.fullAgendaSummary)
+    for (const item of briefing.action_items) {
+      sections.push(this.renderActionItem(item))
     }
 
     return sections
@@ -62,33 +68,22 @@ export class BriefingTextSource
       .join('\n\n')
   }
 
-  private renderPriorityIssue(issue: PriorityIssue): string {
+  private renderActionItem(item: ActionItem): string {
     const parts: string[] = []
-    parts.push(`Priority item ${issue.number}. ${issue.agendaItemTitle}.`)
-
-    parts.push(issue.card.headline)
-    parts.push(issue.card.whatYouNeedToDo)
-    parts.push(issue.card.askThisInTheRoom)
-    if (issue.card.tryThis) {
-      parts.push(issue.card.tryThis)
+    parts.push(`Action item: ${item.title}.`)
+    if (item.overview) parts.push(item.overview)
+    if (item.constituent_sentiment?.summary) {
+      parts.push(`Constituent sentiment: ${item.constituent_sentiment.summary}`)
     }
-
-    if (issue.detail) {
-      const detail = issue.detail
-      parts.push(detail.whatIsHappening)
-      parts.push(detail.whatDecision)
-      parts.push(detail.whyItMatters)
-      parts.push(detail.recommendation)
-      parts.push(detail.actionItem)
-      parts.push(detail.askThis)
-      if (detail.tryThis) {
-        parts.push(detail.tryThis)
-      }
-      if (detail.supportingContext) {
-        parts.push(detail.supportingContext)
+    if (item.budget_impact?.summary) {
+      parts.push(`Budget impact: ${item.budget_impact.summary}`)
+    }
+    if (item.talking_points.length > 0) {
+      parts.push('Talking points.')
+      for (const point of item.talking_points) {
+        parts.push(point)
       }
     }
-
     return parts.filter((part) => part.length > 0).join(' ')
   }
 

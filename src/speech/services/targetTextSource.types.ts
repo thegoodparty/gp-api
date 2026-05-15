@@ -1,9 +1,10 @@
-import { Organization, User } from '@prisma/client'
+import { ElectedOffice, Organization, User } from '@prisma/client'
 
 export type LoadTextInput = {
   id: string
   user: User
   organization: Organization
+  electedOffice: ElectedOffice
 }
 
 export type LoadedText = {

@@ -1,134 +1,134 @@
-import { Organization, User } from '@prisma/client'
+import { ElectedOffice, Organization, User } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { Briefing } from '@/meetings/types/briefing.types'
-import { MeetingsService } from '@/meetings/services/meetings.service'
+import { NotFoundException } from '@nestjs/common'
+import { MeetingBriefingResponse } from '@goodparty_org/contracts'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
 import { BriefingTextSource } from './briefingTextSource.service'
 
 const MEETING_DATE = '2026-05-14'
+const EXPECTED_DATE_AT_MIDNIGHT_UTC = new Date(`${MEETING_DATE}T00:00:00Z`)
 
-const buildBriefing = (overrides: Partial<Briefing> = {}): Briefing => ({
-  version: '1',
-  generatedAt: '2026-05-01T12:00:00Z',
-  generationModel: 'gpt-test',
+const buildBriefing = (
+  overrides: Partial<MeetingBriefingResponse> = {},
+): MeetingBriefingResponse => ({
+  id: 'b1',
+  slug: 'springfield-city-council-2026-05-14',
+  meeting_id: 'm1',
+  title: 'Springfield City Council Meeting',
+  meeting_date: 'May 14, 2026',
+  status: 'briefing_ready',
+  reading_time_minutes: 5,
+  generated_at: '2026-05-01T12:00:00Z',
   meeting: {
-    citySlug: 'springfield-mo',
-    cityName: 'Springfield',
-    state: 'MO',
+    id: 'm1',
+    name: 'City Council',
     body: 'City Council',
-    date: MEETING_DATE,
-    time: '6:00 PM',
-    title: 'Springfield City Council Meeting',
-    readTime: '5 min',
-    sourceUrl: null,
-    sourceType: 'agenda',
+    type: 'city_council',
+    scheduled_at: '2026-05-14T18:00:00-05:00',
+    location: 'Council Chambers',
   },
-  executiveSummary: {
-    headline: 'Three priority items tonight.',
-    subheadline: 'Budget vote, zoning hearing, parks contract.',
-    priorityItemCount: 1,
-    totalAgendaItems: 5,
-  },
-  priorityIssues: [
+  executive_summary: 'Three priority items tonight including the budget vote.',
+  agenda: [],
+  action_items: [
     {
-      number: 1,
-      slug: 'budget-vote',
-      agendaItemTitle: 'Budget Amendment',
-      category: 'finance',
-      card: {
-        headline: 'Vote on the **budget amendment** tonight.',
-        whatYouNeedToDo: 'Read the proposed amendment before the meeting.',
-        askThisInTheRoom: 'How does this affect the parks budget?',
-        tryThis: null,
-        actionButtons: [],
+      id: 'a1',
+      title: 'Budget Amendment',
+      overview: 'A vote on Amendment 4 to the **city budget**.',
+      constituent_sentiment: {
+        summary: 'Constituents support the parks carve-out.',
+        detail: 'Detailed sentiment analysis...',
+        sources: ['poll-1'],
       },
-      detail: {
-        whatIsHappening: 'A vote on Amendment 4.',
-        whatDecision: 'Approve or reject the amendment.',
-        whyItMatters: 'It changes the parks line item.',
-        recommendation: 'Approve with the parks carve-out.',
-        actionItem: 'Bring the budget memo.',
-        askThis: 'Will parks funding be preserved?',
-        tryThis: null,
-        whoIsPresenting: 'Finance Director',
-        supportingContext: 'See [memo](https://example.org/memo).',
-        supportingDocuments: [],
+      recent_news: [],
+      budget_impact: {
+        summary: 'Net neutral over five years.',
+        sources: [],
       },
+      talking_points: [
+        'Approve with the parks carve-out.',
+        'See [memo](https://example.org/memo).',
+      ],
+      sources: [],
     },
   ],
-  fullAgenda: [],
-  fullAgendaSummary:
-    'Five items including the budget vote and a zoning hearing.',
-  constituentData: {
-    available: false,
-    voterCount: null,
-    topIssues: [],
-    ideology: null,
-  },
-  footer: {
-    preparedBy: 'Test',
-    contactNote: 'Contact us',
-  },
   ...overrides,
 })
 
-const buildSource = (briefing: Briefing) => {
-  const meetingsService = {
-    getBriefing: vi.fn().mockResolvedValue(briefing),
-  } as unknown as MeetingsService
-  return { source: new BriefingTextSource(meetingsService), meetingsService }
+const buildSource = (briefing: MeetingBriefingResponse | null) => {
+  const meetingBriefings = {
+    loadBriefingArtifact: vi.fn().mockResolvedValue(briefing),
+  } as unknown as MeetingBriefingsService
+  return {
+    source: new BriefingTextSource(meetingBriefings),
+    meetingBriefings,
+  }
 }
 
 const inputArgs = (id = MEETING_DATE) => ({
   id,
   user: { id: 1 } as User,
   organization: { slug: 'springfield' } as Organization,
+  electedOffice: { id: 'eo-uuid-42' } as ElectedOffice,
 })
 
 describe('BriefingTextSource', () => {
-  it('looks up the briefing using the supplied organization and date id', async () => {
+  it('looks up the briefing using electedOfficeId and the date as midnight UTC', async () => {
     const briefing = buildBriefing()
-    const { source, meetingsService } = buildSource(briefing)
+    const { source, meetingBriefings } = buildSource(briefing)
     const args = inputArgs(MEETING_DATE)
 
     await source.loadText(args)
 
-    expect(meetingsService.getBriefing).toHaveBeenCalledWith(
-      args.organization,
-      MEETING_DATE,
+    expect(meetingBriefings.loadBriefingArtifact).toHaveBeenCalledWith(
+      'eo-uuid-42',
+      EXPECTED_DATE_AT_MIDNIGHT_UTC,
     )
   })
 
-  it('builds a cache key from citySlug, date, and generatedAt', async () => {
+  it('throws NotFoundException when the briefing artifact is missing', async () => {
+    const { source } = buildSource(null)
+
+    await expect(source.loadText(inputArgs())).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it('builds a cache key from slug and generated_at so regenerations bust the cache', async () => {
     const briefing = buildBriefing()
     const { source } = buildSource(briefing)
 
     const result = await source.loadText(inputArgs())
 
     expect(result.cacheKey).toBe(
-      `springfield-mo:${MEETING_DATE}:2026-05-01T12:00:00Z`,
+      'springfield-city-council-2026-05-14:2026-05-01T12:00:00Z',
     )
   })
 
-  it('renders the meeting title, headline, and subheadline as the opening sections', async () => {
+  it('renders title and executive_summary as the opening sections', async () => {
     const briefing = buildBriefing()
     const { source } = buildSource(briefing)
 
     const { text } = await source.loadText(inputArgs())
 
     expect(text.startsWith('Springfield City Council Meeting')).toBe(true)
-    expect(text).toContain('Three priority items tonight.')
-    expect(text).toContain('Budget vote, zoning hearing, parks contract.')
+    expect(text).toContain(
+      'Three priority items tonight including the budget vote.',
+    )
   })
 
-  it('renders priority issues with their guidance and analysis text', async () => {
+  it('renders action items with overview, sentiment, budget impact, and talking points', async () => {
     const briefing = buildBriefing()
     const { source } = buildSource(briefing)
 
     const { text } = await source.loadText(inputArgs())
 
-    expect(text).toContain('Priority item 1. Budget Amendment.')
-    expect(text).toContain('Read the proposed amendment before the meeting.')
-    expect(text).toContain('A vote on Amendment 4.')
+    expect(text).toContain('Action item: Budget Amendment.')
+    expect(text).toContain('A vote on Amendment 4')
+    expect(text).toContain(
+      'Constituent sentiment: Constituents support the parks carve-out.',
+    )
+    expect(text).toContain('Budget impact: Net neutral over five years.')
+    expect(text).toContain('Talking points.')
     expect(text).toContain('Approve with the parks carve-out.')
   })
 
@@ -140,39 +140,20 @@ describe('BriefingTextSource', () => {
 
     expect(text).not.toMatch(/\*\*/)
     expect(text).not.toMatch(/\]\(http/)
-    expect(text).toContain('Vote on the budget amendment tonight.')
+    expect(text).toContain('A vote on Amendment 4 to the city budget.')
     expect(text).toContain('See memo.')
   })
 
-  it('appends the full agenda summary at the end', async () => {
-    const briefing = buildBriefing()
-    const { source } = buildSource(briefing)
-
-    const { text } = await source.loadText(inputArgs())
-
-    expect(text).toContain('Full agenda summary.')
-    expect(
-      text.endsWith(
-        'Five items including the budget vote and a zoning hearing.',
-      ),
-    ).toBe(true)
-  })
-
-  it('renders only the guidance text when a priority issue has no detail', async () => {
+  it('omits optional sentiment, budget impact, and talking points when absent', async () => {
     const briefing = buildBriefing({
-      priorityIssues: [
+      action_items: [
         {
-          number: 1,
-          slug: 'simple',
-          agendaItemTitle: 'Simple Item',
-          category: 'misc',
-          card: {
-            headline: 'Headline only.',
-            whatYouNeedToDo: 'Do this.',
-            askThisInTheRoom: 'Ask that?',
-            tryThis: null,
-            actionButtons: [],
-          },
+          id: 'a1',
+          title: 'Simple Item',
+          overview: 'Just an overview.',
+          recent_news: [],
+          talking_points: [],
+          sources: [],
         },
       ],
     })
@@ -180,18 +161,22 @@ describe('BriefingTextSource', () => {
 
     const { text } = await source.loadText(inputArgs())
 
-    expect(text).toContain('Priority item 1. Simple Item.')
-    expect(text).toContain('Headline only.')
-    expect(text).toContain('Do this.')
-    expect(text).toContain('Ask that?')
+    expect(text).toContain('Action item: Simple Item.')
+    expect(text).toContain('Just an overview.')
+    expect(text).not.toContain('Constituent sentiment:')
+    expect(text).not.toContain('Budget impact:')
+    expect(text).not.toContain('Talking points.')
   })
 
-  it('omits the agenda summary section when the field is empty', async () => {
-    const briefing = buildBriefing({ fullAgendaSummary: '' })
+  it('omits the executive summary section when the field is empty', async () => {
+    const briefing = buildBriefing({ executive_summary: '' })
     const { source } = buildSource(briefing)
 
     const { text } = await source.loadText(inputArgs())
 
-    expect(text).not.toContain('Full agenda summary.')
+    expect(text.startsWith('Springfield City Council Meeting')).toBe(true)
+    expect(text).not.toContain(
+      'Three priority items tonight including the budget vote.',
+    )
   })
 })

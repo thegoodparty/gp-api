@@ -5,6 +5,8 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import {
+  MeetingBriefingResponse,
+  MeetingBriefingResponseSchema,
   MeetingScheduleArtifact,
   MeetingScheduleArtifactSchema,
 } from '@goodparty_org/contracts'
@@ -45,6 +47,35 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     try {
       const parsed = MeetingScheduleArtifactSchema.safeParse(JSON.parse(raw))
+      return parsed.success ? parsed.data : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Load the parsed briefing artifact for an elected office on a given
+   * meeting date. Returns null if no row exists, the S3 object is missing,
+   * or the JSON fails schema validation. Used both by the HTTP controller
+   * (which translates null to 404) and by non-HTTP callers like the speech
+   * text source (which falls back to a different error contract).
+   */
+  async loadBriefingArtifact(
+    electedOfficeId: string,
+    meetingDate: Date,
+  ): Promise<MeetingBriefingResponse | null> {
+    const row = await this.model.findUnique({
+      where: {
+        electedOfficeId_meetingDate: { electedOfficeId, meetingDate },
+      },
+    })
+    if (!row) return null
+
+    const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
+    if (!raw) return null
+
+    try {
+      const parsed = MeetingBriefingResponseSchema.safeParse(JSON.parse(raw))
       return parsed.success ? parsed.data : null
     } catch {
       return null

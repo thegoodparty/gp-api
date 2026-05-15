@@ -1,6 +1,6 @@
 import { Engine, VoiceId } from '@aws-sdk/client-polly'
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { Organization, User } from '@prisma/client'
+import { ElectedOffice, Organization, User } from '@prisma/client'
 import { createHash } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 import {
@@ -26,6 +26,7 @@ type TargetType = SpeechSynthesisTargetType
 type SynthesizeInput = {
   user: User
   organization: Organization
+  electedOffice: ElectedOffice
   request: SynthesizeSpeechRequest
 }
 
@@ -46,7 +47,7 @@ export class TextToSpeechService {
   }
 
   async synthesize(input: SynthesizeInput): Promise<SynthesizeSpeechResponse> {
-    const { request, user, organization } = input
+    const { request, user, organization, electedOffice } = input
     const source = this.sources.get(request.target.type)
     if (!source) {
       throw new NotFoundException(
@@ -61,6 +62,7 @@ export class TextToSpeechService {
       id: request.target.id,
       user,
       organization,
+      electedOffice,
     })
 
     const chunks = chunkBySentence(text, POLLY_MAX_CHARS)
