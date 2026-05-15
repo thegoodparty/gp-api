@@ -13,11 +13,14 @@ import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
-import { Briefing, MeetingSchedule } from '@/generated/agent-job-contracts'
+import { MeetingSchedule } from '@/generated/agent-job-contracts'
 
-// JSON.parse returns unknown — no way to infer parsed shape at compile time
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const parseBriefing = (raw: string): Briefing => JSON.parse(raw) as Briefing
+const parseBriefingArtifact = (
+  raw: string,
+): PrismaJson.MeetingBriefingArtifact =>
+  // JSON.parse returns unknown — no way to infer parsed shape at compile time
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  JSON.parse(raw) as PrismaJson.MeetingBriefingArtifact
 const parseSchedule = (raw: string): MeetingSchedule =>
   // JSON.parse returns unknown — no way to infer parsed shape at compile time
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -297,9 +300,9 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    let parsed: Briefing
+    let artifact: PrismaJson.MeetingBriefingArtifact
     try {
-      parsed = parseBriefing(raw)
+      artifact = parseBriefingArtifact(raw)
     } catch {
       this.logger.error(
         { runId: run.runId },
@@ -307,11 +310,13 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return
     }
-    const dateString = parsed.meeting?.scheduledAt?.slice(0, 10) ?? ''
+
+    const dateString =
+      typeof artifact.meeting_date === 'string' ? artifact.meeting_date : ''
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       this.logger.error(
         { runId: run.runId, dateString },
-        'meeting_briefing artifact has invalid meeting.scheduledAt',
+        'meeting_briefing artifact has invalid meeting_date',
       )
       return
     }
@@ -342,6 +347,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         experimentRunId: run.runId,
         artifactBucket: run.artifactBucket,
         artifactKey: run.artifactKey,
+        artifact,
       },
       update: {
         meetingTime,
@@ -349,6 +355,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         experimentRunId: run.runId,
         artifactBucket: run.artifactBucket,
         artifactKey: run.artifactKey,
+        artifact,
       },
     })
   }

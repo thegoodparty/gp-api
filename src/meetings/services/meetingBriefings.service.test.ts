@@ -199,8 +199,9 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
         duration_minutes: 60,
       }),
       'briefing.json': JSON.stringify({
-        meetingDate: '2026-06-08',
-        meeting: { scheduledAt: '2026-06-08T19:00:00-06:00' },
+        meeting_date: '2026-06-08',
+        meeting_name: 'City Council',
+        location: 'Council Chambers',
       }),
     })
 
@@ -220,6 +221,8 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
     expect(row?.artifactBucket).toBe('briefing-bucket')
     expect(row?.artifactKey).toBe('briefing.json')
     expect(row?.experimentRunId).toBe(briefingRun.runId)
+    expect(row?.artifact?.meeting_name).toBe('City Council')
+    expect(row?.artifact?.location).toBe('Council Chambers')
   })
 
   it('skips when run is not COMPLETED', async () => {

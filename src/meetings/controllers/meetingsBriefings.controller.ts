@@ -61,6 +61,7 @@ export class MeetingsBriefingsController {
         meetingDate: true,
         meetingTime: true,
         meetingTimezone: true,
+        artifact: true,
       },
     })
 
@@ -83,14 +84,24 @@ export class MeetingsBriefingsController {
     for (const row of briefingRows) {
       const date = formatInTimeZone(row.meetingDate, 'UTC', 'yyyy-MM-dd')
       const existing = byDate.get(date)
+      const artifactName = row.artifact?.meeting_name
+      const artifactLocation = row.artifact?.location
       byDate.set(date, {
         meetingDate: date,
         meetingTime: row.meetingTime,
         meetingTimezone: row.meetingTimezone,
         durationMinutes:
           existing?.durationMinutes ?? knownSchedule?.duration_minutes ?? 0,
-        meetingName: existing?.meetingName ?? knownSchedule?.meeting_name ?? '',
-        location: existing?.location ?? knownSchedule?.location ?? '',
+        meetingName:
+          artifactName ||
+          existing?.meetingName ||
+          knownSchedule?.meeting_name ||
+          '',
+        location:
+          artifactLocation ||
+          existing?.location ||
+          knownSchedule?.location ||
+          '',
         hasBriefing: true,
       })
     }
