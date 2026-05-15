@@ -34,6 +34,8 @@ const seedScheduleRun = async (
 
 const foundSchedule = {
   status: 'found',
+  meeting_name: 'City Council',
+  location: 'City Hall Council Chambers, 200 Main St',
   rrule: 'FREQ=MONTHLY;BYDAY=2MO,4MO',
   human: '2nd and 4th Monday',
   time: '19:00',
@@ -58,7 +60,7 @@ describe('GET /v1/meetings', () => {
     expect(result.status).toBe(404)
   })
 
-  it('returns schedule_known:false when no completed schedule run exists', async () => {
+  it('returns scheduleKnown:false when no completed schedule run exists', async () => {
     const orgSlug = 'eo-no-schedule'
     await seedElectedOffice(orgSlug)
 
@@ -67,10 +69,10 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ schedule_known: false, meetings: [] })
+    expect(result.data).toEqual({ scheduleKnown: false, meetings: [] })
   })
 
-  it('returns schedule_known:false when schedule artifact is not_found', async () => {
+  it('returns scheduleKnown:false when schedule artifact is not_found', async () => {
     const orgSlug = 'eo-not-found-schedule'
     await seedElectedOffice(orgSlug)
     await seedScheduleRun(orgSlug)
@@ -86,10 +88,10 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ schedule_known: false, meetings: [] })
+    expect(result.data).toEqual({ scheduleKnown: false, meetings: [] })
   })
 
-  it('returns projected meetings with has_briefing:false when no briefings exist', async () => {
+  it('returns projected meetings with hasBriefing:false when no briefings exist', async () => {
     const orgSlug = 'eo-projected'
     await seedElectedOffice(orgSlug)
     await seedScheduleRun(orgSlug)
@@ -100,11 +102,11 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    expect(result.data.schedule_known).toBe(true)
+    expect(result.data.scheduleKnown).toBe(true)
     expect(result.data.meetings.length).toBeGreaterThan(0)
     expect(
       result.data.meetings.every(
-        (m: { has_briefing: boolean }) => m.has_briefing === false,
+        (m: { hasBriefing: boolean }) => m.hasBriefing === false,
       ),
     ).toBe(true)
   })
@@ -121,15 +123,19 @@ describe('GET /v1/meetings', () => {
 
     expect(result.status).toBe(200)
     for (const m of result.data.meetings as Array<{
-      meeting_date: string
-      meeting_time: string
-      meeting_timezone: string
-      duration_minutes: number
+      meetingDate: string
+      meetingTime: string
+      meetingTimezone: string
+      durationMinutes: number
+      meetingName: string
+      location: string
     }>) {
-      expect(m.meeting_time).toBe('19:00')
-      expect(m.meeting_timezone).toBe('America/Denver')
-      expect(m.duration_minutes).toBe(180)
-      expect(m.meeting_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(m.meetingTime).toBe('19:00')
+      expect(m.meetingTimezone).toBe('America/Denver')
+      expect(m.durationMinutes).toBe(180)
+      expect(m.meetingName).toBe('City Council')
+      expect(m.location).toBe('City Hall Council Chambers, 200 Main St')
+      expect(m.meetingDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     }
   })
 
@@ -150,8 +156,8 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    const dates = (result.data.meetings as Array<{ meeting_date: string }>).map(
-      (m) => m.meeting_date,
+    const dates = (result.data.meetings as Array<{ meetingDate: string }>).map(
+      (m) => m.meetingDate,
     )
     expect(dates.length).toBeGreaterThan(0)
     for (const d of dates) {
@@ -176,7 +182,7 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ schedule_known: true, meetings: [] })
+    expect(result.data).toEqual({ scheduleKnown: true, meetings: [] })
   })
 
   it('returns an empty meeting list when the schedule timezone is invalid', async () => {
@@ -195,7 +201,7 @@ describe('GET /v1/meetings', () => {
     })
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ schedule_known: true, meetings: [] })
+    expect(result.data).toEqual({ scheduleKnown: true, meetings: [] })
   })
 
   it('handles a weekly schedule', async () => {
@@ -216,13 +222,13 @@ describe('GET /v1/meetings', () => {
 
     expect(result.status).toBe(200)
     expect(result.data.meetings.length).toBeGreaterThan(0)
-    for (const m of result.data.meetings as Array<{ meeting_date: string }>) {
-      const day = getDay(parseISO(m.meeting_date))
+    for (const m of result.data.meetings as Array<{ meetingDate: string }>) {
+      const day = getDay(parseISO(m.meetingDate))
       expect(day).toBe(2)
     }
   })
 
-  it('marks dates with existing briefings as has_briefing:true', async () => {
+  it('marks dates with existing briefings as hasBriefing:true', async () => {
     const orgSlug = 'eo-briefings'
     const eo = await seedElectedOffice(orgSlug)
     await seedScheduleRun(orgSlug)
@@ -232,8 +238,8 @@ describe('GET /v1/meetings', () => {
       headers: { 'x-organization-slug': orgSlug },
     })
     const targetDate = (
-      probe.data.meetings as Array<{ meeting_date: string }>
-    )[0].meeting_date
+      probe.data.meetings as Array<{ meetingDate: string }>
+    )[0].meetingDate
 
     const briefingRun = await service.prisma.experimentRun.create({
       data: {
@@ -260,16 +266,16 @@ describe('GET /v1/meetings', () => {
 
     expect(result.status).toBe(200)
     const meetings = result.data.meetings as Array<{
-      meeting_date: string
-      has_briefing: boolean
+      meetingDate: string
+      hasBriefing: boolean
     }>
     expect(
-      meetings.find((m) => m.meeting_date === targetDate)?.has_briefing,
+      meetings.find((m) => m.meetingDate === targetDate)?.hasBriefing,
     ).toBe(true)
     expect(
       meetings
-        .filter((m) => m.meeting_date !== targetDate)
-        .every((m) => !m.has_briefing),
+        .filter((m) => m.meetingDate !== targetDate)
+        .every((m) => !m.hasBriefing),
     ).toBe(true)
   })
 })
@@ -277,23 +283,23 @@ describe('GET /v1/meetings', () => {
 const validBriefingArtifact = {
   id: 'b1',
   slug: 'city-council-june-8-2026',
-  meeting_id: 'm1',
+  meetingId: 'm1',
   title: 'City Council June 8, 2026',
-  meeting_date: 'June 8, 2026',
+  meetingDate: 'June 8, 2026',
   status: 'briefing_ready',
-  reading_time_minutes: 8,
-  generated_at: '2026-05-13T14:22:08Z',
+  readingTimeMinutes: 8,
+  generatedAt: '2026-05-13T14:22:08Z',
   meeting: {
     id: 'm1',
     name: 'City Council',
     body: 'City Council',
     type: 'city_council',
-    scheduled_at: '2026-06-08T19:00:00-06:00',
+    scheduledAt: '2026-06-08T19:00:00-06:00',
     location: 'Council Chambers',
   },
-  executive_summary: 'Summary',
+  executiveSummary: 'Summary',
   agenda: [],
-  action_items: [],
+  actionItems: [],
 }
 
 const seedBriefing = async (
@@ -368,37 +374,16 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.status).toBe(404)
   })
 
-  it('returns 404 when artifact JSON is malformed', async () => {
-    const orgSlug = 'eo-bad-json'
+  it('returns the artifact JSON as-is on success (no shape validation)', async () => {
+    const orgSlug = 'eo-passthrough'
     const eo = await seedElectedOffice(orgSlug)
     await seedBriefing(eo.id, orgSlug, {
       meetingDate: '2026-06-08',
       artifactBucket: 'briefing-bucket',
-      artifactKey: 'bad-json.json',
-    })
-    mockS3({ 'bad-json.json': '{not valid json' })
-
-    const result = await service.client.get(
-      '/v1/meetings/2026-06-08/briefing',
-      { headers: { 'x-organization-slug': orgSlug } },
-    )
-
-    expect(result.status).toBe(404)
-  })
-
-  it('returns 404 when artifact fails Zod validation', async () => {
-    const orgSlug = 'eo-bad-shape'
-    const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, {
-      meetingDate: '2026-06-08',
-      artifactBucket: 'briefing-bucket',
-      artifactKey: 'bad-shape.json',
+      artifactKey: 'partial.json',
     })
     mockS3({
-      'bad-shape.json': JSON.stringify({
-        id: 'b1',
-        status: 'briefing_ready',
-      }),
+      'partial.json': JSON.stringify({ id: 'b1', status: 'briefing_ready' }),
     })
 
     const result = await service.client.get(
@@ -406,7 +391,8 @@ describe('GET /v1/meetings/:date/briefing', () => {
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(result.status).toBe(404)
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({ id: 'b1', status: 'briefing_ready' })
   })
 
   it('returns the parsed briefing artifact on success', async () => {
@@ -426,7 +412,7 @@ describe('GET /v1/meetings/:date/briefing', () => {
 
     expect(result.status).toBe(200)
     expect(result.data.slug).toBe('city-council-june-8-2026')
-    expect(result.data.reading_time_minutes).toBe(8)
-    expect(result.data.meeting.scheduled_at).toBe('2026-06-08T19:00:00-06:00')
+    expect(result.data.readingTimeMinutes).toBe(8)
+    expect(result.data.meeting.scheduledAt).toBe('2026-06-08T19:00:00-06:00')
   })
 })
