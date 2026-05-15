@@ -1,18 +1,21 @@
 import { Engine, VoiceId } from '@aws-sdk/client-polly'
-import { Injectable, NotFoundException } from '@nestjs/common'
-import { ElectedOffice, Organization, User } from '@prisma/client'
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnprocessableEntityException,
+} from '@nestjs/common'
+import { User } from '@prisma/client'
 import { createHash } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 import {
-  SpeechSynthesisTargetType,
   SynthesizeSpeechRequest,
   SynthesizeSpeechResponse,
 } from '@goodparty_org/contracts'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { chunkBySentence } from '../util/chunkBySentence'
-import { BriefingTextSource } from './briefingTextSource.service'
+import { UserRequestBudget } from '../util/userRequestBudget'
 import { PollyService } from './polly.service'
-import { TargetTextSource } from './targetTextSource.types'
 
 const SPEECH_BUCKET =
   process.env.MEETING_PIPELINE_BUCKET ?? 'meeting-pipeline-dev'
@@ -21,60 +24,59 @@ const POLLY_MAX_CHARS = 2900
 const PRESIGNED_URL_EXPIRES_SECONDS = 600
 const AUDIO_FORMAT = 'audio/mpeg' as const
 
-type TargetType = SpeechSynthesisTargetType
+const TTS_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
+const TTS_RATE_LIMIT_PER_USER = 50
 
 type SynthesizeInput = {
   user: User
-  organization: Organization
-  electedOffice: ElectedOffice
   request: SynthesizeSpeechRequest
 }
 
 @Injectable()
 export class TextToSpeechService {
-  private readonly sources: Map<TargetType, TargetTextSource<TargetType>>
+  private readonly budget = new UserRequestBudget({
+    windowMs: TTS_RATE_LIMIT_WINDOW_MS,
+    limit: TTS_RATE_LIMIT_PER_USER,
+  })
 
   constructor(
     private readonly pollyService: PollyService,
     private readonly s3Service: S3Service,
-    private readonly briefingTextSource: BriefingTextSource,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(TextToSpeechService.name)
-    this.sources = new Map<TargetType, TargetTextSource<TargetType>>([
-      [briefingTextSource.type, briefingTextSource],
-    ])
   }
 
   async synthesize(input: SynthesizeInput): Promise<SynthesizeSpeechResponse> {
-    const { request, user, organization, electedOffice } = input
-    const source = this.sources.get(request.target.type)
-    if (!source) {
-      throw new NotFoundException(
-        `No text source registered for target type: ${request.target.type}`,
+    const { user, request } = input
+
+    if (!this.budget.tryAdmit(user.id)) {
+      throw new HttpException(
+        'Speech synthesis rate limit exceeded; please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
       )
     }
 
     const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
     const engine: Engine = request.options?.engine ?? 'neural'
 
-    const { text, cacheKey } = await source.loadText({
-      id: request.target.id,
-      user,
-      organization,
-      electedOffice,
-    })
-
-    const chunks = chunkBySentence(text, POLLY_MAX_CHARS)
+    // The contracts schema enforces non-empty + max length on request.text;
+    // chunkBySentence may still yield zero chunks if the input is purely
+    // whitespace or punctuation that the splitter strips.
+    const chunks = chunkBySentence(request.text, POLLY_MAX_CHARS)
     if (chunks.length === 0) {
-      throw new NotFoundException('Target produced no readable text')
+      throw new UnprocessableEntityException(
+        'Input text contains no readable content',
+      )
     }
+
+    const cacheKey = this.buildTextCacheKey(request.text)
 
     this.logger.info(
       {
-        targetType: request.target.type,
-        targetId: request.target.id,
+        userId: user.id,
         chunkCount: chunks.length,
+        textLength: request.text.length,
         voiceId,
         engine,
       },
@@ -113,8 +115,7 @@ export class TextToSpeechService {
 
     this.logger.info(
       {
-        targetType: request.target.type,
-        targetId: request.target.id,
+        userId: user.id,
         cacheHits,
         cacheMisses: chunks.length - cacheHits,
       },
@@ -125,6 +126,19 @@ export class TextToSpeechService {
       format: AUDIO_FORMAT,
       segments,
     }
+  }
+
+  /**
+   * Top-level cache key for a synthesis request. Hashing the raw text means
+   * the same text from two different callers (or the same caller twice) hits
+   * the same Polly cache, and any change to the text invalidates the prior
+   * audio automatically.
+   *
+   * The voice + engine + per-chunk hash are folded in further down in
+   * `buildSegmentKey` so different voices/engines do not collide.
+   */
+  private buildTextCacheKey(text: string): string {
+    return createHash('sha1').update(text).digest('hex')
   }
 
   private buildSegmentKey(

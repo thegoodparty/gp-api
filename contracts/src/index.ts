@@ -247,12 +247,13 @@ export {
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
 
 export {
-  SPEECH_SYNTHESIS_TARGET_TYPE_VALUES,
-  type SpeechSynthesisTargetType,
-  SpeechSynthesisTargetTypeSchema,
   SPEECH_SYNTHESIS_ENGINE_VALUES,
   type SpeechSynthesisEngine,
   SpeechSynthesisEngineSchema,
+  SPEECH_SYNTHESIS_VOICE_VALUES,
+  type SpeechSynthesisVoice,
+  SpeechSynthesisVoiceSchema,
+  SYNTHESIZE_SPEECH_MAX_TEXT_LENGTH,
   SynthesizeSpeechRequestSchema,
   type SynthesizeSpeechRequest,
   SynthesizeSpeechSegmentSchema,
@@ -262,9 +263,6 @@ export {
 } from './speech/synthesizeSpeech.schema'
 
 export {
-  SPEECH_TO_TEXT_TARGET_TYPE_VALUES,
-  type SpeechToTextTargetType,
-  SpeechToTextTargetTypeSchema,
   TranscribeSessionRequestSchema,
   type TranscribeSessionRequest,
   TranscribeSessionResponseSchema,

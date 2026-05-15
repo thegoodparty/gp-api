@@ -365,8 +365,6 @@ export class SpeechToTextGateway implements OnApplicationBootstrap {
     this.logger.info(
       {
         userId: context.ticket.uid,
-        electedOfficeId: context.ticket.eoid,
-        targetType: context.ticket.tt,
         durationMs: Date.now() - context.startedAtMs,
         bytesReceived: context.bytesReceived,
         reason,

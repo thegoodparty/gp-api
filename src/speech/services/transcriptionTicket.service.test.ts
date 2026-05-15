@@ -10,11 +10,7 @@ const makeJwt = () =>
 
 const buildService = () => new TranscriptionTicketService(makeJwt())
 
-const mintInput = () => ({
-  userId: 123,
-  electedOfficeId: 'eo-456',
-  target: { type: 'note' as const, id: 'note-789' },
-})
+const mintInput = () => ({ userId: 123 })
 
 const decodePayload = (ticket: string): Record<string, unknown> =>
   JSON.parse(
@@ -41,16 +37,21 @@ describe('TranscriptionTicketService.mint', () => {
     expect(result.expiresAt.getTime()).toBeLessThanOrEqual(after + 61_000)
   })
 
-  it('encodes user id, elected office id, target type, and target id in the payload', () => {
+  it('encodes user id and the transcription typ claim in the payload', () => {
     const result = service.mint(mintInput())
     const payload = decodePayload(result.ticket)
     expect(payload).toMatchObject({
       uid: 123,
-      eoid: 'eo-456',
-      tt: 'note',
-      tid: 'note-789',
       typ: 'transcription_ticket',
     })
+  })
+
+  it('does not encode any domain target fields', () => {
+    const result = service.mint(mintInput())
+    const payload = decodePayload(result.ticket)
+    expect(payload).not.toHaveProperty('tt')
+    expect(payload).not.toHaveProperty('tid')
+    expect(payload).not.toHaveProperty('eoid')
   })
 
   it('encodes a UUID jti claim', () => {
@@ -80,9 +81,6 @@ describe('TranscriptionTicketService.verify', () => {
     const payload = service.verify(minted.ticket)
     expect(payload).toMatchObject({
       uid: 123,
-      eoid: 'eo-456',
-      tt: 'note',
-      tid: 'note-789',
       typ: 'transcription_ticket',
     })
   })
@@ -104,7 +102,7 @@ describe('TranscriptionTicketService.verify', () => {
   it('rejects a JWT signed with the same secret but missing the transcription typ claim', () => {
     const sharedJwt = makeJwt()
     const otherTokenForSamePayload = sharedJwt.sign(
-      { uid: 1, eoid: 'e', sub: 'something-else' },
+      { uid: 1, sub: 'something-else' },
       { expiresIn: 60 },
     )
     expect(() => service.verify(otherTokenForSamePayload)).toThrow(

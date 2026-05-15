@@ -5,13 +5,9 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOffice, Organization, User } from '@prisma/client'
+import { User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
-import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
-import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
-import { ReqOrganization } from '@/organizations/decorators/ReqOrganization.decorator'
-import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { SynthesizeSpeechResponseSchema } from '@goodparty_org/contracts'
@@ -24,21 +20,18 @@ import { TextToSpeechService } from '../services/textToSpeech.service'
 export class TextToSpeechController {
   constructor(private readonly textToSpeechService: TextToSpeechService) {}
 
+  /**
+   * Pure pipe: accepts plain text + render options, returns ordered URLs to
+   * cached audio segments. Authentication is enforced by the global
+   * SessionGuard, so the only context the speech service needs is the user
+   * for rate limiting and audit logging.
+   */
   @Post('synthesize')
-  @UseElectedOffice()
-  @UseOrganization()
   @ResponseSchema(SynthesizeSpeechResponseSchema)
   async synthesize(
     @ReqUser() user: User,
-    @ReqOrganization() organization: Organization,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body() request: SynthesizeSpeechRequestDto,
   ) {
-    return this.textToSpeechService.synthesize({
-      user,
-      organization,
-      electedOffice,
-      request,
-    })
+    return this.textToSpeechService.synthesize({ user, request })
   }
 }

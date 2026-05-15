@@ -1,27 +1,26 @@
-import { Injectable } from '@nestjs/common'
-import { ElectedOffice, User } from '@prisma/client'
-import {
-  SpeechToTextTargetType,
-  TranscribeSessionRequest,
-  TranscribeSessionResponse,
-} from '@goodparty_org/contracts'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
+import { User } from '@prisma/client'
+import { TranscribeSessionResponse } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
+import { UserRequestBudget } from '../util/userRequestBudget'
 import { TRANSCRIBE_STREAM_PATH } from '../ws/speechToText.gateway'
 import { TranscriptionTicketService } from './transcriptionTicket.service'
-import { TargetAuthorizer } from './targetAuthorizer.types'
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_API_URL ?? ''
 
+const STT_SESSION_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
+const STT_SESSION_RATE_LIMIT_PER_USER = 30
+
 export type CreateSessionInput = {
   user: User
-  electedOffice: ElectedOffice
-  request: TranscribeSessionRequest
 }
 
 @Injectable()
 export class SpeechToTextService {
-  private readonly authorizers: Map<SpeechToTextTargetType, TargetAuthorizer> =
-    new Map()
+  private readonly budget = new UserRequestBudget({
+    windowMs: STT_SESSION_RATE_LIMIT_WINDOW_MS,
+    limit: STT_SESSION_RATE_LIMIT_PER_USER,
+  })
 
   constructor(
     private readonly ticketService: TranscriptionTicketService,
@@ -30,37 +29,17 @@ export class SpeechToTextService {
     this.logger.setContext(SpeechToTextService.name)
   }
 
-  registerAuthorizer(authorizer: TargetAuthorizer) {
-    this.authorizers.set(authorizer.type, authorizer)
-  }
-
-  async createSession(
-    input: CreateSessionInput,
-  ): Promise<TranscribeSessionResponse> {
-    const authorizer = this.authorizers.get(input.request.target.type)
-    if (authorizer) {
-      await authorizer.authorizeWrite({
-        user: input.user,
-        electedOffice: input.electedOffice,
-        targetId: input.request.target.id,
-      })
+  createSession(input: CreateSessionInput): TranscribeSessionResponse {
+    if (!this.budget.tryAdmit(input.user.id)) {
+      throw new HttpException(
+        'Speech transcription session rate limit exceeded; please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
     }
 
-    const minted = this.ticketService.mint({
-      userId: input.user.id,
-      electedOfficeId: input.electedOffice.id,
-      target: input.request.target,
-    })
-
+    const minted = this.ticketService.mint({ userId: input.user.id })
     const wsUrl = this.buildWsUrl(minted.ticket)
-    this.logger.info(
-      {
-        userId: input.user.id,
-        electedOfficeId: input.electedOffice.id,
-        targetType: input.request.target.type,
-      },
-      'Issued speech-to-text ticket',
-    )
+    this.logger.info({ userId: input.user.id }, 'Issued speech-to-text ticket')
     return {
       wsUrl,
       expiresAt: minted.expiresAt.toISOString(),

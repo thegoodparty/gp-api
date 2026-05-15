@@ -3,10 +3,6 @@ import { JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { randomUUID } from 'crypto'
 import { addSeconds } from 'date-fns'
 import { z } from 'zod'
-import {
-  SpeechToTextTargetType,
-  SpeechToTextTargetTypeSchema,
-} from '@goodparty_org/contracts'
 
 const TICKET_TTL_SECONDS = 60
 const SEEN_JTI_CAPACITY = 4096
@@ -14,9 +10,6 @@ const TICKET_TYP = 'transcription_ticket' as const
 
 const TicketPayloadSchema = z.object({
   uid: z.number().int().positive(),
-  eoid: z.string().min(1),
-  tt: SpeechToTextTargetTypeSchema,
-  tid: z.string().min(1),
   jti: z.string().min(1),
   typ: z.literal(TICKET_TYP),
   iat: z.number().int().nonnegative(),
@@ -27,11 +20,6 @@ export type TranscriptionTicketPayload = z.infer<typeof TicketPayloadSchema>
 
 export type MintTicketInput = {
   userId: number
-  electedOfficeId: string
-  target: {
-    type: SpeechToTextTargetType
-    id: string
-  }
 }
 
 export type MintedTicket = {
@@ -41,6 +29,9 @@ export type MintedTicket = {
 
 @Injectable()
 export class TranscriptionTicketService {
+  // Bounded set protecting against ticket replay within their 60s TTL. The
+  // capacity is more than enough for v1 traffic — even at sustained 50 mints
+  // per second the oldest entries fall out well after expiry.
   private readonly seenJtis: Set<string> = new Set()
 
   constructor(private readonly jwtService: JwtService) {}
@@ -51,9 +42,6 @@ export class TranscriptionTicketService {
     const ticket = this.jwtService.sign(
       {
         uid: input.userId,
-        eoid: input.electedOfficeId,
-        tt: input.target.type,
-        tid: input.target.id,
         jti,
         typ: TICKET_TYP,
       },
