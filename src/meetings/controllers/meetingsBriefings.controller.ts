@@ -6,11 +6,22 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import {
   MeetingDateParam,
   MeetingDateParamSchema,
 } from '../schemas/meetingDateParam.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
+
+type MeetingListItem = {
+  meetingDate: string
+  meetingTime: string
+  meetingTimezone: string
+  durationMinutes: number
+  meetingName: string
+  location: string
+  hasBriefing: boolean
+}
 
 @Controller('meetings')
 export class MeetingsBriefingsController {
@@ -25,42 +36,68 @@ export class MeetingsBriefingsController {
     const schedule = await this.meetingBriefings.loadLatestScheduleForOrg(
       electedOffice.organizationSlug,
     )
-    if (!schedule || schedule.status === 'not_found') {
-      return { scheduleKnown: false, meetings: [] }
-    }
+    const knownSchedule = schedule?.status === 'found' ? schedule : null
 
     const now = new Date()
-    const dates = this.meetingBriefings.projectMeetingDates({
-      schedule,
-      from: subMonths(now, 2),
-      to: addMonths(now, 3),
-    })
+    const windowFrom = subMonths(now, 2)
+    const windowTo = addMonths(now, 3)
 
-    const briefings = await this.meetingBriefings.findMany({
+    const projectedDates = knownSchedule
+      ? this.meetingBriefings.projectMeetingDates({
+          schedule: knownSchedule,
+          from: windowFrom,
+          to: windowTo,
+        })
+      : []
+
+    const briefingRows = await this.meetingBriefings.findMany({
       where: {
         electedOfficeId: electedOffice.id,
-        meetingDate: { in: dates.map((d) => new Date(d)) },
+        meetingDate: { gte: windowFrom, lte: windowTo },
       },
-      select: { meetingDate: true },
+      select: {
+        meetingDate: true,
+        meetingTime: true,
+        meetingTimezone: true,
+      },
     })
-    const haveBriefing = new Set(
-      briefings.map((b) =>
-        formatInTimeZone(b.meetingDate, 'UTC', 'yyyy-MM-dd'),
-      ),
+
+    const byDate = new Map<string, MeetingListItem>()
+
+    if (knownSchedule) {
+      for (const date of projectedDates) {
+        byDate.set(date, {
+          meetingDate: date,
+          meetingTime: knownSchedule.time,
+          meetingTimezone: knownSchedule.timezone,
+          durationMinutes: knownSchedule.duration_minutes,
+          meetingName: knownSchedule.meeting_name,
+          location: knownSchedule.location,
+          hasBriefing: false,
+        })
+      }
+    }
+
+    for (const row of briefingRows) {
+      const date = formatInTimeZone(row.meetingDate, 'UTC', 'yyyy-MM-dd')
+      const existing = byDate.get(date)
+      byDate.set(date, {
+        meetingDate: date,
+        meetingTime: row.meetingTime,
+        meetingTimezone: row.meetingTimezone,
+        durationMinutes:
+          existing?.durationMinutes ?? knownSchedule?.duration_minutes ?? 0,
+        meetingName: existing?.meetingName ?? knownSchedule?.meeting_name ?? '',
+        location: existing?.location ?? knownSchedule?.location ?? '',
+        hasBriefing: true,
+      })
+    }
+
+    const meetings = [...byDate.values()].sort((a, b) =>
+      a.meetingDate.localeCompare(b.meetingDate),
     )
 
-    return {
-      scheduleKnown: true,
-      meetings: dates.map((d) => ({
-        meetingDate: d,
-        meetingTime: schedule.time,
-        meetingTimezone: schedule.timezone,
-        durationMinutes: schedule.duration_minutes,
-        meetingName: schedule.meeting_name,
-        location: schedule.location,
-        hasBriefing: haveBriefing.has(d),
-      })),
-    }
+    return { scheduleKnown: !!knownSchedule, meetings }
   }
 
   @UseElectedOffice()
@@ -74,7 +111,7 @@ export class MeetingsBriefingsController {
       where: {
         electedOfficeId_meetingDate: {
           electedOfficeId: electedOffice.id,
-          meetingDate: new Date(date),
+          meetingDate: parseIsoDateAsUTC(date),
         },
       },
     })

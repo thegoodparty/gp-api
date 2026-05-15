@@ -278,6 +278,100 @@ describe('GET /v1/meetings', () => {
         .every((m) => !m.hasBriefing),
     ).toBe(true)
   })
+
+  it('returns actual briefings even when no schedule is known', async () => {
+    const orgSlug = 'eo-briefings-no-schedule'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date('2026-05-20T00:00:00Z'),
+        meetingTime: '20:00',
+        meetingTimezone: 'America/Chicago',
+        experimentRunId: briefingRun.runId,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-key.json',
+      },
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data.scheduleKnown).toBe(false)
+    expect(result.data.meetings).toEqual([
+      expect.objectContaining({
+        meetingDate: '2026-05-20',
+        meetingTime: '20:00',
+        meetingTimezone: 'America/Chicago',
+        hasBriefing: true,
+      }),
+    ])
+  })
+
+  it('returns ad-hoc briefings outside the projected RRULE dates', async () => {
+    const orgSlug = 'eo-adhoc-briefing'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const probe = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+    const projectedDates = new Set(
+      (probe.data.meetings as Array<{ meetingDate: string }>).map(
+        (m) => m.meetingDate,
+      ),
+    )
+
+    let adhocDate = '2026-05-20'
+    while (projectedDates.has(adhocDate)) {
+      adhocDate = adhocDate.replace(/\d{2}$/, (d) =>
+        String(+d + 1).padStart(2, '0'),
+      )
+    }
+
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date(adhocDate + 'T00:00:00Z'),
+        meetingTime: '20:00',
+        meetingTimezone: 'America/Denver',
+        experimentRunId: briefingRun.runId,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-key.json',
+      },
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    const adhoc = (
+      result.data.meetings as Array<{
+        meetingDate: string
+        hasBriefing: boolean
+      }>
+    ).find((m) => m.meetingDate === adhocDate)
+    expect(adhoc).toBeDefined()
+    expect(adhoc?.hasBriefing).toBe(true)
+  })
 })
 
 const validBriefingArtifact = {
