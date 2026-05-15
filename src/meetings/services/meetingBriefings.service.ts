@@ -14,6 +14,7 @@ import { ExperimentRunsService } from '@/agentExperiments/services/experimentRun
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
+import { getUserFullName } from '@/users/util/users.util'
 
 const parseBriefingArtifact = (
   raw: string,
@@ -39,9 +40,12 @@ type DispatchContext = {
   electedOfficeId: string
   organizationSlug: string
   clerkUserId: string
+  officialName: string
   city: string
   state: string
-  office: string
+  positionName: string
+  l2DistrictType?: string
+  l2DistrictName?: string
 }
 
 const readStringField = (json: unknown, key: string): string => {
@@ -126,7 +130,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         elected_office_id: ctx.electedOfficeId,
         city: ctx.city,
         state: ctx.state,
-        office: ctx.office,
+        office: ctx.positionName,
       },
     })
   }
@@ -185,10 +189,12 @@ export class MeetingBriefingsService extends createPrismaBase(
       organizationSlug: ctx.organizationSlug,
       clerkUserId: ctx.clerkUserId,
       params: {
-        elected_office_id: ctx.electedOfficeId,
+        officialName: ctx.officialName,
         city: ctx.city,
         state: ctx.state,
-        office: ctx.office,
+        positionName: ctx.positionName,
+        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
+        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
       },
     })
   }
@@ -209,10 +215,12 @@ export class MeetingBriefingsService extends createPrismaBase(
       organizationSlug: ctx.organizationSlug,
       clerkUserId: ctx.clerkUserId,
       params: {
-        elected_office_id: ctx.electedOfficeId,
+        officialName: ctx.officialName,
         city: ctx.city,
         state: ctx.state,
-        office: ctx.office,
+        positionName: ctx.positionName,
+        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
+        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
       },
     })
   }
@@ -223,7 +231,6 @@ export class MeetingBriefingsService extends createPrismaBase(
     const [user, organization, campaign] = await Promise.all([
       this.client.user.findUnique({
         where: { id: electedOffice.userId },
-        select: { clerkId: true },
       }),
       this.client.organization.findUnique({
         where: { slug: electedOffice.organizationSlug },
@@ -246,17 +253,26 @@ export class MeetingBriefingsService extends createPrismaBase(
     }
 
     const position = organization?.positionId
-      ? await this.elections.getPositionById(organization.positionId)
+      ? await this.elections.getPositionById(organization.positionId, {
+          includeDistrict: true,
+        })
       : null
     const state = position?.state ?? ''
-    const office = organization?.customPositionName ?? position?.name ?? ''
+    const positionName =
+      organization?.customPositionName ?? position?.name ?? ''
     const city = readStringField(campaign?.details ?? null, 'city')
+    const officialName = getUserFullName(user)
 
-    if (!city || !state || !office) {
+    if (!city || !state || !positionName || !officialName) {
       this.logger.warn(
         {
           electedOfficeId: electedOffice.id,
-          missing: { city: !city, state: !state, office: !office },
+          missing: {
+            city: !city,
+            state: !state,
+            positionName: !positionName,
+            officialName: !officialName,
+          },
         },
         'skipping dispatch: missing required context',
       )
@@ -267,9 +283,12 @@ export class MeetingBriefingsService extends createPrismaBase(
       electedOfficeId: electedOffice.id,
       organizationSlug: electedOffice.organizationSlug,
       clerkUserId: user.clerkId,
+      officialName,
       city,
       state,
-      office,
+      positionName,
+      l2DistrictType: position?.district?.L2DistrictType,
+      l2DistrictName: position?.district?.L2DistrictName,
     }
   }
 
@@ -282,14 +301,18 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const electedOfficeId = readStringField(run.params, 'elected_office_id')
-    if (!electedOfficeId) {
+    const electedOffice = await this.client.electedOffice.findUnique({
+      where: { organizationSlug: run.organizationSlug },
+      select: { id: true },
+    })
+    if (!electedOffice) {
       this.logger.error(
-        { runId: run.runId },
-        'meeting_briefing run missing elected_office_id param',
+        { runId: run.runId, organizationSlug: run.organizationSlug },
+        'meeting_briefing completed but no ElectedOffice for the org',
       )
       return
     }
+    const electedOfficeId = electedOffice.id
 
     const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
     if (!raw) {

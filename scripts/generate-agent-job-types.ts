@@ -5,6 +5,7 @@
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { compile, JSONSchema } from 'json-schema-to-typescript'
+import RefParser from '@apidevtools/json-schema-ref-parser'
 import prettier from 'prettier'
 
 const main = async () => {
@@ -27,13 +28,16 @@ const main = async () => {
       ),
     )
 
+    const inputSchema = await RefParser.dereference(manifest.input_schema)
+    const outputSchema = await RefParser.dereference(manifest.output_schema)
+
     jobSchemas[experiment.id] = {
       type: 'object',
       additionalProperties: false,
       required: ['Input', 'Output'],
       properties: {
-        Input: manifest.input_schema,
-        Output: manifest.output_schema,
+        Input: inputSchema as JSONSchema,
+        Output: outputSchema as JSONSchema,
       },
     }
   }
