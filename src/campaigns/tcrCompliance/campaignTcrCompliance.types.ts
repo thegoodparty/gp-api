@@ -9,10 +9,4 @@ export type CreateTcrCompliancePayload = Omit<
   formattedAddress?: never
 }
 
-export type CreateAgenticTcrCompliancePayload = Omit<
-  CreateAgenticTcrComplianceDto,
-  'placeId' | 'formattedAddress'
-> & {
-  placeId?: never
-  formattedAddress?: never
-}
+export type CreateAgenticTcrCompliancePayload = CreateAgenticTcrComplianceDto

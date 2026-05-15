@@ -192,18 +192,17 @@ describe('CampaignTcrComplianceController', () => {
       expect(payload.websiteDomain).toBeUndefined()
     })
 
-    it('returns the existing record without re-kicking when one is in-flight', async () => {
-      mockTcrService.fetchByCampaignId.mockResolvedValue(mockTcrCompliance)
+    it('passes through whatever the service returns (idempotent path lives in service)', async () => {
+      const existing = { ...mockTcrCompliance, id: 'tcr-existing' }
+      mockTcrService.createAgentic.mockResolvedValue(existing)
 
       const result = await controller.createAgenticTcrCompliance(
         mockCampaign,
         agenticDto,
       )
 
-      expect(result).toEqual(mockTcrCompliance)
-      expect(mockTcrService.createAgentic).not.toHaveBeenCalled()
-      expect(mockCampaignsService.updateJsonFields).not.toHaveBeenCalled()
-      expect(mockAnalytics.track).not.toHaveBeenCalled()
+      expect(result).toEqual(existing)
+      expect(mockTcrService.createAgentic).toHaveBeenCalledTimes(1)
     })
 
     it('tracks ComplianceFormSubmitted with the agentic source', async () => {

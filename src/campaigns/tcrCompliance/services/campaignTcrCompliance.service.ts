@@ -315,15 +315,31 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     const actorTokenUrl = await this.mintAgentActorTokenUrl(user.clerkId)
 
-    const { ein, committeeName, websiteDomain, ...rest } = payload
+    const {
+      ein,
+      committeeName,
+      websiteDomain,
+      placeId,
+      formattedAddress,
+      ...rest
+    } = payload
 
-    await this.campaignsService.updateJsonFields(campaign.id, {
-      details: {
-        einNumber: ein,
-        campaignCommittee: committeeName,
-        pipelineStatus: ComplianceStage.pending_domain_purchase,
+    const updatedCampaign = await this.campaignsService.updateJsonFields(
+      campaign.id,
+      {
+        details: {
+          einNumber: ein,
+          campaignCommittee: committeeName,
+          pipelineStatus: ComplianceStage.pending_domain_purchase,
+        },
+        placeId,
+        formattedAddress,
       },
-    })
+    )
+
+    if (!updatedCampaign) {
+      throw new BadGatewayException('Failed to update campaign details')
+    }
 
     const created = await this.model.create({
       data: {
@@ -331,7 +347,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         ein,
         committeeName,
         websiteDomain: websiteDomain ?? '',
-        postalAddress: campaign.formattedAddress ?? '',
+        postalAddress: updatedCampaign.formattedAddress ?? '',
         campaignId: campaign.id,
       },
     })

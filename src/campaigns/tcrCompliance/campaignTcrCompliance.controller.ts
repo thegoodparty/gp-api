@@ -91,39 +91,15 @@ export class CampaignTcrComplianceController {
     @Body()
     tcrComplianceDto: CreateAgenticTcrComplianceDto,
   ) {
-    const existing = await this.tcrComplianceService.fetchByCampaignId(
-      campaign.id,
-    )
-    if (existing) {
-      return existing
-    }
-
     const user = await this.userService.findByCampaign(campaign)
     if (!user) {
       throw new NotFoundException('User not found for this campaign')
     }
 
-    const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
-      tcrComplianceDto
-
-    const updatedCampaign = await this.campaignsService.updateJsonFields(
-      campaign.id,
-      {
-        placeId,
-        formattedAddress,
-      },
-    )
-
-    if (!updatedCampaign) {
-      throw new InternalServerErrorException(
-        'Failed to update campaign details',
-      )
-    }
-
     const result = await this.tcrComplianceService.createAgentic(
       user,
-      updatedCampaign,
-      tcrComplianceCreatePayload,
+      campaign,
+      tcrComplianceDto,
     )
 
     try {

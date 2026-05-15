@@ -51,6 +51,8 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     phone: '5555555555',
     officeLevel: OfficeLevel.state,
     committeeType: CommitteeType.CANDIDATE,
+    placeId: 'place-123',
+    formattedAddress: '123 Main St',
   }
 
   beforeEach(async () => {
@@ -99,7 +101,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     delete process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID
   })
 
-  it('persists with pipelineStatus = pending_domain_purchase', async () => {
+  it('persists with pipelineStatus = pending_domain_purchase and the place fields', async () => {
     await service.createAgentic(user, campaign, {
       ...basePayload,
       websiteDomain: 'example.com',
@@ -111,6 +113,8 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         campaignCommittee: basePayload.committeeName,
         pipelineStatus: ComplianceStage.pending_domain_purchase,
       },
+      placeId: basePayload.placeId,
+      formattedAddress: basePayload.formattedAddress,
     })
   })
 
