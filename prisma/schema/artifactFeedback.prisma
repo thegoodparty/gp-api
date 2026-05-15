@@ -1,5 +1,10 @@
 enum ArtifactResourceType {
-  briefing
+  agenda_item
+}
+
+enum ArtifactFeedbackKind {
+  positive
+  negative
 }
 
 model ArtifactFeedback {
@@ -8,16 +13,22 @@ model ArtifactFeedback {
   organizationSlug String       @map("organization_slug")
   organization     Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
+  briefingId String          @map("briefing_id")
+  briefing   MeetingBriefing @relation(fields: [briefingId], references: [id], onDelete: Cascade)
+
   submitterUserId Int  @map("submitter_user_id")
   submitter       User @relation(fields: [submitterUserId], references: [id], onDelete: Cascade)
 
   artifactId   String               @map("artifact_id")
   artifactType ArtifactResourceType @map("artifact_type")
 
-  // e.g. "positive" or "negative"
-  feedback String @map("feedback")
+  feedback ArtifactFeedbackKind
 
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  @@unique([submitterUserId, briefingId, artifactId, artifactType], map: "artifact_feedback_user_briefing_item_unique")
+  @@index([organizationSlug])
+  @@index([briefingId])
   @@map("artifact_feedback")
 }

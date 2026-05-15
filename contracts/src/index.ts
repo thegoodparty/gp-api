@@ -295,3 +295,20 @@ export {
   AnnotationsListResponseSchema,
   type AnnotationsListResponse,
 } from './annotations/Annotation.schema'
+
+export {
+  ARTIFACT_RESOURCE_TYPE_VALUES,
+  ArtifactResourceTypeSchema,
+  type ArtifactResourceType,
+  ARTIFACT_FEEDBACK_KIND_VALUES,
+  ArtifactFeedbackKindSchema,
+  type ArtifactFeedbackKind,
+  ArtifactFeedbackSchema,
+  type ArtifactFeedback,
+  SetArtifactFeedbackRequestSchema,
+  type SetArtifactFeedbackRequest,
+  ArtifactFeedbackResponseSchema,
+  type ArtifactFeedbackResponse,
+  BriefingFeedbackListResponseSchema,
+  type BriefingFeedbackListResponse,
+} from './artifactFeedback/ArtifactFeedback.schema'
