@@ -1,7 +1,7 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice } from '@prisma/client'
-import { addMonths, subMonths } from 'date-fns'
+import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
@@ -40,9 +40,10 @@ export class MeetingsBriefingsController {
 
     const now = new Date()
     const windowFrom = parseIsoDateAsUTC(
-      formatInTimeZone(subMonths(now, 2), 'UTC', 'yyyy-MM-dd'),
+      formatInTimeZone(subDays(now, 4), 'UTC', 'yyyy-MM-dd'),
     )
     const windowTo = addMonths(now, 3)
+    const today = formatInTimeZone(now, 'UTC', 'yyyy-MM-dd')
 
     const projectedDates = knownSchedule
       ? this.meetingBriefings.projectMeetingDates({
@@ -69,6 +70,7 @@ export class MeetingsBriefingsController {
 
     if (knownSchedule) {
       for (const date of projectedDates) {
+        if (date < today) continue
         byDate.set(date, {
           meetingDate: date,
           meetingTime: knownSchedule.time,
