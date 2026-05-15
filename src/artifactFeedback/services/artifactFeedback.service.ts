@@ -4,7 +4,6 @@ import {
   ArtifactFeedbackKind,
   ArtifactResourceType,
   ElectedOffice,
-  Prisma,
 } from '@prisma/client'
 import { ArtifactFeedback as ArtifactFeedbackDTO } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -65,29 +64,25 @@ export class ArtifactFeedbackService extends createPrismaBase(
       electedOffice,
     )
 
-    const row = await this.client.$transaction(
-      (tx) =>
-        tx.artifactFeedback.upsert({
-          where: {
-            submitterUserId_briefingId_artifactId_artifactType: {
-              submitterUserId: userId,
-              briefingId,
-              artifactId: itemId,
-              artifactType: ArtifactResourceType.agenda_item,
-            },
-          },
-          create: {
-            organizationSlug: electedOffice.organizationSlug,
-            briefingId,
-            submitterUserId: userId,
-            artifactId: itemId,
-            artifactType: ArtifactResourceType.agenda_item,
-            feedback,
-          },
-          update: { feedback },
-        }),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    )
+    const row = await this.client.artifactFeedback.upsert({
+      where: {
+        submitterUserId_briefingId_artifactId_artifactType: {
+          submitterUserId: userId,
+          briefingId,
+          artifactId: itemId,
+          artifactType: ArtifactResourceType.agenda_item,
+        },
+      },
+      create: {
+        organizationSlug: electedOffice.organizationSlug,
+        briefingId,
+        submitterUserId: userId,
+        artifactId: itemId,
+        artifactType: ArtifactResourceType.agenda_item,
+        feedback,
+      },
+      update: { feedback },
+    })
 
     return toDTO(row)
   }
