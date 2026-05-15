@@ -28,6 +28,15 @@ export type SpeechSynthesisVoice =
   (typeof SPEECH_SYNTHESIS_VOICE_VALUES)[number]
 export const SpeechSynthesisVoiceSchema = z.enum(SPEECH_SYNTHESIS_VOICE_VALUES)
 
+export const GENERATIVE_VOICE_VALUES: readonly SpeechSynthesisVoice[] = [
+  'Joanna',
+  'Matthew',
+  'Salli',
+  'Ruth',
+  'Stephen',
+  'Amy',
+]
+
 /**
  * Hard cap on a single synthesis request, in characters of text. Sized to
  * cover a typical full meeting briefing read-out (~5,000 words / 30,000
@@ -59,6 +68,12 @@ export const SynthesizeSpeechRequestSchema = z.object({
       voiceId: SpeechSynthesisVoiceSchema.default('Amy'),
       engine: SpeechSynthesisEngineSchema.default('generative'),
     })
+    .refine(
+      ({ voiceId, engine }) =>
+        engine !== 'generative' ||
+        GENERATIVE_VOICE_VALUES.includes(voiceId),
+      { message: 'Selected voice does not support the generative engine' },
+    )
     .optional(),
 })
 export type SynthesizeSpeechRequest = z.infer<

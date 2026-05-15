@@ -1,5 +1,17 @@
 # @goodparty_org/contracts
 
+## 0.6.0
+
+### Minor Changes
+
+- Add `'generative'` to `SpeechSynthesisEngineSchema` and `'Amy'` to
+  `SpeechSynthesisVoiceSchema`. Export `GENERATIVE_VOICE_VALUES` — the
+  subset of voices that support the generative engine (`Joanna`, `Matthew`,
+  `Salli`, `Ruth`, `Stephen`, `Amy`). Update default voice/engine from
+  `Joanna`/`neural` to `Amy`/`generative`. Add a cross-field refine to
+  `SynthesizeSpeechRequestSchema` that rejects any `voiceId` × `engine:
+  'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
+
 ## 0.5.0
 
 ### Minor Changes
