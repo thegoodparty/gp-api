@@ -92,21 +92,27 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     vi.clearAllMocks()
   })
 
-  it('persists with pipelineStatus = pending_domain_purchase and the place fields', async () => {
+  it('persists with pipelineStatus and place fields, sharing the outer transaction', async () => {
     await service.createAgentic(user, campaign, {
       ...basePayload,
       websiteDomain: 'example.com',
     })
 
-    expect(mockCampaigns.updateJsonFields).toHaveBeenCalledWith(campaign.id, {
-      details: {
-        einNumber: basePayload.ein,
-        campaignCommittee: basePayload.committeeName,
-        pipelineStatus: ComplianceStage.pending_domain_purchase,
+    expect(mockCampaigns.updateJsonFields).toHaveBeenCalledWith(
+      campaign.id,
+      {
+        details: {
+          einNumber: basePayload.ein,
+          campaignCommittee: basePayload.committeeName,
+          pipelineStatus: ComplianceStage.pending_domain_purchase,
+        },
+        placeId: basePayload.placeId,
+        formattedAddress: basePayload.formattedAddress,
       },
-      placeId: basePayload.placeId,
-      formattedAddress: basePayload.formattedAddress,
-    })
+      true,
+      undefined,
+      mockPrisma,
+    )
   })
 
   it('persists websiteDomain as empty string when missing', async () => {

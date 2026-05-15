@@ -314,39 +314,43 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       ...rest
     } = payload
 
-    const updatedCampaign = await this.campaignsService.updateJsonFields(
-      campaign.id,
-      {
-        details: {
-          einNumber: ein,
-          campaignCommittee: committeeName,
-          pipelineStatus: ComplianceStage.pending_domain_purchase,
-        },
-        placeId,
-        formattedAddress,
-      },
-    )
-
-    if (!updatedCampaign) {
-      throw new BadGatewayException('Failed to update campaign details')
-    }
-
-    const newRecordData = {
-      ...rest,
-      ein,
-      committeeName,
-      websiteDomain: websiteDomain ?? '',
-      postalAddress: updatedCampaign.formattedAddress ?? '',
-      campaignId: campaign.id,
-    }
-
     let created: TcrCompliance
     try {
       created = await this.client.$transaction(async (tx) => {
+        const updatedCampaign = await this.campaignsService.updateJsonFields(
+          campaign.id,
+          {
+            details: {
+              einNumber: ein,
+              campaignCommittee: committeeName,
+              pipelineStatus: ComplianceStage.pending_domain_purchase,
+            },
+            placeId,
+            formattedAddress,
+          },
+          true,
+          undefined,
+          tx,
+        )
+
+        if (!updatedCampaign) {
+          throw new BadGatewayException('Failed to update campaign details')
+        }
+
         if (existing) {
           await tx.tcrCompliance.delete({ where: { id: existing.id } })
         }
-        return tx.tcrCompliance.create({ data: newRecordData })
+
+        return tx.tcrCompliance.create({
+          data: {
+            ...rest,
+            ein,
+            committeeName,
+            websiteDomain: websiteDomain ?? '',
+            postalAddress: updatedCampaign.formattedAddress ?? '',
+            campaignId: campaign.id,
+          },
+        })
       })
     } catch (err) {
       if (
