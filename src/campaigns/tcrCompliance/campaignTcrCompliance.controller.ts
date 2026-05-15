@@ -19,6 +19,7 @@ import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interc
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
 import { ComplianceStateService } from './services/complianceState.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
+import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
@@ -80,6 +81,65 @@ export class CampaignTcrComplianceController {
   })
   async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
     return this.complianceStateService.findStateForCampaign(campaign.id)
+  }
+
+  @Post('agentic')
+  @UseCampaign()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async createAgenticTcrCompliance(
+    @ReqCampaign() campaign: Campaign,
+    @Body()
+    tcrComplianceDto: CreateAgenticTcrComplianceDto,
+  ) {
+    const existing = await this.tcrComplianceService.fetchByCampaignId(
+      campaign.id,
+    )
+    if (existing) {
+      return existing
+    }
+
+    const user = await this.userService.findByCampaign(campaign)
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
+    const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
+      tcrComplianceDto
+
+    const updatedCampaign = await this.campaignsService.updateJsonFields(
+      campaign.id,
+      {
+        placeId,
+        formattedAddress,
+      },
+    )
+
+    if (!updatedCampaign) {
+      throw new InternalServerErrorException(
+        'Failed to update campaign details',
+      )
+    }
+
+    const result = await this.tcrComplianceService.createAgentic(
+      user,
+      updatedCampaign,
+      tcrComplianceCreatePayload,
+    )
+
+    try {
+      await this.analytics.track(
+        user.id,
+        EVENTS.Outreach.ComplianceFormSubmitted,
+        { source: 'agentic_compliance_flow' },
+      )
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to track agentic compliance form submitted event for user ${user.id}`,
+      )
+    }
+
+    return result
   }
 
   @Post()

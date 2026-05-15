@@ -7,6 +7,7 @@ import {
   BallotReadyPositionLevel,
   CampaignCreatedBy,
   CampaignLaunchStatus,
+  ComplianceStage,
   ElectionLevel,
   OnboardingStep,
   VoterGoals,
@@ -72,6 +73,7 @@ declare global {
       einNumber?: string | null
       einSupportingDocument?: string | null
       wonGeneral?: boolean
+      pipelineStatus?: ComplianceStage
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.

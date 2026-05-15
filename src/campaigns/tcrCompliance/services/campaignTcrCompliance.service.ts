@@ -1,9 +1,14 @@
 import {
+  BadGatewayException,
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { ComplianceStage } from '@goodparty_org/contracts'
+import { ClerkClient } from '@clerk/backend'
+import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { Interval } from '@nestjs/schedule'
 import {
   Campaign,
@@ -14,6 +19,7 @@ import {
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
+  MessageGroup,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../../../queue/queue.types'
@@ -27,7 +33,11 @@ import {
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
-import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
+import {
+  CreateAgenticTcrCompliancePayload,
+  CreateTcrCompliancePayload,
+} from '../campaignTcrCompliance.types'
+import { CampaignsService } from '../../services/campaigns.service'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -40,7 +50,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   constructor(
     private readonly peerlyIdentityService: PeerlyIdentityService,
     private readonly websitesService: WebsitesService,
+    private readonly campaignsService: CampaignsService,
     private queueService: QueueProducerService,
+    @Inject(CLERK_CLIENT_PROVIDER_TOKEN)
+    private readonly clerkClient: ClerkClient,
   ) {
     super()
   }
@@ -274,6 +287,95 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return createdTcrCompliance
+  }
+
+  async createAgentic(
+    user: User,
+    campaign: Campaign,
+    payload: CreateAgenticTcrCompliancePayload,
+  ) {
+    if (!user.clerkId) {
+      throw new BadRequestException(
+        'User must have a Clerk ID to start the agentic compliance flow',
+      )
+    }
+
+    const existing = await this.fetchByCampaignId(campaign.id)
+    const isTerminalFailure =
+      existing?.status === TcrComplianceStatus.rejected ||
+      existing?.status === TcrComplianceStatus.error
+
+    if (existing && !isTerminalFailure) {
+      return existing
+    }
+
+    if (existing) {
+      await this.model.delete({ where: { id: existing.id } })
+    }
+
+    const actorTokenUrl = await this.mintAgentActorTokenUrl(user.clerkId)
+
+    const { ein, committeeName, websiteDomain, ...rest } = payload
+
+    await this.campaignsService.updateJsonFields(campaign.id, {
+      details: {
+        einNumber: ein,
+        campaignCommittee: committeeName,
+        pipelineStatus: ComplianceStage.pending_domain_purchase,
+      },
+    })
+
+    const created = await this.model.create({
+      data: {
+        ...rest,
+        ein,
+        committeeName,
+        websiteDomain: websiteDomain ?? '',
+        postalAddress: campaign.formattedAddress ?? '',
+        campaignId: campaign.id,
+      },
+    })
+
+    await this.queueService.sendMessage(
+      {
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: campaign.id,
+          tcrComplianceId: created.id,
+          clerkUserId: user.clerkId,
+          actorTokenUrl,
+        },
+      },
+      `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
+      { deduplicationId: `agentic-compliance-${created.id}` },
+    )
+
+    this.logger.info(
+      `[TCR Compliance] Agentic flow kicked off for campaignId=${campaign.id}, tcrComplianceId=${created.id}`,
+    )
+
+    return created
+  }
+
+  private async mintAgentActorTokenUrl(candidateClerkId: string) {
+    const brokerClerkId = process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID
+    if (!brokerClerkId) {
+      throw new BadGatewayException(
+        'BROKER_SERVICE_ACCOUNT_CLERK_ID is not configured',
+      )
+    }
+
+    const { url } = await this.clerkClient.actorTokens.create({
+      userId: candidateClerkId,
+      actor: { sub: brokerClerkId },
+      expiresInSeconds: 3600,
+    })
+
+    if (!url) {
+      throw new BadGatewayException('Clerk did not return an actor token URL')
+    }
+
+    return url
   }
 
   async delete(id: string) {
