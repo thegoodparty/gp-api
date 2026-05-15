@@ -43,7 +43,7 @@ export class BriefingNotesService extends createPrismaBase(MODELS.Annotation) {
 
     const notes: Note[] = []
     for (const row of rows) {
-      if (!row.note?.body) continue
+      if (row.note == null || !row.note.body) continue
       const highlight = extractHighlight(args.artifactContent, row)
       notes.push({
         id: row.id,
