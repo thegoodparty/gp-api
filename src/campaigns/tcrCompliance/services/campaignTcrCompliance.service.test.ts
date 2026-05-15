@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { CommitteeType, OfficeLevel, TcrComplianceStatus } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { ComplianceStage } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTcrComplianceService } from './campaignTcrCompliance.service'
@@ -31,6 +30,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     create: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
   }
   let mockPrisma: {
     tcrCompliance: typeof mockModel
@@ -72,6 +72,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         ),
       delete: vi.fn().mockResolvedValue(undefined),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      update: vi.fn().mockResolvedValue(undefined),
     }
     mockPrisma = {
       tcrCompliance: mockModel,
@@ -98,7 +99,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     vi.clearAllMocks()
   })
 
-  it('persists with pipelineStatus and place fields, sharing the outer transaction', async () => {
+  it('persists ein/committee/place fields, sharing the outer transaction', async () => {
     await service.createAgentic(user, campaign, {
       ...basePayload,
       websiteDomain: 'example.com',
@@ -110,7 +111,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         details: {
           einNumber: basePayload.ein,
           campaignCommittee: basePayload.committeeName,
-          pipelineStatus: ComplianceStage.pending_domain_purchase,
         },
         placeId: basePayload.placeId,
         formattedAddress: basePayload.formattedAddress,
@@ -138,6 +138,21 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
     expect(result).toEqual(expect.objectContaining({ id: 'tcr-new' }))
+  })
+
+  it('marks the record error and re-throws if SQS sendMessage fails', async () => {
+    const sqsErr = new Error('SQS unavailable')
+    mockQueue.sendMessage.mockRejectedValueOnce(sqsErr)
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toBe(sqsErr)
+
+    expect(mockModel.update).toHaveBeenCalledWith({
+      where: { id: 'tcr-new' },
+      data: { status: TcrComplianceStatus.error },
+    })
+    expect(mockCrm.trackCampaign).not.toHaveBeenCalled()
   })
 
   it('sends the kickoff before tracking CRM (CRM failure cannot strand the record)', async () => {
@@ -232,7 +247,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
   })
 
-  it('does not restart when the existing record was rejected by the compliance bureau', async () => {
+  it('restarts when the existing record was rejected (user is re-submitting corrected data)', async () => {
     const existing = {
       id: 'tcr-rejected',
       campaignId: campaign.id,
@@ -240,12 +255,13 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     }
     mockModel.findUnique.mockResolvedValue(existing)
 
-    const result = await service.createAgentic(user, campaign, basePayload)
+    await service.createAgentic(user, campaign, basePayload)
 
-    expect(result).toEqual(existing)
-    expect(mockModel.create).not.toHaveBeenCalled()
-    expect(mockModel.deleteMany).not.toHaveBeenCalled()
-    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+    expect(mockModel.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'tcr-rejected' },
+    })
+    expect(mockModel.create).toHaveBeenCalledTimes(1)
+    expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
   })
 
   it('rolls back the delete when create fails inside the transaction', async () => {

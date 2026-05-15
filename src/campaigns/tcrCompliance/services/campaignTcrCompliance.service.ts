@@ -5,7 +5,6 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { ComplianceStage } from '@goodparty_org/contracts'
 import { Interval } from '@nestjs/schedule'
 import {
   Campaign,
@@ -299,7 +298,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     }
 
     const existing = await this.fetchByCampaignId(campaign.id)
-    const isRetryableFailure = existing?.status === TcrComplianceStatus.error
+    const isRetryableFailure =
+      existing?.status === TcrComplianceStatus.error ||
+      existing?.status === TcrComplianceStatus.rejected
 
     if (existing && !isRetryableFailure) {
       return existing
@@ -323,7 +324,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
             details: {
               einNumber: ein,
               campaignCommittee: committeeName,
-              pipelineStatus: ComplianceStage.pending_domain_purchase,
             },
             placeId,
             formattedAddress,
@@ -377,21 +377,29 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw err
     }
 
-    await this.queueService.sendMessage(
-      {
-        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
-        data: {
-          campaignId: campaign.id,
-          tcrComplianceId: created.id,
-          clerkUserId: user.clerkId,
+    try {
+      await this.queueService.sendMessage(
+        {
+          type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+          data: {
+            campaignId: campaign.id,
+            tcrComplianceId: created.id,
+            clerkUserId: user.clerkId,
+          },
         },
-      },
-      `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
-      {
-        deduplicationId: `agentic-compliance-${created.id}`,
-        throwOnError: true,
-      },
-    )
+        `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
+        {
+          deduplicationId: `agentic-compliance-${created.id}`,
+          throwOnError: true,
+        },
+      )
+    } catch (err) {
+      await this.model.update({
+        where: { id: created.id },
+        data: { status: TcrComplianceStatus.error },
+      })
+      throw err
+    }
 
     try {
       await this.crmCampaignsService.trackCampaign(campaign.id)
