@@ -53,12 +53,38 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>
 // Kind-specific payload shapes
 // ---------------------------------------------------------------------------
 
+export const OCR_STATUS_VALUES = [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+  'skipped',
+] as const
+export const OcrStatusSchema = z.enum(OCR_STATUS_VALUES)
+export type OcrStatus = z.infer<typeof OcrStatusSchema>
+
+export const AnnotationNoteAttachmentSchema = z.object({
+  id: z.string(),
+  file_name: z.string(),
+  mime_type: z.string(),
+  size_bytes: z.number().int().nonnegative(),
+  ocr_status: OcrStatusSchema,
+  ocr_text: z.string().nullable(),
+  ocr_error: z.string().nullable(),
+  ocr_completed_at: z.string().nullable(),
+  created_at: z.string(),
+})
+export type AnnotationNoteAttachment = z.infer<
+  typeof AnnotationNoteAttachmentSchema
+>
+
 export const AnnotationNoteSchema = z.object({
   id: z.string(),
   // Optional once a note can be attachment-only (no typed body). Phase 1
   // create requires a body, but the response shape is nullable for forward
   // compatibility with Phase 2.
   body: z.string().nullable(),
+  attachments: z.array(AnnotationNoteAttachmentSchema),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -129,6 +155,39 @@ export const UpdateNoteRequestSchema = z.object({
   body: noteBodySchema,
 })
 export type UpdateNoteRequest = z.infer<typeof UpdateNoteRequestSchema>
+
+// ---------------------------------------------------------------------------
+// Attachment request shapes (Phase 2 — camera / upload intake)
+// ---------------------------------------------------------------------------
+
+const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024 // 20 MB
+const ATTACHMENT_ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+] as const
+
+export const AttachmentPresignRequestSchema = z.object({
+  file_name: z.string().min(1).max(255),
+  mime_type: z.enum(ATTACHMENT_ALLOWED_MIME_TYPES),
+  size_bytes: z.number().int().positive().max(ATTACHMENT_MAX_BYTES),
+})
+export type AttachmentPresignRequest = z.infer<
+  typeof AttachmentPresignRequestSchema
+>
+
+export const AttachmentPresignResponseSchema = z.object({
+  attachment_id: z.string(),
+  upload_url: z.string(),
+  storage_key: z.string(),
+})
+export type AttachmentPresignResponse = z.infer<
+  typeof AttachmentPresignResponseSchema
+>
 
 // ---------------------------------------------------------------------------
 // Response schemas

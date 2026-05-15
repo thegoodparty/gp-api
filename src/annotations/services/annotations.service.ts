@@ -14,7 +14,13 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 const MAX_ANNOTATIONS_PER_USER_PER_BRIEFING = 200
 
 const ANNOTATION_INCLUDE = {
-  note: true,
+  note: {
+    include: {
+      attachments: {
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  },
   bugReport: true,
   chat: true,
 } satisfies Prisma.AnnotationInclude
@@ -40,6 +46,19 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
     base.note = {
       id: row.note.id,
       body: row.note.body,
+      attachments: row.note.attachments.map((a) => ({
+        id: a.id,
+        file_name: a.fileName,
+        mime_type: a.mimeType,
+        size_bytes: a.sizeBytes,
+        ocr_status: a.ocrStatus,
+        ocr_text: a.ocrText,
+        ocr_error: a.ocrError,
+        ocr_completed_at: a.ocrCompletedAt
+          ? a.ocrCompletedAt.toISOString()
+          : null,
+        created_at: a.createdAt.toISOString(),
+      })),
       created_at: row.note.createdAt.toISOString(),
       updated_at: row.note.updatedAt.toISOString(),
     }

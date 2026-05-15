@@ -52,6 +52,7 @@ import {
   AgentExperimentResultSchema,
   DomainEmailForwardingMessage,
   WeeklyTasksDigestMessageSchema,
+  OcrAttachmentMessageSchema,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -64,6 +65,7 @@ import {
   SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { AnnotationAttachmentService } from '@/annotations/services/annotationAttachment.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { WeeklyTasksDigestHandlerService } from '../../campaigns/tasks/services/weeklyTasksDigestHandler.service'
@@ -121,6 +123,7 @@ export class QueueConsumerService {
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly experimentRunsService: ExperimentRunsService,
     private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly annotationAttachments: AnnotationAttachmentService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -371,6 +374,14 @@ export class QueueConsumerService {
         return await this.handleAgentExperimentResult(
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
+      case QueueType.OCR_ATTACHMENT:
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const { attachmentId } = OcrAttachmentMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.annotationAttachments.runOcr(attachmentId)
+          return true
+        })
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },

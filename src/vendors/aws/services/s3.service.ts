@@ -155,6 +155,40 @@ export class S3Service extends AwsService {
     }, 'getFile')
   }
 
+  async getFileBytes(bucket: string, key: string): Promise<Buffer | undefined> {
+    return this.executeAwsOperation(async () => {
+      try {
+        const response = await this.s3Client.send(
+          new GetObjectCommand({
+            Bucket: bucket,
+            Key: key,
+          }),
+        )
+        const bytes = await response.Body?.transformToByteArray()
+        return bytes ? Buffer.from(bytes) : undefined
+      } catch (error) {
+        if (error instanceof NoSuchKey) {
+          return undefined
+        }
+        throw error
+      }
+    }, 'getFileBytes')
+  }
+
+  async deleteObject(bucket: string, key: string): Promise<void> {
+    return this.executeAwsOperation(async () => {
+      try {
+        const { DeleteObjectCommand } = await import('@aws-sdk/client-s3')
+        await this.s3Client.send(
+          new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+        )
+      } catch (error) {
+        if (error instanceof NoSuchKey) return
+        throw error
+      }
+    }, 'deleteObject')
+  }
+
   getFileUrl(
     bucket: string,
     key: string,

@@ -16,6 +16,7 @@ import { ContactsModule } from 'src/contacts/contacts.module'
 import { AgentExperimentsModule } from 'src/agentExperiments/agentExperiments.module'
 import { MeetingsModule } from 'src/meetings/meetings.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
+import { AnnotationsModule } from 'src/annotations/annotations.module'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
     AwsModule,
     AgentExperimentsModule,
     MeetingsModule,
+    AnnotationsModule,
   ],
   providers: [QueueConsumerService],
 })
