@@ -1,14 +1,11 @@
 import {
   BadGatewayException,
   BadRequestException,
-  Inject,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { ComplianceStage } from '@goodparty_org/contracts'
-import { ClerkClient } from '@clerk/backend'
-import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { Interval } from '@nestjs/schedule'
 import {
   Campaign,
@@ -16,6 +13,7 @@ import {
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
@@ -52,8 +50,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private readonly websitesService: WebsitesService,
     private readonly campaignsService: CampaignsService,
     private queueService: QueueProducerService,
-    @Inject(CLERK_CLIENT_PROVIDER_TOKEN)
-    private readonly clerkClient: ClerkClient,
   ) {
     super()
   }
@@ -309,12 +305,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return existing
     }
 
-    if (existing) {
-      await this.model.delete({ where: { id: existing.id } })
-    }
-
-    const actorTokenUrl = await this.mintAgentActorTokenUrl(user.clerkId)
-
     const {
       ein,
       committeeName,
@@ -341,16 +331,37 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw new BadGatewayException('Failed to update campaign details')
     }
 
-    const created = await this.model.create({
-      data: {
-        ...rest,
-        ein,
-        committeeName,
-        websiteDomain: websiteDomain ?? '',
-        postalAddress: updatedCampaign.formattedAddress ?? '',
-        campaignId: campaign.id,
-      },
-    })
+    if (existing) {
+      await this.model.delete({ where: { id: existing.id } })
+    }
+
+    let created: TcrCompliance
+    try {
+      created = await this.model.create({
+        data: {
+          ...rest,
+          ein,
+          committeeName,
+          websiteDomain: websiteDomain ?? '',
+          postalAddress: updatedCampaign.formattedAddress ?? '',
+          campaignId: campaign.id,
+        },
+      })
+    } catch (err) {
+      if (
+        err instanceof PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const raced = await this.fetchByCampaignId(campaign.id)
+        if (raced) {
+          this.logger.info(
+            `[TCR Compliance] Agentic kickoff lost race for campaignId=${campaign.id}; returning record created by parallel request`,
+          )
+          return raced
+        }
+      }
+      throw err
+    }
 
     await this.queueService.sendMessage(
       {
@@ -359,7 +370,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           campaignId: campaign.id,
           tcrComplianceId: created.id,
           clerkUserId: user.clerkId,
-          actorTokenUrl,
         },
       },
       `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
@@ -371,27 +381,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return created
-  }
-
-  private async mintAgentActorTokenUrl(candidateClerkId: string) {
-    const brokerClerkId = process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID
-    if (!brokerClerkId) {
-      throw new BadGatewayException(
-        'BROKER_SERVICE_ACCOUNT_CLERK_ID is not configured',
-      )
-    }
-
-    const { url } = await this.clerkClient.actorTokens.create({
-      userId: candidateClerkId,
-      actor: { sub: brokerClerkId },
-      expiresInSeconds: 3600,
-    })
-
-    if (!url) {
-      throw new BadGatewayException('Clerk did not return an actor token URL')
-    }
-
-    return url
   }
 
   async delete(id: string) {

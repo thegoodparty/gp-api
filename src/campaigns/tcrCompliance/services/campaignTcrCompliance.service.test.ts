@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { BadGatewayException, BadRequestException } from '@nestjs/common'
+import { BadRequestException } from '@nestjs/common'
 import { CommitteeType, OfficeLevel, TcrComplianceStatus } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ComplianceStage } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTcrComplianceService } from './campaignTcrCompliance.service'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
@@ -11,15 +12,11 @@ import { CampaignsService } from '../../services/campaigns.service'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { MessageGroup, QueueType } from '../../../queue/queue.types'
-import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import {
   createMockUser,
   createMockCampaign,
 } from '@/shared/test-utils/mockData.util'
-
-const ACTOR_TOKEN_URL = 'https://clerk.example.com/v1/tickets/accept?ticket=abc'
-const BROKER_CLERK_ID = 'broker_clerk_xyz'
 
 describe('CampaignTcrComplianceService - createAgentic', () => {
   let service: CampaignTcrComplianceService
@@ -33,9 +30,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     delete: ReturnType<typeof vi.fn>
   }
   let mockPrisma: { tcrCompliance: typeof mockModel }
-  let mockClerk: {
-    actorTokens: { create: ReturnType<typeof vi.fn> }
-  }
 
   const user = createMockUser({ clerkId: 'user_clerk_abc' })
   const campaign = createMockCampaign({
@@ -72,12 +66,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       delete: vi.fn().mockResolvedValue(undefined),
     }
     mockPrisma = { tcrCompliance: mockModel }
-    mockClerk = {
-      actorTokens: {
-        create: vi.fn().mockResolvedValue({ url: ACTOR_TOKEN_URL }),
-      },
-    }
-    process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID = BROKER_CLERK_ID
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -86,7 +74,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         { provide: WebsitesService, useValue: mockWebsites },
         { provide: CampaignsService, useValue: mockCampaigns },
         { provide: QueueProducerService, useValue: mockQueue },
-        { provide: CLERK_CLIENT_PROVIDER_TOKEN, useValue: mockClerk },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
       ],
@@ -95,10 +82,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     service = module.get(CampaignTcrComplianceService)
 
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    delete process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID
   })
 
   it('persists with pipelineStatus = pending_domain_purchase and the place fields', async () => {
@@ -138,14 +121,9 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
   })
 
-  it('enqueues the agentic kickoff with the minted actor token URL', async () => {
+  it('enqueues the agentic kickoff with only non-sensitive routing data', async () => {
     await service.createAgentic(user, campaign, basePayload)
 
-    expect(mockClerk.actorTokens.create).toHaveBeenCalledWith({
-      userId: user.clerkId,
-      actor: { sub: BROKER_CLERK_ID },
-      expiresInSeconds: 3600,
-    })
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
     const [message, group, options] = mockQueue.sendMessage.mock.calls[0]
     expect(message).toEqual({
@@ -154,7 +132,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         campaignId: campaign.id,
         tcrComplianceId: 'tcr-new',
         clerkUserId: user.clerkId,
-        actorTokenUrl: ACTOR_TOKEN_URL,
       },
     })
     expect(group).toBe(
@@ -163,14 +140,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(options).toEqual({
       deduplicationId: 'agentic-compliance-tcr-new',
     })
-  })
-
-  it('throws BadGatewayException when BROKER_SERVICE_ACCOUNT_CLERK_ID is unset', async () => {
-    delete process.env.BROKER_SERVICE_ACCOUNT_CLERK_ID
-
-    await expect(
-      service.createAgentic(user, campaign, basePayload),
-    ).rejects.toThrow(BadGatewayException)
   })
 
   it('returns the existing record without re-kicking when one is in-flight', async () => {
@@ -187,7 +156,6 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockModel.create).not.toHaveBeenCalled()
     expect(mockCampaigns.updateJsonFields).not.toHaveBeenCalled()
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
-    expect(mockClerk.actorTokens.create).not.toHaveBeenCalled()
   })
 
   it('restarts when the existing record is in a terminal failure state', async () => {
@@ -205,6 +173,40 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     })
     expect(mockModel.create).toHaveBeenCalledTimes(1)
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the parallel record when a concurrent submission wins the race', async () => {
+    const raced = {
+      id: 'tcr-raced',
+      campaignId: campaign.id,
+      status: TcrComplianceStatus.submitted,
+    }
+    mockModel.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(raced)
+    mockModel.create.mockRejectedValueOnce(
+      new PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    )
+
+    const result = await service.createAgentic(user, campaign, basePayload)
+
+    expect(result).toEqual(raced)
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('rethrows non-P2002 Prisma errors from create', async () => {
+    const otherErr = new PrismaClientKnownRequestError('Connection lost', {
+      code: 'P1001',
+      clientVersion: 'test',
+    })
+    mockModel.create.mockRejectedValueOnce(otherErr)
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toBe(otherErr)
   })
 
   it('throws BadRequestException when the user has no Clerk ID', async () => {

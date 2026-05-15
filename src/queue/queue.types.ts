@@ -65,7 +65,6 @@ export type AgenticComplianceKickoffMessage = {
   campaignId: number
   tcrComplianceId: string
   clerkUserId: string
-  actorTokenUrl: string
 }
 
 export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(
