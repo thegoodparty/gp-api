@@ -255,6 +255,14 @@ export interface MeetingScheduleFound {
    */
   human: string
   /**
+   * Customary location for regular meetings (e.g. 'City Hall Council Chambers, 200 Main St'). Falls back to a city-hall address if the source doesn't state a specific room.
+   */
+  location: string
+  /**
+   * Official name of the meeting body as the source refers to it (e.g. 'City Council', 'Planning Board'). Used as the list-row title in the candidate dashboard.
+   */
+  meeting_name: string
+  /**
    * iCalendar RFC 5545 RRULE string. MUST NOT contain DTSTART.
    */
   rrule: string
@@ -1157,6 +1165,8 @@ export interface MeetingScheduleNotFound {
   duration_minutes: number
   generated_at: string
   human: string
+  location: string
+  meeting_name: string
   rrule: string
   /**
    * @maxItems 20

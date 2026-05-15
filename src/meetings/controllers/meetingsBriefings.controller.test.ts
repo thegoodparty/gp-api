@@ -34,6 +34,8 @@ const seedScheduleRun = async (
 
 const foundSchedule = {
   status: 'found',
+  meeting_name: 'City Council',
+  location: 'City Hall Council Chambers, 200 Main St',
   rrule: 'FREQ=MONTHLY;BYDAY=2MO,4MO',
   human: '2nd and 4th Monday',
   time: '19:00',
@@ -125,10 +127,14 @@ describe('GET /v1/meetings', () => {
       meetingTime: string
       meetingTimezone: string
       durationMinutes: number
+      meetingName: string
+      location: string
     }>) {
       expect(m.meetingTime).toBe('19:00')
       expect(m.meetingTimezone).toBe('America/Denver')
       expect(m.durationMinutes).toBe(180)
+      expect(m.meetingName).toBe('City Council')
+      expect(m.location).toBe('City Hall Council Chambers, 200 Main St')
       expect(m.meetingDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     }
   })

@@ -56,6 +56,8 @@ export class MeetingsBriefingsController {
         meetingTime: schedule.time,
         meetingTimezone: schedule.timezone,
         durationMinutes: schedule.duration_minutes,
+        meetingName: schedule.meeting_name,
+        location: schedule.location,
         hasBriefing: haveBriefing.has(d),
       })),
     }
