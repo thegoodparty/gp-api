@@ -28,6 +28,7 @@ import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { MeetingBriefingsService } from 'src/meetings/services/meetingBriefings.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import {
@@ -119,6 +120,7 @@ export class QueueConsumerService {
     private readonly organizationsService: OrganizationsService,
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly experimentRunsService: ExperimentRunsService,
+    private readonly meetingBriefings: MeetingBriefingsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -852,6 +854,16 @@ export class QueueConsumerService {
       { updatedRun, data },
       'Updated experiment run from queue event',
     )
+
+    await this.meetingBriefings
+      .onExperimentRunCompleted(updatedRun)
+      .catch((err: unknown) =>
+        this.logger.error(
+          { err, runId: updatedRun.runId },
+          'onExperimentRunCompleted failed after run update',
+        ),
+      )
+
     return true
   }
 

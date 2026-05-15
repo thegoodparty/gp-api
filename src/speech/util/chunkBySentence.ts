@@ -1,4 +1,12 @@
-const SENTENCE_BOUNDARY = /([.!?]+["'\u201d\u2019)\]]*\s+|\n+)/g
+// Sentence boundary detector. Quantifiers are bounded so the regex cannot
+// backtrack polynomially on adversarial input (e.g. a 50,000-char run of
+// "!!!"). The bounds are deliberately small but more than enough for real
+// prose: at most 4 terminal punctuation chars in a row ("!!!"), at most 4
+// closing quote/paren/bracket chars after a sentence ("…")"), at most 4
+// inter-sentence whitespace chars, or up to 4 consecutive newlines for
+// paragraph breaks. Anything beyond those bounds gets split across two
+// matches at the next iteration, which is still correct for chunking.
+const SENTENCE_BOUNDARY = /([.!?]{1,4}["'\u201d\u2019)\]]{0,4}\s{1,4}|\n{1,4})/g
 
 export const chunkBySentence = (text: string, maxChars: number): string[] => {
   if (text.length === 0) {

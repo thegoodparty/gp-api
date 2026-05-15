@@ -14,6 +14,7 @@ import { PollsModule } from 'src/polls/polls.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { ContactsModule } from 'src/contacts/contacts.module'
 import { AgentExperimentsModule } from 'src/agentExperiments/agentExperiments.module'
+import { MeetingsModule } from 'src/meetings/meetings.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 
 @Module({
@@ -39,6 +40,7 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
     ContactsModule,
     AwsModule,
     AgentExperimentsModule,
+    MeetingsModule,
   ],
   providers: [QueueConsumerService],
 })

@@ -69,6 +69,18 @@ describe('chunkBySentence', () => {
     expect(chunks).toEqual(['Are you there?', 'Yes I am! Good.'])
   })
 
+  it('handles adversarial punctuation runs in linear time (ReDoS guard)', () => {
+    // Long unbroken run of '!' marks would cause polynomial backtracking on a
+    // naive /[.!?]+["'…)\]]*\s+|\n+/g regex. With bounded quantifiers the
+    // scan stays linear; we cap runtime so a regression would fail the test
+    // on any reasonable machine.
+    const text = '!'.repeat(50_000)
+    const start = Date.now()
+    const chunks = chunkBySentence(text, 1000)
+    expect(Date.now() - start).toBeLessThan(500)
+    expect(chunks.join('')).toBe(text)
+  })
+
   it('preserves the full text content across chunks', () => {
     const text = 'A first sentence. A second one. And the third one here.'
     const chunks = chunkBySentence(text, 18)

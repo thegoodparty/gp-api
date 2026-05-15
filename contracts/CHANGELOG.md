@@ -1,5 +1,18 @@
 # @goodparty_org/contracts
 
+## 0.4.0
+
+### Breaking Changes
+
+- Remove the meetings module schemas added in 0.3.0
+  (`MeetingScheduleArtifact`, `MeetingsListResponse`,
+  `MeetingBriefingResponse`). The corresponding gp-api endpoints
+  (`GET /v1/meetings`, `GET /v1/meetings/:date/briefing`) no longer
+  wrap their responses in Zod validation — they pass through the
+  agent's camelCase artifact and return a typed camelCase object
+  from the controller respectively. Consumers that imported these
+  schemas should remove the imports and rely on their own types.
+
 ## 0.3.0
 
 ### Minor Changes
