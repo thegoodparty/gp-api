@@ -23,6 +23,7 @@ const briefing: MeetingBriefing = {
   artifactKey: 'office-123/2026-05-14.md',
   createdAt: new Date('2026-05-10T12:00:00.000Z'),
   updatedAt: new Date('2026-05-10T12:00:00.000Z'),
+  artifact: null,
 }
 
 const baseAnnotation: Annotation = {

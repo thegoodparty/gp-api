@@ -18,6 +18,7 @@ const briefing: MeetingBriefing = {
   artifactKey: 'office-hendersonville-council/2026-05-19.md',
   createdAt: new Date('2026-05-12T12:00:00.000Z'),
   updatedAt: new Date('2026-05-12T12:00:00.000Z'),
+  artifact: null,
 }
 
 const annotation: Annotation = {
