@@ -1,3 +1,11 @@
+enum OcrStatus {
+  pending
+  processing
+  completed
+  failed
+  skipped
+}
+
 model AnnotationNoteAttachment {
   id String @id @default(cuid())
 
@@ -9,8 +17,14 @@ model AnnotationNoteAttachment {
   mimeType   String @map("mime_type")
   sizeBytes  Int    @map("size_bytes")
 
+  ocrStatus      OcrStatus @default(pending) @map("ocr_status")
+  ocrText        String?   @db.Text @map("ocr_text")
+  ocrError       String?   @map("ocr_error")
+  ocrCompletedAt DateTime? @map("ocr_completed_at")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([noteId])
+  @@index([noteId, ocrStatus])
   @@map("annotation_note_attachment")
 }
