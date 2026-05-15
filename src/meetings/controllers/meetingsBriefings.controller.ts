@@ -83,8 +83,12 @@ export class MeetingsBriefingsController {
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()
 
-    // JSON.parse returns unknown — pass through artifact as-is
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return JSON.parse(raw)
+    try {
+      // JSON.parse returns unknown — pass through artifact as-is
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return JSON.parse(raw)
+    } catch {
+      throw new NotFoundException()
+    }
   }
 }

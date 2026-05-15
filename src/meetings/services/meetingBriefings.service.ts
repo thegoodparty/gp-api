@@ -12,6 +12,7 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { Briefing, MeetingSchedule } from '@/generated/agent-job-contracts'
 
 // JSON.parse returns unknown — no way to infer parsed shape at compile time
@@ -80,7 +81,15 @@ export class MeetingBriefingsService extends createPrismaBase(
     const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
     if (!raw) return null
 
-    return parseSchedule(raw)
+    try {
+      return parseSchedule(raw)
+    } catch {
+      this.logger.error(
+        { organizationSlug, runId: run.runId },
+        'meeting_schedule artifact is not valid JSON',
+      )
+      return null
+    }
   }
 
   projectMeetingDates({ schedule, from, to }: ProjectArgs): string[] {
@@ -141,7 +150,12 @@ export class MeetingBriefingsService extends createPrismaBase(
     const now = new Date()
 
     for (const eo of offices) {
-      await this.dispatchBriefingIfNeeded(eo, now)
+      await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
+        this.logger.error(
+          { err, electedOfficeId: eo.id },
+          'dispatchBriefingIfNeeded failed, continuing',
+        ),
+      )
     }
   }
 
@@ -283,8 +297,17 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const parsed = parseBriefing(raw)
-    const dateString = parsed.meeting.scheduledAt.slice(0, 10)
+    let parsed: Briefing
+    try {
+      parsed = parseBriefing(raw)
+    } catch {
+      this.logger.error(
+        { runId: run.runId },
+        'meeting_briefing artifact is not valid JSON',
+      )
+      return
+    }
+    const dateString = parsed.meeting?.scheduledAt?.slice(0, 10) ?? ''
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       this.logger.error(
         { runId: run.runId, dateString },
@@ -308,12 +331,12 @@ export class MeetingBriefingsService extends createPrismaBase(
       where: {
         electedOfficeId_meetingDate: {
           electedOfficeId,
-          meetingDate: new Date(dateString),
+          meetingDate: parseIsoDateAsUTC(dateString),
         },
       },
       create: {
         electedOfficeId,
-        meetingDate: new Date(dateString),
+        meetingDate: parseIsoDateAsUTC(dateString),
         meetingTime,
         meetingTimezone,
         experimentRunId: run.runId,

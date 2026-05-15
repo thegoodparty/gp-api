@@ -855,7 +855,14 @@ export class QueueConsumerService {
       'Updated experiment run from queue event',
     )
 
-    await this.meetingBriefings.onExperimentRunCompleted(updatedRun)
+    await this.meetingBriefings
+      .onExperimentRunCompleted(updatedRun)
+      .catch((err: unknown) =>
+        this.logger.error(
+          { err, runId: updatedRun.runId },
+          'onExperimentRunCompleted failed after run update',
+        ),
+      )
 
     return true
   }
