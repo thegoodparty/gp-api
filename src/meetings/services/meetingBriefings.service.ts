@@ -105,24 +105,17 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    try {
-      await this.experimentRuns.dispatchRun({
-        type: SCHEDULE_EXPERIMENT_TYPE,
-        organizationSlug: ctx.organizationSlug,
-        clerkUserId: ctx.clerkUserId,
-        params: {
-          elected_office_id: ctx.electedOfficeId,
-          city: ctx.city,
-          state: ctx.state,
-          office: ctx.office,
-        },
-      })
-    } catch (err) {
-      this.logger.error(
-        { err, electedOfficeId: electedOffice.id },
-        'meeting_schedule dispatch failed',
-      )
-    }
+    await this.experimentRuns.dispatchRun({
+      type: SCHEDULE_EXPERIMENT_TYPE,
+      organizationSlug: ctx.organizationSlug,
+      clerkUserId: ctx.clerkUserId,
+      params: {
+        elected_office_id: ctx.electedOfficeId,
+        city: ctx.city,
+        state: ctx.state,
+        office: ctx.office,
+      },
+    })
   }
 
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
@@ -147,14 +140,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     const now = new Date()
 
     for (const eo of offices) {
-      try {
-        await this.dispatchBriefingIfNeeded(eo, now)
-      } catch (err) {
-        this.logger.error(
-          { err, electedOfficeId: eo.id },
-          'daily meeting_briefing dispatch iteration failed',
-        )
-      }
+      await this.dispatchBriefingIfNeeded(eo, now)
     }
   }
 
@@ -176,24 +162,17 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    try {
-      await this.experimentRuns.dispatchRun({
-        type: BRIEFING_EXPERIMENT_TYPE,
-        organizationSlug: ctx.organizationSlug,
-        clerkUserId: ctx.clerkUserId,
-        params: {
-          elected_office_id: ctx.electedOfficeId,
-          city: ctx.city,
-          state: ctx.state,
-          office: ctx.office,
-        },
-      })
-    } catch (err) {
-      this.logger.error(
-        { err, electedOfficeId: eo.id },
-        'daily meeting_briefing dispatch failed',
-      )
-    }
+    await this.experimentRuns.dispatchRun({
+      type: BRIEFING_EXPERIMENT_TYPE,
+      organizationSlug: ctx.organizationSlug,
+      clerkUserId: ctx.clerkUserId,
+      params: {
+        elected_office_id: ctx.electedOfficeId,
+        city: ctx.city,
+        state: ctx.state,
+        office: ctx.office,
+      },
+    })
   }
 
   private async dispatchFirstBriefingForOrg(
@@ -207,24 +186,17 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(eo)
     if (!ctx) return
 
-    try {
-      await this.experimentRuns.dispatchRun({
-        type: BRIEFING_EXPERIMENT_TYPE,
-        organizationSlug: ctx.organizationSlug,
-        clerkUserId: ctx.clerkUserId,
-        params: {
-          elected_office_id: ctx.electedOfficeId,
-          city: ctx.city,
-          state: ctx.state,
-          office: ctx.office,
-        },
-      })
-    } catch (err) {
-      this.logger.error(
-        { err, organizationSlug },
-        'meeting_briefing dispatch after schedule completion failed',
-      )
-    }
+    await this.experimentRuns.dispatchRun({
+      type: BRIEFING_EXPERIMENT_TYPE,
+      organizationSlug: ctx.organizationSlug,
+      clerkUserId: ctx.clerkUserId,
+      params: {
+        elected_office_id: ctx.electedOfficeId,
+        city: ctx.city,
+        state: ctx.state,
+        office: ctx.office,
+      },
+    })
   }
 
   private async resolveDispatchContext(
