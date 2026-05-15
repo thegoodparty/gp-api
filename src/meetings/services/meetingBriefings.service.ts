@@ -12,16 +12,21 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
-import {
-  MeetingScheduleArtifact,
-  MeetingScheduleArtifactSchema,
-} from '@goodparty_org/contracts'
+import { Briefing, MeetingSchedule } from '@/generated/agent-job-contracts'
+
+// JSON.parse returns unknown — no way to infer parsed shape at compile time
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+const parseBriefing = (raw: string): Briefing => JSON.parse(raw) as Briefing
+const parseSchedule = (raw: string): MeetingSchedule =>
+  // JSON.parse returns unknown — no way to infer parsed shape at compile time
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  JSON.parse(raw) as MeetingSchedule
 
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
 
 export type ProjectArgs = {
-  schedule: MeetingScheduleArtifact
+  schedule: MeetingSchedule
   from: Date
   to: Date
 }
@@ -35,14 +40,13 @@ type DispatchContext = {
   office: string
 }
 
-const isStringIndexedObject = (
-  v: Prisma.JsonValue,
-): v is Record<string, Prisma.JsonValue> =>
-  v !== null && typeof v === 'object' && !Array.isArray(v)
-
-const readStringField = (json: Prisma.JsonValue, key: string): string => {
-  if (!isStringIndexedObject(json)) return ''
-  const value = json[key]
+const readStringField = (json: unknown, key: string): string => {
+  if (json === null || typeof json !== 'object' || Array.isArray(json)) {
+    return ''
+  }
+  // narrowing a JSON object — runtime guard above guarantees shape
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const value = (json as Record<string, unknown>)[key]
   return typeof value === 'string' ? value : ''
 }
 
@@ -60,7 +64,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 
   async loadLatestScheduleForOrg(
     organizationSlug: string,
-  ): Promise<MeetingScheduleArtifact | null> {
+  ): Promise<MeetingSchedule | null> {
     const run = await this.client.experimentRun.findFirst({
       where: {
         organizationSlug,
@@ -76,12 +80,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
     if (!raw) return null
 
-    try {
-      const parsed = MeetingScheduleArtifactSchema.safeParse(JSON.parse(raw))
-      return parsed.success ? parsed.data : null
-    } catch {
-      return null
-    }
+    return parseSchedule(raw)
   }
 
   projectMeetingDates({ schedule, from, to }: ProjectArgs): string[] {
@@ -266,10 +265,7 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const electedOfficeId = readStringField(
-      run.params as Prisma.JsonValue,
-      'elected_office_id',
-    )
+    const electedOfficeId = readStringField(run.params, 'elected_office_id')
     if (!electedOfficeId) {
       this.logger.error(
         { runId: run.runId },
@@ -287,33 +283,26 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    let parsed
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      this.logger.error(
-        { runId: run.runId },
-        'meeting_briefing artifact JSON malformed',
-      )
-      return
-    }
-
-    const meetingDate = readStringField(parsed, 'meetingDate')
-    const meetingScheduledAt = readStringField(
-      isStringIndexedObject(parsed) ? parsed.meeting : null,
-      'scheduledAt',
-    )
-    const dateString = meetingDate || meetingScheduledAt.slice(0, 10)
+    const parsed = parseBriefing(raw)
+    const dateString = parsed.meeting.scheduledAt.slice(0, 10)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       this.logger.error(
         { runId: run.runId, dateString },
-        'meeting_briefing artifact missing meetingDate',
+        'meeting_briefing artifact has invalid meeting.scheduledAt',
       )
       return
     }
 
-    const meetingTime = readStringField(parsed, 'meetingTime') || '00:00'
-    const meetingTimezone = readStringField(parsed, 'meetingTimezone') || 'UTC'
+    const schedule = await this.loadLatestScheduleForOrg(run.organizationSlug)
+    if (!schedule || schedule.status === 'not_found') {
+      this.logger.error(
+        { runId: run.runId, organizationSlug: run.organizationSlug },
+        'meeting_briefing completed but no schedule found for the org',
+      )
+      return
+    }
+    const meetingTime = schedule.time
+    const meetingTimezone = schedule.timezone
 
     await this.model.upsert({
       where: {

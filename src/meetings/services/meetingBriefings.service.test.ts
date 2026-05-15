@@ -171,6 +171,15 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
     const eo = await service.prisma.electedOffice.create({
       data: { organizationSlug: orgSlug, userId: service.user.id },
     })
+    await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'schedule-bucket',
+        artifactKey: 'schedule.json',
+      },
+    })
     const briefingRun = await service.prisma.experimentRun.create({
       data: {
         organizationSlug: orgSlug,
@@ -182,6 +191,13 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
       },
     })
     mockS3({
+      'schedule.json': JSON.stringify({
+        status: 'known',
+        rrule: 'FREQ=WEEKLY;BYDAY=MO',
+        time: '19:00',
+        timezone: 'America/Chicago',
+        duration_minutes: 60,
+      }),
       'briefing.json': JSON.stringify({
         meetingDate: '2026-06-08',
         meeting: { scheduledAt: '2026-06-08T19:00:00-06:00' },

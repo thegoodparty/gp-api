@@ -3,11 +3,6 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice } from '@prisma/client'
 import { addMonths, subMonths } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
-import {
-  MeetingBriefingResponseSchema,
-  MeetingsListResponseSchema,
-} from '@goodparty_org/contracts'
-import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
@@ -26,13 +21,12 @@ export class MeetingsBriefingsController {
 
   @UseElectedOffice()
   @Get()
-  @ResponseSchema(MeetingsListResponseSchema)
   async list(@ReqElectedOffice() electedOffice: ElectedOffice) {
     const schedule = await this.meetingBriefings.loadLatestScheduleForOrg(
       electedOffice.organizationSlug,
     )
     if (!schedule || schedule.status === 'not_found') {
-      return { schedule_known: false, meetings: [] }
+      return { scheduleKnown: false, meetings: [] }
     }
 
     const now = new Date()
@@ -56,20 +50,19 @@ export class MeetingsBriefingsController {
     )
 
     return {
-      schedule_known: true,
+      scheduleKnown: true,
       meetings: dates.map((d) => ({
-        meeting_date: d,
-        meeting_time: schedule.time,
-        meeting_timezone: schedule.timezone,
-        duration_minutes: schedule.duration_minutes,
-        has_briefing: haveBriefing.has(d),
+        meetingDate: d,
+        meetingTime: schedule.time,
+        meetingTimezone: schedule.timezone,
+        durationMinutes: schedule.duration_minutes,
+        hasBriefing: haveBriefing.has(d),
       })),
     }
   }
 
   @UseElectedOffice()
   @Get(':date/briefing')
-  @ResponseSchema(MeetingBriefingResponseSchema)
   async getBriefing(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Param(new ZodValidationPipe(MeetingDateParamSchema))
@@ -88,13 +81,8 @@ export class MeetingsBriefingsController {
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()
 
-    try {
-      const parsed = MeetingBriefingResponseSchema.safeParse(JSON.parse(raw))
-      if (!parsed.success) throw new NotFoundException()
-      return parsed.data
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err
-      throw new NotFoundException()
-    }
+    // JSON.parse returns unknown — pass through artifact as-is
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return JSON.parse(raw)
   }
 }
