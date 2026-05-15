@@ -35,10 +35,12 @@ type DispatchContext = {
   office: string
 }
 
-const isStringIndexedObject = (v: unknown): v is Record<string, unknown> =>
+const isStringIndexedObject = (
+  v: Prisma.JsonValue,
+): v is Record<string, Prisma.JsonValue> =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
 
-const readStringField = (json: unknown, key: string): string => {
+const readStringField = (json: Prisma.JsonValue, key: string): string => {
   if (!isStringIndexedObject(json)) return ''
   const value = json[key]
   return typeof value === 'string' ? value : ''
@@ -264,7 +266,10 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const electedOfficeId = readStringField(run.params, 'elected_office_id')
+    const electedOfficeId = readStringField(
+      run.params as Prisma.JsonValue,
+      'elected_office_id',
+    )
     if (!electedOfficeId) {
       this.logger.error(
         { runId: run.runId },
@@ -282,7 +287,7 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    let parsed: unknown
+    let parsed
     try {
       parsed = JSON.parse(raw)
     } catch {

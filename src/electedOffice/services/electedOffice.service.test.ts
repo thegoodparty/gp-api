@@ -61,7 +61,7 @@ describe('ElectedOfficeService', () => {
     }
 
     service = new ElectedOfficeService({
-      onElectedOfficeCreated: vi.fn(),
+      onElectedOfficeCreated: vi.fn().mockResolvedValue(undefined),
     } as never)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,

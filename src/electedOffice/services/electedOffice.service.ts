@@ -76,7 +76,12 @@ export class ElectedOfficeService extends createPrismaBase(
       })
     })
 
-    await this.meetingBriefings.onElectedOfficeCreated(created)
+    await this.meetingBriefings.onElectedOfficeCreated(created).catch((err) => {
+      this.logger.error(
+        { err, electedOfficeId: created.id },
+        'meeting schedule dispatch failed after EO created',
+      )
+    })
 
     return created
   }
