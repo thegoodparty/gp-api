@@ -245,3 +245,26 @@ export {
 } from './elections/raceListItem'
 
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
+
+export {
+  SPEECH_SYNTHESIS_ENGINE_VALUES,
+  type SpeechSynthesisEngine,
+  SpeechSynthesisEngineSchema,
+  SPEECH_SYNTHESIS_VOICE_VALUES,
+  type SpeechSynthesisVoice,
+  SpeechSynthesisVoiceSchema,
+  SYNTHESIZE_SPEECH_MAX_TEXT_LENGTH,
+  SynthesizeSpeechRequestSchema,
+  type SynthesizeSpeechRequest,
+  SynthesizeSpeechSegmentSchema,
+  type SynthesizeSpeechSegment,
+  SynthesizeSpeechResponseSchema,
+  type SynthesizeSpeechResponse,
+} from './speech/synthesizeSpeech.schema'
+
+export {
+  TranscribeSessionRequestSchema,
+  type TranscribeSessionRequest,
+  TranscribeSessionResponseSchema,
+  type TranscribeSessionResponse,
+} from './speech/transcribeSession.schema'
