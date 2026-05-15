@@ -49,9 +49,7 @@ describe('UserOwnerOrAdminGuard', () => {
   })
 
   it('rejects when no user and no M2M token', () => {
-    const result = guard.canActivate(
-      mockContext({ params: { id: '1' } }),
-    )
+    const result = guard.canActivate(mockContext({ params: { id: '1' } }))
     expect(result).toBe(false)
   })
 
