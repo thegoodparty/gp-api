@@ -36,6 +36,7 @@ import {
   CreateTcrCompliancePayload,
 } from '../campaignTcrCompliance.types'
 import { CampaignsService } from '../../services/campaigns.service'
+import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -49,6 +50,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private readonly peerlyIdentityService: PeerlyIdentityService,
     private readonly websitesService: WebsitesService,
     private readonly campaignsService: CampaignsService,
+    private readonly crmCampaignsService: CrmCampaignsService,
     private queueService: QueueProducerService,
   ) {
     super()
@@ -328,17 +330,19 @@ export class CampaignTcrComplianceService extends createPrismaBase(
             placeId,
             formattedAddress,
           },
-          true,
+          false,
           undefined,
           tx,
         )
 
         if (!updatedCampaign) {
-          throw new BadGatewayException('Failed to update campaign details')
+          throw new NotFoundException(
+            `Campaign ${campaign.id} not found while updating compliance details`,
+          )
         }
 
         if (existing) {
-          await tx.tcrCompliance.delete({ where: { id: existing.id } })
+          await tx.tcrCompliance.deleteMany({ where: { id: existing.id } })
         }
 
         return tx.tcrCompliance.create({
@@ -374,6 +378,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       }
       throw err
     }
+
+    await this.crmCampaignsService.trackCampaign(campaign.id)
 
     await this.queueService.sendMessage(
       {

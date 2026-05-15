@@ -9,6 +9,7 @@ import { CampaignTcrComplianceService } from './campaignTcrCompliance.service'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CampaignsService } from '../../services/campaigns.service'
+import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { MessageGroup, QueueType } from '../../../queue/queue.types'
@@ -23,11 +24,13 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   let mockPeerly: { getIdentities: ReturnType<typeof vi.fn> }
   let mockWebsites: { findFirstOrThrow: ReturnType<typeof vi.fn> }
   let mockCampaigns: { updateJsonFields: ReturnType<typeof vi.fn> }
+  let mockCrm: { trackCampaign: ReturnType<typeof vi.fn> }
   let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
   let mockModel: {
     findUnique: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
+    deleteMany: ReturnType<typeof vi.fn>
   }
   let mockPrisma: {
     tcrCompliance: typeof mockModel
@@ -58,6 +61,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     mockCampaigns = {
       updateJsonFields: vi.fn().mockResolvedValue(campaign),
     }
+    mockCrm = { trackCampaign: vi.fn().mockResolvedValue(undefined) }
     mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
     mockModel = {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -67,6 +71,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
           Promise.resolve({ id: 'tcr-new', ...data }),
         ),
       delete: vi.fn().mockResolvedValue(undefined),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     }
     mockPrisma = {
       tcrCompliance: mockModel,
@@ -81,6 +86,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         { provide: PeerlyIdentityService, useValue: mockPeerly },
         { provide: WebsitesService, useValue: mockWebsites },
         { provide: CampaignsService, useValue: mockCampaigns },
+        { provide: CrmCampaignsService, useValue: mockCrm },
         { provide: QueueProducerService, useValue: mockQueue },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
@@ -109,10 +115,20 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         placeId: basePayload.placeId,
         formattedAddress: basePayload.formattedAddress,
       },
-      true,
+      false,
       undefined,
       mockPrisma,
     )
+    expect(mockCrm.trackCampaign).toHaveBeenCalledWith(campaign.id)
+  })
+
+  it('does not call CRM tracking if the transaction throws', async () => {
+    mockCampaigns.updateJsonFields.mockResolvedValueOnce(null)
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toThrow()
+    expect(mockCrm.trackCampaign).not.toHaveBeenCalled()
   })
 
   it('persists websiteDomain as empty string when missing', async () => {
@@ -173,7 +189,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('restarts atomically (delete + create in a transaction) on terminal failure', async () => {
+  it('restarts atomically (deleteMany + create in a transaction) on terminal failure', async () => {
     const existing = {
       id: 'tcr-failed',
       campaignId: campaign.id,
@@ -184,7 +200,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     await service.createAgentic(user, campaign, basePayload)
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
-    expect(mockModel.delete).toHaveBeenCalledWith({
+    expect(mockModel.deleteMany).toHaveBeenCalledWith({
       where: { id: 'tcr-failed' },
     })
     expect(mockModel.create).toHaveBeenCalledTimes(1)
