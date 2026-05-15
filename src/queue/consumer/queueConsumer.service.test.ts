@@ -221,6 +221,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -778,6 +779,7 @@ describe('QueueConsumerService - handleDomainEmailForwardingMessage', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -958,6 +960,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       contactsService as never,
       s3Service as never,
       usersService as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
