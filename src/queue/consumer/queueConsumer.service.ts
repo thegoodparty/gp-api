@@ -370,9 +370,11 @@ export class QueueConsumerService {
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
       case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
-        throw new Error(
-          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented',
+        this.logger.warn(
+          { messageId: message.MessageId, data: queueMessage.data },
+          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented — deleting message',
         )
+        return true
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },

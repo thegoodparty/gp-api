@@ -29,7 +29,10 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     create: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
   }
-  let mockPrisma: { tcrCompliance: typeof mockModel }
+  let mockPrisma: {
+    tcrCompliance: typeof mockModel
+    $transaction: ReturnType<typeof vi.fn>
+  }
 
   const user = createMockUser({ clerkId: 'user_clerk_abc' })
   const campaign = createMockCampaign({
@@ -65,7 +68,12 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         ),
       delete: vi.fn().mockResolvedValue(undefined),
     }
-    mockPrisma = { tcrCompliance: mockModel }
+    mockPrisma = {
+      tcrCompliance: mockModel,
+      $transaction: vi.fn(async (cb: (tx: typeof mockPrisma) => unknown) =>
+        cb(mockPrisma),
+      ),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -159,7 +167,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('restarts when the existing record is in a terminal failure state', async () => {
+  it('restarts atomically (delete + create in a transaction) on terminal failure', async () => {
     const existing = {
       id: 'tcr-failed',
       campaignId: campaign.id,
@@ -169,11 +177,31 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
     await service.createAgentic(user, campaign, basePayload)
 
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
     expect(mockModel.delete).toHaveBeenCalledWith({
       where: { id: 'tcr-failed' },
     })
     expect(mockModel.create).toHaveBeenCalledTimes(1)
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('rolls back the delete when create fails inside the transaction', async () => {
+    const existing = {
+      id: 'tcr-failed',
+      campaignId: campaign.id,
+      status: TcrComplianceStatus.error,
+    }
+    mockModel.findUnique.mockResolvedValue(existing)
+    const dbErr = new PrismaClientKnownRequestError('Connection lost', {
+      code: 'P1001',
+      clientVersion: 'test',
+    })
+    mockModel.create.mockRejectedValueOnce(dbErr)
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toBe(dbErr)
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
   it('returns the parallel record when a concurrent submission wins the race', async () => {

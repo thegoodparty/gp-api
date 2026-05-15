@@ -331,21 +331,22 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw new BadGatewayException('Failed to update campaign details')
     }
 
-    if (existing) {
-      await this.model.delete({ where: { id: existing.id } })
+    const newRecordData = {
+      ...rest,
+      ein,
+      committeeName,
+      websiteDomain: websiteDomain ?? '',
+      postalAddress: updatedCampaign.formattedAddress ?? '',
+      campaignId: campaign.id,
     }
 
     let created: TcrCompliance
     try {
-      created = await this.model.create({
-        data: {
-          ...rest,
-          ein,
-          committeeName,
-          websiteDomain: websiteDomain ?? '',
-          postalAddress: updatedCampaign.formattedAddress ?? '',
-          campaignId: campaign.id,
-        },
+      created = await this.client.$transaction(async (tx) => {
+        if (existing) {
+          await tx.tcrCompliance.delete({ where: { id: existing.id } })
+        }
+        return tx.tcrCompliance.create({ data: newRecordData })
       })
     } catch (err) {
       if (
