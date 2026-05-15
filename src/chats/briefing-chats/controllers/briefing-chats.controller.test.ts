@@ -667,10 +667,10 @@ describe('BriefingChatsController.streamMessage', () => {
 
   it('writes an error frame before ending when sendMessage throws after headers', async () => {
     const failingIterable: AsyncIterable<ChatStreamChunk> = {
-      [Symbol.asyncIterator]: async function* () {
-        throw new Error('upstream blew up before any chunk')
-        yield { type: 'done' }
-      },
+      [Symbol.asyncIterator]:
+        async function* (): AsyncGenerator<ChatStreamChunk> {
+          throw new Error('upstream blew up before any chunk')
+        },
     }
     serviceSpy = buildService({
       sendMessage: vi.fn(() => failingIterable),

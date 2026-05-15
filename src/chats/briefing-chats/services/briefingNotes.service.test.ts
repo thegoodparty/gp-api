@@ -172,9 +172,7 @@ describe('BriefingNotesService', () => {
       findMany.mockResolvedValueOnce([writtenByAnnotationsApi])
 
       const artifactContent = JSON.stringify({
-        priorityIssues: [
-          { card: { headline: 'Short title text here' } },
-        ],
+        priorityIssues: [{ card: { headline: 'Short title text here' } }],
       })
 
       const out = await svc.loadNotesForChat({

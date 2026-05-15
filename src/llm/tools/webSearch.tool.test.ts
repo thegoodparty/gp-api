@@ -154,16 +154,14 @@ describe('TavilySearchProvider', () => {
     let observedSignal: AbortSignal | undefined
     const fetchMock = vi
       .fn()
-      .mockImplementation(
-        (_url: string, init?: { signal?: AbortSignal }) => {
-          observedSignal = init?.signal
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ results: [] }),
-            text: async () => '',
-          })
-        },
-      )
+      .mockImplementation((_url: string, init?: { signal?: AbortSignal }) => {
+        observedSignal = init?.signal
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ results: [] }),
+          text: async () => '',
+        })
+      })
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
 
     const provider = new TavilySearchProvider({ timeoutMs: 60_000 })

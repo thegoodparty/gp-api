@@ -534,9 +534,10 @@ describe('ChatStoreService', () => {
       })
       expect(stillThere).toBeNull()
 
-      const convoAfter = await service.prisma.chatConversation.findUniqueOrThrow(
-        { where: { id: convo.id } },
-      )
+      const convoAfter =
+        await service.prisma.chatConversation.findUniqueOrThrow({
+          where: { id: convo.id },
+        })
       expect(convoAfter.deletedAt).toBeInstanceOf(Date)
     })
 

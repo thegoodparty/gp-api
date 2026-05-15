@@ -1060,9 +1060,7 @@ describe('ChatStreamService', () => {
         return { ...result, textStream: wrapped }
       }
 
-      const iter = service.stream(
-        baseStreamArgs({ signal: controller.signal }),
-      )
+      const iter = service.stream(baseStreamArgs({ signal: controller.signal }))
       const reader = iter[Symbol.asyncIterator]()
 
       const first = await reader.next()

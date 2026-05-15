@@ -73,8 +73,7 @@ export interface TavilySearchProviderOptions {
   timeoutMs?: number
 }
 
-const isClientError = (status: number): boolean =>
-  status >= 400 && status < 500
+const isClientError = (status: number): boolean => status >= 400 && status < 500
 
 export class TavilySearchProvider implements SearchProvider {
   private readonly endpoint = 'https://api.tavily.com/search'

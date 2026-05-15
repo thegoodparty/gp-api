@@ -45,10 +45,7 @@ const DELIMITER_PATTERNS: RegExp[] = [
 ]
 
 export const sanitizeUntrustedContent = (s: string): string =>
-  DELIMITER_PATTERNS.reduce(
-    (acc, re) => acc.replace(re, DELIMITER_REMOVED),
-    s,
-  )
+  DELIMITER_PATTERNS.reduce((acc, re) => acc.replace(re, DELIMITER_REMOVED), s)
 
 const ROLE_CLARIFIERS_BLOCK = `ROLE CLARIFIERS (do not violate)
 - You are the chief of staff. The user is the elected official you serve, NOT you.
@@ -217,7 +214,7 @@ export const buildSystemPrompt = (args: BuildSystemPromptArgs): string => {
     today,
     availableToolNames,
     notesCount,
-    user,
+    user: _user,
     office,
     highlight,
     parsed,
@@ -246,7 +243,7 @@ Today is ${today}.`
     notesCount > 0 && availableToolNames.includes('get_my_notes')
   const notesHintBlock = includeNotesHint
     ? `YOUR NOTES (${notesCount} on this briefing):\n` +
-      "- You have written notes against specific passages of this briefing. Call `get_my_notes` when the question touches something you might have personally annotated (e.g. \"what did I think about\", \"remind me why I noted\", \"my view on\").\n" +
+      '- You have written notes against specific passages of this briefing. Call `get_my_notes` when the question touches something you might have personally annotated (e.g. "what did I think about", "remind me why I noted", "my view on").\n' +
       '- Cite the highlighted passage when you reference a note so the user can place it.'
     : null
 
