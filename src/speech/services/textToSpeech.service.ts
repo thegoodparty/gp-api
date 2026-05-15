@@ -57,8 +57,8 @@ export class TextToSpeechService {
       )
     }
 
-    const voiceId: VoiceId = request.options?.voiceId ?? 'Joanna'
-    const engine: Engine = request.options?.engine ?? 'neural'
+    const voiceId: VoiceId = request.options?.voiceId ?? 'Amy'
+    const engine: Engine = request.options?.engine ?? 'generative'
 
     // The contracts schema enforces non-empty + max length on request.text;
     // chunkBySentence may still yield zero chunks if the input is purely

@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
-export const SPEECH_SYNTHESIS_ENGINE_VALUES = ['neural', 'standard'] as const
+export const SPEECH_SYNTHESIS_ENGINE_VALUES = [
+  'neural',
+  'standard',
+  'generative',
+] as const
 export type SpeechSynthesisEngine =
   (typeof SPEECH_SYNTHESIS_ENGINE_VALUES)[number]
 export const SpeechSynthesisEngineSchema = z.enum(
@@ -18,10 +22,20 @@ export const SPEECH_SYNTHESIS_VOICE_VALUES = [
   'Justin',
   'Ruth',
   'Stephen',
+  'Amy',
 ] as const
 export type SpeechSynthesisVoice =
   (typeof SPEECH_SYNTHESIS_VOICE_VALUES)[number]
 export const SpeechSynthesisVoiceSchema = z.enum(SPEECH_SYNTHESIS_VOICE_VALUES)
+
+export const GENERATIVE_VOICE_VALUES: readonly SpeechSynthesisVoice[] = [
+  'Joanna',
+  'Matthew',
+  'Salli',
+  'Ruth',
+  'Stephen',
+  'Amy',
+]
 
 /**
  * Hard cap on a single synthesis request, in characters of text. Sized to
@@ -51,9 +65,15 @@ export const SynthesizeSpeechRequestSchema = z.object({
     ),
   options: z
     .object({
-      voiceId: SpeechSynthesisVoiceSchema.default('Joanna'),
-      engine: SpeechSynthesisEngineSchema.default('neural'),
+      voiceId: SpeechSynthesisVoiceSchema.default('Amy'),
+      engine: SpeechSynthesisEngineSchema.default('generative'),
     })
+    .refine(
+      ({ voiceId, engine }) =>
+        engine !== 'generative' ||
+        GENERATIVE_VOICE_VALUES.includes(voiceId),
+      { message: 'Selected voice does not support the generative engine' },
+    )
     .optional(),
 })
 export type SynthesizeSpeechRequest = z.infer<
