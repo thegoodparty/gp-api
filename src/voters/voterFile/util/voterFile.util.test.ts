@@ -1,13 +1,13 @@
 import { BadRequestException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { VoterFileType } from '../voterFile.types'
 import { typeToQuery } from './voterFile.util'
 
 const logger = {
-  debug: () => {},
-  warn: () => {},
+  debug: vi.fn(),
+  warn: vi.fn(),
 } as unknown as PinoLogger
 
 const statewideCampaign = (state: string | null | undefined) =>
