@@ -546,7 +546,7 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.status).toBe(400)
   })
 
-  it('returns 404 when no briefing row exists for that date', async () => {
+  it('returns awaiting_agenda when no briefing row exists for that date', async () => {
     const orgSlug = 'eo-missing-briefing'
     await seedElectedOffice(orgSlug)
 
@@ -555,7 +555,32 @@ describe('GET /v1/meetings/:date/briefing', () => {
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(result.status).toBe(404)
+    expect(result.status).toBe(200)
+    expect(result.data.status).toBe('awaiting_agenda')
+    expect(result.data.meetingDate).toBe('2026-06-08')
+  })
+
+  it('returns schedule info in awaiting_agenda when schedule is known', async () => {
+    const orgSlug = 'eo-awaiting-with-schedule'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({
+      status: 'awaiting_agenda',
+      meetingDate: '2026-06-08',
+      meetingName: foundSchedule.meeting_name,
+      meetingTime: foundSchedule.time,
+      meetingTimezone: foundSchedule.timezone,
+      location: foundSchedule.location,
+      durationMinutes: foundSchedule.duration_minutes,
+    })
   })
 
   it('returns 404 when S3 object is missing', async () => {

@@ -128,7 +128,21 @@ export class MeetingsBriefingsController {
         },
       },
     })
-    if (!row) throw new NotFoundException()
+    if (!row) {
+      const schedule = await this.meetingBriefings.loadLatestScheduleForOrg(
+        electedOffice.organizationSlug,
+      )
+      const info = schedule?.status === 'found' ? schedule : null
+      return {
+        status: 'awaiting_agenda',
+        meetingDate: date,
+        meetingName: info?.meeting_name ?? '',
+        meetingTime: info?.time ?? '',
+        meetingTimezone: info?.timezone ?? '',
+        location: info?.location ?? '',
+        durationMinutes: info?.duration_minutes ?? 0,
+      }
+    }
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()
