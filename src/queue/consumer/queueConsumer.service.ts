@@ -372,9 +372,9 @@ export class QueueConsumerService {
       case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
         this.logger.warn(
           { messageId: message.MessageId, data: queueMessage.data },
-          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented — deleting message',
+          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented — routing to DLQ',
         )
-        return true
+        return false
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
