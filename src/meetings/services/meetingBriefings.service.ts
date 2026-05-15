@@ -307,6 +307,9 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const artifact = parsed as unknown as PrismaJson.MeetingBriefingArtifact
+
     const dateString = parsed.meeting?.scheduledAt?.slice(0, 10) ?? ''
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       this.logger.error(
@@ -342,6 +345,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         experimentRunId: run.runId,
         artifactBucket: run.artifactBucket,
         artifactKey: run.artifactKey,
+        artifact,
       },
       update: {
         meetingTime,
@@ -349,6 +353,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         experimentRunId: run.runId,
         artifactBucket: run.artifactBucket,
         artifactKey: run.artifactKey,
+        artifact,
       },
     })
   }
