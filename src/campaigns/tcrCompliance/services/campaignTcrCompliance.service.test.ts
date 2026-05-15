@@ -131,6 +131,31 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockCrm.trackCampaign).not.toHaveBeenCalled()
   })
 
+  it('still returns the record when CRM tracking fails after the kickoff', async () => {
+    mockCrm.trackCampaign.mockRejectedValueOnce(new Error('HubSpot down'))
+
+    const result = await service.createAgentic(user, campaign, basePayload)
+
+    expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+    expect(result).toEqual(expect.objectContaining({ id: 'tcr-new' }))
+  })
+
+  it('sends the kickoff before tracking CRM (CRM failure cannot strand the record)', async () => {
+    const callOrder: string[] = []
+    mockQueue.sendMessage.mockImplementation(() => {
+      callOrder.push('sendMessage')
+      return Promise.resolve()
+    })
+    mockCrm.trackCampaign.mockImplementation(() => {
+      callOrder.push('trackCampaign')
+      return Promise.resolve()
+    })
+
+    await service.createAgentic(user, campaign, basePayload)
+
+    expect(callOrder).toEqual(['sendMessage', 'trackCampaign'])
+  })
+
   it('persists websiteDomain as empty string when missing', async () => {
     await service.createAgentic(user, campaign, basePayload)
 
@@ -189,7 +214,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('restarts atomically (deleteMany + create in a transaction) on terminal failure', async () => {
+  it('restarts atomically (deleteMany + create in a transaction) on transient error', async () => {
     const existing = {
       id: 'tcr-failed',
       campaignId: campaign.id,
@@ -205,6 +230,22 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     })
     expect(mockModel.create).toHaveBeenCalledTimes(1)
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not restart when the existing record was rejected by the compliance bureau', async () => {
+    const existing = {
+      id: 'tcr-rejected',
+      campaignId: campaign.id,
+      status: TcrComplianceStatus.rejected,
+    }
+    mockModel.findUnique.mockResolvedValue(existing)
+
+    const result = await service.createAgentic(user, campaign, basePayload)
+
+    expect(result).toEqual(existing)
+    expect(mockModel.create).not.toHaveBeenCalled()
+    expect(mockModel.deleteMany).not.toHaveBeenCalled()
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
   it('rolls back the delete when create fails inside the transaction', async () => {

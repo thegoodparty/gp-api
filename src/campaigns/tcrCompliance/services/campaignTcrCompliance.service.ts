@@ -299,11 +299,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     }
 
     const existing = await this.fetchByCampaignId(campaign.id)
-    const isTerminalFailure =
-      existing?.status === TcrComplianceStatus.rejected ||
-      existing?.status === TcrComplianceStatus.error
+    const isRetryableFailure = existing?.status === TcrComplianceStatus.error
 
-    if (existing && !isTerminalFailure) {
+    if (existing && !isRetryableFailure) {
       return existing
     }
 
@@ -379,8 +377,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw err
     }
 
-    await this.crmCampaignsService.trackCampaign(campaign.id)
-
     await this.queueService.sendMessage(
       {
         type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
@@ -396,6 +392,15 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         throwOnError: true,
       },
     )
+
+    try {
+      await this.crmCampaignsService.trackCampaign(campaign.id)
+    } catch (err) {
+      this.logger.error(
+        { err, campaignId: campaign.id },
+        '[TCR Compliance] CRM tracking failed after agentic kickoff enqueued; agent run will continue',
+      )
+    }
 
     this.logger.info(
       `[TCR Compliance] Agentic flow kicked off for campaignId=${campaign.id}, tcrComplianceId=${created.id}`,
