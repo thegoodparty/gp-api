@@ -300,6 +300,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     const existing = await this.fetchByCampaignId(campaign.id)
     const isRetryableFailure = existing?.status === TcrComplianceStatus.error
+
     if (existing && !isRetryableFailure) {
       return existing
     }
