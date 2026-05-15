@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus } from '@prisma/client'
-import { getDay, parseISO } from 'date-fns'
+import { addDays, getDay, parseISO } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { useTestService } from '@/test-service'
 
 const service = useTestService()
@@ -289,10 +291,11 @@ describe('GET /v1/meetings', () => {
         status: ExperimentRunStatus.COMPLETED,
       },
     })
+    const today = formatInTimeZone(new Date(), 'UTC', 'yyyy-MM-dd')
     await service.prisma.meetingBriefing.create({
       data: {
         electedOfficeId: eo.id,
-        meetingDate: new Date('2026-05-20T00:00:00Z'),
+        meetingDate: parseIsoDateAsUTC(today),
         meetingTime: '20:00',
         meetingTimezone: 'America/Chicago',
         experimentRunId: briefingRun.runId,
@@ -309,7 +312,7 @@ describe('GET /v1/meetings', () => {
     expect(result.data.scheduleKnown).toBe(false)
     expect(result.data.meetings).toEqual([
       expect.objectContaining({
-        meetingDate: '2026-05-20',
+        meetingDate: today,
         meetingTime: '20:00',
         meetingTimezone: 'America/Chicago',
         hasBriefing: true,
@@ -332,10 +335,12 @@ describe('GET /v1/meetings', () => {
       ),
     )
 
-    let adhocDate = '2026-05-20'
+    let adhocDate = formatInTimeZone(new Date(), 'UTC', 'yyyy-MM-dd')
     while (projectedDates.has(adhocDate)) {
-      adhocDate = adhocDate.replace(/\d{2}$/, (d) =>
-        String(+d + 1).padStart(2, '0'),
+      adhocDate = formatInTimeZone(
+        addDays(parseIsoDateAsUTC(adhocDate), 1),
+        'UTC',
+        'yyyy-MM-dd',
       )
     }
 
@@ -349,7 +354,7 @@ describe('GET /v1/meetings', () => {
     await service.prisma.meetingBriefing.create({
       data: {
         electedOfficeId: eo.id,
-        meetingDate: new Date(adhocDate + 'T00:00:00Z'),
+        meetingDate: parseIsoDateAsUTC(adhocDate),
         meetingTime: '20:00',
         meetingTimezone: 'America/Denver',
         experimentRunId: briefingRun.runId,

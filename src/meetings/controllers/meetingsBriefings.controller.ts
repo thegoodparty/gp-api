@@ -39,7 +39,9 @@ export class MeetingsBriefingsController {
     const knownSchedule = schedule?.status === 'found' ? schedule : null
 
     const now = new Date()
-    const windowFrom = subMonths(now, 2)
+    const windowFrom = parseIsoDateAsUTC(
+      formatInTimeZone(subMonths(now, 2), 'UTC', 'yyyy-MM-dd'),
+    )
     const windowTo = addMonths(now, 3)
 
     const projectedDates = knownSchedule
