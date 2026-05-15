@@ -55,7 +55,10 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>
 
 export const AnnotationNoteSchema = z.object({
   id: z.string(),
-  body: z.string(),
+  // Optional once a note can be attachment-only (no typed body). Phase 1
+  // create requires a body, but the response shape is nullable for forward
+  // compatibility with Phase 2.
+  body: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 })
