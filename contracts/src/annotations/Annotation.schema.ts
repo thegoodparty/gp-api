@@ -99,7 +99,7 @@ export type Annotation = z.infer<typeof AnnotationSchema>
 // Request schemas
 // ---------------------------------------------------------------------------
 
-const noteBodySchema = z.string().max(10_000)
+const noteBodySchema = z.string().min(1).max(10_000)
 const bugReportDescriptionSchema = z.string().min(1).max(4_000)
 
 export const CreateAnnotationRequestSchema = z.discriminatedUnion('kind', [

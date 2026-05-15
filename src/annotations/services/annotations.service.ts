@@ -130,49 +130,55 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
   ): Promise<AnnotationDTO> {
     const briefingId = await this.resolveBriefingId(meetingDate, electedOffice)
 
-    const existing = await this.client.annotation.count({
-      where: {
-        resourceType: 'briefing',
-        resourceId: briefingId,
-        authorUserId: userId,
-      },
-    })
-    if (existing >= MAX_ANNOTATIONS_PER_USER_PER_BRIEFING) {
-      throw new ForbiddenException('annotation_limit_reached')
-    }
-
     const anchorFields = {
       jsonPath: input.anchor.json_path,
       start: input.anchor.start,
       end: input.anchor.end,
     }
 
-    if (input.kind === 'note') {
-      const row = await this.client.annotation.create({
-        data: {
-          author: { connect: { id: userId } },
-          kind: AnnotationKind.note,
-          resourceType: 'briefing',
-          resourceId: briefingId,
-          ...anchorFields,
-          note: { create: { body: input.payload.body } },
-        },
-        include: ANNOTATION_INCLUDE,
-      })
-      return toDTO(row)
-    }
-    // kind === 'bug_report'
-    const row = await this.client.annotation.create({
-      data: {
-        author: { connect: { id: userId } },
-        kind: AnnotationKind.bug_report,
-        resourceType: 'briefing',
-        resourceId: briefingId,
-        ...anchorFields,
-        bugReport: { create: { description: input.payload.description } },
+    // The count check and create must serialize: under concurrent writes,
+    // two requests could each observe count=199 and both insert, bypassing
+    // the 200-limit. Serializable isolation forces them to retry.
+    const row = await this.client.$transaction(
+      async (tx) => {
+        const existing = await tx.annotation.count({
+          where: {
+            resourceType: 'briefing',
+            resourceId: briefingId,
+            authorUserId: userId,
+          },
+        })
+        if (existing >= MAX_ANNOTATIONS_PER_USER_PER_BRIEFING) {
+          throw new ForbiddenException('annotation_limit_reached')
+        }
+
+        if (input.kind === 'note') {
+          return tx.annotation.create({
+            data: {
+              author: { connect: { id: userId } },
+              kind: AnnotationKind.note,
+              resourceType: 'briefing',
+              resourceId: briefingId,
+              ...anchorFields,
+              note: { create: { body: input.payload.body } },
+            },
+            include: ANNOTATION_INCLUDE,
+          })
+        }
+        return tx.annotation.create({
+          data: {
+            author: { connect: { id: userId } },
+            kind: AnnotationKind.bug_report,
+            resourceType: 'briefing',
+            resourceId: briefingId,
+            ...anchorFields,
+            bugReport: { create: { description: input.payload.description } },
+          },
+          include: ANNOTATION_INCLUDE,
+        })
       },
-      include: ANNOTATION_INCLUDE,
-    })
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    )
     return toDTO(row)
   }
 
@@ -222,7 +228,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
         chatConversationId: true,
       },
     })
-    if (!row) return
+    if (!row) throw new NotFoundException('annotation_not_found')
     if (row.authorUserId !== userId) {
       throw new ForbiddenException('annotation_not_yours')
     }
