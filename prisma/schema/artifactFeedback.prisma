@@ -13,6 +13,9 @@ model ArtifactFeedback {
   organizationSlug String       @map("organization_slug")
   organization     Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
+  briefingId String          @map("briefing_id")
+  briefing   MeetingBriefing @relation(fields: [briefingId], references: [id], onDelete: Cascade)
+
   submitterUserId Int  @map("submitter_user_id")
   submitter       User @relation(fields: [submitterUserId], references: [id], onDelete: Cascade)
 
@@ -24,8 +27,8 @@ model ArtifactFeedback {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@unique([submitterUserId, artifactId, artifactType], map: "artifact_feedback_user_artifact_unique")
+  @@unique([submitterUserId, briefingId, artifactId, artifactType], map: "artifact_feedback_user_briefing_item_unique")
   @@index([organizationSlug])
-  @@index([artifactType, artifactId])
+  @@index([briefingId])
   @@map("artifact_feedback")
 }

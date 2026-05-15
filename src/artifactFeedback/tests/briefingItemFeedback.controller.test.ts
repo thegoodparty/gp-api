@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus, MeetingBriefing } from '@prisma/client'
 import { useTestService } from '@/test-service'
 
 const service = useTestService()
@@ -20,7 +20,7 @@ const seedBriefing = async (
   eoId: string,
   orgSlug: string,
   meetingDate: string,
-) => {
+): Promise<MeetingBriefing> => {
   const briefingRun = await service.prisma.experimentRun.create({
     data: {
       organizationSlug: orgSlug,
@@ -48,6 +48,7 @@ const orgHeader = (slug: string) => ({
 const ITEM_ID = 'item_alpha_uuid'
 const OTHER_ITEM_ID = 'item_beta_uuid'
 const DATE = '2026-06-08'
+const OTHER_DATE = '2026-06-15'
 const NO_BRIEFING_FOR_DATE_TEST =
   'returns 404 when no briefing exists for the date'
 
@@ -55,7 +56,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('creates the feedback row when none exists', async () => {
     const orgSlug = 'eo-fb-create'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     const result = await service.client.put(
       `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
@@ -73,15 +74,16 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     })
 
     const rows = await service.prisma.artifactFeedback.findMany({
-      where: { submitterUserId: service.user.id, artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, submitterUserId: service.user.id },
     })
     expect(rows).toHaveLength(1)
+    expect(rows[0].artifactId).toBe(ITEM_ID)
   })
 
   it('switching positive -> negative updates the same row in place', async () => {
     const orgSlug = 'eo-fb-switch'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     const first = await service.client.put(
       `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
@@ -99,7 +101,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     expect(second.data.feedback).toBe('negative')
 
     const rows = await service.prisma.artifactFeedback.findMany({
-      where: { submitterUserId: service.user.id, artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, submitterUserId: service.user.id },
     })
     expect(rows).toHaveLength(1)
     expect(rows[0].feedback).toBe('negative')
@@ -108,7 +110,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('repeating the same vote is idempotent (single row)', async () => {
     const orgSlug = 'eo-fb-idempotent'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     await service.client.put(
       `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
@@ -122,9 +124,38 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     )
 
     const rows = await service.prisma.artifactFeedback.findMany({
-      where: { submitterUserId: service.user.id, artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, submitterUserId: service.user.id },
     })
     expect(rows).toHaveLength(1)
+  })
+
+  it('the same item id in two different briefings produces two independent rows', async () => {
+    const orgSlug = 'eo-fb-cross-briefing'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefingOne = await seedBriefing(eo.id, orgSlug, DATE)
+    const briefingTwo = await seedBriefing(eo.id, orgSlug, OTHER_DATE)
+
+    await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'positive' },
+      orgHeader(orgSlug),
+    )
+    await service.client.put(
+      `/v1/meetings/${OTHER_DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative' },
+      orgHeader(orgSlug),
+    )
+
+    const rowsOne = await service.prisma.artifactFeedback.findMany({
+      where: { briefingId: briefingOne.id, submitterUserId: service.user.id },
+    })
+    const rowsTwo = await service.prisma.artifactFeedback.findMany({
+      where: { briefingId: briefingTwo.id, submitterUserId: service.user.id },
+    })
+    expect(rowsOne).toHaveLength(1)
+    expect(rowsOne[0].feedback).toBe('positive')
+    expect(rowsTwo).toHaveLength(1)
+    expect(rowsTwo[0].feedback).toBe('negative')
   })
 
   it('rejects an invalid feedback value', async () => {
@@ -171,7 +202,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('two users can vote on the same item without colliding', async () => {
     const orgSlug = 'eo-fb-two-users'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     const otherUser = await service.prisma.user.create({
       data: {
@@ -185,6 +216,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     await service.prisma.artifactFeedback.create({
       data: {
         organizationSlug: orgSlug,
+        briefingId: briefing.id,
         submitterUserId: otherUser.id,
         artifactId: ITEM_ID,
         artifactType: 'agenda_item',
@@ -200,7 +232,7 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
 
     expect(result.status).toBe(200)
     const rows = await service.prisma.artifactFeedback.findMany({
-      where: { artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, artifactId: ITEM_ID },
       orderBy: { submitterUserId: 'asc' },
     })
     expect(rows).toHaveLength(2)
@@ -215,11 +247,12 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('deletes the row and returns 204', async () => {
     const orgSlug = 'eo-fb-delete'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     await service.prisma.artifactFeedback.create({
       data: {
         organizationSlug: orgSlug,
+        briefingId: briefing.id,
         submitterUserId: service.user.id,
         artifactId: ITEM_ID,
         artifactType: 'agenda_item',
@@ -234,7 +267,7 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
 
     expect(result.status).toBe(204)
     const remaining = await service.prisma.artifactFeedback.findMany({
-      where: { submitterUserId: service.user.id, artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, submitterUserId: service.user.id },
     })
     expect(remaining).toHaveLength(0)
   })
@@ -255,7 +288,7 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('does not touch another user feedback for the same item', async () => {
     const orgSlug = 'eo-fb-delete-isolation'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
 
     const otherUser = await service.prisma.user.create({
       data: {
@@ -269,6 +302,7 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     await service.prisma.artifactFeedback.create({
       data: {
         organizationSlug: orgSlug,
+        briefingId: briefing.id,
         submitterUserId: otherUser.id,
         artifactId: ITEM_ID,
         artifactType: 'agenda_item',
@@ -282,10 +316,52 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
     )
 
     const remaining = await service.prisma.artifactFeedback.findMany({
-      where: { artifactId: ITEM_ID },
+      where: { briefingId: briefing.id, artifactId: ITEM_ID },
     })
     expect(remaining).toHaveLength(1)
     expect(remaining[0].submitterUserId).toBe(otherUser.id)
+  })
+
+  it('does not touch the same user feedback in a different briefing', async () => {
+    const orgSlug = 'eo-fb-delete-cross-briefing'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefingOne = await seedBriefing(eo.id, orgSlug, DATE)
+    const briefingTwo = await seedBriefing(eo.id, orgSlug, OTHER_DATE)
+
+    await service.prisma.artifactFeedback.createMany({
+      data: [
+        {
+          organizationSlug: orgSlug,
+          briefingId: briefingOne.id,
+          submitterUserId: service.user.id,
+          artifactId: ITEM_ID,
+          artifactType: 'agenda_item',
+          feedback: 'positive',
+        },
+        {
+          organizationSlug: orgSlug,
+          briefingId: briefingTwo.id,
+          submitterUserId: service.user.id,
+          artifactId: ITEM_ID,
+          artifactType: 'agenda_item',
+          feedback: 'positive',
+        },
+      ],
+    })
+
+    await service.client.delete(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      orgHeader(orgSlug),
+    )
+
+    const remainingOne = await service.prisma.artifactFeedback.findMany({
+      where: { briefingId: briefingOne.id },
+    })
+    const remainingTwo = await service.prisma.artifactFeedback.findMany({
+      where: { briefingId: briefingTwo.id },
+    })
+    expect(remainingOne).toHaveLength(0)
+    expect(remainingTwo).toHaveLength(1)
   })
 
   it(NO_BRIEFING_FOR_DATE_TEST, async () => {
@@ -302,10 +378,11 @@ describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
 })
 
 describe('GET /v1/meetings/:date/briefing/feedback', () => {
-  it('returns only the requesting user own feedback rows', async () => {
+  it('returns only the requesting user own feedback rows for that briefing', async () => {
     const orgSlug = 'eo-fb-list-isolation'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, DATE)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
+    const otherBriefing = await seedBriefing(eo.id, orgSlug, OTHER_DATE)
 
     const otherUser = await service.prisma.user.create({
       data: {
@@ -320,6 +397,7 @@ describe('GET /v1/meetings/:date/briefing/feedback', () => {
       data: [
         {
           organizationSlug: orgSlug,
+          briefingId: briefing.id,
           submitterUserId: service.user.id,
           artifactId: ITEM_ID,
           artifactType: 'agenda_item',
@@ -327,6 +405,7 @@ describe('GET /v1/meetings/:date/briefing/feedback', () => {
         },
         {
           organizationSlug: orgSlug,
+          briefingId: briefing.id,
           submitterUserId: service.user.id,
           artifactId: OTHER_ITEM_ID,
           artifactType: 'agenda_item',
@@ -334,7 +413,16 @@ describe('GET /v1/meetings/:date/briefing/feedback', () => {
         },
         {
           organizationSlug: orgSlug,
+          briefingId: briefing.id,
           submitterUserId: otherUser.id,
+          artifactId: ITEM_ID,
+          artifactType: 'agenda_item',
+          feedback: 'negative',
+        },
+        {
+          organizationSlug: orgSlug,
+          briefingId: otherBriefing.id,
+          submitterUserId: service.user.id,
           artifactId: ITEM_ID,
           artifactType: 'agenda_item',
           feedback: 'negative',
