@@ -1,0 +1,23 @@
+enum ArtifactResourceType {
+  briefing
+}
+
+model ArtifactFeedback {
+  id String @id @default(uuid(7))
+
+  organizationSlug String       @map("organization_slug")
+  organization     Organization @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+
+  submitterUserId Int  @map("submitter_user_id")
+  submitter       User @relation(fields: [submitterUserId], references: [id], onDelete: Cascade)
+
+  artifactId   String               @map("artifact_id")
+  artifactType ArtifactResourceType @map("artifact_type")
+
+  // e.g. "positive" or "negative"
+  feedback String @map("feedback")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("artifact_feedback")
+}
