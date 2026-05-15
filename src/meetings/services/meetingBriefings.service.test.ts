@@ -199,8 +199,7 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
         duration_minutes: 60,
       }),
       'briefing.json': JSON.stringify({
-        meetingDate: '2026-06-08',
-        meeting: { scheduledAt: '2026-06-08T19:00:00-06:00' },
+        meeting_date: '2026-06-08',
         meeting_name: 'City Council',
         location: 'Council Chambers',
       }),
