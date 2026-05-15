@@ -9,6 +9,7 @@ import {
   CreateAnnotationRequest,
 } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_ANNOTATIONS_PER_USER_PER_BRIEFING = 200
 
@@ -62,16 +63,39 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
 @Injectable()
 export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
   /**
-   * Verify the active elected office owns the briefing referenced by id.
-   * Throws NotFound for missing briefings (avoid leaking existence) and
-   * Forbidden when the office does not match.
+   * Resolve the MeetingBriefing for the active elected office and meeting
+   * date. Throws NotFound when no briefing exists at that date for the
+   * authorized office; uses the same lookup key as
+   * `GET /v1/meetings/:date/briefing`.
    */
-  private async assertBriefingAccess(
-    briefingId: string,
+  private async resolveBriefingId(
+    meetingDate: string,
+    electedOffice: ElectedOffice,
+  ): Promise<string> {
+    const briefing = await this.client.meetingBriefing.findUnique({
+      where: {
+        electedOfficeId_meetingDate: {
+          electedOfficeId: electedOffice.id,
+          meetingDate: parseIsoDateAsUTC(meetingDate),
+        },
+      },
+      select: { id: true },
+    })
+    if (!briefing) throw new NotFoundException('briefing_not_found')
+    return briefing.id
+  }
+
+  /**
+   * Verify the user is authorized for the annotation's underlying briefing.
+   * Used on update/delete by annotation id, where the URL no longer carries
+   * the date.
+   */
+  private async assertAnnotationBriefingAccess(
+    briefingResourceId: string,
     electedOffice: ElectedOffice,
   ): Promise<void> {
     const briefing = await this.client.meetingBriefing.findUnique({
-      where: { id: briefingId },
+      where: { id: briefingResourceId },
       select: { electedOfficeId: true },
     })
     if (!briefing) throw new NotFoundException('briefing_not_found')
@@ -81,11 +105,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
   }
 
   async listForBriefing(
-    briefingId: string,
+    meetingDate: string,
     userId: number,
     electedOffice: ElectedOffice,
   ): Promise<AnnotationDTO[]> {
-    await this.assertBriefingAccess(briefingId, electedOffice)
+    const briefingId = await this.resolveBriefingId(meetingDate, electedOffice)
     const rows = await this.client.annotation.findMany({
       where: {
         resourceType: 'briefing',
@@ -99,12 +123,12 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
   }
 
   async createForBriefing(
-    briefingId: string,
+    meetingDate: string,
     userId: number,
     electedOffice: ElectedOffice,
     input: CreateAnnotationRequest,
   ): Promise<AnnotationDTO> {
-    await this.assertBriefingAccess(briefingId, electedOffice)
+    const briefingId = await this.resolveBriefingId(meetingDate, electedOffice)
 
     const existing = await this.client.annotation.count({
       where: {
@@ -169,7 +193,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     if (row.kind !== AnnotationKind.note || !row.note) {
       throw new ForbiddenException('not_a_note')
     }
-    await this.assertBriefingAccess(row.resourceId, electedOffice)
+    await this.assertAnnotationBriefingAccess(row.resourceId, electedOffice)
 
     const updated = await this.client.annotation.update({
       where: { id: annotationId },
@@ -202,7 +226,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     if (row.authorUserId !== userId) {
       throw new ForbiddenException('annotation_not_yours')
     }
-    await this.assertBriefingAccess(row.resourceId, electedOffice)
+    await this.assertAnnotationBriefingAccess(row.resourceId, electedOffice)
 
     await this.client.$transaction(async (tx) => {
       await tx.annotation.delete({ where: { id: annotationId } })

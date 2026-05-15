@@ -22,22 +22,38 @@ import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
+import {
+  MeetingDateParam,
+  MeetingDateParamSchema,
+} from '@/meetings/schemas/meetingDateParam.schema'
 import { AnnotationsService } from '../services/annotations.service'
 
+/**
+ * Briefing annotations.
+ *
+ * Briefings are addressed by `(elected office, meeting date)`, matching the
+ * URL pattern of `GET /v1/meetings/:date/briefing`. The MeetingBriefing
+ * row's UUID is resolved server-side and stored as the annotation's
+ * `resourceId`; the frontend only ever sees the date.
+ *
+ * Annotation IDs are generated server-side, so update and delete are
+ * addressed by the annotation's own id directly.
+ */
 @Controller()
 export class AnnotationsController {
   constructor(private readonly annotations: AnnotationsService) {}
 
   @UseElectedOffice()
-  @Get('meeting-briefings/:briefingId/annotations')
+  @Get('meetings/:date/briefing/annotations')
   @ResponseSchema(AnnotationsListResponseSchema)
   async list(
-    @Param('briefingId') briefingId: string,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
     @ReqUser() user: User,
     @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
     const annotations = await this.annotations.listForBriefing(
-      briefingId,
+      date,
       user.id,
       electedOffice,
     )
@@ -45,17 +61,18 @@ export class AnnotationsController {
   }
 
   @UseElectedOffice()
-  @Post('meeting-briefings/:briefingId/annotations')
+  @Post('meetings/:date/briefing/annotations')
   @ResponseSchema(AnnotationResponseSchema)
   async create(
-    @Param('briefingId') briefingId: string,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
     @ReqUser() user: User,
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body(new ZodValidationPipe(CreateAnnotationRequestSchema))
     body: CreateAnnotationRequest,
   ) {
     return this.annotations.createForBriefing(
-      briefingId,
+      date,
       user.id,
       electedOffice,
       body,
