@@ -311,6 +311,32 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
+    const briefingStatus = artifact.briefing_status
+    if (briefingStatus === undefined) {
+      this.logger.error(
+        { runId: run.runId },
+        'meeting_briefing artifact missing briefing_status field',
+      )
+      return
+    }
+    if (briefingStatus === 'error') {
+      this.logger.error(
+        { runId: run.runId, briefingStatus },
+        'meeting_briefing artifact reports an unrecoverable error; skipping row write',
+      )
+      return
+    }
+    if (
+      briefingStatus !== 'briefing_ready' &&
+      briefingStatus !== 'agenda_provided_by_user'
+    ) {
+      this.logger.info(
+        { runId: run.runId, briefingStatus },
+        'meeting_briefing produced a placeholder; skipping row write so the next cron run retries',
+      )
+      return
+    }
+
     const dateString =
       typeof artifact.meeting_date === 'string' ? artifact.meeting_date : ''
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
