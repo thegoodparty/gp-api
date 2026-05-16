@@ -9,6 +9,8 @@ const UserWritableMetaDataSchema = UserMetaDataObjectSchema.omit({
   profile_updated_count: true,
   isDeleted: true,
   fsUserId: true,
+  lastVisited: true,
+  sessionCount: true,
 })
 
 export class UpdateMetadataSchema extends createZodDto(
