@@ -181,6 +181,7 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
         duration_minutes: 60,
       }),
       'briefing.json': JSON.stringify({
+        briefing_status: 'briefing_ready',
         meeting_date: '2026-06-08',
         meeting_name: 'City Council',
         location: 'Council Chambers',
@@ -205,6 +206,64 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
     expect(row?.experimentRunId).toBe(briefingRun.runId)
     expect(row?.artifact?.meeting_name).toBe('City Council')
     expect(row?.artifact?.location).toBe('Council Chambers')
+  })
+
+  it('does not write a MeetingBriefing row for placeholder briefing_status (awaiting_agenda)', async () => {
+    const orgSlug = `eo-awaiting-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: service.user.id },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'schedule-bucket',
+        artifactKey: 'schedule.json',
+      },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing.json',
+        params: { elected_office_id: eo.id },
+      },
+    })
+    mockS3({
+      'schedule.json': JSON.stringify({
+        status: 'known',
+        rrule: 'FREQ=WEEKLY;BYDAY=MO',
+        time: '19:00',
+        timezone: 'America/Chicago',
+        duration_minutes: 60,
+      }),
+      'briefing.json': JSON.stringify({
+        briefing_status: 'awaiting_agenda',
+        meeting_date: '2026-06-08',
+        meeting_name: 'City Council',
+        location: 'Council Chambers',
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    const row = await service.prisma.meetingBriefing.findUnique({
+      where: {
+        electedOfficeId_meetingDate: {
+          electedOfficeId: eo.id,
+          meetingDate: new Date('2026-06-08'),
+        },
+      },
+    })
+    expect(row).toBeNull()
   })
 
   it('skips when run is not COMPLETED', async () => {

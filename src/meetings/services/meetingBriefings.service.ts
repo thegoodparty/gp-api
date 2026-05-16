@@ -311,6 +311,18 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
+    const briefingStatus = artifact.briefing_status
+    if (
+      briefingStatus !== 'briefing_ready' &&
+      briefingStatus !== 'agenda_provided_by_user'
+    ) {
+      this.logger.info(
+        { runId: run.runId, briefingStatus },
+        'meeting_briefing produced a placeholder; skipping row write so the next cron run retries',
+      )
+      return
+    }
+
     const dateString =
       typeof artifact.meeting_date === 'string' ? artifact.meeting_date : ''
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
