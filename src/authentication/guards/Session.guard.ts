@@ -79,7 +79,7 @@ export class SessionGuard implements CanActivate {
 
       request.user = {
         ...user,
-        impersonating: actor != null,
+        impersonating: actorUser != null,
       }
       if (actorUser) {
         request.actorUser = actorUser

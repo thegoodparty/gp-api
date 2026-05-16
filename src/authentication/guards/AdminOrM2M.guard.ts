@@ -10,8 +10,7 @@ export class AdminOrM2MGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<IncomingRequest>()
     return Boolean(
       req.m2mToken ||
-        effectiveUser(req)?.roles.includes(UserRole.admin) ||
-        req.user?.impersonating,
+        effectiveUser(req)?.roles.includes(UserRole.admin),
     )
   }
 }
