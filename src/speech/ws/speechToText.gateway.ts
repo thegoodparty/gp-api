@@ -23,7 +23,13 @@ const SESSION_HARD_CAP_MS = 10 * 60_000
 const WARN_BEFORE_CAP_MS = 60_000
 const WARN_AT_MS = SESSION_HARD_CAP_MS - WARN_BEFORE_CAP_MS
 
-const RATE_LIMIT_BYTES_PER_SEC = 16 * 1024
+// The client streams 16 kHz mono 16-bit PCM, i.e. 32_000 bytes/sec at steady
+// state. We allow ~1.5× headroom for the frame burstiness introduced by the
+// AudioWorklet (which posts one 2048-sample frame every ~128 ms rather than a
+// perfectly uniform stream) before flagging the session as abusive. A lower
+// cap (we previously used 16 KB/sec) trips on every legitimate session as
+// soon as the 2-second grace window elapses.
+const RATE_LIMIT_BYTES_PER_SEC = 48 * 1024
 const RATE_LIMIT_GRACE_MS = 2_000
 
 const ClientStopMessageSchema = z.object({ type: z.literal('stop') }).strict()
