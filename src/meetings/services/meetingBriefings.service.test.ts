@@ -1,5 +1,5 @@
 import { ExperimentRunStatus } from '@prisma/client'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
@@ -36,6 +36,32 @@ const mockS3 = (responses: Record<string, string | undefined>) => {
 }
 
 describe('POST /v1/elected-office dispatches meeting_schedule', () => {
+  beforeEach(() => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('skips dispatch when MEETINGS_AUTOMATION_ENABLED is unset', async () => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
+    const orgSlug = `eo-gate-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-gate' })
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const res = await service.client.post(
+      '/v1/elected-office',
+      {},
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(res.status).toBe(201)
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
   it('dispatches when org has a position', async () => {
     const orgSlug = `eo-create-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-123' })
@@ -93,6 +119,38 @@ describe('POST /v1/elected-office dispatches meeting_schedule', () => {
 })
 
 describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
+  beforeEach(() => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('does not dispatch briefing on schedule completion when MEETINGS_AUTOMATION_ENABLED is unset', async () => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
+    const orgSlug = `eo-chain-gate-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-gate' })
+    await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const scheduleRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(scheduleRun)
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
   it('dispatches meeting_briefing for the org after meeting_schedule completes', async () => {
     const orgSlug = `eo-chain-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain' })
@@ -404,6 +462,22 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
 })
 
 describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
+  beforeEach(() => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('skips entirely when MEETINGS_AUTOMATION_ENABLED is unset', async () => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+    await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
   it('dispatches only for EOs without a future briefing', async () => {
     const orgSlugA = `eo-cron-a-${Date.now()}`
     await seedOrgAndCampaign(orgSlugA, { positionId: 'br-pos-cron-a' })
@@ -496,5 +570,80 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
         }),
       }),
     )
+  })
+})
+
+describe('MeetingBriefingsService.dispatchManual', () => {
+  it('dispatches a schedule run regardless of the env gate', async () => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
+    const orgSlug = `eo-manual-schedule-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-manual-s' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    vi.spyOn(
+      service.app.get(ElectionsService),
+      'getPositionById',
+    ).mockResolvedValue({
+      id: 'pos-real-id',
+      brPositionId: 'br-pos-manual-s',
+      brDatabaseId: 'br-db-manual-s',
+      state: 'MN',
+      name: 'City Council',
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'schedule')
+
+    expect(result.dispatched).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'meeting_schedule' }),
+    )
+    vi.unstubAllEnvs()
+  })
+
+  it('dispatches a briefing run when kind is briefing', async () => {
+    const orgSlug = `eo-manual-briefing-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-manual-b' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    vi.spyOn(
+      service.app.get(ElectionsService),
+      'getPositionById',
+    ).mockResolvedValue({
+      id: 'pos-real-id',
+      brPositionId: 'br-pos-manual-b',
+      brDatabaseId: 'br-db-manual-b',
+      state: 'MN',
+      name: 'City Council',
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
+    expect(result.dispatched).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'meeting_briefing' }),
+    )
+  })
+
+  it('returns dispatched:false for unknown electedOfficeId', async () => {
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual('not-a-real-id', 'schedule')
+    expect(result.dispatched).toBe(false)
+    expect(dispatchSpy).not.toHaveBeenCalled()
   })
 })

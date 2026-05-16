@@ -30,6 +30,11 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
 
+const isAutomationEnabled = () =>
+  process.env.MEETINGS_AUTOMATION_ENABLED === 'true'
+
+export type ManualDispatchKind = 'schedule' | 'briefing'
+
 export type ProjectArgs = {
   schedule: MeetingSchedule
   from: Date
@@ -108,9 +113,20 @@ export class MeetingBriefingsService extends createPrismaBase(
   }
 
   async onElectedOfficeCreated(electedOffice: ElectedOffice): Promise<void> {
+    if (!isAutomationEnabled()) {
+      this.logger.info(
+        { electedOfficeId: electedOffice.id },
+        'meetings automation disabled; skipping auto schedule dispatch',
+      )
+      return
+    }
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
+    await this.dispatchSchedule(ctx)
+  }
+
+  private async dispatchSchedule(ctx: DispatchContext): Promise<void> {
     await this.experimentRuns.dispatchRun({
       type: SCHEDULE_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
@@ -123,10 +139,52 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
   }
 
+  private async dispatchBriefing(ctx: DispatchContext): Promise<void> {
+    await this.experimentRuns.dispatchRun({
+      type: BRIEFING_EXPERIMENT_TYPE,
+      organizationSlug: ctx.organizationSlug,
+      clerkUserId: ctx.clerkUserId,
+      params: {
+        officialName: ctx.officialName,
+        state: ctx.state,
+        positionName: ctx.positionName,
+        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
+        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
+      },
+    })
+  }
+
+  async dispatchManual(
+    electedOfficeId: string,
+    kind: ManualDispatchKind,
+  ): Promise<{ dispatched: boolean }> {
+    const electedOffice = await this.client.electedOffice.findUnique({
+      where: { id: electedOfficeId },
+    })
+    if (!electedOffice) return { dispatched: false }
+
+    const ctx = await this.resolveDispatchContext(electedOffice)
+    if (!ctx) return { dispatched: false }
+
+    if (kind === 'schedule') {
+      await this.dispatchSchedule(ctx)
+    } else {
+      await this.dispatchBriefing(ctx)
+    }
+    return { dispatched: true }
+  }
+
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
     if (run.status !== ExperimentRunStatus.COMPLETED) return
 
     if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
+      if (!isAutomationEnabled()) {
+        this.logger.info(
+          { runId: run.runId },
+          'meetings automation disabled; skipping briefing dispatch on schedule completion',
+        )
+        return
+      }
       await this.dispatchFirstBriefingForOrg(run.organizationSlug)
       return
     }
@@ -138,6 +196,12 @@ export class MeetingBriefingsService extends createPrismaBase(
 
   @Cron('0 7 * * *')
   async dispatchDailyBriefings(): Promise<void> {
+    if (!isAutomationEnabled()) {
+      this.logger.info(
+        'meetings automation disabled; skipping daily briefing cron',
+      )
+      return
+    }
     const offices = await this.client.electedOffice.findMany({
       select: { id: true, organizationSlug: true, userId: true },
     })
@@ -172,18 +236,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    await this.experimentRuns.dispatchRun({
-      type: BRIEFING_EXPERIMENT_TYPE,
-      organizationSlug: ctx.organizationSlug,
-      clerkUserId: ctx.clerkUserId,
-      params: {
-        officialName: ctx.officialName,
-        state: ctx.state,
-        positionName: ctx.positionName,
-        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
-        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
-      },
-    })
+    await this.dispatchBriefing(ctx)
   }
 
   private async dispatchFirstBriefingForOrg(
