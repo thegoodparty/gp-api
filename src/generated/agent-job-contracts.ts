@@ -35,10 +35,6 @@ export interface AgentJobContracts {
   meeting_briefing: {
     Input: {
       /**
-       * City name as it appears in L2 (title-case, e.g. "New York").
-       */
-      city: string
-      /**
        * L2 district value to match (e.g. "25"). Required if l2DistrictType is set.
        */
       l2DistrictName?: string
@@ -1006,15 +1002,11 @@ export interface MeetingBriefingPlaceholder {
 }
 export interface MeetingScheduleInput {
   /**
-   * Full city name (e.g. Burnsville).
-   */
-  city: string
-  /**
    * Opaque gp-api ElectedOffice.id; passed through to the callback. Not used during research.
    */
   elected_office_id?: string
   /**
-   * Governing body name (e.g. City Council).
+   * Full position/office name as it appears to the candidate (e.g. 'Burnsville City Council Member', 'Mayor of Cheyenne'). Usually contains the jurisdiction verbatim; when generic (e.g. just 'City Council'), the agent must infer the city from the position + state via WebSearch.
    */
   office: string
   /**
