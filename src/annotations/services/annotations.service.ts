@@ -10,11 +10,18 @@ import {
 } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { resolveBriefingId } from '@/meetings/util/resolveBriefingId'
+import { S3Service } from '@/vendors/aws/services/s3.service'
 
 const MAX_ANNOTATIONS_PER_USER_PER_BRIEFING = 200
 
 const ANNOTATION_INCLUDE = {
-  note: true,
+  note: {
+    include: {
+      attachments: {
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  },
   bugReport: true,
   chat: true,
 } satisfies Prisma.AnnotationInclude
@@ -40,6 +47,19 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
     base.note = {
       id: row.note.id,
       body: row.note.body,
+      attachments: row.note.attachments.map((a) => ({
+        id: a.id,
+        file_name: a.fileName,
+        mime_type: a.mimeType,
+        size_bytes: a.sizeBytes,
+        ocr_status: a.ocrStatus,
+        ocr_text: a.ocrText,
+        ocr_error: a.ocrError,
+        ocr_completed_at: a.ocrCompletedAt
+          ? a.ocrCompletedAt.toISOString()
+          : null,
+        created_at: a.createdAt.toISOString(),
+      })),
       created_at: row.note.createdAt.toISOString(),
       updated_at: row.note.updatedAt.toISOString(),
     }
@@ -62,6 +82,13 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
 
 @Injectable()
 export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
+  constructor(private readonly s3: S3Service) {
+    super()
+  }
+
+  private get attachmentBucket(): string | null {
+    return process.env.ANNOTATION_ATTACHMENTS_BUCKET ?? null
+  }
   /**
    * Verify the user is authorized for the annotation's underlying briefing.
    * Used on update/delete by annotation id, where the URL no longer carries
@@ -145,7 +172,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
               resourceType: 'briefing',
               resourceId: briefingId,
               ...anchorFields,
-              note: { create: { body: input.payload.body } },
+              note: { create: { body: input.payload.body ?? null } },
             },
             include: ANNOTATION_INCLUDE,
           })
@@ -211,6 +238,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
         noteId: true,
         annotationBugReportId: true,
         chatConversationId: true,
+        note: {
+          select: {
+            attachments: { select: { storageKey: true } },
+          },
+        },
       },
     })
     if (!row) throw new NotFoundException('annotation_not_found')
@@ -218,6 +250,8 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
       throw new ForbiddenException('annotation_not_yours')
     }
     await this.assertAnnotationBriefingAccess(row.resourceId, electedOffice)
+
+    const storageKeys = row.note?.attachments.map((a) => a.storageKey) ?? []
 
     await this.client.$transaction(async (tx) => {
       await tx.annotation.delete({ where: { id: annotationId } })
@@ -231,5 +265,23 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
       }
       // Chat soft-delete is the responsibility of Collin's chat service.
     })
+
+    // Best-effort S3 cleanup for any attachments the deleted note carried.
+    // We do this AFTER the transaction commits — better to leak an S3 object
+    // than to roll back a successful delete because cleanup failed. The DB
+    // cascade has already removed the attachment rows.
+    const bucket = this.attachmentBucket
+    if (bucket && storageKeys.length > 0) {
+      for (const key of storageKeys) {
+        try {
+          await this.s3.deleteObject(bucket, key)
+        } catch (err) {
+          this.logger.warn(
+            { err, annotationId, key },
+            'best-effort S3 delete failed for annotation attachment',
+          )
+        }
+      }
+    }
   }
 }

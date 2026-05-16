@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus } from '@prisma/client'
 import { useTestService } from '@/test-service'
+import { S3Service } from '@/vendors/aws/services/s3.service'
 
 const service = useTestService()
 
@@ -443,6 +444,55 @@ describe('DELETE /v1/annotations/:annotationId', () => {
     expect(
       await service.prisma.annotationNote.findUnique({
         where: { id: annotation.note!.id },
+      }),
+    ).toBeNull()
+  })
+
+  it('cleans up S3 attachments when deleting an annotation', async () => {
+    const orgSlug = 'eo-delete-with-attachments'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefing = await seedBriefing(eo.id, orgSlug, '2026-06-08')
+    const annotation = await service.prisma.annotation.create({
+      data: {
+        author: { connect: { id: service.user.id } },
+        kind: 'note',
+        resourceType: 'briefing',
+        resourceId: briefing.id,
+        note: {
+          create: {
+            body: null,
+            attachments: {
+              create: [
+                {
+                  storageKey: 'annotations/x/y',
+                  fileName: 'doc.pdf',
+                  mimeType: 'application/pdf',
+                  sizeBytes: 1024,
+                },
+              ],
+            },
+          },
+        },
+      },
+      include: { note: { include: { attachments: true } } },
+    })
+
+    const s3 = service.app.get(S3Service)
+    const deleteSpy = vi.spyOn(s3, 'deleteObject').mockResolvedValue(undefined)
+
+    const result = await service.client.delete(
+      `/v1/annotations/${annotation.id}`,
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(204)
+    expect(deleteSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      'annotations/x/y',
+    )
+    expect(
+      await service.prisma.annotationNoteAttachment.findFirst({
+        where: { noteId: annotation.note!.id },
       }),
     ).toBeNull()
   })
