@@ -319,6 +319,13 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return
     }
+    if (briefingStatus === 'error') {
+      this.logger.error(
+        { runId: run.runId, briefingStatus },
+        'meeting_briefing artifact reports an unrecoverable error; skipping row write',
+      )
+      return
+    }
     if (
       briefingStatus !== 'briefing_ready' &&
       briefingStatus !== 'agenda_provided_by_user'
