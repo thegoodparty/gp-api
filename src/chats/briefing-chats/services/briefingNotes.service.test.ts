@@ -1,8 +1,18 @@
-import { AnnotationKind, AnnotationResourceType } from '@prisma/client'
+import {
+  AnnotationKind,
+  AnnotationResourceType,
+  OcrStatus,
+} from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { PrismaService } from '@/prisma/prisma.service'
 import { BriefingNotesService } from './briefingNotes.service'
+
+interface FakeAttachmentRow {
+  fileName: string
+  ocrStatus: OcrStatus
+  ocrText: string | null
+}
 
 interface FakeAnnotationRow {
   id: string
@@ -10,7 +20,7 @@ interface FakeAnnotationRow {
   start: number | null
   end: number | null
   createdAt: Date
-  note: { body: string } | null
+  note: { body: string | null; attachments: FakeAttachmentRow[] } | null
 }
 
 const buildService = (deps: {
@@ -43,30 +53,73 @@ const buildService = (deps: {
 
 describe('BriefingNotesService', () => {
   describe('countNotesForUser', () => {
-    it('counts annotations scoped to user + briefing + kind=note with a note attached', async () => {
-      const count = vi.fn().mockResolvedValue(3)
-      const svc = buildService({ count })
+    it('counts only notes that will produce readable content for the LLM', async () => {
+      const rows: FakeAnnotationRow[] = [
+        {
+          id: 'typed',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-10T15:00:00Z'),
+          note: { body: 'hello', attachments: [] },
+        },
+        {
+          id: 'attachment-completed',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-10T15:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'sign.jpg',
+                ocrStatus: OcrStatus.completed,
+                ocrText: 'VOTE NO',
+              },
+            ],
+          },
+        },
+        {
+          id: 'attachment-pending',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-10T15:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'flyer.jpg',
+                ocrStatus: OcrStatus.pending,
+                ocrText: null,
+              },
+            ],
+          },
+        },
+        {
+          id: 'truly-empty',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-10T15:00:00Z'),
+          note: { body: '', attachments: [] },
+        },
+      ]
+      const findMany = vi.fn().mockResolvedValue(rows)
+      const svc = buildService({ findMany })
 
       const out = await svc.countNotesForUser({
         userId: 7,
         briefingId: 'brief-1',
       })
 
-      expect(out).toBe(3)
-      expect(count).toHaveBeenCalledWith({
-        where: {
-          authorUserId: 7,
-          resourceId: 'brief-1',
-          resourceType: AnnotationResourceType.briefing,
-          kind: AnnotationKind.note,
-          note: { isNot: null },
-        },
-      })
+      expect(out).toBe(2)
     })
 
     it('returns 0 when the user has no notes on the briefing', async () => {
-      const count = vi.fn().mockResolvedValue(0)
-      const svc = buildService({ count })
+      const findMany = vi.fn().mockResolvedValue([])
+      const svc = buildService({ findMany })
 
       const out = await svc.countNotesForUser({
         userId: 7,
@@ -74,16 +127,6 @@ describe('BriefingNotesService', () => {
       })
 
       expect(out).toBe(0)
-    })
-
-    it('does not load notes or parse the artifact', async () => {
-      const count = vi.fn().mockResolvedValue(2)
-      const findMany = vi.fn()
-      const svc = buildService({ count, findMany })
-
-      await svc.countNotesForUser({ userId: 1, briefingId: 'b' })
-
-      expect(findMany).not.toHaveBeenCalled()
     })
   })
 
@@ -104,7 +147,7 @@ describe('BriefingNotesService', () => {
           start: null,
           end: null,
           createdAt: new Date('2026-05-10T15:00:00Z'),
-          note: { body: 'general thought' },
+          note: { body: 'general thought', attachments: [] },
         },
       ]
       findMany.mockResolvedValueOnce(rows)
@@ -142,7 +185,7 @@ describe('BriefingNotesService', () => {
           start: null,
           end: null,
           createdAt: new Date('2026-05-11T15:00:00Z'),
-          note: { body: 'kept' },
+          note: { body: 'kept', attachments: [] },
         },
       ]
       findMany.mockResolvedValueOnce(rows)
@@ -167,7 +210,10 @@ describe('BriefingNotesService', () => {
         start: 0,
         end: 11,
         createdAt: new Date('2026-05-12T10:00:00Z'),
-        note: { body: 'Worth flagging for the next session.' },
+        note: {
+          body: 'Worth flagging for the next session.',
+          attachments: [],
+        },
       }
       findMany.mockResolvedValueOnce([writtenByAnnotationsApi])
 
@@ -197,7 +243,7 @@ describe('BriefingNotesService', () => {
           resourceType: AnnotationResourceType.briefing,
           kind: AnnotationKind.note,
         },
-        include: { note: true },
+        include: { note: { include: { attachments: true } } },
         orderBy: { createdAt: 'asc' },
       })
     })
@@ -209,7 +255,7 @@ describe('BriefingNotesService', () => {
         start: 0,
         end: 5,
         createdAt: new Date('2026-05-12T10:00:00Z'),
-        note: { body: 'note on now-deleted section' },
+        note: { body: 'note on now-deleted section', attachments: [] },
       }
       findMany.mockResolvedValueOnce([row])
 
@@ -228,6 +274,168 @@ describe('BriefingNotesService', () => {
           createdAt: '2026-05-12T10:00:00.000Z',
         },
       ])
+    })
+
+    it('uses completed OCR text when the note body is empty', async () => {
+      const rows: FakeAnnotationRow[] = [
+        {
+          id: 'attachment-only',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'yard-sign.jpg',
+                ocrStatus: OcrStatus.completed,
+                ocrText: 'RE-ELECT JANE',
+              },
+            ],
+          },
+        },
+      ]
+      findMany.mockResolvedValueOnce(rows)
+
+      const out = await svc.loadNotesForChat({
+        userId: 7,
+        briefingId: 'b',
+        artifactContent: '{}',
+      })
+
+      expect(out).toEqual([
+        {
+          id: 'attachment-only',
+          body: '[yard-sign.jpg]\nRE-ELECT JANE',
+          jsonPath: null,
+          highlightedText: null,
+          createdAt: '2026-05-13T10:00:00.000Z',
+        },
+      ])
+    })
+
+    it('concatenates multiple completed attachments with file-name prefixes', async () => {
+      const rows: FakeAnnotationRow[] = [
+        {
+          id: 'multi',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'a.jpg',
+                ocrStatus: OcrStatus.completed,
+                ocrText: 'one',
+              },
+              {
+                fileName: 'b.jpg',
+                ocrStatus: OcrStatus.completed,
+                ocrText: 'two',
+              },
+            ],
+          },
+        },
+      ]
+      findMany.mockResolvedValueOnce(rows)
+
+      const out = await svc.loadNotesForChat({
+        userId: 7,
+        briefingId: 'b',
+        artifactContent: '{}',
+      })
+
+      expect(out[0].body).toBe('[a.jpg]\none\n\n[b.jpg]\ntwo')
+    })
+
+    it('skips notes whose only attachment has not finished OCR yet', async () => {
+      const rows: FakeAnnotationRow[] = [
+        {
+          id: 'pending',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'flyer.jpg',
+                ocrStatus: OcrStatus.pending,
+                ocrText: null,
+              },
+            ],
+          },
+        },
+        {
+          id: 'failed',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: {
+            body: null,
+            attachments: [
+              {
+                fileName: 'blurry.jpg',
+                ocrStatus: OcrStatus.failed,
+                ocrText: null,
+              },
+            ],
+          },
+        },
+        {
+          id: 'kept',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: { body: 'typed', attachments: [] },
+        },
+      ]
+      findMany.mockResolvedValueOnce(rows)
+
+      const out = await svc.loadNotesForChat({
+        userId: 7,
+        briefingId: 'b',
+        artifactContent: '{}',
+      })
+
+      expect(out.map((n) => n.id)).toEqual(['kept'])
+    })
+
+    it('prefers typed body over OCR text when both exist', async () => {
+      const rows: FakeAnnotationRow[] = [
+        {
+          id: 'mixed',
+          jsonPath: null,
+          start: null,
+          end: null,
+          createdAt: new Date('2026-05-13T10:00:00Z'),
+          note: {
+            body: 'my caption',
+            attachments: [
+              {
+                fileName: 'sign.jpg',
+                ocrStatus: OcrStatus.completed,
+                ocrText: 'OCR TEXT',
+              },
+            ],
+          },
+        },
+      ]
+      findMany.mockResolvedValueOnce(rows)
+
+      const out = await svc.loadNotesForChat({
+        userId: 7,
+        briefingId: 'b',
+        artifactContent: '{}',
+      })
+
+      expect(out[0].body).toBe('my caption')
     })
   })
 })
