@@ -2,15 +2,9 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
+import { calcTextAmountInCents } from 'src/shared/util/textPricing.util'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
 import { PinoLogger } from 'nestjs-pino'
-
-const PRICE_PER_CONTACT_TENTH_CENTS = 35
-
-function calcAmountInCents(contactCount: number): number {
-  const totalTenthCents = contactCount * PRICE_PER_CONTACT_TENTH_CENTS
-  return Math.floor((totalTenthCents + 5) / 10)
-}
 
 @Injectable()
 export class OutreachPurchaseHandlerService
@@ -37,7 +31,7 @@ export class OutreachPurchaseHandlerService
     outreachType,
   }: OutreachPurchaseMetadata): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return calcAmountInCents(contactCount)
+      return calcTextAmountInCents(contactCount)
     }
 
     const hasOffer =
@@ -48,7 +42,7 @@ export class OutreachPurchaseHandlerService
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      const finalAmount = calcAmountInCents(discountedContactCount)
+      const finalAmount = calcTextAmountInCents(discountedContactCount)
 
       this.logger.info(
         `Campaign ${campaignId}: applying free texts discount (${contactCount} contacts, ${discountedContactCount} billable, amount: ${finalAmount})`,
@@ -57,7 +51,7 @@ export class OutreachPurchaseHandlerService
       return finalAmount
     }
 
-    return calcAmountInCents(contactCount)
+    return calcTextAmountInCents(contactCount)
   }
 
   async calculateDiscount(
@@ -74,7 +68,7 @@ export class OutreachPurchaseHandlerService
 
     if (hasOffer) {
       const freeTexts = Math.min(contactCount, FREE_TEXTS_OFFER.COUNT)
-      return calcAmountInCents(freeTexts)
+      return calcTextAmountInCents(freeTexts)
     }
 
     return 0
