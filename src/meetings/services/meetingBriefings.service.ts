@@ -312,6 +312,13 @@ export class MeetingBriefingsService extends createPrismaBase(
     }
 
     const briefingStatus = artifact.briefing_status
+    if (briefingStatus === undefined) {
+      this.logger.error(
+        { runId: run.runId },
+        'meeting_briefing artifact missing briefing_status field',
+      )
+      return
+    }
     if (
       briefingStatus !== 'briefing_ready' &&
       briefingStatus !== 'agenda_provided_by_user'
