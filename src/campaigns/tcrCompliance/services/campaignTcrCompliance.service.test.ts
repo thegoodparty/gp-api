@@ -27,6 +27,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
   let mockModel: {
     findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
@@ -65,6 +66,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
     mockModel = {
       findUnique: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi
         .fn()
         .mockImplementation(({ data }) =>
@@ -138,6 +140,15 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
     expect(result).toEqual(expect.objectContaining({ id: 'tcr-new' }))
+  })
+
+  it('stamps kickoffSentAt after a successful kickoff send', async () => {
+    await service.createAgentic(user, campaign, basePayload)
+
+    expect(mockModel.update).toHaveBeenCalledWith({
+      where: { id: 'tcr-new' },
+      data: { kickoffSentAt: expect.any(Date) },
+    })
   })
 
   it('marks the record error and re-throws if SQS sendMessage fails', async () => {
@@ -338,5 +349,114 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     await expect(
       service.createAgentic(userWithoutClerk, campaign, basePayload),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  describe('sweepStrandedAgenticKickoffs', () => {
+    const sweep = (svc: CampaignTcrComplianceService) =>
+      (
+        svc as unknown as { sweepStrandedAgenticKickoffs: () => Promise<void> }
+      ).sweepStrandedAgenticKickoffs()
+
+    it('re-enqueues kickoff and stamps kickoffSentAt for stranded records', async () => {
+      const stranded = {
+        id: 'tcr-stranded',
+        campaignId: 99,
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        campaign: { user: { clerkId: 'clerk_stranded' } },
+      }
+      mockModel.findMany.mockResolvedValueOnce([stranded])
+
+      await sweep(service)
+
+      expect(mockModel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: TcrComplianceStatus.submitted,
+            peerlyIdentityId: null,
+            kickoffSentAt: null,
+            createdAt: { lt: expect.any(Date) },
+          },
+        }),
+      )
+      expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+      const [message, group, options] = mockQueue.sendMessage.mock.calls[0]
+      expect(message).toEqual({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 99,
+          tcrComplianceId: 'tcr-stranded',
+          clerkUserId: 'clerk_stranded',
+        },
+      })
+      expect(group).toBe(`${MessageGroup.agenticComplianceKickoff}-99`)
+      expect(options.throwOnError).toBe(true)
+      expect(options.deduplicationId).toMatch(
+        /^agentic-compliance-tcr-stranded-recover-\d+$/,
+      )
+      expect(mockModel.update).toHaveBeenCalledWith({
+        where: { id: 'tcr-stranded' },
+        data: { kickoffSentAt: expect.any(Date) },
+      })
+    })
+
+    it('skips records whose campaign user has no Clerk id', async () => {
+      const stranded = {
+        id: 'tcr-no-clerk',
+        campaignId: 42,
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        campaign: { user: { clerkId: null } },
+      }
+      mockModel.findMany.mockResolvedValueOnce([stranded])
+
+      await sweep(service)
+
+      expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+      expect(mockModel.update).not.toHaveBeenCalled()
+    })
+
+    it('continues after one record fails to re-enqueue', async () => {
+      const a = {
+        id: 'tcr-a',
+        campaignId: 1,
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        campaign: { user: { clerkId: 'clerk_a' } },
+      }
+      const b = {
+        id: 'tcr-b',
+        campaignId: 2,
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        campaign: { user: { clerkId: 'clerk_b' } },
+      }
+      mockModel.findMany.mockResolvedValueOnce([a, b])
+      mockQueue.sendMessage
+        .mockRejectedValueOnce(new Error('SQS hiccup'))
+        .mockResolvedValueOnce(undefined)
+
+      await sweep(service)
+
+      expect(mockQueue.sendMessage).toHaveBeenCalledTimes(2)
+      expect(mockModel.update).toHaveBeenCalledTimes(1)
+      expect(mockModel.update).toHaveBeenCalledWith({
+        where: { id: 'tcr-b' },
+        data: { kickoffSentAt: expect.any(Date) },
+      })
+    })
+
+    it('is a no-op when no stranded records are found', async () => {
+      mockModel.findMany.mockResolvedValueOnce([])
+
+      await sweep(service)
+
+      expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+      expect(mockModel.update).not.toHaveBeenCalled()
+    })
   })
 })

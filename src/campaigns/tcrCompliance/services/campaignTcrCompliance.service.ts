@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
+import { subMinutes } from 'date-fns'
 import {
   Campaign,
   TcrCompliance,
@@ -41,6 +42,13 @@ const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
   : 12 * 60 * 60 // Defaults to 12 hrs
 
+const AGENTIC_KICKOFF_SWEEP_INTERVAL = process.env
+  .AGENTIC_KICKOFF_SWEEP_INTERVAL
+  ? parseInt(process.env.AGENTIC_KICKOFF_SWEEP_INTERVAL)
+  : 10 * 60
+
+const AGENTIC_KICKOFF_STALENESS_MINUTES = 10
+
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
   MODELS.TcrCompliance,
@@ -53,6 +61,70 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private queueService: QueueProducerService,
   ) {
     super()
+  }
+
+  @Interval(AGENTIC_KICKOFF_SWEEP_INTERVAL * 1000)
+  private async sweepStrandedAgenticKickoffs() {
+    const cutoff = subMinutes(new Date(), AGENTIC_KICKOFF_STALENESS_MINUTES)
+    const stranded = await this.model.findMany({
+      where: {
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        campaign: { include: { user: true } },
+      },
+    })
+
+    if (!stranded.length) {
+      return
+    }
+
+    this.logger.warn(
+      { count: stranded.length, cutoff: cutoff.toISOString() },
+      `[TCR Compliance] Sweeping ${stranded.length} stranded agentic kickoff(s)`,
+    )
+
+    for (const record of stranded) {
+      const clerkUserId = record.campaign?.user?.clerkId
+      if (!clerkUserId) {
+        this.logger.error(
+          { tcrComplianceId: record.id, campaignId: record.campaignId },
+          '[TCR Compliance] Stranded agentic record has no Clerk user; skipping',
+        )
+        continue
+      }
+
+      try {
+        await this.queueService.sendMessage(
+          {
+            type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+            data: {
+              campaignId: record.campaignId,
+              tcrComplianceId: record.id,
+              clerkUserId,
+            },
+          },
+          `${MessageGroup.agenticComplianceKickoff}-${record.campaignId}`,
+          {
+            deduplicationId: `agentic-compliance-${record.id}-recover-${Date.now()}`,
+            throwOnError: true,
+          },
+        )
+
+        await this.model.update({
+          where: { id: record.id },
+          data: { kickoffSentAt: new Date() },
+        })
+      } catch (err) {
+        this.logger.error(
+          { err, tcrComplianceId: record.id },
+          '[TCR Compliance] Failed to re-enqueue stranded agentic kickoff',
+        )
+      }
+    }
   }
 
   @Interval(TCR_COMPLIANCE_CHECK_INTERVAL * 1000) // This will run based on the environment variable
@@ -400,6 +472,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       })
       throw err
     }
+
+    await this.model.update({
+      where: { id: created.id },
+      data: { kickoffSentAt: new Date() },
+    })
 
     try {
       await this.crmCampaignsService.trackCampaign(campaign.id)
