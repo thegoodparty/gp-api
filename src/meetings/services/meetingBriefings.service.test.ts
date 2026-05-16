@@ -119,6 +119,38 @@ describe('POST /v1/elected-office dispatches meeting_schedule', () => {
 })
 
 describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
+  beforeEach(() => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('does not dispatch briefing on schedule completion when MEETINGS_AUTOMATION_ENABLED is unset', async () => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
+    const orgSlug = `eo-chain-gate-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-gate' })
+    await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const scheduleRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(scheduleRun)
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
   it('dispatches meeting_briefing for the org after meeting_schedule completes', async () => {
     const orgSlug = `eo-chain-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain' })

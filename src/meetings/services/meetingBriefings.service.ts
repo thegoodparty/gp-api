@@ -178,6 +178,13 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (run.status !== ExperimentRunStatus.COMPLETED) return
 
     if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
+      if (!isAutomationEnabled()) {
+        this.logger.info(
+          { runId: run.runId },
+          'meetings automation disabled; skipping briefing dispatch on schedule completion',
+        )
+        return
+      }
       await this.dispatchFirstBriefingForOrg(run.organizationSlug)
       return
     }

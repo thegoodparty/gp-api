@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus } from '@prisma/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ExperimentRunStatus, UserRole } from '@prisma/client'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { ElectionsService } from '@/elections/services/elections.service'
 import { addDays, getDay, parseISO } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { S3Service } from '@/vendors/aws/services/s3.service'
@@ -641,5 +643,96 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.data.slug).toBe('city-council-june-8-2026')
     expect(result.data.readingTimeMinutes).toBe(8)
     expect(result.data.meeting.scheduledAt).toBe('2026-06-08T19:00:00-06:00')
+  })
+})
+
+describe('POST /v1/meetings/briefings/dispatch', () => {
+  beforeEach(() => {
+    vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  const makeAdmin = () =>
+    service.prisma.user.update({
+      where: { id: service.user.id },
+      data: { roles: [UserRole.admin] },
+    })
+
+  it('returns 403 when caller is not an admin', async () => {
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: 'any-id', kind: 'schedule' },
+    )
+    expect(result.status).toBe(403)
+  })
+
+  it('returns 400 when body is missing required fields', async () => {
+    await makeAdmin()
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      {},
+    )
+    expect(result.status).toBe(400)
+  })
+
+  it('returns 404 when elected office is not found', async () => {
+    await makeAdmin()
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: 'nonexistent', kind: 'schedule' },
+    )
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 200 and dispatches when admin sends a valid request', async () => {
+    await makeAdmin()
+    const orgSlug = `eo-dispatch-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: service.user.id, positionId: 'br-pos-d' },
+    })
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: `test-campaign-${orgSlug}`,
+        organizationSlug: orgSlug,
+        details: {},
+      },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    vi.spyOn(
+      service.app.get(ElectionsService),
+      'getPositionById',
+    ).mockResolvedValue({
+      id: 'pos-real',
+      brPositionId: 'br-pos-d',
+      brDatabaseId: 'br-db-d',
+      state: 'MN',
+      name: 'City Council',
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: eo.id, kind: 'schedule' },
+    )
+
+    expect(result.status).toBe(201)
+    expect(result.data).toEqual({ dispatched: true, kind: 'schedule' })
+    expect(dispatchSpy).toHaveBeenCalledWith({
+      type: 'meeting_schedule',
+      organizationSlug: orgSlug,
+      clerkUserId: service.user.clerkId!,
+      params: {
+        elected_office_id: eo.id,
+        state: 'MN',
+        office: 'City Council',
+      },
+    })
   })
 })
