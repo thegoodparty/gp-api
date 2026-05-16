@@ -392,6 +392,12 @@ export = async () => {
         qa: 'agent-dispatch-qa.fifo',
         prod: 'agent-dispatch-prod.fifo',
       }),
+      MEETINGS_AUTOMATION_ENABLED: select({
+        preview: '',
+        dev: '',
+        qa: '',
+        prod: 'true',
+      }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
@@ -463,10 +469,7 @@ export = async () => {
         // S3 object using the caller's credentials, so the s3:GetObject grant
         // above covers that side.
         Effect: 'Allow',
-        Action: [
-          'textract:DetectDocumentText',
-          'textract:AnalyzeDocument',
-        ],
+        Action: ['textract:DetectDocumentText', 'textract:AnalyzeDocument'],
         Resource: ['*'],
       },
     ],
