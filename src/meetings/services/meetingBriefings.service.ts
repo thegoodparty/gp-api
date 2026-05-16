@@ -41,21 +41,10 @@ type DispatchContext = {
   organizationSlug: string
   clerkUserId: string
   officialName: string
-  city: string
   state: string
   positionName: string
   l2DistrictType?: string
   l2DistrictName?: string
-}
-
-const readStringField = (json: unknown, key: string): string => {
-  if (json === null || typeof json !== 'object' || Array.isArray(json)) {
-    return ''
-  }
-  // narrowing a JSON object — runtime guard above guarantees shape
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const value = (json as Record<string, unknown>)[key]
-  return typeof value === 'string' ? value : ''
 }
 
 @Injectable()
@@ -128,7 +117,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       clerkUserId: ctx.clerkUserId,
       params: {
         elected_office_id: ctx.electedOfficeId,
-        city: ctx.city,
         state: ctx.state,
         office: ctx.positionName,
       },
@@ -190,7 +178,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       clerkUserId: ctx.clerkUserId,
       params: {
         officialName: ctx.officialName,
-        city: ctx.city,
         state: ctx.state,
         positionName: ctx.positionName,
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
@@ -216,7 +203,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       clerkUserId: ctx.clerkUserId,
       params: {
         officialName: ctx.officialName,
-        city: ctx.city,
         state: ctx.state,
         positionName: ctx.positionName,
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
@@ -228,7 +214,7 @@ export class MeetingBriefingsService extends createPrismaBase(
   private async resolveDispatchContext(
     electedOffice: ElectedOffice,
   ): Promise<DispatchContext | null> {
-    const [user, organization, campaign] = await Promise.all([
+    const [user, organization] = await Promise.all([
       this.client.user.findUnique({
         where: { id: electedOffice.userId },
       }),
@@ -236,12 +222,6 @@ export class MeetingBriefingsService extends createPrismaBase(
         where: { slug: electedOffice.organizationSlug },
         select: { positionId: true, customPositionName: true },
       }),
-      electedOffice.campaignId
-        ? this.client.campaign.findUnique({
-            where: { id: electedOffice.campaignId },
-            select: { details: true },
-          })
-        : Promise.resolve(null),
     ])
 
     if (!user?.clerkId) {
@@ -260,15 +240,13 @@ export class MeetingBriefingsService extends createPrismaBase(
     const state = position?.state ?? ''
     const positionName =
       organization?.customPositionName ?? position?.name ?? ''
-    const city = readStringField(campaign?.details ?? null, 'city')
     const officialName = getUserFullName(user)
 
-    if (!city || !state || !positionName || !officialName) {
+    if (!state || !positionName || !officialName) {
       this.logger.warn(
         {
           electedOfficeId: electedOffice.id,
           missing: {
-            city: !city,
             state: !state,
             positionName: !positionName,
             officialName: !officialName,
@@ -284,7 +262,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       organizationSlug: electedOffice.organizationSlug,
       clerkUserId: user.clerkId,
       officialName,
-      city,
       state,
       positionName,
       l2DistrictType: position?.district?.L2DistrictType,

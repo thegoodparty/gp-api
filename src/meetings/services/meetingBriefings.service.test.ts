@@ -10,7 +10,7 @@ const service = useTestService()
 
 const seedOrgAndCampaign = async (
   orgSlug: string,
-  options: { positionId?: string; city?: string } = {},
+  options: { positionId?: string } = {},
 ) => {
   await service.prisma.organization.create({
     data: {
@@ -24,7 +24,7 @@ const seedOrgAndCampaign = async (
       userId: service.user.id,
       slug: `test-campaign-${orgSlug}`,
       organizationSlug: orgSlug,
-      details: options.city ? { city: options.city } : {},
+      details: {},
     },
   })
 }
@@ -36,12 +36,9 @@ const mockS3 = (responses: Record<string, string | undefined>) => {
 }
 
 describe('POST /v1/elected-office dispatches meeting_schedule', () => {
-  it('dispatches when org has position + campaign has city', async () => {
+  it('dispatches when org has a position', async () => {
     const orgSlug = `eo-create-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, {
-      positionId: 'br-pos-123',
-      city: 'Burnsville',
-    })
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-123' })
 
     vi.spyOn(
       service.app.get(ElectionsService),
@@ -70,27 +67,16 @@ describe('POST /v1/elected-office dispatches meeting_schedule', () => {
       clerkUserId: service.user.clerkId!,
       params: {
         elected_office_id: res.data.id as string,
-        city: 'Burnsville',
         state: 'MN',
         office: 'City Council',
       },
     })
   })
 
-  it('does not dispatch when campaign has no city', async () => {
-    const orgSlug = `eo-no-city-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-456' })
+  it('does not dispatch when org has no position', async () => {
+    const orgSlug = `eo-no-position-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug)
 
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-456',
-      brDatabaseId: 'br-db-456',
-      state: 'MN',
-      name: 'City Council',
-    })
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
       .mockResolvedValue(undefined)
@@ -109,10 +95,7 @@ describe('POST /v1/elected-office dispatches meeting_schedule', () => {
 describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
   it('dispatches meeting_briefing for the org after meeting_schedule completes', async () => {
     const orgSlug = `eo-chain-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, {
-      positionId: 'br-pos-chain',
-      city: 'Burnsville',
-    })
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain' })
     await service.prisma.electedOffice.create({
       data: {
         organizationSlug: orgSlug,
@@ -156,7 +139,6 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
       clerkUserId: service.user.clerkId!,
       params: {
         officialName: `${service.user.firstName} ${service.user.lastName}`,
-        city: 'Burnsville',
         state: 'MN',
         positionName: 'City Council',
       },
@@ -252,10 +234,7 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
 describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
   it('dispatches only for EOs without a future briefing', async () => {
     const orgSlugA = `eo-cron-a-${Date.now()}`
-    await seedOrgAndCampaign(orgSlugA, {
-      positionId: 'br-pos-cron-a',
-      city: 'Burnsville',
-    })
+    await seedOrgAndCampaign(orgSlugA, { positionId: 'br-pos-cron-a' })
     const campaignA = await service.prisma.campaign.findFirst({
       where: { organizationSlug: orgSlugA },
     })
@@ -288,7 +267,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
         userId: otherUser.id,
         slug: `test-campaign-${orgSlugB}`,
         organizationSlug: orgSlugB,
-        details: { city: 'Burnsville' },
+        details: {},
       },
     })
     await service.prisma.electedOffice.create({
