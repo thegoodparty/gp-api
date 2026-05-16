@@ -365,7 +365,7 @@ describe('UsersController', () => {
 
   describe('updateMetadata', () => {
     it('patches user metadata with the provided meta', () => {
-      const meta = { customerId: 'cus_456' }
+      const meta = { textNotifications: true }
       controller.updateMetadata(mockUser, { meta })
 
       expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, meta)
