@@ -1,7 +1,7 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice } from '@prisma/client'
-import { addMonths, subMonths } from 'date-fns'
+import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
@@ -40,9 +40,10 @@ export class MeetingsBriefingsController {
 
     const now = new Date()
     const windowFrom = parseIsoDateAsUTC(
-      formatInTimeZone(subMonths(now, 2), 'UTC', 'yyyy-MM-dd'),
+      formatInTimeZone(subDays(now, 4), 'UTC', 'yyyy-MM-dd'),
     )
     const windowTo = addMonths(now, 3)
+    const today = formatInTimeZone(now, 'UTC', 'yyyy-MM-dd')
 
     const projectedDates = knownSchedule
       ? this.meetingBriefings.projectMeetingDates({
@@ -61,6 +62,7 @@ export class MeetingsBriefingsController {
         meetingDate: true,
         meetingTime: true,
         meetingTimezone: true,
+        artifact: true,
       },
     })
 
@@ -68,6 +70,7 @@ export class MeetingsBriefingsController {
 
     if (knownSchedule) {
       for (const date of projectedDates) {
+        if (date < today) continue
         byDate.set(date, {
           meetingDate: date,
           meetingTime: knownSchedule.time,
@@ -83,14 +86,24 @@ export class MeetingsBriefingsController {
     for (const row of briefingRows) {
       const date = formatInTimeZone(row.meetingDate, 'UTC', 'yyyy-MM-dd')
       const existing = byDate.get(date)
+      const artifactName = row.artifact?.meeting_name
+      const artifactLocation = row.artifact?.location
       byDate.set(date, {
         meetingDate: date,
         meetingTime: row.meetingTime,
         meetingTimezone: row.meetingTimezone,
         durationMinutes:
           existing?.durationMinutes ?? knownSchedule?.duration_minutes ?? 0,
-        meetingName: existing?.meetingName ?? knownSchedule?.meeting_name ?? '',
-        location: existing?.location ?? knownSchedule?.location ?? '',
+        meetingName:
+          artifactName ||
+          existing?.meetingName ||
+          knownSchedule?.meeting_name ||
+          '',
+        location:
+          artifactLocation ||
+          existing?.location ||
+          knownSchedule?.location ||
+          '',
         hasBriefing: true,
       })
     }
@@ -117,7 +130,21 @@ export class MeetingsBriefingsController {
         },
       },
     })
-    if (!row) throw new NotFoundException()
+    if (!row) {
+      const schedule = await this.meetingBriefings.loadLatestScheduleForOrg(
+        electedOffice.organizationSlug,
+      )
+      const info = schedule?.status === 'found' ? schedule : null
+      return {
+        status: 'awaiting_agenda',
+        meetingDate: date,
+        meetingName: info?.meeting_name ?? '',
+        meetingTime: info?.time ?? '',
+        meetingTimezone: info?.timezone ?? '',
+        location: info?.location ?? '',
+        durationMinutes: info?.duration_minutes ?? 0,
+      }
+    }
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()

@@ -51,6 +51,8 @@
     "npm": ">=10.9.0"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.77",
+    "@ai-sdk/openai-compatible": "^2.0.47",
     "@amplitude/experiment-node-server": "1.11.0",
     "@aws-sdk/client-dynamodb": "^3.902.0",
     "@aws-sdk/client-polly": "^3.972.0",
@@ -64,6 +66,7 @@
     "@aws-sdk/s3-request-presigner": "^3.730.0",
     "@clerk/backend": "^2.29.7",
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
+    "@databricks/sql": "^1.14.0",
     "@faker-js/faker": "^9.2.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.0",
@@ -109,6 +112,7 @@
     "@types/ms": "^2.1.0",
     "@types/yargs": "^17.0.35",
     "@vercel/sdk": "^1.18.7",
+    "ai": "^6.0.182",
     "async-retry": "^1.3.3",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
@@ -138,6 +142,7 @@
     "nestjs-pino": "^4.6.0",
     "nestjs-zod": "^4.2.1",
     "ngeohash": "^0.6.3",
+    "node-sql-parser": "^5.4.0",
     "openai": "^4.83.0",
     "p-map": "^7.0.4",
     "p-throttle": "^8.1.0",

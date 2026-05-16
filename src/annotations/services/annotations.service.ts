@@ -9,7 +9,7 @@ import {
   CreateAnnotationRequest,
 } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+import { resolveBriefingId } from '@/meetings/util/resolveBriefingId'
 
 const MAX_ANNOTATIONS_PER_USER_PER_BRIEFING = 200
 
@@ -82,29 +82,6 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
 @Injectable()
 export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
   /**
-   * Resolve the MeetingBriefing for the active elected office and meeting
-   * date. Throws NotFound when no briefing exists at that date for the
-   * authorized office; uses the same lookup key as
-   * `GET /v1/meetings/:date/briefing`.
-   */
-  private async resolveBriefingId(
-    meetingDate: string,
-    electedOffice: ElectedOffice,
-  ): Promise<string> {
-    const briefing = await this.client.meetingBriefing.findUnique({
-      where: {
-        electedOfficeId_meetingDate: {
-          electedOfficeId: electedOffice.id,
-          meetingDate: parseIsoDateAsUTC(meetingDate),
-        },
-      },
-      select: { id: true },
-    })
-    if (!briefing) throw new NotFoundException('briefing_not_found')
-    return briefing.id
-  }
-
-  /**
    * Verify the user is authorized for the annotation's underlying briefing.
    * Used on update/delete by annotation id, where the URL no longer carries
    * the date.
@@ -128,7 +105,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     userId: number,
     electedOffice: ElectedOffice,
   ): Promise<AnnotationDTO[]> {
-    const briefingId = await this.resolveBriefingId(meetingDate, electedOffice)
+    const briefingId = await resolveBriefingId(
+      this.client,
+      meetingDate,
+      electedOffice,
+    )
     const rows = await this.client.annotation.findMany({
       where: {
         resourceType: 'briefing',
@@ -147,7 +128,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     electedOffice: ElectedOffice,
     input: CreateAnnotationRequest,
   ): Promise<AnnotationDTO> {
-    const briefingId = await this.resolveBriefingId(meetingDate, electedOffice)
+    const briefingId = await resolveBriefingId(
+      this.client,
+      meetingDate,
+      electedOffice,
+    )
 
     const anchorFields = {
       jsonPath: input.anchor.json_path,

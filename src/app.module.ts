@@ -1,4 +1,5 @@
 import { AgentExperimentsModule } from '@/agentExperiments/agentExperiments.module'
+import { BriefingChatsModule } from '@/chats/briefing-chats/briefing-chats.module'
 import { McpModule } from '@/mcp/mcp.module'
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
@@ -24,6 +25,7 @@ import { OnboardingModule } from '@/onboarding/onboarding.module'
 import { PaymentsModule } from '@/payments/payments.module'
 import { MeetingsModule } from '@/meetings/meetings.module'
 import { AnnotationsModule } from '@/annotations/annotations.module'
+import { ArtifactFeedbackModule } from '@/artifactFeedback/artifactFeedback.module'
 import { PollsModule } from '@/polls/polls.module'
 import { PrismaModule } from '@/prisma/prisma.module'
 import { QueueConsumerModule } from '@/queue/consumer/queueConsumer.module'
@@ -83,10 +85,12 @@ import { loggerModule } from './observability/logging/logger-module'
     PollsModule,
     MeetingsModule,
     AnnotationsModule,
+    ArtifactFeedbackModule,
     ElectedOfficeModule,
     OrganizationsModule,
     OnboardingModule,
     SpeechModule,
+    BriefingChatsModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.

@@ -320,6 +320,109 @@ describe('GET /v1/meetings', () => {
     ])
   })
 
+  it('uses artifact meeting_name and location when present', async () => {
+    const orgSlug = 'eo-artifact-fields'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const probe = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+    const targetDate = (
+      probe.data.meetings as Array<{ meetingDate: string }>
+    )[0].meetingDate
+
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date(targetDate + 'T00:00:00Z'),
+        meetingTime: '19:00',
+        meetingTimezone: 'America/Denver',
+        experimentRunId: briefingRun.runId,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-key.json',
+        artifact: {
+          meeting_name: 'Special Session',
+          location: 'Annex Hall, 42 Oak St',
+        },
+      },
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    const target = (
+      result.data.meetings as Array<{
+        meetingDate: string
+        meetingName: string
+        location: string
+        hasBriefing: boolean
+      }>
+    ).find((m) => m.meetingDate === targetDate)
+    expect(target?.meetingName).toBe('Special Session')
+    expect(target?.location).toBe('Annex Hall, 42 Oak St')
+    expect(target?.hasBriefing).toBe(true)
+  })
+
+  it('falls back to schedule when artifact lacks meeting_name/location', async () => {
+    const orgSlug = 'eo-artifact-empty'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const probe = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+    const targetDate = (
+      probe.data.meetings as Array<{ meetingDate: string }>
+    )[0].meetingDate
+
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date(targetDate + 'T00:00:00Z'),
+        meetingTime: '19:00',
+        meetingTimezone: 'America/Denver',
+        experimentRunId: briefingRun.runId,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-key.json',
+        artifact: { meeting_name: '', location: '' },
+      },
+    })
+
+    const result = await service.client.get('/v1/meetings', {
+      headers: { 'x-organization-slug': orgSlug },
+    })
+
+    expect(result.status).toBe(200)
+    const target = (
+      result.data.meetings as Array<{
+        meetingDate: string
+        meetingName: string
+        location: string
+      }>
+    ).find((m) => m.meetingDate === targetDate)
+    expect(target?.meetingName).toBe('City Council')
+    expect(target?.location).toBe('City Hall Council Chambers, 200 Main St')
+  })
+
   it('returns ad-hoc briefings outside the projected RRULE dates', async () => {
     const orgSlug = 'eo-adhoc-briefing'
     const eo = await seedElectedOffice(orgSlug)
@@ -443,7 +546,7 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.status).toBe(400)
   })
 
-  it('returns 404 when no briefing row exists for that date', async () => {
+  it('returns awaiting_agenda when no briefing row exists for that date', async () => {
     const orgSlug = 'eo-missing-briefing'
     await seedElectedOffice(orgSlug)
 
@@ -452,7 +555,32 @@ describe('GET /v1/meetings/:date/briefing', () => {
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(result.status).toBe(404)
+    expect(result.status).toBe(200)
+    expect(result.data.status).toBe('awaiting_agenda')
+    expect(result.data.meetingDate).toBe('2026-06-08')
+  })
+
+  it('returns schedule info in awaiting_agenda when schedule is known', async () => {
+    const orgSlug = 'eo-awaiting-with-schedule'
+    await seedElectedOffice(orgSlug)
+    await seedScheduleRun(orgSlug)
+    mockS3({ 'schedule-key.json': JSON.stringify(foundSchedule) })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing',
+      { headers: { 'x-organization-slug': orgSlug } },
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data).toEqual({
+      status: 'awaiting_agenda',
+      meetingDate: '2026-06-08',
+      meetingName: foundSchedule.meeting_name,
+      meetingTime: foundSchedule.time,
+      meetingTimezone: foundSchedule.timezone,
+      location: foundSchedule.location,
+      durationMinutes: foundSchedule.duration_minutes,
+    })
   })
 
   it('returns 404 when S3 object is missing', async () => {
