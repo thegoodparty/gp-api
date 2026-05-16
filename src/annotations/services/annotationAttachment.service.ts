@@ -116,30 +116,40 @@ export class AnnotationAttachmentService extends createPrismaBase(
       electedOffice,
     )
 
-    const existing = await this.client.annotationNoteAttachment.count({
-      where: { noteId },
-    })
-    if (existing >= MAX_ATTACHMENTS_PER_NOTE) {
-      throw new ForbiddenException('attachment_limit_reached')
-    }
-
-    const created = await this.client.annotationNoteAttachment.create({
-      data: {
-        note: { connect: { id: noteId } },
-        fileName: input.file_name,
-        mimeType: input.mime_type,
-        sizeBytes: input.size_bytes,
-        storageKey: '', // populated below
-        ocrStatus: OcrStatus.pending,
+    // Count + create + storage-key update must serialize: under concurrent
+    // requests, two presigns could both observe count=0 and both insert,
+    // bypassing the one-attachment-per-note cap. Same shape as the 200-
+    // annotation limit guard in AnnotationsService.
+    const created = await this.client.$transaction(
+      async (tx) => {
+        const existing = await tx.annotationNoteAttachment.count({
+          where: { noteId },
+        })
+        if (existing >= MAX_ATTACHMENTS_PER_NOTE) {
+          throw new ForbiddenException('attachment_limit_reached')
+        }
+        const row = await tx.annotationNoteAttachment.create({
+          data: {
+            note: { connect: { id: noteId } },
+            fileName: input.file_name,
+            mimeType: input.mime_type,
+            sizeBytes: input.size_bytes,
+            storageKey: '', // populated below
+            ocrStatus: OcrStatus.pending,
+          },
+          select: { id: true },
+        })
+        const storageKey = this.buildStorageKey(annotationId, row.id)
+        await tx.annotationNoteAttachment.update({
+          where: { id: row.id },
+          data: { storageKey },
+        })
+        return { id: row.id, storageKey }
       },
-      select: { id: true },
-    })
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    )
 
-    const storageKey = this.buildStorageKey(annotationId, created.id)
-    await this.client.annotationNoteAttachment.update({
-      where: { id: created.id },
-      data: { storageKey },
-    })
+    const storageKey = created.storageKey
 
     const uploadUrl = await this.s3.getSignedUrlForUpload(
       this.bucket,
@@ -181,8 +191,14 @@ export class AnnotationAttachmentService extends createPrismaBase(
       throw new BadRequestException('attachment_already_processed')
     }
 
-    const bytes = await this.s3.getFileBytes(this.bucket, attachment.storageKey)
-    if (!bytes) {
+    // HEAD instead of full GET — we only need to know the object is there,
+    // not read its bytes (the OCR worker reads the bytes later via
+    // OcrService).
+    const exists = await this.s3.objectExists(
+      this.bucket,
+      attachment.storageKey,
+    )
+    if (!exists) {
       throw new BadRequestException('upload_not_received')
     }
 

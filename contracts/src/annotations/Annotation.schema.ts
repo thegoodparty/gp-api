@@ -163,11 +163,14 @@ export type UpdateNoteRequest = z.infer<typeof UpdateNoteRequestSchema>
 // ---------------------------------------------------------------------------
 
 const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024 // 20 MB
+// Limited to what the OCR pipeline can actually read end-to-end. Textract's
+// DetectDocumentText accepts only JPEG / PNG / PDF / TIFF, so allowing heic
+// or webp here would land the attachment in S3 but always fail OCR. HEIC
+// support is a Phase 3 conversion step. PDF/DOCX/TXT go through their own
+// extractors (pdf-parse / mammoth / direct read), not Textract.
 const ATTACHMENT_ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png',
-  'image/heic',
-  'image/webp',
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',

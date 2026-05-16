@@ -16,6 +16,15 @@ import { PinoLogger } from 'nestjs-pino'
 const { AWS_REGION: region = 'us-west-2' } = process.env
 const EXPIRES_IN_DEFAULT = 3600 // 1 hour
 
+const isHttpStatusError = (error: unknown, status: number): boolean => {
+  if (typeof error !== 'object' || error === null) return false
+  if (!('$metadata' in error)) return false
+  const meta = (error as { $metadata?: unknown }).$metadata
+  if (typeof meta !== 'object' || meta === null) return false
+  if (!('httpStatusCode' in meta)) return false
+  return (meta as { httpStatusCode?: unknown }).httpStatusCode === status
+}
+
 export type UploadFileOptions = {
   cacheControl?: string
   contentType?: string
@@ -187,6 +196,24 @@ export class S3Service extends AwsService {
         throw error
       }
     }, 'deleteObject')
+  }
+
+  async objectExists(bucket: string, key: string): Promise<boolean> {
+    return this.executeAwsOperation(async () => {
+      try {
+        const { HeadObjectCommand } = await import('@aws-sdk/client-s3')
+        await this.s3Client.send(
+          new HeadObjectCommand({ Bucket: bucket, Key: key }),
+        )
+        return true
+      } catch (error: unknown) {
+        if (error instanceof NoSuchKey) return false
+        // S3 HEAD on a missing key surfaces as either NoSuchKey or a plain
+        // 404 NotFound depending on permissions; treat both as "missing".
+        if (isHttpStatusError(error, 404)) return false
+        throw error
+      }
+    }, 'objectExists')
   }
 
   getFileUrl(

@@ -72,6 +72,7 @@ const mockS3 = () => {
     upload: vi
       .spyOn(s3, 'getSignedUrlForUpload')
       .mockResolvedValue('https://s3.example/upload-url'),
+    exists: vi.spyOn(s3, 'objectExists').mockResolvedValue(true),
     get: vi.spyOn(s3, 'getFileBytes').mockResolvedValue(Buffer.from('binary')),
     del: vi.spyOn(s3, 'deleteObject').mockResolvedValue(undefined),
   }
@@ -203,14 +204,14 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
     )
 
     expect(result.status).toBe(204)
-    expect(s3.get).toHaveBeenCalled()
+    expect(s3.exists).toHaveBeenCalled()
     expect(queue).toHaveBeenCalledOnce()
   })
 
   it('returns 400 when the file has not actually landed in S3', async () => {
     const { annotation } = await seedBriefingAndNote('eo-missing-upload')
     const s3 = mockS3()
-    s3.get.mockResolvedValueOnce(undefined)
+    s3.exists.mockResolvedValueOnce(false)
     mockQueue()
 
     const presign = await service.client.post(
