@@ -1,5 +1,6 @@
 import * as aws from '@pulumi/aws'
 import * as pulumi from '@pulumi/pulumi'
+import { createAnnotationAttachmentsBucket } from './components/annotation-attachments-bucket'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createGrafanaResources } from './components/grafana'
@@ -119,6 +120,14 @@ export = async () => {
     ignorePublicAcls: true,
     restrictPublicBuckets: true,
   })
+
+  // Private bucket for top-level note attachments (camera shots / uploads).
+  // Browser PUTs via presigned URL; gp-api task role reads back for OCR.
+  // Preview environments share the dev bucket — no per-PR bucket.
+  const annotationAttachmentsBucketName =
+    environment === 'preview'
+      ? 'annotation-attachments-dev'
+      : createAnnotationAttachmentsBucket({ environment }).bucket.bucket
 
   // Assets bucket - used for storing uploaded files, images, etc.
   if (environment !== 'preview') {
@@ -387,6 +396,7 @@ export = async () => {
       MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
+      ANNOTATION_ATTACHMENTS_BUCKET: annotationAttachmentsBucketName,
       DB_HOST: rdsCluster.endpoint,
       DB_USER: rdsCluster.masterUsername,
       DB_NAME: rdsCluster.databaseName,
@@ -445,6 +455,17 @@ export = async () => {
         Action: [
           'transcribe:StartStreamTranscription',
           'transcribe:StartStreamTranscriptionWebSocket',
+        ],
+        Resource: ['*'],
+      },
+      {
+        // OCR for annotation note attachments. DetectDocumentText reads the
+        // S3 object using the caller's credentials, so the s3:GetObject grant
+        // above covers that side.
+        Effect: 'Allow',
+        Action: [
+          'textract:DetectDocumentText',
+          'textract:AnalyzeDocument',
         ],
         Resource: ['*'],
       },
