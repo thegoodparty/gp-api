@@ -242,6 +242,7 @@ export class AnnotationAttachmentService extends createPrismaBase(
       where: { id: attachmentId },
       select: {
         id: true,
+        noteId: true,
         storageKey: true,
         mimeType: true,
         fileName: true,
@@ -278,15 +279,27 @@ export class AnnotationAttachmentService extends createPrismaBase(
         mimeType: attachment.mimeType,
         fileName: attachment.fileName,
       })
+      const trimmed = result.text.slice(0, OCR_TEXT_MAX_BYTES)
       await this.client.annotationNoteAttachment.update({
         where: { id: attachmentId },
         data: {
           ocrStatus: result.ocrStatus,
-          ocrText: result.text.slice(0, OCR_TEXT_MAX_BYTES),
+          ocrText: trimmed,
           ocrError: null,
           ocrCompletedAt: new Date(),
         },
       })
+      // When the parent note's body is still null (the camera/upload intake
+      // path), copy the OCR text into body so downstream readers (recap,
+      // list UI, search) can read everything off `body` without knowing
+      // about attachment.ocr_text. `updateMany` with body:null in the where
+      // clause makes this a no-op if the user typed a body.
+      if (trimmed.trim().length > 0) {
+        await this.client.annotationNote.updateMany({
+          where: { id: attachment.noteId, body: null },
+          data: { body: trimmed },
+        })
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error(

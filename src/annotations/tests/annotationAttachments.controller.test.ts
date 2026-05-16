@@ -301,6 +301,93 @@ describe('AnnotationAttachmentService.runOcr', () => {
     expect(row?.ocrCompletedAt).not.toBeNull()
   })
 
+  it('backfills the parent note body with OCR text when body was null', async () => {
+    const { annotation, noteId } = await seedBriefingAndNote('eo-ocr-backfill')
+    mockS3()
+    mockQueue()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-ocr-backfill'),
+    )
+    const attachmentId = presign.data.attachment_id
+
+    const ocr = service.app.get(OcrService)
+    vi.spyOn(ocr, 'process').mockResolvedValue({
+      text: 'extracted body content',
+      confidence: 0.9,
+      meta: {},
+      ocrStatus: OcrStatus.completed,
+    })
+
+    await service.app.get(AnnotationAttachmentService).runOcr(attachmentId)
+
+    const note = await service.prisma.annotationNote.findUnique({
+      where: { id: noteId },
+    })
+    expect(note?.body).toBe('extracted body content')
+  })
+
+  it('does not overwrite a body the user typed', async () => {
+    const eo = await seedElectedOffice('eo-ocr-noclobber')
+    const briefing = await service.prisma.experimentRun
+      .create({
+        data: {
+          organizationSlug: 'eo-ocr-noclobber',
+          experimentType: 'meeting_briefing',
+          status: ExperimentRunStatus.COMPLETED,
+        },
+      })
+      .then((run) =>
+        service.prisma.meetingBriefing.create({
+          data: {
+            electedOfficeId: eo.id,
+            meetingDate: new Date('2026-06-08T00:00:00Z'),
+            meetingTime: '19:00',
+            meetingTimezone: 'America/Denver',
+            experimentRunId: run.runId,
+            artifactBucket: 'briefing-bucket',
+            artifactKey: 'noclobber.json',
+          },
+        }),
+      )
+    const annotation = await service.prisma.annotation.create({
+      data: {
+        author: { connect: { id: service.user.id } },
+        kind: 'note',
+        resourceType: 'briefing',
+        resourceId: briefing.id,
+        note: { create: { body: 'user-typed caption' } },
+      },
+      include: { note: true },
+    })
+    mockS3()
+    mockQueue()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-ocr-noclobber'),
+    )
+    const attachmentId = presign.data.attachment_id
+
+    const ocr = service.app.get(OcrService)
+    vi.spyOn(ocr, 'process').mockResolvedValue({
+      text: 'OCR text that should NOT win',
+      confidence: 0.9,
+      meta: {},
+      ocrStatus: OcrStatus.completed,
+    })
+
+    await service.app.get(AnnotationAttachmentService).runOcr(attachmentId)
+
+    const note = await service.prisma.annotationNote.findUnique({
+      where: { id: annotation.noteId! },
+    })
+    expect(note?.body).toBe('user-typed caption')
+  })
+
   it('writes failed status + error message when the provider throws', async () => {
     const { annotation } = await seedBriefingAndNote('eo-ocr-fail')
     mockS3()
