@@ -1,8 +1,16 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+} from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice, UserRole } from '@prisma/client'
 import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
+import { Roles } from '@/authentication/decorators/Roles.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
@@ -11,6 +19,10 @@ import {
   MeetingDateParam,
   MeetingDateParamSchema,
 } from '../schemas/meetingDateParam.schema'
+import {
+  DispatchMeetingAgentDto,
+  DispatchMeetingAgentSchema,
+} from '../schemas/dispatchMeetingAgent.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
 
 type MeetingListItem = {
@@ -156,5 +168,23 @@ export class MeetingsBriefingsController {
     } catch {
       throw new NotFoundException()
     }
+  }
+
+  @Roles(UserRole.admin)
+  @Post('briefings/dispatch')
+  async dispatchAgent(
+    @Body(new ZodValidationPipe(DispatchMeetingAgentSchema))
+    body: DispatchMeetingAgentDto,
+  ) {
+    const result = await this.meetingBriefings.dispatchManual(
+      body.electedOfficeId,
+      body.kind,
+    )
+    if (!result.dispatched) {
+      throw new NotFoundException(
+        'Could not resolve dispatch context for that elected office',
+      )
+    }
+    return { dispatched: true, kind: body.kind }
   }
 }
