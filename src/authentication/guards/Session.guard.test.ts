@@ -40,7 +40,9 @@ const adminUser: User = {
 describe('SessionGuard — impersonating flag', () => {
   let guard: SessionGuard
   let authProvider: AuthProvider
-  let usersService: { model: { findUnique: ReturnType<typeof vi.fn> } }
+  let usersService: {
+    model: { findUnique: ReturnType<typeof vi.fn> }
+  }
   let sessions: { trackSession: ReturnType<typeof vi.fn> }
   let clerkEnricher: {
     fetchClerkFields: ReturnType<typeof vi.fn>
@@ -55,7 +57,9 @@ describe('SessionGuard — impersonating flag', () => {
 
   const buildContext = (req: IncomingRequest) =>
     ({
-      switchToHttp: () => ({ getRequest: () => req }),
+      switchToHttp: () => ({
+        getRequest: () => req,
+      }),
       getHandler: () => ({}),
       getClass: () => ({}),
     }) as unknown as ExecutionContext
@@ -88,54 +92,75 @@ describe('SessionGuard — impersonating flag', () => {
     )
   })
 
-  it('sets impersonating=false when no actor claim', async () => {
+  it('no actor claim: impersonating=false, no actorUser', async () => {
     vi.mocked(authProvider.verifySessionToken).mockResolvedValue({
       externalUserId: baseUser.clerkId!,
     })
     usersService.model.findUnique.mockResolvedValue(baseUser)
 
-    const req = buildRequest('session_token')
+    const req = buildRequest('tok')
     await guard.canActivate(buildContext(req))
 
     expect(req.user?.impersonating).toBe(false)
     expect(req.actorUser).toBeUndefined()
+    expect(req.actorSub).toBeUndefined()
   })
 
-  it('sets impersonating=true when actor resolves to a user', async () => {
+  it('actor resolved: impersonating=true, actorUser set', async () => {
     vi.mocked(authProvider.verifySessionToken).mockResolvedValue({
       externalUserId: baseUser.clerkId!,
       actor: { sub: adminUser.clerkId! },
     })
     usersService.model.findUnique.mockImplementation(
       ({ where }: { where: { clerkId: string } }) =>
-        where.clerkId === baseUser.clerkId!
+        where.clerkId === baseUser.clerkId
           ? baseUser
-          : where.clerkId === adminUser.clerkId!
+          : where.clerkId === adminUser.clerkId
             ? adminUser
             : null,
     )
 
-    const req = buildRequest('session_token')
+    const req = buildRequest('tok')
     await guard.canActivate(buildContext(req))
 
     expect(req.user?.impersonating).toBe(true)
     expect(req.actorUser).toEqual(
-      expect.objectContaining({ clerkId: adminUser.clerkId! }),
+      expect.objectContaining({
+        clerkId: adminUser.clerkId,
+      }),
     )
   })
 
-  it('sets impersonating=false when actor.sub is not a user_ ID', async () => {
+  it('actor.sub is not a user_ ID: impersonating=false, actorUser absent', async () => {
     vi.mocked(authProvider.verifySessionToken).mockResolvedValue({
       externalUserId: baseUser.clerkId!,
       actor: { sub: 'admin@goodparty.org' },
     })
     usersService.model.findUnique.mockResolvedValue(baseUser)
 
-    const req = buildRequest('session_token')
+    const req = buildRequest('tok')
     await guard.canActivate(buildContext(req))
 
     expect(req.user?.impersonating).toBe(false)
     expect(req.actorUser).toBeUndefined()
     expect(req.actorSub).toBe('admin@goodparty.org')
+  })
+
+  it('actor.sub is user_ but not in DB: impersonating=false, actorUser absent', async () => {
+    vi.mocked(authProvider.verifySessionToken).mockResolvedValue({
+      externalUserId: baseUser.clerkId!,
+      actor: { sub: 'user_nonexistent_789' },
+    })
+    usersService.model.findUnique.mockImplementation(
+      ({ where }: { where: { clerkId: string } }) =>
+        where.clerkId === baseUser.clerkId ? baseUser : null,
+    )
+
+    const req = buildRequest('tok')
+    await guard.canActivate(buildContext(req))
+
+    expect(req.user?.impersonating).toBe(false)
+    expect(req.actorUser).toBeUndefined()
+    expect(req.actorSub).toBe('user_nonexistent_789')
   })
 })
