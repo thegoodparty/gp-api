@@ -8,10 +8,7 @@ import { effectiveUser } from '@/authentication/util/effectiveUser.util'
 export class AdminOrM2MGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<IncomingRequest>()
-    return Boolean(
-      req.m2mToken ||
-        effectiveUser(req)?.roles.includes(UserRole.admin) ||
-        req.user?.impersonating,
-    )
+    const isAdmin = effectiveUser(req)?.roles.includes(UserRole.admin)
+    return Boolean(req.m2mToken || isAdmin)
   }
 }
