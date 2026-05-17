@@ -105,6 +105,62 @@ export class BraintrustService {
     }
   }
 
+  // Use this when you want nested parent/child spans. Calling tracedNested
+  // inside another tracedNested callback creates a child of the outer span via
+  // the Braintrust SDK's AsyncLocalStorage-based context propagation. Set
+  // `type: 'task'` on the outer call and `type: 'llm'` on the inner LLM calls
+  // so the Braintrust UI rolls them up correctly.
+  async tracedNested<T>(
+    name: string,
+    fn: () => T | Promise<T>,
+    options?: {
+      input?: Record<string, unknown>
+      metadata?: Record<string, unknown>
+      type?: 'task' | 'llm' | 'function'
+    },
+  ): Promise<T> {
+    if (!this._enabled || !this.braintrustLogger) {
+      return fn()
+    }
+
+    // Captured via closure mutation so the outer catch can preserve the fn
+    // result when tracing itself fails after fn already succeeded.
+    const captured: { value?: T; ran: boolean } = { ran: false }
+
+    try {
+      return await braintrust.traced(
+        async (span) => {
+          try {
+            const value = await fn()
+            captured.value = value
+            captured.ran = true
+            this.logToSpan(span, options, this.serializeOutput(value))
+            return value
+          } catch (error) {
+            this.logToSpan(span, options, {
+              error: error instanceof Error ? error.message : String(error),
+              success: false,
+            })
+            throw new LlmExecutionError(error)
+          }
+        },
+        { name, ...(options?.type && { type: options.type }) },
+      )
+    } catch (error) {
+      if (error instanceof LlmExecutionError) {
+        throw error.cause
+      }
+      this.logger.warn(
+        `Braintrust tracing failed for "${name}": ${error instanceof Error ? error.message : String(error)}`,
+      )
+
+      if (captured.ran && captured.value !== undefined) {
+        return captured.value
+      }
+      return fn()
+    }
+  }
+
   private logToSpan(
     span: { log: (data: Record<string, unknown>) => void },
     options:

@@ -1,0 +1,18 @@
+model CampaignPlanOpponent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaignPlan   CampaignPlan @relation(fields: [campaignPlanId], references: [id], onDelete: Cascade)
+  campaignPlanId Int          @map("campaign_plan_id")
+
+  fullName         String   @map("full_name")
+  partyAffiliation String   @map("party_affiliation")
+  incumbent        Boolean?
+  politicalSummary String   @map("political_summary")
+
+  keyFacts CampaignPlanOpponentKeyFact[]
+  websites CampaignPlanOpponentWebsite[]
+
+  @@index([campaignPlanId])
+  @@map("campaign_plan_opponent")
+}

@@ -1,0 +1,13 @@
+model CampaignPlanChallenge {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaignPlan   CampaignPlan @relation(fields: [campaignPlanId], references: [id], onDelete: Cascade)
+  campaignPlanId Int          @map("campaign_plan_id")
+
+  order   Int
+  content String
+
+  @@index([campaignPlanId])
+  @@map("campaign_plan_challenge")
+}

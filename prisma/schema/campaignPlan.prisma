@@ -3,13 +3,12 @@ model CampaignPlan {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  campaignInfoHash String @map("campaign_info_hash")
-  plan             String
-
-  rawJson Json? @map("raw_json")
-
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId Int      @unique @map("campaign_id")
+
+  opportunities CampaignPlanOpportunity[]
+  challenges    CampaignPlanChallenge[]
+  opponents     CampaignPlanOpponent[]
 
   @@map("campaign_plan")
 }
