@@ -5,6 +5,7 @@ import {
   CampaignSchema,
   ElectionLevelSchema,
 } from '@goodparty_org/contracts'
+import { StateSchema } from '@/shared/schemas/State.schema'
 
 // TODO(ENG-6410): This schema uses .passthrough() which allows ANY fields to be sent through,
 // even if not defined here. This is a security/data integrity concern because:
@@ -17,7 +18,7 @@ import {
 
 const CampaignDetailsSchema = z
   .object({
-    state: z.string(),
+    state: StateSchema(),
     ballotLevel: BallotReadyPositionLevelSchema,
     electionDate: z.string(),
     primaryElectionDate: z.string(),

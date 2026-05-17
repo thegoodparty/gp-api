@@ -1,6 +1,7 @@
-import { ConflictException } from '@nestjs/common'
+import { BadRequestException, ConflictException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { OrgDistrict } from 'src/organizations/organizations.types'
+import { STATE_CODES } from '@/shared/constants/states'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
   CustomFilter,
@@ -50,6 +51,14 @@ export function typeToQuery(
   limit?: number,
 ) {
   const state = campaign.details.state
+  if (
+    !state ||
+    !STATE_CODES.includes(state.toUpperCase())
+  ) {
+    throw new BadRequestException(
+      `Invalid state code: ${state}`,
+    )
+  }
   const electionDate: string | undefined = campaign.details?.electionDate
   const electionYear = electionDate
     ? Number(String(electionDate).slice(0, 4))
