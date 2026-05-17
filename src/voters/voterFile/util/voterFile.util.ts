@@ -50,15 +50,17 @@ export function typeToQuery(
   selectedColumns?: GetVoterFileSchema['selectedColumns'],
   limit?: number,
 ) {
-  const state = campaign.details.state
+  const rawState: string | undefined =
+    campaign.details.state
   if (
-    !state ||
-    !STATE_CODES.includes(state.toUpperCase())
+    !rawState ||
+    !STATE_CODES.includes(rawState.toUpperCase())
   ) {
     throw new BadRequestException(
-      `Invalid state code: ${state}`,
+      `Invalid state code: ${rawState}`,
     )
   }
+  const state = rawState.toUpperCase()
   const electionDate: string | undefined = campaign.details?.electionDate
   const electionYear = electionDate
     ? Number(String(electionDate).slice(0, 4))
