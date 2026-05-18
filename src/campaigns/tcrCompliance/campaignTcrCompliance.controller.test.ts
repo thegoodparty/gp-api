@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { HttpStatus } from '@nestjs/common'
+import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants'
 import { CommitteeType, TcrComplianceStatus } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -232,6 +232,16 @@ describe('CampaignTcrComplianceController', () => {
         controller.createAgenticTcrCompliance,
       )
       expect(httpCode).toBe(HttpStatus.ACCEPTED)
+    })
+
+    it('throws NotFoundException when the campaign has no user', async () => {
+      mockUserService.findByCampaign.mockResolvedValue(null)
+
+      await expect(
+        controller.createAgenticTcrCompliance(mockCampaign, agenticDto),
+      ).rejects.toThrow(NotFoundException)
+      expect(mockTcrService.createAgentic).not.toHaveBeenCalled()
+      expect(mockAnalytics.track).not.toHaveBeenCalled()
     })
   })
 

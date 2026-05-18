@@ -166,6 +166,17 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     expect(mockCrm.trackCampaign).not.toHaveBeenCalled()
   })
 
+  it('preserves the original SQS error if the fallback status update also fails', async () => {
+    const sqsErr = new Error('SQS unavailable')
+    const updateErr = new Error('DB unavailable')
+    mockQueue.sendMessage.mockRejectedValueOnce(sqsErr)
+    mockModel.update.mockRejectedValueOnce(updateErr)
+
+    await expect(
+      service.createAgentic(user, campaign, basePayload),
+    ).rejects.toBe(sqsErr)
+  })
+
   it('sends the kickoff before tracking CRM (CRM failure cannot strand the record)', async () => {
     const callOrder: string[] = []
     mockQueue.sendMessage.mockImplementation(() => {

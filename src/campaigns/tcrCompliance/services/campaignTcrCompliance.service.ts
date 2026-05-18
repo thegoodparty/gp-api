@@ -466,10 +466,17 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         },
       )
     } catch (err) {
-      await this.model.update({
-        where: { id: created.id },
-        data: { status: TcrComplianceStatus.error },
-      })
+      try {
+        await this.model.update({
+          where: { id: created.id },
+          data: { status: TcrComplianceStatus.error },
+        })
+      } catch (updateErr) {
+        this.logger.error(
+          { updateErr, tcrComplianceId: created.id },
+          '[TCR Compliance] Failed to mark record as error after SQS send failure; sweep will recover',
+        )
+      }
       throw err
     }
 
