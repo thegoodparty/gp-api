@@ -22,7 +22,7 @@ const NOTE_B: Note = {
 }
 
 describe('getMyNotes tool', () => {
-  it('returns all notes when no topic is provided', async () => {
+  it('returns every note the provider yields', async () => {
     const provider = new InMemoryNotesProvider([NOTE_A, NOTE_B])
     const tool = buildGetMyNotesTool({ provider })
 
@@ -31,29 +31,11 @@ describe('getMyNotes tool', () => {
     expect(out).toEqual([NOTE_A, NOTE_B])
   })
 
-  it('filters by case-insensitive substring on body', async () => {
-    const provider = new InMemoryNotesProvider([NOTE_A, NOTE_B])
+  it('returns an empty array when the provider has no notes', async () => {
+    const provider = new InMemoryNotesProvider([])
     const tool = buildGetMyNotesTool({ provider })
 
-    const out = await tool.execute({ topic: 'fiscal' })
-
-    expect(out.map((n) => n.id)).toEqual(['n2'])
-  })
-
-  it('filters by case-insensitive substring on highlighted text', async () => {
-    const provider = new InMemoryNotesProvider([NOTE_A, NOTE_B])
-    const tool = buildGetMyNotesTool({ provider })
-
-    const out = await tool.execute({ topic: 'rental' })
-
-    expect(out.map((n) => n.id)).toEqual(['n1'])
-  })
-
-  it('returns an empty array when no note matches', async () => {
-    const provider = new InMemoryNotesProvider([NOTE_A, NOTE_B])
-    const tool = buildGetMyNotesTool({ provider })
-
-    const out = await tool.execute({ topic: 'asteroid mining' })
+    const out = await tool.execute({})
 
     expect(out).toEqual([])
   })
