@@ -1,3 +1,11 @@
+enum OcrStatus {
+  pending
+  processing
+  completed
+  failed
+  skipped
+}
+
 model AnnotationNoteAttachment {
   id String @id @default(cuid())
 
@@ -9,8 +17,15 @@ model AnnotationNoteAttachment {
   mimeType   String @map("mime_type")
   sizeBytes  Int    @map("size_bytes")
 
+  ocrStatus      OcrStatus @default(pending) @map("ocr_status")
+  ocrText        String?   @db.Text          @map("ocr_text")
+  ocrError       String?   @db.Text          @map("ocr_error")
+  ocrCompletedAt DateTime?                   @map("ocr_completed_at")
+
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([noteId])
+  // The composite (note_id, ocr_status) index also serves noteId-only lookups
+  // via its leading column, so we drop the standalone noteId index.
+  @@index([noteId, ocrStatus])
   @@map("annotation_note_attachment")
 }

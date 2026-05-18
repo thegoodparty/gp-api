@@ -12,6 +12,7 @@ export enum QueueType {
   WEEKLY_TASKS_DIGEST = 'weeklyTasksDigest',
   AGENT_EXPERIMENT_RESULT = 'agentExperimentResult',
   AGENTIC_COMPLIANCE_KICKOFF = 'agenticComplianceKickoff',
+  OCR_ATTACHMENT = 'ocrAttachment',
 }
 
 export type QueueMessage =
@@ -45,6 +46,10 @@ export type QueueMessage =
   | {
       type: QueueType.AGENTIC_COMPLIANCE_KICKOFF
       data: AgenticComplianceKickoffMessage
+    }
+  | {
+      type: QueueType.OCR_ATTACHMENT
+      data: OcrAttachmentMessage
     }
 
 export type GenerateAiContentMessageData = {
@@ -186,3 +191,8 @@ export const AgentExperimentResultSchema = z.object({
 export type AgentExperimentResultData = z.infer<
   typeof AgentExperimentResultSchema
 >
+
+export const OcrAttachmentMessageSchema = z.object({
+  attachmentId: z.string(),
+})
+export type OcrAttachmentMessage = z.infer<typeof OcrAttachmentMessageSchema>

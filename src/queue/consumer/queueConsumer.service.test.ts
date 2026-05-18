@@ -2,6 +2,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
+import { AnnotationAttachmentService } from '@/annotations/services/annotationAttachment.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
@@ -217,6 +219,8 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -778,6 +782,8 @@ describe('QueueConsumerService - handleDomainEmailForwardingMessage', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -961,6 +967,8 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -1085,6 +1093,14 @@ describe('QueueConsumerService - message type routing', () => {
           useValue: { handleWeeklyTasksDigest: vi.fn() },
         },
         { provide: ExperimentRunsService, useValue: {} },
+        {
+          provide: MeetingBriefingsService,
+          useValue: { onExperimentRunCompleted: vi.fn() },
+        },
+        {
+          provide: AnnotationAttachmentService,
+          useValue: { runOcr: vi.fn() },
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()

@@ -1,5 +1,10 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
-import { ConflictException, Injectable } from '@nestjs/common'
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common'
 import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -10,6 +15,7 @@ import {
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
 import { v7 as uuidv7 } from 'uuid'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
 import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
@@ -27,6 +33,13 @@ export type CreateElectedOfficeArgs = {
 export class ElectedOfficeService extends createPrismaBase(
   MODELS.ElectedOffice,
 ) {
+  constructor(
+    @Inject(forwardRef(() => MeetingBriefingsService))
+    private readonly meetingBriefings: MeetingBriefingsService,
+  ) {
+    super()
+  }
+
   async create(args: CreateElectedOfficeArgs) {
     const existing = await this.model.findFirst({
       where: { userId: args.userId },
@@ -41,7 +54,7 @@ export class ElectedOfficeService extends createPrismaBase(
       overrideDistrictId: null,
     }
 
-    return this.client.$transaction(async (tx) => {
+    const created = await this.client.$transaction(async (tx) => {
       const id = uuidv7()
 
       await tx.organization.create({
@@ -52,7 +65,7 @@ export class ElectedOfficeService extends createPrismaBase(
         },
       })
 
-      return await tx.electedOffice.create({
+      return tx.electedOffice.create({
         data: {
           id,
           swornInDate: args.swornInDate,
@@ -62,6 +75,17 @@ export class ElectedOfficeService extends createPrismaBase(
         },
       })
     })
+
+    await this.meetingBriefings
+      .onElectedOfficeCreated(created)
+      .catch((err: Error) => {
+        this.logger.error(
+          { err, electedOfficeId: created.id },
+          'meeting schedule dispatch failed after EO created',
+        )
+      })
+
+    return created
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {

@@ -60,7 +60,7 @@ Every file in `.cursor/rules/` carries `alwaysApply: true`. They override the re
 
 - **No semicolons**, single quotes, trailing commas (`.prettierrc`)
 - **Max 80-char lines.** Break long arg lists onto separate lines (prettier-conformance.mdc)
-- **No comments. Ever.** (rules.mdc Rule 4). Not "unless the why is non-obvious" — none. If the code needs explaining, rename the identifier or extract a function.
+- **Default to writing no comments.** Only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader (rules.mdc Rule 4). Don't explain WHAT the code does — rename identifiers or extract functions instead.
 - `@typescript-eslint/no-explicit-any` is an **error** — never use `any`. **Also never use `unknown`** in new code (rules.mdc Rule 0) — use proper types, generics, unions, or type guards.
 - `unused-imports/no-unused-imports` is an **error**
 - Delete unused variables; **don't `_`-prefix them** (no-underscore-unused-vars.mdc)
@@ -196,7 +196,7 @@ Categories that PR review keeps catching. Each one has caused a real bug. Read t
 - Never edit a file under `prisma/schema/migrations/<timestamp>/` — applied migrations are immutable.
 - Never use `.passthrough()` on input schemas.
 - Never use `any` or `unknown` in new code, and never disable `@typescript-eslint/no-explicit-any` without an inline comment justifying it.
-- Never add comments (rules.mdc Rule 4). Don't leave `// removed X` markers or "TODO" trails for completed work.
+- Don't leave `// removed X` markers, "TODO" trails for completed work, or commentary about the current task — those rot fast. Comments are reserved for non-obvious WHYs (rules.mdc Rule 4).
 - Never add a JSON column when the data has a known structure or needs to be queried (rules.mdc Rule 25). Use real columns / relations.
 - Never use raw `Date` arithmetic / setters / comparison — use `date-fns` (rules.mdc Rule 28).
 - Never use a string/number literal where the library exposes an enum or constant (rules.mdc Rule 26).
