@@ -632,7 +632,7 @@ describe('BriefingChatsService', () => {
 
         const tools = chatStream.lastArgs?.tools ?? {}
         const tool = tools.get_my_notes as unknown as LlmStreamTool<
-          { topic?: string },
+          Record<string, never>,
           Array<{ id: string }>
         >
         const out = await tool.execute({})
@@ -676,7 +676,7 @@ describe('BriefingChatsService', () => {
 
         const tools = chatStream.lastArgs?.tools ?? {}
         const tool = tools.get_my_notes as unknown as LlmStreamTool<
-          { topic?: string },
+          Record<string, never>,
           Array<{ id: string }>
         >
 
@@ -715,13 +715,13 @@ describe('BriefingChatsService', () => {
 
         const tools = chatStream.lastArgs?.tools ?? {}
         const tool = tools.get_my_notes as unknown as LlmStreamTool<
-          { topic?: string },
+          Record<string, never>,
           Array<{ id: string }>
         >
 
         await tool.execute({})
         await tool.execute({})
-        await tool.execute({ topic: 'b' })
+        await tool.execute({})
 
         expect(notes.loadNotesForChatMock).toHaveBeenCalledTimes(1)
       })
