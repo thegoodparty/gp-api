@@ -9,6 +9,7 @@ import { Interval } from '@nestjs/schedule'
 import { subMinutes } from 'date-fns'
 import {
   Campaign,
+  Prisma,
   TcrCompliance,
   TcrComplianceStatus,
   User,
@@ -389,43 +390,46 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     let record: TcrCompliance
     try {
-      record = await this.client.$transaction(async (tx) => {
-        const updatedCampaign = await this.campaignsService.updateJsonFields(
-          campaign.id,
-          {
-            details: {
-              einNumber: ein,
-              campaignCommittee: committeeName,
+      record = await this.client.$transaction(
+        async (tx) => {
+          const updatedCampaign = await this.campaignsService.updateJsonFields(
+            campaign.id,
+            {
+              details: {
+                einNumber: ein,
+                campaignCommittee: committeeName,
+              },
+              placeId,
+              formattedAddress,
             },
-            placeId,
-            formattedAddress,
-          },
-          false,
-          undefined,
-          tx,
-        )
-
-        if (!updatedCampaign) {
-          throw new NotFoundException(
-            `Campaign ${campaign.id} not found while updating compliance details`,
+            false,
+            undefined,
+            tx,
           )
-        }
 
-        if (existing) {
-          await tx.tcrCompliance.deleteMany({ where: { id: existing.id } })
-        }
+          if (!updatedCampaign) {
+            throw new NotFoundException(
+              `Campaign ${campaign.id} not found while updating compliance details`,
+            )
+          }
 
-        return tx.tcrCompliance.create({
-          data: {
-            ...rest,
-            ein,
-            committeeName,
-            websiteDomain: websiteDomain ?? '',
-            postalAddress: updatedCampaign.formattedAddress ?? '',
-            campaignId: campaign.id,
-          },
-        })
-      })
+          if (existing) {
+            await tx.tcrCompliance.deleteMany({ where: { id: existing.id } })
+          }
+
+          return tx.tcrCompliance.create({
+            data: {
+              ...rest,
+              ein,
+              committeeName,
+              websiteDomain: websiteDomain ?? '',
+              postalAddress: updatedCampaign.formattedAddress ?? '',
+              campaignId: campaign.id,
+            },
+          })
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
     } catch (err) {
       if (
         err instanceof PrismaClientKnownRequestError &&
