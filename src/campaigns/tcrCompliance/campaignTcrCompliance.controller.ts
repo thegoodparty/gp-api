@@ -96,26 +96,28 @@ export class CampaignTcrComplianceController {
       throw new NotFoundException('User not found for this campaign')
     }
 
-    const result = await this.tcrComplianceService.createAgentic(
+    const { record, created } = await this.tcrComplianceService.createAgentic(
       user,
       campaign,
       tcrComplianceDto,
     )
 
-    try {
-      await this.analytics.track(
-        user.id,
-        EVENTS.Outreach.ComplianceFormSubmitted,
-        { source: 'agentic_compliance_flow' },
-      )
-    } catch (e) {
-      this.logger.error(
-        { e },
-        `Failed to track agentic compliance form submitted event for user ${user.id}`,
-      )
+    if (created) {
+      try {
+        await this.analytics.track(
+          user.id,
+          EVENTS.Outreach.ComplianceFormSubmitted,
+          { source: 'agentic_compliance_flow' },
+        )
+      } catch (e) {
+        this.logger.error(
+          { e },
+          `Failed to track agentic compliance form submitted event for user ${user.id}`,
+        )
+      }
     }
 
-    return result
+    return record
   }
 
   @Post()

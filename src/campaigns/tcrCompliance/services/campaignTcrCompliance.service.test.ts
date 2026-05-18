@@ -139,7 +139,10 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     const result = await service.createAgentic(user, campaign, basePayload)
 
     expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
-    expect(result).toEqual(expect.objectContaining({ id: 'tcr-new' }))
+    expect(result).toEqual({
+      record: expect.objectContaining({ id: 'tcr-new' }),
+      created: true,
+    })
   })
 
   it('stamps kickoffSentAt after a successful kickoff send', async () => {
@@ -245,7 +248,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
     const result = await service.createAgentic(user, campaign, basePayload)
 
-    expect(result).toEqual(existing)
+    expect(result).toEqual({ record: existing, created: false })
     expect(mockModel.create).not.toHaveBeenCalled()
     expect(mockCampaigns.updateJsonFields).not.toHaveBeenCalled()
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
@@ -323,7 +326,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
     const result = await service.createAgentic(user, campaign, basePayload)
 
-    expect(result).toEqual(raced)
+    expect(result).toEqual({ record: raced, created: false })
     expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 

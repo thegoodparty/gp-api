@@ -375,7 +375,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       existing?.status === TcrComplianceStatus.rejected
 
     if (existing && !isRetryableFailure) {
-      return existing
+      return { record: existing, created: false }
     }
 
     const {
@@ -387,9 +387,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       ...rest
     } = payload
 
-    let created: TcrCompliance
+    let record: TcrCompliance
     try {
-      created = await this.client.$transaction(async (tx) => {
+      record = await this.client.$transaction(async (tx) => {
         const updatedCampaign = await this.campaignsService.updateJsonFields(
           campaign.id,
           {
@@ -436,7 +436,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           this.logger.info(
             `[TCR Compliance] Agentic kickoff lost race for campaignId=${campaign.id}; returning record created by parallel request`,
           )
-          return raced
+          return { record: raced, created: false }
         }
         this.logger.error(
           { err, campaignId: campaign.id, target: err.meta?.target },
@@ -455,25 +455,25 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
           data: {
             campaignId: campaign.id,
-            tcrComplianceId: created.id,
+            tcrComplianceId: record.id,
             clerkUserId: user.clerkId,
           },
         },
         `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
         {
-          deduplicationId: `agentic-compliance-${created.id}`,
+          deduplicationId: `agentic-compliance-${record.id}`,
           throwOnError: true,
         },
       )
     } catch (err) {
       try {
         await this.model.update({
-          where: { id: created.id },
+          where: { id: record.id },
           data: { status: TcrComplianceStatus.error },
         })
       } catch (updateErr) {
         this.logger.error(
-          { updateErr, tcrComplianceId: created.id },
+          { updateErr, tcrComplianceId: record.id },
           '[TCR Compliance] Failed to mark record as error after SQS send failure; sweep will recover',
         )
       }
@@ -481,7 +481,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     }
 
     await this.model.update({
-      where: { id: created.id },
+      where: { id: record.id },
       data: { kickoffSentAt: new Date() },
     })
 
@@ -495,10 +495,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     }
 
     this.logger.info(
-      `[TCR Compliance] Agentic flow kicked off for campaignId=${campaign.id}, tcrComplianceId=${created.id}`,
+      `[TCR Compliance] Agentic flow kicked off for campaignId=${campaign.id}, tcrComplianceId=${record.id}`,
     )
 
-    return created
+    return { record, created: true }
   }
 
   async delete(id: string) {

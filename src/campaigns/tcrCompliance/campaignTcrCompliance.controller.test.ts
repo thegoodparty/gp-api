@@ -55,7 +55,9 @@ describe('CampaignTcrComplianceController', () => {
     mockTcrService = {
       fetchByCampaignId: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue(mockTcrCompliance),
-      createAgentic: vi.fn().mockResolvedValue(mockTcrCompliance),
+      createAgentic: vi
+        .fn()
+        .mockResolvedValue({ record: mockTcrCompliance, created: true }),
       retrieveCampaignVerifyToken: vi.fn().mockResolvedValue('cv-token-123'),
       submitCampaignVerifyToken: vi.fn().mockResolvedValue({ brand: 'ok' }),
       model: { update: vi.fn().mockResolvedValue(mockTcrCompliance) },
@@ -192,9 +194,12 @@ describe('CampaignTcrComplianceController', () => {
       expect(payload.websiteDomain).toBeUndefined()
     })
 
-    it('passes through whatever the service returns (idempotent path lives in service)', async () => {
+    it('returns the existing record when the service short-circuits idempotently', async () => {
       const existing = { ...mockTcrCompliance, id: 'tcr-existing' }
-      mockTcrService.createAgentic.mockResolvedValue(existing)
+      mockTcrService.createAgentic.mockResolvedValue({
+        record: existing,
+        created: false,
+      })
 
       const result = await controller.createAgenticTcrCompliance(
         mockCampaign,
@@ -205,7 +210,7 @@ describe('CampaignTcrComplianceController', () => {
       expect(mockTcrService.createAgentic).toHaveBeenCalledTimes(1)
     })
 
-    it('tracks ComplianceFormSubmitted with the agentic source', async () => {
+    it('tracks ComplianceFormSubmitted with the agentic source when a new record is created', async () => {
       await controller.createAgenticTcrCompliance(mockCampaign, agenticDto)
 
       expect(mockAnalytics.track).toHaveBeenCalledWith(
@@ -213,6 +218,17 @@ describe('CampaignTcrComplianceController', () => {
         EVENTS.Outreach.ComplianceFormSubmitted,
         { source: 'agentic_compliance_flow' },
       )
+    })
+
+    it('does NOT track analytics on idempotent re-call (existing record returned)', async () => {
+      mockTcrService.createAgentic.mockResolvedValue({
+        record: mockTcrCompliance,
+        created: false,
+      })
+
+      await controller.createAgenticTcrCompliance(mockCampaign, agenticDto)
+
+      expect(mockAnalytics.track).not.toHaveBeenCalled()
     })
 
     it('still returns the result when analytics tracking fails', async () => {
