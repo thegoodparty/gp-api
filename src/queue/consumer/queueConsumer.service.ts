@@ -374,6 +374,12 @@ export class QueueConsumerService {
         return await this.handleAgentExperimentResult(
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
+      case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
+        this.logger.warn(
+          { messageId: message.MessageId, data: queueMessage.data },
+          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented — discarding message',
+        )
+        return true
       case QueueType.OCR_ATTACHMENT:
         return await this.withLegacyErrorSwallowing(message, async () => {
           const { attachmentId } = OcrAttachmentMessageSchema.parse(

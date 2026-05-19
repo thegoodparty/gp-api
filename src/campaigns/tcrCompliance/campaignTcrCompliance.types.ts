@@ -1,4 +1,5 @@
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
+import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplianceDto.schema'
 
 export type CreateTcrCompliancePayload = Omit<
   CreateTcrComplianceDto,
@@ -7,3 +8,5 @@ export type CreateTcrCompliancePayload = Omit<
   placeId?: never
   formattedAddress?: never
 }
+
+export type CreateAgenticTcrCompliancePayload = CreateAgenticTcrComplianceDto

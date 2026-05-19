@@ -1,19 +1,24 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
+import { subMinutes } from 'date-fns'
 import {
   Campaign,
+  Prisma,
   TcrCompliance,
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
+  MessageGroup,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../../../queue/queue.types'
@@ -27,11 +32,23 @@ import {
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
-import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
+import {
+  CreateAgenticTcrCompliancePayload,
+  CreateTcrCompliancePayload,
+} from '../campaignTcrCompliance.types'
+import { CampaignsService } from '../../services/campaigns.service'
+import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
   : 12 * 60 * 60 // Defaults to 12 hrs
+
+const AGENTIC_KICKOFF_SWEEP_INTERVAL = process.env
+  .AGENTIC_KICKOFF_SWEEP_INTERVAL
+  ? parseInt(process.env.AGENTIC_KICKOFF_SWEEP_INTERVAL)
+  : 10 * 60
+
+const AGENTIC_KICKOFF_STALENESS_MINUTES = 10
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
@@ -40,9 +57,75 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   constructor(
     private readonly peerlyIdentityService: PeerlyIdentityService,
     private readonly websitesService: WebsitesService,
+    private readonly campaignsService: CampaignsService,
+    private readonly crmCampaignsService: CrmCampaignsService,
     private queueService: QueueProducerService,
   ) {
     super()
+  }
+
+  @Interval(AGENTIC_KICKOFF_SWEEP_INTERVAL * 1000)
+  private async sweepStrandedAgenticKickoffs() {
+    const cutoff = subMinutes(new Date(), AGENTIC_KICKOFF_STALENESS_MINUTES)
+    const stranded = await this.model.findMany({
+      where: {
+        status: TcrComplianceStatus.submitted,
+        peerlyIdentityId: null,
+        kickoffSentAt: null,
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        campaign: { include: { user: true } },
+      },
+    })
+
+    if (!stranded.length) {
+      return
+    }
+
+    this.logger.warn(
+      { count: stranded.length, cutoff: cutoff.toISOString() },
+      `[TCR Compliance] Sweeping ${stranded.length} stranded agentic kickoff(s)`,
+    )
+
+    for (const record of stranded) {
+      const clerkUserId = record.campaign?.user?.clerkId
+      if (!clerkUserId) {
+        this.logger.error(
+          { tcrComplianceId: record.id, campaignId: record.campaignId },
+          '[TCR Compliance] Stranded agentic record has no Clerk user; skipping',
+        )
+        continue
+      }
+
+      try {
+        await this.queueService.sendMessage(
+          {
+            type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+            data: {
+              campaignId: record.campaignId,
+              tcrComplianceId: record.id,
+              clerkUserId,
+            },
+          },
+          `${MessageGroup.agenticComplianceKickoff}-${record.campaignId}`,
+          {
+            deduplicationId: `agentic-compliance-${record.id}-recover-${Date.now()}`,
+            throwOnError: true,
+          },
+        )
+
+        await this.model.update({
+          where: { id: record.id },
+          data: { kickoffSentAt: new Date() },
+        })
+      } catch (err) {
+        this.logger.error(
+          { err, tcrComplianceId: record.id },
+          '[TCR Compliance] Failed to re-enqueue stranded agentic kickoff',
+        )
+      }
+    }
   }
 
   @Interval(TCR_COMPLIANCE_CHECK_INTERVAL * 1000) // This will run based on the environment variable
@@ -274,6 +357,152 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return createdTcrCompliance
+  }
+
+  async createAgentic(
+    user: User,
+    campaign: Campaign,
+    payload: CreateAgenticTcrCompliancePayload,
+  ) {
+    if (!user.clerkId) {
+      throw new BadRequestException(
+        'User must have a Clerk ID to start the agentic compliance flow',
+      )
+    }
+
+    const existing = await this.fetchByCampaignId(campaign.id)
+    const isRetryableFailure =
+      existing?.status === TcrComplianceStatus.error ||
+      existing?.status === TcrComplianceStatus.rejected
+
+    if (existing && !isRetryableFailure) {
+      return { record: existing, created: false }
+    }
+
+    const {
+      ein,
+      committeeName,
+      websiteDomain,
+      placeId,
+      formattedAddress,
+      ...rest
+    } = payload
+
+    let record: TcrCompliance
+    try {
+      record = await this.client.$transaction(
+        async (tx) => {
+          const updatedCampaign = await this.campaignsService.updateJsonFields(
+            campaign.id,
+            {
+              details: {
+                einNumber: ein,
+                campaignCommittee: committeeName,
+              },
+              placeId,
+              formattedAddress,
+            },
+            false,
+            undefined,
+            tx,
+          )
+
+          if (!updatedCampaign) {
+            throw new NotFoundException(
+              `Campaign ${campaign.id} not found while updating compliance details`,
+            )
+          }
+
+          if (existing) {
+            await tx.tcrCompliance.deleteMany({ where: { id: existing.id } })
+          }
+
+          return tx.tcrCompliance.create({
+            data: {
+              ...rest,
+              ein,
+              committeeName,
+              websiteDomain: websiteDomain ?? '',
+              postalAddress: updatedCampaign.formattedAddress ?? '',
+              campaignId: campaign.id,
+            },
+          })
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+    } catch (err) {
+      if (
+        err instanceof PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const raced = await this.fetchByCampaignId(campaign.id)
+        if (raced) {
+          this.logger.info(
+            `[TCR Compliance] Agentic kickoff lost race for campaignId=${campaign.id}; returning record created by parallel request`,
+          )
+          return { record: raced, created: false }
+        }
+        this.logger.error(
+          { err, campaignId: campaign.id, target: err.meta?.target },
+          '[TCR Compliance] P2002 on create with no racing record found — likely a unique constraint other than campaignId',
+        )
+        throw new BadGatewayException(
+          'Failed to create TCR compliance record due to a constraint violation',
+        )
+      }
+      throw err
+    }
+
+    try {
+      await this.queueService.sendMessage(
+        {
+          type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+          data: {
+            campaignId: campaign.id,
+            tcrComplianceId: record.id,
+            clerkUserId: user.clerkId,
+          },
+        },
+        `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
+        {
+          deduplicationId: `agentic-compliance-${record.id}`,
+          throwOnError: true,
+        },
+      )
+    } catch (err) {
+      try {
+        await this.model.update({
+          where: { id: record.id },
+          data: { status: TcrComplianceStatus.error },
+        })
+      } catch (updateErr) {
+        this.logger.error(
+          { updateErr, tcrComplianceId: record.id },
+          '[TCR Compliance] Failed to mark record as error after SQS send failure; sweep will recover',
+        )
+      }
+      throw err
+    }
+
+    await this.model.update({
+      where: { id: record.id },
+      data: { kickoffSentAt: new Date() },
+    })
+
+    try {
+      await this.crmCampaignsService.trackCampaign(campaign.id)
+    } catch (err) {
+      this.logger.error(
+        { err, campaignId: campaign.id },
+        '[TCR Compliance] CRM tracking failed after agentic kickoff enqueued; agent run will continue',
+      )
+    }
+
+    this.logger.info(
+      `[TCR Compliance] Agentic flow kicked off for campaignId=${campaign.id}, tcrComplianceId=${record.id}`,
+    )
+
+    return { record, created: true }
   }
 
   async delete(id: string) {

@@ -7,11 +7,11 @@ import {
   tcrComplianceTransform,
 } from './tcrComplianceBase.schema'
 
-export class CreateTcrComplianceDto extends createZodDto(
+export class CreateAgenticTcrComplianceDto extends createZodDto(
   z
     .object({
       ...tcrComplianceBaseShape,
-      websiteDomain: UrlOrDomainSchema,
+      websiteDomain: UrlOrDomainSchema.optional(),
     })
     .superRefine(tcrComplianceSuperRefine)
     .transform(tcrComplianceTransform),

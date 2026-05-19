@@ -19,6 +19,7 @@ import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interc
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
 import { ComplianceStateService } from './services/complianceState.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
+import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
@@ -80,6 +81,43 @@ export class CampaignTcrComplianceController {
   })
   async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
     return this.complianceStateService.findStateForCampaign(campaign.id)
+  }
+
+  @Post('agentic')
+  @UseCampaign()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async createAgenticTcrCompliance(
+    @ReqCampaign() campaign: Campaign,
+    @Body()
+    tcrComplianceDto: CreateAgenticTcrComplianceDto,
+  ) {
+    const user = await this.userService.findByCampaign(campaign)
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
+    const { record, created } = await this.tcrComplianceService.createAgentic(
+      user,
+      campaign,
+      tcrComplianceDto,
+    )
+
+    if (created) {
+      try {
+        await this.analytics.track(
+          user.id,
+          EVENTS.Outreach.ComplianceFormSubmitted,
+          { source: 'agentic_compliance_flow' },
+        )
+      } catch (e) {
+        this.logger.error(
+          { e },
+          `Failed to track agentic compliance form submitted event for user ${user.id}`,
+        )
+      }
+    }
+
+    return record
   }
 
   @Post()

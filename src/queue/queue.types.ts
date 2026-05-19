@@ -11,6 +11,7 @@ export enum QueueType {
   CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
   WEEKLY_TASKS_DIGEST = 'weeklyTasksDigest',
   AGENT_EXPERIMENT_RESULT = 'agentExperimentResult',
+  AGENTIC_COMPLIANCE_KICKOFF = 'agenticComplianceKickoff',
   OCR_ATTACHMENT = 'ocrAttachment',
 }
 
@@ -43,6 +44,10 @@ export type QueueMessage =
       data: AgentExperimentResultData
     }
   | {
+      type: QueueType.AGENTIC_COMPLIANCE_KICKOFF
+      data: AgenticComplianceKickoffMessage
+    }
+  | {
       type: QueueType.OCR_ATTACHMENT
       data: OcrAttachmentMessage
     }
@@ -59,6 +64,12 @@ export type TcrComplianceStatusCheckMessage = {
 
 export type DomainEmailForwardingMessage = {
   domainId: number
+}
+
+export type AgenticComplianceKickoffMessage = {
+  campaignId: number
+  tcrComplianceId: string
+  clerkUserId: string
 }
 
 export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(
@@ -142,6 +153,7 @@ export enum MessageGroup {
   domainEmailRedirect = 'domainEmailRedirect',
   polls = 'polls',
   weeklyTasksDigest = 'weeklyTasksDigest',
+  agenticComplianceKickoff = 'agenticComplianceKickoff',
 }
 
 const PollResponseJsonRowSchema = z.object({
