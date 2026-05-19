@@ -462,9 +462,9 @@ describe('UsersController', () => {
       const args = {
         bucket: 'uploads',
         fileName: 'doc.pdf',
-        fileType: 'application/pdf',
+        fileType: 'application/pdf' as const,
       }
-      const result = await controller.generateSignedUploadUrl(args)
+      const result = await controller.generateSignedUploadUrl(mockUser, args)
 
       expect(filesService.generateSignedUploadUrl).toHaveBeenCalledWith(args)
       expect(result).toEqual({
