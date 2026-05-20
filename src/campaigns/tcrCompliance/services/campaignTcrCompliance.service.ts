@@ -40,7 +40,7 @@ import { CampaignsService } from '../../services/campaigns.service'
 import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 import { ComplianceStateService } from './complianceState.service'
 import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
-import { SubmitToPeerlyOutput } from '@goodparty_org/contracts'
+import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -429,6 +429,20 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return this.buildSubmitToPeerlyResponse(existing, pinDeliveryChannels)
     }
 
+    // Stage gate: only proceed when the candidate's website is live + the
+    // domain is registered (derived stage = awaiting_pin with identity still
+    // null). Reject all earlier stages so an agent can't kick a Peerly brand
+    // submission for an unverified/unregistered domain.
+    const stateBeforeSubmit =
+      await this.complianceStateService.findStateForCampaign(campaign.id)
+    if (stateBeforeSubmit.stage !== ComplianceStage.awaiting_pin) {
+      throw new UnprocessableEntityException(
+        `Cannot submit TCR registration to Peerly until the candidate's ` +
+          `website is published and live. Current compliance stage: ` +
+          `${stateBeforeSubmit.stage}. Wait for stage = awaiting_pin.`,
+      )
+    }
+
     // Pre-Peerly claim: only one concurrent caller may proceed past this
     // point. The TTL allows re-claim if a prior caller crashed mid-flight
     // without clearing its claim.
@@ -436,6 +450,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       new Date(),
       PEERLY_SUBMISSION_CLAIM_TTL_MINUTES,
     )
+    const claimTimestamp = new Date()
     const claim = await this.model.updateMany({
       where: {
         id: existing.id,
@@ -445,7 +460,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           { peerlySubmissionStartedAt: { lt: staleBefore } },
         ],
       },
-      data: { peerlySubmissionStartedAt: new Date() },
+      data: { peerlySubmissionStartedAt: claimTimestamp },
     })
 
     if (claim.count === 0) {
@@ -484,11 +499,15 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         hostname,
       )
     } catch (error) {
-      // Roll back the claim so a retry can re-enter the submission flow.
-      // Scope by peerlyIdentityId: null so a concurrently-completed call's
-      // record (which would only happen if the TTL fired) isn't disturbed.
+      // Roll back only this caller's claim by matching the exact timestamp we
+      // wrote. A TTL re-claimant (caller B, after our call exceeded TTL) will
+      // have a different timestamp, so its in-flight claim isn't disturbed.
       await this.model.updateMany({
-        where: { id: existing.id, peerlyIdentityId: null },
+        where: {
+          id: existing.id,
+          peerlyIdentityId: null,
+          peerlySubmissionStartedAt: claimTimestamp,
+        },
         data: { peerlySubmissionStartedAt: null },
       })
       throw error

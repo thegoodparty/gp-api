@@ -784,7 +784,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     })
   })
 
-  it('rolls back the claim and rethrows when the Peerly submission fails', async () => {
+  it('rolls back only this callers own claim (matched by timestamp) and rethrows when Peerly fails', async () => {
     const peerlyErr = new BadGatewayException('Peerly down')
     mockPeerly.createIdentity.mockRejectedValueOnce(peerlyErr)
 
@@ -794,11 +794,40 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
 
     // Two updateMany calls: claim, then rollback
     expect(mockTcrModel.updateMany).toHaveBeenCalledTimes(2)
-    expect(mockTcrModel.updateMany.mock.calls[1][0]).toEqual({
-      where: { id: existingRecord.id, peerlyIdentityId: null },
+    const claimCall = mockTcrModel.updateMany.mock.calls[0][0]
+    const rollbackCall = mockTcrModel.updateMany.mock.calls[1][0]
+    const claimTimestamp = claimCall.data.peerlySubmissionStartedAt
+    expect(claimTimestamp).toBeInstanceOf(Date)
+    // Rollback scopes to the exact timestamp we wrote, so a TTL re-claim by
+    // another caller would NOT be cleared by our rollback.
+    expect(rollbackCall).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        peerlySubmissionStartedAt: claimTimestamp,
+      },
       data: { peerlySubmissionStartedAt: null },
     })
     // Final write never happens on the failure path
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
+  })
+
+  it('throws UnprocessableEntityException when compliance stage is not awaiting_pin (website not yet live)', async () => {
+    mockComplianceState.findStateForCampaign.mockResolvedValueOnce({
+      stage: 'pending_website_live',
+      domain: null,
+      websiteId: null,
+      peerlyVerificationId: null,
+    })
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow(
+      'Cannot submit TCR registration to Peerly until the candidate',
+    )
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+    expect(mockTcrModel.updateMany).not.toHaveBeenCalled()
     expect(mockTcrModel.update).not.toHaveBeenCalled()
   })
 
