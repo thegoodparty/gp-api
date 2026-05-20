@@ -196,6 +196,25 @@ export function buildSlackBlocks({
                 },
               ],
             },
+            // Hardcoded 'N/A': downstream automation parses this message
+            // and expects the "Due Date" line. The original source value was
+            // removed and we don't have a replacement yet.
+            {
+              type: SlackMessageType.RICH_TEXT_SECTION,
+              elements: [
+                {
+                  type: SlackMessageType.TEXT,
+                  text: 'Due Date: ',
+                  style: {
+                    bold: true,
+                  },
+                },
+                {
+                  type: SlackMessageType.TEXT,
+                  text: 'N/A',
+                },
+              ],
+            },
           ].filter((elem) => elem !== undefined),
         },
         {
