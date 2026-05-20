@@ -655,7 +655,13 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
       peerly10DLCBrandSubmissionKey: 'brand-existing',
       peerlyVerificationId: 'cv-existing',
       stage: 'awaiting_pin',
-      pinDeliveryChannels: { email: input.email, phone: input.phone },
+      // Channels come from the persisted record, not the request input, so a
+      // retry with different contact details cannot misreport where Peerly
+      // sent the PIN.
+      pinDeliveryChannels: {
+        email: existingRecord.email,
+        phone: existingRecord.phone,
+      },
     })
   })
 
@@ -780,7 +786,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
       peerly10DLCBrandSubmissionKey: 'brand-winner',
       peerlyVerificationId: 'cv-winner',
       stage: 'awaiting_pin',
-      pinDeliveryChannels: { email: input.email, phone: input.phone },
+      pinDeliveryChannels: { email: winner.email, phone: winner.phone },
     })
   })
 
@@ -856,5 +862,35 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
       }),
     })
     expect(result.peerlyVerificationId).toBe('cv-existing-from-prior-run')
+  })
+
+  it('surfaces BadRequestException and rolls back claim when campaignCommittee is absent (real submit10DlcBrand guard)', async () => {
+    // The real PeerlyIdentityService.submit10DlcBrand throws this when
+    // campaign.details.campaignCommittee is missing. The rest of this suite
+    // mocks the helper away; this test forces the real production-path error
+    // so we exercise error propagation + claim rollback.
+    const missingCommitteeErr = new BadRequestException(
+      'Campaign committee is required to submit 10DLC brand',
+    )
+    mockPeerly.submit10DlcBrand.mockRejectedValueOnce(missingCommitteeErr)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toBe(missingCommitteeErr)
+
+    // Two updateMany calls: claim, then rollback scoped to our own timestamp.
+    expect(mockTcrModel.updateMany).toHaveBeenCalledTimes(2)
+    const claimCall = mockTcrModel.updateMany.mock.calls[0][0]
+    const rollbackCall = mockTcrModel.updateMany.mock.calls[1][0]
+    expect(rollbackCall).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        peerlySubmissionStartedAt: claimCall.data.peerlySubmissionStartedAt,
+      },
+      data: { peerlySubmissionStartedAt: null },
+    })
+    // Final write never happens on the failure path.
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
   })
 })

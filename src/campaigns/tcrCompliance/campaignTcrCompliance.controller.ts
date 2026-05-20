@@ -95,18 +95,20 @@ export class CampaignTcrComplianceController {
   @McpTool({
     description:
       "Submit the candidate's TCR/Identity registration to Peerly for " +
-      "10DLC compliance. Use after the candidate's website is " +
-      'published and live on a verified domain (compliance stage = ' +
-      '`pending_website_live` complete). Required inputs: EIN, ' +
-      'committee name, office level, election filing details, contact ' +
-      'email and phone, and the verified website URL. Creates the ' +
-      'Peerly Identity, Identity Profile, 10DLC Brand, and Campaign ' +
-      'Verify Request; Peerly then sends a PIN to the candidate via the ' +
-      'contact channels supplied. Returns the Peerly identity id, ' +
-      'verification id, advanced compliance stage (`awaiting_pin`), and ' +
-      'the PIN delivery channels the candidate should check. Idempotent ' +
-      'on retry: a second call returns the existing record without ' +
-      're-submitting to Peerly.',
+      '10DLC compliance. Precondition (enforced by the route): the ' +
+      'compliance stage must be `awaiting_pin` — i.e., the domain is ' +
+      "registered and the candidate's website is published and " +
+      'verified live. Calls with any earlier stage return 422. ' +
+      'Required inputs: EIN, committee name, office level, election ' +
+      'filing details, contact email and phone, and the verified ' +
+      'website URL. Creates the Peerly Identity, Identity Profile, ' +
+      '10DLC Brand, and Campaign Verify Request; Peerly then sends a ' +
+      'PIN to the candidate via the contact channels supplied. ' +
+      'Returns the Peerly identity id, CV verification id, derived ' +
+      'compliance stage (`awaiting_pin`), and the PIN delivery ' +
+      'channels (from the persisted record) the candidate should ' +
+      'check. Idempotent on retry: a second call returns the existing ' +
+      'record without re-submitting to Peerly.',
   })
   async submitToPeerly(
     @ReqCampaign() campaign: Campaign,

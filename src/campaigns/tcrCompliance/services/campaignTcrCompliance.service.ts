@@ -423,10 +423,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     }
 
-    const pinDeliveryChannels = { email: input.email, phone: input.phone }
-
     if (existing.peerlyIdentityId) {
-      return this.buildSubmitToPeerlyResponse(existing, pinDeliveryChannels)
+      return this.buildSubmitToPeerlyResponse(existing)
     }
 
     // Stage gate: only proceed when the candidate's website is live + the
@@ -466,7 +464,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     if (claim.count === 0) {
       const current = await this.fetchByCampaignId(campaign.id)
       if (current?.peerlyIdentityId) {
-        return this.buildSubmitToPeerlyResponse(current, pinDeliveryChannels)
+        return this.buildSubmitToPeerlyResponse(current)
       }
       throw new ConflictException(
         `A Peerly submission is already in progress for ` +
@@ -545,12 +543,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         `peerlyIdentityId=${updated.peerlyIdentityId}`,
     )
 
-    return this.buildSubmitToPeerlyResponse(updated, pinDeliveryChannels)
+    return this.buildSubmitToPeerlyResponse(updated)
   }
 
   private async buildSubmitToPeerlyResponse(
     record: TcrCompliance,
-    pinDeliveryChannels: { email: string; phone: string },
   ): Promise<SubmitToPeerlyOutput> {
     const state = await this.complianceStateService.findStateForCampaign(
       record.campaignId,
@@ -568,7 +565,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       peerly10DLCBrandSubmissionKey: record.peerly10DLCBrandSubmissionKey,
       peerlyVerificationId: record.peerlyCvVerificationId,
       stage: state.stage,
-      pinDeliveryChannels,
+      pinDeliveryChannels: { email: record.email, phone: record.phone },
     }
   }
 
