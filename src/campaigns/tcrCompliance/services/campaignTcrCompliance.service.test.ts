@@ -498,7 +498,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
   }
   let mockTcrModel: {
     findUnique: ReturnType<typeof vi.fn>
-    findUniqueOrThrow: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
     updateMany: ReturnType<typeof vi.fn>
   }
   let mockPrisma: {
@@ -576,11 +576,13 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     }
     mockTcrModel = {
       findUnique: vi.fn().mockResolvedValue(existingRecord),
-      findUniqueOrThrow: vi
-        .fn()
-        .mockImplementation(({ where }) =>
-          Promise.resolve({ ...existingRecord, id: where.id }),
-        ),
+      update: vi.fn().mockImplementation(({ where, data }) =>
+        Promise.resolve({
+          ...existingRecord,
+          ...data,
+          id: where.id,
+        }),
+      ),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     }
     mockPrisma = {
@@ -677,6 +679,27 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     )
   })
 
+  it('claims the submission slot atomically before calling Peerly', async () => {
+    await service.submitToPeerlyForAgent(user, campaign, input)
+
+    const firstUpdateMany = mockTcrModel.updateMany.mock.calls[0]
+    expect(firstUpdateMany[0]).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        OR: [
+          { peerlySubmissionStartedAt: null },
+          { peerlySubmissionStartedAt: { lt: expect.any(Date) } },
+        ],
+      },
+      data: { peerlySubmissionStartedAt: expect.any(Date) },
+    })
+    // Claim happens BEFORE Peerly is invoked
+    const claimCallOrder = mockTcrModel.updateMany.mock.invocationCallOrder[0]
+    const peerlyCallOrder = mockPeerly.getIdentities.mock.invocationCallOrder[0]
+    expect(claimCallOrder).toBeLessThan(peerlyCallOrder)
+  })
+
   it('submits to Peerly, persists results (including peerlyCvVerificationId), and returns awaiting_pin on the happy path', async () => {
     const result = await service.submitToPeerlyForAgent(user, campaign, input)
 
@@ -693,8 +716,8 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
       'janedoe.com',
     )
 
-    expect(mockTcrModel.updateMany).toHaveBeenCalledWith({
-      where: { id: existingRecord.id, peerlyIdentityId: null },
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: existingRecord.id },
       data: expect.objectContaining({
         peerlyIdentityId: 'peerly-id-1',
         peerlyIdentityProfileLink: 'https://peerly/profile/1',
@@ -717,7 +740,20 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     })
   })
 
-  it('returns the parallel callers record when the write-time race guard reports count=0', async () => {
+  it('throws ConflictException when claim is taken and the in-flight call has not yet persisted peerlyIdentityId', async () => {
+    mockTcrModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    mockTcrModel.findUnique
+      .mockResolvedValueOnce(existingRecord)
+      .mockResolvedValueOnce(existingRecord)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow('A Peerly submission is already in progress')
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+  })
+
+  it('returns idempotent response when claim is taken because a concurrent call already completed', async () => {
     mockTcrModel.updateMany.mockResolvedValueOnce({ count: 0 })
     const winner = {
       ...existingRecord,
@@ -732,6 +768,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
 
     const result = await service.submitToPeerlyForAgent(user, campaign, input)
 
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
     expect(result).toEqual({
       tcrComplianceId: winner.id,
       peerlyIdentityId: 'peerly-winner',
@@ -741,5 +778,23 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
       stage: 'awaiting_pin',
       pinDeliveryChannels: { email: input.email, phone: input.phone },
     })
+  })
+
+  it('rolls back the claim and rethrows when the Peerly submission fails', async () => {
+    const peerlyErr = new BadGatewayException('Peerly down')
+    mockPeerly.createIdentity.mockRejectedValueOnce(peerlyErr)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toBe(peerlyErr)
+
+    // Two updateMany calls: claim, then rollback
+    expect(mockTcrModel.updateMany).toHaveBeenCalledTimes(2)
+    expect(mockTcrModel.updateMany.mock.calls[1][0]).toEqual({
+      where: { id: existingRecord.id, peerlyIdentityId: null },
+      data: { peerlySubmissionStartedAt: null },
+    })
+    // Final write never happens on the failure path
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
   })
 })
