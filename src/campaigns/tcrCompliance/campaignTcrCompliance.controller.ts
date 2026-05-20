@@ -20,6 +20,7 @@ import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.s
 import { ComplianceStateService } from './services/complianceState.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplianceDto.schema'
+import { SubmitToPeerlyDto } from './schemas/submitToPeerlyDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
@@ -33,7 +34,10 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { McpTool } from '@/mcp/decorators/McpTool.decorator'
-import { ComplianceStateOutputSchema } from '@goodparty_org/contracts'
+import {
+  ComplianceStateOutputSchema,
+  SubmitToPeerlyOutputSchema,
+} from '@goodparty_org/contracts'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -81,6 +85,43 @@ export class CampaignTcrComplianceController {
   })
   async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
     return this.complianceStateService.findStateForCampaign(campaign.id)
+  }
+
+  @Post('submit-to-peerly')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(ZodResponseInterceptor)
+  @ResponseSchema(SubmitToPeerlyOutputSchema)
+  @McpTool({
+    description:
+      "Submit the candidate's TCR/Identity registration to Peerly for " +
+      "10DLC compliance. Use after the candidate's website is " +
+      'published and live on a verified domain (compliance stage = ' +
+      '`pending_website_live` complete). Required inputs: EIN, ' +
+      'committee name, office level, election filing details, contact ' +
+      'email and phone, and the verified website URL. Creates the ' +
+      'Peerly Identity, Identity Profile, 10DLC Brand, and Campaign ' +
+      'Verify Request; Peerly then sends a PIN to the candidate via the ' +
+      'contact channels supplied. Returns the Peerly identity id, ' +
+      'verification id, advanced compliance stage (`awaiting_pin`), and ' +
+      'the PIN delivery channels the candidate should check. Idempotent ' +
+      'on retry: a second call returns the existing record without ' +
+      're-submitting to Peerly.',
+  })
+  async submitToPeerly(
+    @ReqCampaign() campaign: Campaign,
+    @Body() input: SubmitToPeerlyDto,
+  ) {
+    const user = await this.userService.findByCampaign(campaign)
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
+    return this.tcrComplianceService.submitToPeerlyForAgent(
+      user,
+      campaign,
+      input,
+    )
   }
 
   @Post('agentic')

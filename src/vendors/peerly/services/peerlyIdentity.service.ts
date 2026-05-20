@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
+import { Campaign, TcrCompliance, User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
@@ -208,7 +208,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     peerlyIdentityId: string,
     tcrCompliancePayload: CreateTcrCompliancePayload,
     campaign: Campaign,
-    domain: Domain,
+    domainName: string,
   ) {
     const { details: campaignDetails, placeId } = campaign
     const { phone, websiteDomain, ein } = tcrCompliancePayload
@@ -247,7 +247,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       state: state?.short_name,
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
+      email: `info@${domainName}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
       ...(geography.didState !== P2P_JOB_DEFAULTS.DID_STATE
         ? {
             jobAreas: [
@@ -377,7 +377,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     >,
     user: User,
     campaign: Campaign,
-    domain: Domain,
+    domainName: string,
   ): Promise<PeerlySubmitCVResponseBody | null> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
@@ -468,7 +468,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       filing_phone_type: 'cell',
       filing_phone_number: phone,
       state: state?.short_name,
-      campaign_website: domain ? `https://${domain?.name}` : undefined,
+      campaign_website: domainName ? `https://${domainName}` : undefined,
       // Federal-specific fields
       ...(isFederal
         ? {

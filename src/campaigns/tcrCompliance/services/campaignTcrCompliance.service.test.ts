@@ -5,6 +5,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTcrComplianceService } from './campaignTcrCompliance.service'
+import { ComplianceStateService } from './complianceState.service'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CampaignsService } from '../../services/campaigns.service'
@@ -24,6 +25,9 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   let mockWebsites: { findFirstOrThrow: ReturnType<typeof vi.fn> }
   let mockCampaigns: { updateJsonFields: ReturnType<typeof vi.fn> }
   let mockCrm: { trackCampaign: ReturnType<typeof vi.fn> }
+  let mockComplianceState: {
+    findStateForCampaign: ReturnType<typeof vi.fn>
+  }
   let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
   let mockModel: {
     findUnique: ReturnType<typeof vi.fn>
@@ -63,6 +67,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       updateJsonFields: vi.fn().mockResolvedValue(campaign),
     }
     mockCrm = { trackCampaign: vi.fn().mockResolvedValue(undefined) }
+    mockComplianceState = { findStateForCampaign: vi.fn() }
     mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
     mockModel = {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -90,6 +95,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         { provide: WebsitesService, useValue: mockWebsites },
         { provide: CampaignsService, useValue: mockCampaigns },
         { provide: CrmCampaignsService, useValue: mockCrm },
+        { provide: ComplianceStateService, useValue: mockComplianceState },
         { provide: QueueProducerService, useValue: mockQueue },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
@@ -471,6 +477,269 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
       expect(mockQueue.sendMessage).not.toHaveBeenCalled()
       expect(mockModel.update).not.toHaveBeenCalled()
+    })
+  })
+})
+
+describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
+  let service: CampaignTcrComplianceService
+  let mockPeerly: {
+    getTCRIdentityName: ReturnType<typeof vi.fn>
+    getIdentities: ReturnType<typeof vi.fn>
+    createIdentity: ReturnType<typeof vi.fn>
+    getIdentityProfile: ReturnType<typeof vi.fn>
+    submitIdentityProfile: ReturnType<typeof vi.fn>
+    submit10DlcBrand: ReturnType<typeof vi.fn>
+    getCampaignVerifyRequest: ReturnType<typeof vi.fn>
+    submitCampaignVerifyRequest: ReturnType<typeof vi.fn>
+  }
+  let mockComplianceState: {
+    findStateForCampaign: ReturnType<typeof vi.fn>
+  }
+  let mockTcrModel: {
+    findUnique: ReturnType<typeof vi.fn>
+    findUniqueOrThrow: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
+  let mockPrisma: {
+    tcrCompliance: typeof mockTcrModel
+    $transaction: ReturnType<typeof vi.fn>
+  }
+
+  const user = createMockUser({ clerkId: 'user_clerk_xyz' })
+  const campaign = createMockCampaign({
+    userId: user.id,
+    formattedAddress: '123 Main St',
+    placeId: 'place-123',
+    details: { electionDate: '2026-11-03' },
+  })
+
+  const input = {
+    ein: '12-3456789',
+    committeeName: 'Jane for Springfield',
+    filingUrl: 'https://example.gov/filing/123',
+    email: 'jane@example.com',
+    phone: '5555555555',
+    officeLevel: OfficeLevel.state,
+    fecCommitteeId: undefined,
+    committeeType: CommitteeType.CANDIDATE,
+    websiteUrl: 'https://janedoe.com',
+  }
+
+  const existingRecord = {
+    id: 'tcr-existing',
+    campaignId: campaign.id,
+    ein: '00-0000000',
+    committeeName: 'Stub Committee',
+    websiteDomain: '',
+    filingUrl: 'https://stub.gov/filing',
+    phone: '0000000000',
+    email: 'stub@example.com',
+    officeLevel: OfficeLevel.state,
+    fecCommitteeId: null,
+    committeeType: CommitteeType.CANDIDATE,
+    status: TcrComplianceStatus.submitted,
+    peerlyIdentityId: null,
+    peerlyIdentityProfileLink: null,
+    peerly10DLCBrandSubmissionKey: null,
+    peerlyCvVerificationId: null,
+    postalAddress: '123 Main St',
+    kickoffSentAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    tdlcNumber: null,
+    peerlyRegistrationLink: null,
+  }
+
+  beforeEach(async () => {
+    mockPeerly = {
+      getTCRIdentityName: vi.fn().mockReturnValue('Jane Doe - 12-3456789'),
+      getIdentities: vi.fn().mockResolvedValue([]),
+      createIdentity: vi.fn().mockResolvedValue({ identity_id: 'peerly-id-1' }),
+      getIdentityProfile: vi.fn().mockResolvedValue(null),
+      submitIdentityProfile: vi
+        .fn()
+        .mockResolvedValue({ link: 'https://peerly/profile/1', profile: {} }),
+      submit10DlcBrand: vi.fn().mockResolvedValue('brand-key-1'),
+      getCampaignVerifyRequest: vi.fn().mockResolvedValue(null),
+      submitCampaignVerifyRequest: vi
+        .fn()
+        .mockResolvedValue({ verification_id: 'cv-verif-1', message: 'ok' }),
+    }
+    mockComplianceState = {
+      findStateForCampaign: vi.fn().mockResolvedValue({
+        stage: 'awaiting_pin',
+        domain: null,
+        websiteId: null,
+        peerlyVerificationId: null,
+      }),
+    }
+    mockTcrModel = {
+      findUnique: vi.fn().mockResolvedValue(existingRecord),
+      findUniqueOrThrow: vi
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve({ ...existingRecord, id: where.id }),
+        ),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }
+    mockPrisma = {
+      tcrCompliance: mockTcrModel,
+      $transaction: vi.fn(),
+    }
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: PeerlyIdentityService, useValue: mockPeerly },
+        {
+          provide: WebsitesService,
+          useValue: { findFirstOrThrow: vi.fn() },
+        },
+        {
+          provide: CampaignsService,
+          useValue: { updateJsonFields: vi.fn() },
+        },
+        {
+          provide: CrmCampaignsService,
+          useValue: { trackCampaign: vi.fn() },
+        },
+        { provide: ComplianceStateService, useValue: mockComplianceState },
+        {
+          provide: QueueProducerService,
+          useValue: { sendMessage: vi.fn() },
+        },
+        { provide: PinoLogger, useValue: createMockLogger() },
+        CampaignTcrComplianceService,
+      ],
+    }).compile()
+
+    service = module.get(CampaignTcrComplianceService)
+  })
+
+  it('throws NotFoundException when no TcrCompliance exists', async () => {
+    mockTcrModel.findUnique.mockResolvedValueOnce(null)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow(
+      `TcrCompliance record not found for campaignId=${campaign.id}`,
+    )
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+  })
+
+  it('is idempotent: returns existing record without calling Peerly when peerlyIdentityId is set', async () => {
+    mockTcrModel.findUnique.mockResolvedValueOnce({
+      ...existingRecord,
+      peerlyIdentityId: 'peerly-already-set',
+      peerlyIdentityProfileLink: 'https://peerly/profile/existing',
+      peerly10DLCBrandSubmissionKey: 'brand-existing',
+      peerlyCvVerificationId: 'cv-existing',
+    })
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+    expect(mockPeerly.createIdentity).not.toHaveBeenCalled()
+    expect(mockPeerly.submit10DlcBrand).not.toHaveBeenCalled()
+    expect(mockPeerly.submitCampaignVerifyRequest).not.toHaveBeenCalled()
+    expect(mockTcrModel.updateMany).not.toHaveBeenCalled()
+
+    expect(result).toEqual({
+      tcrComplianceId: existingRecord.id,
+      peerlyIdentityId: 'peerly-already-set',
+      peerlyIdentityProfileLink: 'https://peerly/profile/existing',
+      peerly10DLCBrandSubmissionKey: 'brand-existing',
+      peerlyVerificationId: 'cv-existing',
+      stage: 'awaiting_pin',
+      pinDeliveryChannels: { email: input.email, phone: input.phone },
+    })
+  })
+
+  it('passes the parsed URL hostname to the Peerly helper (no DB lookup of Domain row required)', async () => {
+    await service.submitToPeerlyForAgent(user, campaign, {
+      ...input,
+      websiteUrl: 'https://www.janedoe.com/path?q=1',
+    })
+
+    expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      campaign,
+      'www.janedoe.com',
+    )
+    expect(mockPeerly.submitCampaignVerifyRequest).toHaveBeenCalledWith(
+      expect.any(Object),
+      user,
+      campaign,
+      'www.janedoe.com',
+    )
+  })
+
+  it('submits to Peerly, persists results (including peerlyCvVerificationId), and returns awaiting_pin on the happy path', async () => {
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
+      'peerly-id-1',
+      expect.objectContaining({ websiteDomain: input.websiteUrl }),
+      campaign,
+      'janedoe.com',
+    )
+    expect(mockPeerly.submitCampaignVerifyRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ peerlyIdentityId: 'peerly-id-1' }),
+      user,
+      campaign,
+      'janedoe.com',
+    )
+
+    expect(mockTcrModel.updateMany).toHaveBeenCalledWith({
+      where: { id: existingRecord.id, peerlyIdentityId: null },
+      data: expect.objectContaining({
+        peerlyIdentityId: 'peerly-id-1',
+        peerlyIdentityProfileLink: 'https://peerly/profile/1',
+        peerly10DLCBrandSubmissionKey: 'brand-key-1',
+        peerlyCvVerificationId: 'cv-verif-1',
+        websiteDomain: input.websiteUrl,
+        email: input.email,
+        phone: input.phone,
+      }),
+    })
+
+    expect(result).toEqual({
+      tcrComplianceId: existingRecord.id,
+      peerlyIdentityId: 'peerly-id-1',
+      peerlyIdentityProfileLink: 'https://peerly/profile/1',
+      peerly10DLCBrandSubmissionKey: 'brand-key-1',
+      peerlyVerificationId: 'cv-verif-1',
+      stage: 'awaiting_pin',
+      pinDeliveryChannels: { email: input.email, phone: input.phone },
+    })
+  })
+
+  it('returns the parallel callers record when the write-time race guard reports count=0', async () => {
+    mockTcrModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    const winner = {
+      ...existingRecord,
+      peerlyIdentityId: 'peerly-winner',
+      peerlyIdentityProfileLink: 'https://peerly/profile/winner',
+      peerly10DLCBrandSubmissionKey: 'brand-winner',
+      peerlyCvVerificationId: 'cv-winner',
+    }
+    mockTcrModel.findUnique
+      .mockResolvedValueOnce(existingRecord)
+      .mockResolvedValueOnce(winner)
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(result).toEqual({
+      tcrComplianceId: winner.id,
+      peerlyIdentityId: 'peerly-winner',
+      peerlyIdentityProfileLink: 'https://peerly/profile/winner',
+      peerly10DLCBrandSubmissionKey: 'brand-winner',
+      peerlyVerificationId: 'cv-winner',
+      stage: 'awaiting_pin',
+      pinDeliveryChannels: { email: input.email, phone: input.phone },
     })
   })
 })

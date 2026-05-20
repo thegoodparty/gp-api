@@ -200,6 +200,13 @@ export {
   type ComplianceStateOutput,
 } from './campaigns/ComplianceStateOutput.schema'
 
+export {
+  SubmitToPeerlyPinDeliveryChannelsSchema,
+  type SubmitToPeerlyPinDeliveryChannels,
+  SubmitToPeerlyOutputSchema,
+  type SubmitToPeerlyOutput,
+} from './campaigns/SubmitToPeerlyOutput.schema'
+
 export type { Ecanvasser, EcanvasserSummary } from './ecanvasser/types'
 
 export {
