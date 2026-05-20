@@ -459,11 +459,20 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     }
 
-    const hostname = new URL(input.websiteUrl).hostname
-    const { websiteUrl, ...rest } = input
+    // Strip leading www. so Peerly's 10DLC brand `website` + `email` fields
+    // and the persisted websiteDomain all use the apex domain — matching the
+    // legacy create() path (which sources from Domain.name, an apex domain).
+    const hostname = new URL(input.websiteUrl).hostname.replace(/^www\./, '')
     const helperPayload: CreateTcrCompliancePayload = {
-      ...rest,
-      websiteDomain: websiteUrl,
+      ein: input.ein,
+      committeeName: input.committeeName,
+      filingUrl: input.filingUrl,
+      email: input.email,
+      phone: input.phone,
+      officeLevel: input.officeLevel,
+      fecCommitteeId: input.fecCommitteeId,
+      committeeType: input.committeeType,
+      websiteDomain: hostname,
     }
 
     let peerlyResult: PeerlySubmissionResult
@@ -496,13 +505,18 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         officeLevel: input.officeLevel,
         fecCommitteeId: input.fecCommitteeId ?? null,
         committeeType: input.committeeType,
-        websiteDomain: input.websiteUrl,
+        websiteDomain: hostname,
         postalAddress: campaign.formattedAddress ?? existing.postalAddress,
         peerlyIdentityId: peerlyResult.peerlyIdentityId,
         peerlyIdentityProfileLink: peerlyResult.peerlyIdentityProfileLink,
         peerly10DLCBrandSubmissionKey:
           peerlyResult.peerly10DLCBrandSubmissionKey,
-        peerlyCvVerificationId: peerlyResult.cvVerificationId,
+        // Peerly's GET-CV-request response doesn't carry verification_id, so
+        // when the helper skipped CV submission (existing CV found), it
+        // returns null. Fall back to the persisted value so a real ID isn't
+        // overwritten on retry.
+        peerlyCvVerificationId:
+          peerlyResult.cvVerificationId ?? existing.peerlyCvVerificationId,
       },
     })
 

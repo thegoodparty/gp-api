@@ -659,7 +659,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     })
   })
 
-  it('passes the parsed URL hostname to the Peerly helper (no DB lookup of Domain row required)', async () => {
+  it('canonicalizes the input URL to the apex hostname (strips www., scheme, and path) for both Peerly fields and the DB', async () => {
     await service.submitToPeerlyForAgent(user, campaign, {
       ...input,
       websiteUrl: 'https://www.janedoe.com/path?q=1',
@@ -667,16 +667,20 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
 
     expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Object),
+      expect.objectContaining({ websiteDomain: 'janedoe.com' }),
       campaign,
-      'www.janedoe.com',
+      'janedoe.com',
     )
     expect(mockPeerly.submitCampaignVerifyRequest).toHaveBeenCalledWith(
       expect.any(Object),
       user,
       campaign,
-      'www.janedoe.com',
+      'janedoe.com',
     )
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: existingRecord.id },
+      data: expect.objectContaining({ websiteDomain: 'janedoe.com' }),
+    })
   })
 
   it('claims the submission slot atomically before calling Peerly', async () => {
@@ -705,7 +709,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
 
     expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
       'peerly-id-1',
-      expect.objectContaining({ websiteDomain: input.websiteUrl }),
+      expect.objectContaining({ websiteDomain: 'janedoe.com' }),
       campaign,
       'janedoe.com',
     )
@@ -723,7 +727,7 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
         peerlyIdentityProfileLink: 'https://peerly/profile/1',
         peerly10DLCBrandSubmissionKey: 'brand-key-1',
         peerlyCvVerificationId: 'cv-verif-1',
-        websiteDomain: input.websiteUrl,
+        websiteDomain: 'janedoe.com',
         email: input.email,
         phone: input.phone,
       }),
@@ -796,5 +800,32 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     })
     // Final write never happens on the failure path
     expect(mockTcrModel.update).not.toHaveBeenCalled()
+  })
+
+  it('preserves persisted peerlyCvVerificationId when Peerly already has a CV request (existing-CV branch)', async () => {
+    // Existing record carries a CV id from a prior partial run.
+    const recordWithExistingCv = {
+      ...existingRecord,
+      peerlyCvVerificationId: 'cv-existing-from-prior-run',
+    }
+    mockTcrModel.findUnique.mockResolvedValueOnce(recordWithExistingCv)
+
+    // Peerly's GET shows an existing CV request, so the helper skips submit
+    // and returns null for cvVerificationId (the GET response shape carries
+    // no verification_id).
+    mockPeerly.getCampaignVerifyRequest.mockResolvedValueOnce({
+      verification_status: 'pending',
+    })
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.submitCampaignVerifyRequest).not.toHaveBeenCalled()
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: recordWithExistingCv.id },
+      data: expect.objectContaining({
+        peerlyCvVerificationId: 'cv-existing-from-prior-run',
+      }),
+    })
+    expect(result.peerlyVerificationId).toBe('cv-existing-from-prior-run')
   })
 })
