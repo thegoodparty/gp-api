@@ -7,15 +7,6 @@ import {
 } from '@goodparty_org/contracts'
 import { StateSchema } from '@/shared/schemas/State.schema'
 
-const STRIPE_MANAGED_DETAIL_KEYS = [
-  'subscriptionId',
-  'subscriptionCanceledAt',
-  'subscriptionCancelAt',
-  'endOfElectionSubscriptionCanceled',
-  'isProUpdatedAt',
-  'proUpgradeSlackNotifiedAt',
-]
-
 const CampaignDetailsSchema = z
   .object({
     state: StateSchema(),
@@ -69,14 +60,6 @@ const CampaignDetailsSchema = z
     tier: z.string(),
   })
   .partial()
-  .passthrough()
-  .transform((details) => {
-    const safe = { ...details }
-    for (const key of STRIPE_MANAGED_DETAIL_KEYS) {
-      delete safe[key]
-    }
-    return safe
-  })
 
 export const updateCampaignBodySchema = CampaignSchema.pick({
   slug: true,
