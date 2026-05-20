@@ -183,6 +183,83 @@ describe('WeeklyTasksDigestHandlerService', () => {
     expect(userIds).toEqual([100, 200])
   })
 
+  it('orders the selected tasks by date ascending in the emitted event', async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeDigestRow({
+        slot: 1,
+        title: 'Outreach late',
+        flow_type: CampaignTaskType.text,
+        date: new Date('2026-04-25T00:00:00.000Z'),
+      }),
+      makeDigestRow({
+        slot: 2,
+        title: 'Outreach early',
+        flow_type: CampaignTaskType.doorKnocking,
+        date: new Date('2026-04-21T00:00:00.000Z'),
+      }),
+      makeDigestRow({
+        slot: 3,
+        title: 'Education middle',
+        flow_type: CampaignTaskType.education,
+        date: new Date('2026-04-23T00:00:00.000Z'),
+      }),
+    ])
+
+    await service.handleWeeklyTasksDigest({
+      windowStart: WINDOW_START,
+      windowEnd: WINDOW_END,
+    })
+
+    const [, , properties] = (mockAnalytics.track as ReturnType<typeof vi.fn>)
+      .mock.calls[0]
+
+    expect(properties.task_name_1).toBe('Outreach early')
+    expect(properties.task_name_2).toBe('Education middle')
+    expect(properties.task_name_3).toBe('Outreach late')
+    expect(properties.task_due_date_1).toBe('2026-04-21')
+    expect(properties.task_due_date_2).toBe('2026-04-23')
+    expect(properties.task_due_date_3).toBe('2026-04-25')
+  })
+
+  it('keeps empty slots at the end when fewer than 5 tasks exist, with populated tasks sorted by date ascending', async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeDigestRow({
+        slot: 1,
+        title: 'Latest',
+        date: new Date('2026-04-26T00:00:00.000Z'),
+      }),
+      makeDigestRow({
+        slot: 2,
+        title: 'Earliest',
+        date: new Date('2026-04-20T00:00:00.000Z'),
+      }),
+      makeDigestRow({
+        slot: 3,
+        title: 'Middle',
+        date: new Date('2026-04-23T00:00:00.000Z'),
+      }),
+    ])
+
+    await service.handleWeeklyTasksDigest({
+      windowStart: WINDOW_START,
+      windowEnd: WINDOW_END,
+    })
+
+    const [, , properties] = (mockAnalytics.track as ReturnType<typeof vi.fn>)
+      .mock.calls[0]
+
+    expect(properties.task_name_1).toBe('Earliest')
+    expect(properties.task_name_2).toBe('Middle')
+    expect(properties.task_name_3).toBe('Latest')
+
+    expect(properties.task_name_4).toBe('')
+    expect(properties.task_due_date_4).toBe('')
+    expect(properties.task_week_number_4).toBe(null)
+    expect(properties.task_name_5).toBe('')
+    expect(properties.task_due_date_5).toBe('')
+    expect(properties.task_week_number_5).toBe(null)
+  })
+
   it('continues processing remaining campaigns when analytics fails for one', async () => {
     mockQueryRaw.mockResolvedValueOnce([
       makeDigestRow({ campaign_id: 1, user_id: 100, slot: 1 }),
