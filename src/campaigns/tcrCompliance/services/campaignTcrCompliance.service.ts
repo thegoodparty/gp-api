@@ -41,6 +41,8 @@ import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 import { ComplianceStateService } from './complianceState.service'
 import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
 import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
+import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
+import { AgenticComplianceKickoffMessage } from '../../../queue/queue.types'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -76,6 +78,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private readonly crmCampaignsService: CrmCampaignsService,
     private readonly complianceStateService: ComplianceStateService,
     private queueService: QueueProducerService,
+    private readonly experimentRunsService: ExperimentRunsService,
   ) {
     super()
   }
@@ -713,6 +716,65 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return { record, created: true }
+  }
+
+  async handleAgenticKickoff(message: AgenticComplianceKickoffMessage) {
+    const { campaignId, tcrComplianceId, clerkUserId } = message
+
+    const record = await this.model.findUnique({
+      where: { id: tcrComplianceId },
+    })
+    if (!record || record.campaignId !== campaignId) {
+      this.logger.warn(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Kickoff for unknown or mismatched record; dropping',
+      )
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: campaignId },
+    })
+    if (!campaign) {
+      this.logger.warn(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Kickoff for unknown campaign; dropping',
+      )
+      return
+    }
+
+    const existingRun = await this.experimentRunsService.findFirst({
+      where: {
+        experimentType: 'compliance_setup',
+        params: {
+          path: ['tcrComplianceId'],
+          equals: tcrComplianceId,
+        },
+      },
+    })
+    if (existingRun) {
+      this.logger.info(
+        {
+          tcrComplianceId,
+          existingRunId: existingRun.runId,
+          status: existingRun.status,
+        },
+        '[TCR Compliance] Agent run already dispatched for record; skipping',
+      )
+      return
+    }
+
+    await this.experimentRunsService.dispatchRun({
+      type: 'compliance_setup',
+      organizationSlug: campaign.organizationSlug,
+      clerkUserId,
+      params: { campaignId, tcrComplianceId },
+    })
+
+    this.logger.info(
+      { campaignId, tcrComplianceId },
+      '[TCR Compliance] Dispatched compliance_setup agent run',
+    )
   }
 
   async delete(id: string) {

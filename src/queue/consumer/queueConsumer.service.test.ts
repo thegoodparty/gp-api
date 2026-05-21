@@ -1076,7 +1076,12 @@ describe('QueueConsumerService - message type routing', () => {
             addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
-        { provide: CampaignTcrComplianceService, useValue: {} },
+        {
+          provide: CampaignTcrComplianceService,
+          useValue: {
+            handleAgenticKickoff: vi.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: ContactsService, useValue: {} },
         { provide: DomainsService, useValue: {} },
         { provide: ElectedOfficeService, useValue: {} },
@@ -1209,6 +1214,57 @@ describe('QueueConsumerService - message type routing', () => {
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
+    expect(handleSpy).not.toHaveBeenCalled()
+  })
+
+  it('routes agenticComplianceKickoff messages to the TCR compliance handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-kickoff-ok',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: 'tcr-abc',
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).toHaveBeenCalledOnce()
+    expect(handleSpy).toHaveBeenCalledWith({
+      campaignId: 42,
+      tcrComplianceId: 'tcr-abc',
+      clerkUserId: 'user_clerk_xyz',
+    })
+  })
+
+  it('rejects agenticComplianceKickoff with invalid payload and does not call handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-kickoff-invalid',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 'not-a-number',
+          tcrComplianceId: '',
+        },
+      }),
+    }
+
+    await service.processMessage(message)
+
     expect(handleSpy).not.toHaveBeenCalled()
   })
 

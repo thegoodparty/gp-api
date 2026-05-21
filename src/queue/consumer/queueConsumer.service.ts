@@ -47,6 +47,7 @@ import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
+  AgenticComplianceKickoffMessageSchema,
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
   AgentExperimentResultSchema,
@@ -375,11 +376,14 @@ export class QueueConsumerService {
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
       case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
-        this.logger.warn(
-          { messageId: message.MessageId, data: queueMessage.data },
-          'AGENTIC_COMPLIANCE_KICKOFF handler not yet implemented — discarding message',
-        )
-        return true
+        this.logger.info('received agenticComplianceKickoff message')
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const kickoff = AgenticComplianceKickoffMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.tcrComplianceService.handleAgenticKickoff(kickoff)
+          return true
+        })
       case QueueType.OCR_ATTACHMENT:
         return await this.withLegacyErrorSwallowing(message, async () => {
           const { attachmentId } = OcrAttachmentMessageSchema.parse(

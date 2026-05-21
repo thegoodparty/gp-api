@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
-import { CommitteeType, OfficeLevel, TcrComplianceStatus } from '@prisma/client'
+import {
+  CommitteeType,
+  ExperimentRunStatus,
+  OfficeLevel,
+  TcrComplianceStatus,
+} from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +16,7 @@ import { WebsitesService } from '../../../websites/services/websites.service'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
+import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { MessageGroup, QueueType } from '../../../queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -23,12 +29,19 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   let service: CampaignTcrComplianceService
   let mockPeerly: { getIdentities: ReturnType<typeof vi.fn> }
   let mockWebsites: { findFirstOrThrow: ReturnType<typeof vi.fn> }
-  let mockCampaigns: { updateJsonFields: ReturnType<typeof vi.fn> }
+  let mockCampaigns: {
+    updateJsonFields: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+  }
   let mockCrm: { trackCampaign: ReturnType<typeof vi.fn> }
   let mockComplianceState: {
     findStateForCampaign: ReturnType<typeof vi.fn>
   }
   let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
+  let mockExperimentRuns: {
+    findFirst: ReturnType<typeof vi.fn>
+    dispatchRun: ReturnType<typeof vi.fn>
+  }
   let mockModel: {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
@@ -65,10 +78,15 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     mockWebsites = { findFirstOrThrow: vi.fn() }
     mockCampaigns = {
       updateJsonFields: vi.fn().mockResolvedValue(campaign),
+      findUnique: vi.fn().mockResolvedValue(campaign),
     }
     mockCrm = { trackCampaign: vi.fn().mockResolvedValue(undefined) }
     mockComplianceState = { findStateForCampaign: vi.fn() }
     mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
+    mockExperimentRuns = {
+      findFirst: vi.fn().mockResolvedValue(null),
+      dispatchRun: vi.fn().mockResolvedValue(undefined),
+    }
     mockModel = {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
@@ -97,6 +115,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         { provide: CrmCampaignsService, useValue: mockCrm },
         { provide: ComplianceStateService, useValue: mockComplianceState },
         { provide: QueueProducerService, useValue: mockQueue },
+        { provide: ExperimentRunsService, useValue: mockExperimentRuns },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
       ],
@@ -481,6 +500,149 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   })
 })
 
+describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
+  let service: CampaignTcrComplianceService
+  let mockCampaigns: { findUnique: ReturnType<typeof vi.fn> }
+  let mockExperimentRuns: {
+    findFirst: ReturnType<typeof vi.fn>
+    dispatchRun: ReturnType<typeof vi.fn>
+  }
+  let mockModel: { findUnique: ReturnType<typeof vi.fn> }
+  let mockPrisma: { tcrCompliance: typeof mockModel }
+
+  const kickoff = {
+    campaignId: 123,
+    tcrComplianceId: 'tcr-abc',
+    clerkUserId: 'user_clerk_abc',
+  }
+  const tcrRecord = {
+    id: kickoff.tcrComplianceId,
+    campaignId: kickoff.campaignId,
+  }
+  const campaign = createMockCampaign({
+    id: kickoff.campaignId,
+    organizationSlug: 'org-jane-for-springfield',
+  })
+
+  beforeEach(async () => {
+    mockCampaigns = { findUnique: vi.fn().mockResolvedValue(campaign) }
+    mockExperimentRuns = {
+      findFirst: vi.fn().mockResolvedValue(null),
+      dispatchRun: vi.fn().mockResolvedValue(undefined),
+    }
+    mockModel = { findUnique: vi.fn().mockResolvedValue(tcrRecord) }
+    mockPrisma = { tcrCompliance: mockModel }
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: PeerlyIdentityService, useValue: {} },
+        { provide: WebsitesService, useValue: {} },
+        { provide: CampaignsService, useValue: mockCampaigns },
+        { provide: CrmCampaignsService, useValue: {} },
+        { provide: ComplianceStateService, useValue: {} },
+        { provide: QueueProducerService, useValue: { sendMessage: vi.fn() } },
+        { provide: ExperimentRunsService, useValue: mockExperimentRuns },
+        { provide: PinoLogger, useValue: createMockLogger() },
+        CampaignTcrComplianceService,
+      ],
+    }).compile()
+
+    service = module.get(CampaignTcrComplianceService)
+
+    vi.clearAllMocks()
+    mockCampaigns.findUnique.mockResolvedValue(campaign)
+    mockExperimentRuns.findFirst.mockResolvedValue(null)
+    mockExperimentRuns.dispatchRun.mockResolvedValue(undefined)
+    mockModel.findUnique.mockResolvedValue(tcrRecord)
+  })
+
+  it('dispatches a compliance_setup run with the campaign and record ids', async () => {
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.findFirst).toHaveBeenCalledWith({
+      where: {
+        experimentType: 'compliance_setup',
+        params: {
+          path: ['tcrComplianceId'],
+          equals: kickoff.tcrComplianceId,
+        },
+      },
+    })
+    expect(mockExperimentRuns.dispatchRun).toHaveBeenCalledWith({
+      type: 'compliance_setup',
+      organizationSlug: campaign.organizationSlug,
+      clerkUserId: kickoff.clerkUserId,
+      params: {
+        campaignId: kickoff.campaignId,
+        tcrComplianceId: kickoff.tcrComplianceId,
+      },
+    })
+  })
+
+  it('does not include actor_token_url in the dispatch params', async () => {
+    await service.handleAgenticKickoff(kickoff)
+
+    const dispatchCall = mockExperimentRuns.dispatchRun.mock.calls[0][0]
+    expect(JSON.stringify(dispatchCall)).not.toContain('actor_token_url')
+    expect(JSON.stringify(dispatchCall)).not.toContain('actorTokenUrl')
+  })
+
+  it.each([
+    ExperimentRunStatus.RUNNING,
+    ExperimentRunStatus.COMPLETED,
+    ExperimentRunStatus.FAILED,
+  ])(
+    'skips dispatch when a %s run already exists for the record',
+    async (status) => {
+      mockExperimentRuns.findFirst.mockResolvedValueOnce({
+        runId: 'run-existing',
+        status,
+      })
+
+      await service.handleAgenticKickoff(kickoff)
+
+      expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+    },
+  )
+
+  it('drops silently when the TcrCompliance record does not exist', async () => {
+    mockModel.findUnique.mockResolvedValueOnce(null)
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.findFirst).not.toHaveBeenCalled()
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('drops silently when the record belongs to a different campaign', async () => {
+    mockModel.findUnique.mockResolvedValueOnce({
+      ...tcrRecord,
+      campaignId: tcrRecord.campaignId + 1,
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.findFirst).not.toHaveBeenCalled()
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('drops silently when the campaign does not exist', async () => {
+    mockCampaigns.findUnique.mockResolvedValueOnce(null)
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('propagates BadGatewayException from dispatchRun so the message redelivers', async () => {
+    const err = new BadGatewayException('SQS dispatch failed')
+    mockExperimentRuns.dispatchRun.mockRejectedValueOnce(err)
+
+    await expect(service.handleAgenticKickoff(kickoff)).rejects.toBe(err)
+  })
+})
+
 describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
   let service: CampaignTcrComplianceService
   let mockPeerly: {
@@ -610,6 +772,10 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
         {
           provide: QueueProducerService,
           useValue: { sendMessage: vi.fn() },
+        },
+        {
+          provide: ExperimentRunsService,
+          useValue: { findFirst: vi.fn(), dispatchRun: vi.fn() },
         },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
