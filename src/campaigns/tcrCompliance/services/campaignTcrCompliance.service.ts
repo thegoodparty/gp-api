@@ -43,6 +43,7 @@ import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
 import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
 import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
 import { AgenticComplianceKickoffMessage } from '../../../queue/queue.types'
+import { ExperimentRunStatus } from '@prisma/client'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -746,6 +747,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     const existingRun = await this.experimentRunsService.findFirst({
       where: {
         experimentType: 'compliance_setup',
+        status: {
+          in: [ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED],
+        },
         params: {
           path: ['tcrComplianceId'],
           equals: tcrComplianceId,

@@ -1223,13 +1223,14 @@ describe('QueueConsumerService - message type routing', () => {
       .spyOn(tcr, 'handleAgenticKickoff')
       .mockResolvedValue(undefined)
 
+    const validTcrCuid = 'ckpqr7s3z00010o9k1234abcd'
     const message: Message = {
       MessageId: 'msg-kickoff-ok',
       Body: JSON.stringify({
         type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
         data: {
           campaignId: 42,
-          tcrComplianceId: 'tcr-abc',
+          tcrComplianceId: validTcrCuid,
           clerkUserId: 'user_clerk_xyz',
         },
       }),
@@ -1241,12 +1242,12 @@ describe('QueueConsumerService - message type routing', () => {
     expect(handleSpy).toHaveBeenCalledOnce()
     expect(handleSpy).toHaveBeenCalledWith({
       campaignId: 42,
-      tcrComplianceId: 'tcr-abc',
+      tcrComplianceId: validTcrCuid,
       clerkUserId: 'user_clerk_xyz',
     })
   })
 
-  it('rejects agenticComplianceKickoff with invalid payload and does not call handler', async () => {
+  it('discards agenticComplianceKickoff with invalid payload and does not call handler', async () => {
     const tcr = module.get(CampaignTcrComplianceService)
     const handleSpy = vi
       .spyOn(tcr, 'handleAgenticKickoff')
@@ -1257,14 +1258,16 @@ describe('QueueConsumerService - message type routing', () => {
       Body: JSON.stringify({
         type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
         data: {
-          campaignId: 'not-a-number',
-          tcrComplianceId: '',
+          campaignId: 42,
+          tcrComplianceId: 'not-a-cuid',
+          clerkUserId: 'user_clerk_xyz',
         },
       }),
     }
 
-    await service.processMessage(message)
+    const result = await service.processMessage(message)
 
+    expect(result).toBe(true)
     expect(handleSpy).not.toHaveBeenCalled()
   })
 

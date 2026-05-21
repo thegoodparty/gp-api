@@ -563,6 +563,9 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     expect(mockExperimentRuns.findFirst).toHaveBeenCalledWith({
       where: {
         experimentType: 'compliance_setup',
+        status: {
+          in: [ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED],
+        },
         params: {
           path: ['tcrComplianceId'],
           equals: kickoff.tcrComplianceId,
@@ -588,11 +591,7 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     expect(JSON.stringify(dispatchCall)).not.toContain('actorTokenUrl')
   })
 
-  it.each([
-    ExperimentRunStatus.RUNNING,
-    ExperimentRunStatus.COMPLETED,
-    ExperimentRunStatus.FAILED,
-  ])(
+  it.each([ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED])(
     'skips dispatch when a %s run already exists for the record',
     async (status) => {
       mockExperimentRuns.findFirst.mockResolvedValueOnce({

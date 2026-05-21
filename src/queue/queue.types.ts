@@ -68,7 +68,7 @@ export type DomainEmailForwardingMessage = {
 
 export const AgenticComplianceKickoffMessageSchema = z.object({
   campaignId: z.number().int(),
-  tcrComplianceId: z.string().min(1),
+  tcrComplianceId: z.string().cuid(),
   clerkUserId: z.string().min(1),
 })
 
