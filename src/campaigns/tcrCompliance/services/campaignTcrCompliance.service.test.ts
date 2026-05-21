@@ -524,11 +524,13 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     organizationSlug: 'org-jane-for-springfield',
   })
 
+  const dispatchedRun = { runId: 'run-dispatched-xyz' }
+
   beforeEach(async () => {
     mockCampaigns = { findUnique: vi.fn().mockResolvedValue(campaign) }
     mockExperimentRuns = {
       findFirst: vi.fn().mockResolvedValue(null),
-      dispatchRun: vi.fn().mockResolvedValue(undefined),
+      dispatchRun: vi.fn().mockResolvedValue(dispatchedRun),
     }
     mockModel = { findUnique: vi.fn().mockResolvedValue(tcrRecord) }
     mockPrisma = { tcrCompliance: mockModel }
@@ -553,7 +555,7 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     vi.clearAllMocks()
     mockCampaigns.findUnique.mockResolvedValue(campaign)
     mockExperimentRuns.findFirst.mockResolvedValue(null)
-    mockExperimentRuns.dispatchRun.mockResolvedValue(undefined)
+    mockExperimentRuns.dispatchRun.mockResolvedValue(dispatchedRun)
     mockModel.findUnique.mockResolvedValue(tcrRecord)
   })
 
@@ -639,6 +641,14 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     mockExperimentRuns.dispatchRun.mockRejectedValueOnce(err)
 
     await expect(service.handleAgenticKickoff(kickoff)).rejects.toBe(err)
+  })
+
+  it('throws when dispatchRun returns no run (queue not configured in env)', async () => {
+    mockExperimentRuns.dispatchRun.mockResolvedValueOnce(undefined)
+
+    await expect(service.handleAgenticKickoff(kickoff)).rejects.toThrow(
+      /Agent dispatch queue not configured/,
+    )
   })
 })
 

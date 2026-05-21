@@ -744,6 +744,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return
     }
 
+    // Idempotency filter intentionally excludes FAILED. Per CLAUDE.md
+    // "Idempotency check breadth", FAILED runs must remain eligible for
+    // re-dispatch — sweepStaleRuns flips RUNNING→FAILED at 45min, and
+    // dispatchRun writes RUNNING then flips to FAILED on SQS-send failure;
+    // including FAILED here would permanently strand both.
     const existingRun = await this.experimentRunsService.findFirst({
       where: {
         experimentType: 'compliance_setup',
@@ -768,15 +773,23 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return
     }
 
-    await this.experimentRunsService.dispatchRun({
+    const run = await this.experimentRunsService.dispatchRun({
       type: 'compliance_setup',
       organizationSlug: campaign.organizationSlug,
       clerkUserId,
       params: { campaignId, tcrComplianceId },
     })
 
+    if (!run) {
+      throw new Error(
+        `[TCR Compliance] Agent dispatch queue not configured; ` +
+          `cannot kick off compliance_setup for tcrComplianceId=` +
+          `${tcrComplianceId}`,
+      )
+    }
+
     this.logger.info(
-      { campaignId, tcrComplianceId },
+      { campaignId, tcrComplianceId, runId: run.runId },
       '[TCR Compliance] Dispatched compliance_setup agent run',
     )
   }
