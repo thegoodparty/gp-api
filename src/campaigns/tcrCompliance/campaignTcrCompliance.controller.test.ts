@@ -37,6 +37,7 @@ describe('CampaignTcrComplianceController', () => {
     fetchByCampaignId: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     createAgentic: ReturnType<typeof vi.fn>
+    submitToPeerlyForAgent: ReturnType<typeof vi.fn>
     retrieveCampaignVerifyToken: ReturnType<typeof vi.fn>
     submitCampaignVerifyToken: ReturnType<typeof vi.fn>
     model: { update: ReturnType<typeof vi.fn> }
@@ -58,6 +59,7 @@ describe('CampaignTcrComplianceController', () => {
       createAgentic: vi
         .fn()
         .mockResolvedValue({ record: mockTcrCompliance, created: true }),
+      submitToPeerlyForAgent: vi.fn(),
       retrieveCampaignVerifyToken: vi.fn().mockResolvedValue('cv-token-123'),
       submitCampaignVerifyToken: vi.fn().mockResolvedValue({ brand: 'ok' }),
       model: { update: vi.fn().mockResolvedValue(mockTcrCompliance) },
@@ -326,6 +328,61 @@ describe('CampaignTcrComplianceController', () => {
       )
 
       expect(result).toEqual(expectedBrand)
+    })
+  })
+
+  describe('submitToPeerly', () => {
+    const submitToPeerlyDto = {
+      ein: '12-3456789',
+      committeeName: 'Test Committee',
+      filingUrl: 'https://example.gov/filing',
+      email: 'test@example.com',
+      phone: '5555555555',
+      officeLevel: 'state' as const,
+      fecCommitteeId: undefined,
+      committeeType: CommitteeType.CANDIDATE,
+      websiteUrl: 'https://janedoe.com',
+    }
+
+    it('delegates to service.submitToPeerlyForAgent and returns its output', async () => {
+      const expectedOutput = {
+        tcrComplianceId: 'tcr-1',
+        peerlyIdentityId: 'peerly-id-1',
+        peerlyIdentityProfileLink: 'https://peerly/profile/1',
+        peerly10DLCBrandSubmissionKey: 'brand-key-1',
+        peerlyVerificationId: 'cv-verif-1',
+        stage: ComplianceStage.awaiting_pin,
+        pinDeliveryChannels: {
+          email: submitToPeerlyDto.email,
+          phone: submitToPeerlyDto.phone,
+        },
+      }
+      mockTcrService.submitToPeerlyForAgent = vi
+        .fn()
+        .mockResolvedValue(expectedOutput)
+
+      const result = await controller.submitToPeerly(
+        mockCampaign,
+        submitToPeerlyDto,
+      )
+
+      expect(mockTcrService.submitToPeerlyForAgent).toHaveBeenCalledWith(
+        mockUser,
+        mockCampaign,
+        submitToPeerlyDto,
+      )
+      expect(result).toEqual(expectedOutput)
+    })
+
+    it('throws NotFoundException when the campaign has no user', async () => {
+      mockUserService.findByCampaign.mockResolvedValue(null)
+      mockTcrService.submitToPeerlyForAgent = vi.fn()
+
+      await expect(
+        controller.submitToPeerly(mockCampaign, submitToPeerlyDto),
+      ).rejects.toThrow('User not found for this campaign')
+
+      expect(mockTcrService.submitToPeerlyForAgent).not.toHaveBeenCalled()
     })
   })
 

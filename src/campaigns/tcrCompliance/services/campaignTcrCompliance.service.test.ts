@@ -5,6 +5,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTcrComplianceService } from './campaignTcrCompliance.service'
+import { ComplianceStateService } from './complianceState.service'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CampaignsService } from '../../services/campaigns.service'
@@ -24,6 +25,9 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   let mockWebsites: { findFirstOrThrow: ReturnType<typeof vi.fn> }
   let mockCampaigns: { updateJsonFields: ReturnType<typeof vi.fn> }
   let mockCrm: { trackCampaign: ReturnType<typeof vi.fn> }
+  let mockComplianceState: {
+    findStateForCampaign: ReturnType<typeof vi.fn>
+  }
   let mockQueue: { sendMessage: ReturnType<typeof vi.fn> }
   let mockModel: {
     findUnique: ReturnType<typeof vi.fn>
@@ -63,6 +67,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       updateJsonFields: vi.fn().mockResolvedValue(campaign),
     }
     mockCrm = { trackCampaign: vi.fn().mockResolvedValue(undefined) }
+    mockComplianceState = { findStateForCampaign: vi.fn() }
     mockQueue = { sendMessage: vi.fn().mockResolvedValue(undefined) }
     mockModel = {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -90,6 +95,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
         { provide: WebsitesService, useValue: mockWebsites },
         { provide: CampaignsService, useValue: mockCampaigns },
         { provide: CrmCampaignsService, useValue: mockCrm },
+        { provide: ComplianceStateService, useValue: mockComplianceState },
         { provide: QueueProducerService, useValue: mockQueue },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignTcrComplianceService,
@@ -472,5 +478,419 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       expect(mockQueue.sendMessage).not.toHaveBeenCalled()
       expect(mockModel.update).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
+  let service: CampaignTcrComplianceService
+  let mockPeerly: {
+    getTCRIdentityName: ReturnType<typeof vi.fn>
+    getIdentities: ReturnType<typeof vi.fn>
+    createIdentity: ReturnType<typeof vi.fn>
+    getIdentityProfile: ReturnType<typeof vi.fn>
+    submitIdentityProfile: ReturnType<typeof vi.fn>
+    submit10DlcBrand: ReturnType<typeof vi.fn>
+    getCampaignVerifyRequest: ReturnType<typeof vi.fn>
+    submitCampaignVerifyRequest: ReturnType<typeof vi.fn>
+  }
+  let mockComplianceState: {
+    findStateForCampaign: ReturnType<typeof vi.fn>
+  }
+  let mockTcrModel: {
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
+  let mockPrisma: {
+    tcrCompliance: typeof mockTcrModel
+    $transaction: ReturnType<typeof vi.fn>
+  }
+
+  const user = createMockUser({ clerkId: 'user_clerk_xyz' })
+  const campaign = createMockCampaign({
+    userId: user.id,
+    formattedAddress: '123 Main St',
+    placeId: 'place-123',
+    details: { electionDate: '2026-11-03' },
+  })
+
+  const input = {
+    ein: '12-3456789',
+    committeeName: 'Jane for Springfield',
+    filingUrl: 'https://example.gov/filing/123',
+    email: 'jane@example.com',
+    phone: '5555555555',
+    officeLevel: OfficeLevel.state,
+    fecCommitteeId: undefined,
+    committeeType: CommitteeType.CANDIDATE,
+    websiteUrl: 'https://janedoe.com',
+  }
+
+  const existingRecord = {
+    id: 'tcr-existing',
+    campaignId: campaign.id,
+    ein: '00-0000000',
+    committeeName: 'Stub Committee',
+    websiteDomain: '',
+    filingUrl: 'https://stub.gov/filing',
+    phone: '0000000000',
+    email: 'stub@example.com',
+    officeLevel: OfficeLevel.state,
+    fecCommitteeId: null,
+    committeeType: CommitteeType.CANDIDATE,
+    status: TcrComplianceStatus.submitted,
+    peerlyIdentityId: null,
+    peerlyIdentityProfileLink: null,
+    peerly10DLCBrandSubmissionKey: null,
+    peerlyCvVerificationId: null,
+    postalAddress: '123 Main St',
+    kickoffSentAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    tdlcNumber: null,
+    peerlyRegistrationLink: null,
+  }
+
+  beforeEach(async () => {
+    mockPeerly = {
+      getTCRIdentityName: vi.fn().mockReturnValue('Jane Doe - 12-3456789'),
+      getIdentities: vi.fn().mockResolvedValue([]),
+      createIdentity: vi.fn().mockResolvedValue({ identity_id: 'peerly-id-1' }),
+      getIdentityProfile: vi.fn().mockResolvedValue(null),
+      submitIdentityProfile: vi
+        .fn()
+        .mockResolvedValue({ link: 'https://peerly/profile/1', profile: {} }),
+      submit10DlcBrand: vi.fn().mockResolvedValue('brand-key-1'),
+      getCampaignVerifyRequest: vi.fn().mockResolvedValue(null),
+      submitCampaignVerifyRequest: vi
+        .fn()
+        .mockResolvedValue({ verification_id: 'cv-verif-1', message: 'ok' }),
+    }
+    mockComplianceState = {
+      findStateForCampaign: vi.fn().mockResolvedValue({
+        stage: 'awaiting_pin',
+        domain: null,
+        websiteId: null,
+        peerlyVerificationId: null,
+      }),
+    }
+    mockTcrModel = {
+      findUnique: vi.fn().mockResolvedValue(existingRecord),
+      update: vi.fn().mockImplementation(({ where, data }) =>
+        Promise.resolve({
+          ...existingRecord,
+          ...data,
+          id: where.id,
+        }),
+      ),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }
+    mockPrisma = {
+      tcrCompliance: mockTcrModel,
+      $transaction: vi.fn(),
+    }
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: PeerlyIdentityService, useValue: mockPeerly },
+        {
+          provide: WebsitesService,
+          useValue: { findFirstOrThrow: vi.fn() },
+        },
+        {
+          provide: CampaignsService,
+          useValue: { updateJsonFields: vi.fn() },
+        },
+        {
+          provide: CrmCampaignsService,
+          useValue: { trackCampaign: vi.fn() },
+        },
+        { provide: ComplianceStateService, useValue: mockComplianceState },
+        {
+          provide: QueueProducerService,
+          useValue: { sendMessage: vi.fn() },
+        },
+        { provide: PinoLogger, useValue: createMockLogger() },
+        CampaignTcrComplianceService,
+      ],
+    }).compile()
+
+    service = module.get(CampaignTcrComplianceService)
+  })
+
+  it('throws NotFoundException when no TcrCompliance exists', async () => {
+    mockTcrModel.findUnique.mockResolvedValueOnce(null)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow(
+      `TcrCompliance record not found for campaignId=${campaign.id}`,
+    )
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+  })
+
+  it('is idempotent: returns existing record without calling Peerly when peerlyIdentityId is set', async () => {
+    mockTcrModel.findUnique.mockResolvedValueOnce({
+      ...existingRecord,
+      peerlyIdentityId: 'peerly-already-set',
+      peerlyIdentityProfileLink: 'https://peerly/profile/existing',
+      peerly10DLCBrandSubmissionKey: 'brand-existing',
+      peerlyCvVerificationId: 'cv-existing',
+    })
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+    expect(mockPeerly.createIdentity).not.toHaveBeenCalled()
+    expect(mockPeerly.submit10DlcBrand).not.toHaveBeenCalled()
+    expect(mockPeerly.submitCampaignVerifyRequest).not.toHaveBeenCalled()
+    expect(mockTcrModel.updateMany).not.toHaveBeenCalled()
+
+    expect(result).toEqual({
+      tcrComplianceId: existingRecord.id,
+      peerlyIdentityId: 'peerly-already-set',
+      peerlyIdentityProfileLink: 'https://peerly/profile/existing',
+      peerly10DLCBrandSubmissionKey: 'brand-existing',
+      peerlyVerificationId: 'cv-existing',
+      stage: 'awaiting_pin',
+      // Channels come from the persisted record, not the request input, so a
+      // retry with different contact details cannot misreport where Peerly
+      // sent the PIN.
+      pinDeliveryChannels: {
+        email: existingRecord.email,
+        phone: existingRecord.phone,
+      },
+    })
+  })
+
+  it('canonicalizes the input URL to the apex hostname (strips www., scheme, and path) for both Peerly fields and the DB', async () => {
+    await service.submitToPeerlyForAgent(user, campaign, {
+      ...input,
+      websiteUrl: 'https://www.janedoe.com/path?q=1',
+    })
+
+    expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ websiteDomain: 'janedoe.com' }),
+      campaign,
+      'janedoe.com',
+    )
+    expect(mockPeerly.submitCampaignVerifyRequest).toHaveBeenCalledWith(
+      expect.any(Object),
+      user,
+      campaign,
+      'janedoe.com',
+    )
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: existingRecord.id },
+      data: expect.objectContaining({ websiteDomain: 'janedoe.com' }),
+    })
+  })
+
+  it('claims the submission slot atomically before calling Peerly', async () => {
+    await service.submitToPeerlyForAgent(user, campaign, input)
+
+    const firstUpdateMany = mockTcrModel.updateMany.mock.calls[0]
+    expect(firstUpdateMany[0]).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        OR: [
+          { peerlySubmissionStartedAt: null },
+          { peerlySubmissionStartedAt: { lt: expect.any(Date) } },
+        ],
+      },
+      data: { peerlySubmissionStartedAt: expect.any(Date) },
+    })
+    // Claim happens BEFORE Peerly is invoked
+    const claimCallOrder = mockTcrModel.updateMany.mock.invocationCallOrder[0]
+    const peerlyCallOrder = mockPeerly.getIdentities.mock.invocationCallOrder[0]
+    expect(claimCallOrder).toBeLessThan(peerlyCallOrder)
+  })
+
+  it('submits to Peerly, persists results (including peerlyCvVerificationId), and returns awaiting_pin on the happy path', async () => {
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.submit10DlcBrand).toHaveBeenCalledWith(
+      'peerly-id-1',
+      expect.objectContaining({ websiteDomain: 'janedoe.com' }),
+      campaign,
+      'janedoe.com',
+    )
+    expect(mockPeerly.submitCampaignVerifyRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ peerlyIdentityId: 'peerly-id-1' }),
+      user,
+      campaign,
+      'janedoe.com',
+    )
+
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: existingRecord.id },
+      data: expect.objectContaining({
+        peerlyIdentityId: 'peerly-id-1',
+        peerlyIdentityProfileLink: 'https://peerly/profile/1',
+        peerly10DLCBrandSubmissionKey: 'brand-key-1',
+        peerlyCvVerificationId: 'cv-verif-1',
+        websiteDomain: 'janedoe.com',
+        email: input.email,
+        phone: input.phone,
+      }),
+    })
+
+    expect(result).toEqual({
+      tcrComplianceId: existingRecord.id,
+      peerlyIdentityId: 'peerly-id-1',
+      peerlyIdentityProfileLink: 'https://peerly/profile/1',
+      peerly10DLCBrandSubmissionKey: 'brand-key-1',
+      peerlyVerificationId: 'cv-verif-1',
+      stage: 'awaiting_pin',
+      pinDeliveryChannels: { email: input.email, phone: input.phone },
+    })
+  })
+
+  it('throws ConflictException when claim is taken and the in-flight call has not yet persisted peerlyIdentityId', async () => {
+    mockTcrModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    mockTcrModel.findUnique
+      .mockResolvedValueOnce(existingRecord)
+      .mockResolvedValueOnce(existingRecord)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow('A Peerly submission is already in progress')
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+  })
+
+  it('returns idempotent response when claim is taken because a concurrent call already completed', async () => {
+    mockTcrModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    const winner = {
+      ...existingRecord,
+      peerlyIdentityId: 'peerly-winner',
+      peerlyIdentityProfileLink: 'https://peerly/profile/winner',
+      peerly10DLCBrandSubmissionKey: 'brand-winner',
+      peerlyCvVerificationId: 'cv-winner',
+    }
+    mockTcrModel.findUnique
+      .mockResolvedValueOnce(existingRecord)
+      .mockResolvedValueOnce(winner)
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      tcrComplianceId: winner.id,
+      peerlyIdentityId: 'peerly-winner',
+      peerlyIdentityProfileLink: 'https://peerly/profile/winner',
+      peerly10DLCBrandSubmissionKey: 'brand-winner',
+      peerlyVerificationId: 'cv-winner',
+      stage: 'awaiting_pin',
+      pinDeliveryChannels: { email: winner.email, phone: winner.phone },
+    })
+  })
+
+  it('rolls back only this callers own claim (matched by timestamp) and rethrows when Peerly fails', async () => {
+    const peerlyErr = new BadGatewayException('Peerly down')
+    mockPeerly.createIdentity.mockRejectedValueOnce(peerlyErr)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toBe(peerlyErr)
+
+    // Two updateMany calls: claim, then rollback
+    expect(mockTcrModel.updateMany).toHaveBeenCalledTimes(2)
+    const claimCall = mockTcrModel.updateMany.mock.calls[0][0]
+    const rollbackCall = mockTcrModel.updateMany.mock.calls[1][0]
+    const claimTimestamp = claimCall.data.peerlySubmissionStartedAt
+    expect(claimTimestamp).toBeInstanceOf(Date)
+    // Rollback scopes to the exact timestamp we wrote, so a TTL re-claim by
+    // another caller would NOT be cleared by our rollback.
+    expect(rollbackCall).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        peerlySubmissionStartedAt: claimTimestamp,
+      },
+      data: { peerlySubmissionStartedAt: null },
+    })
+    // Final write never happens on the failure path
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
+  })
+
+  it('throws UnprocessableEntityException when compliance stage is not awaiting_pin (website not yet live)', async () => {
+    mockComplianceState.findStateForCampaign.mockResolvedValueOnce({
+      stage: 'pending_website_live',
+      domain: null,
+      websiteId: null,
+      peerlyVerificationId: null,
+    })
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toThrow(
+      'Cannot submit TCR registration to Peerly until the candidate',
+    )
+
+    expect(mockPeerly.getIdentities).not.toHaveBeenCalled()
+    expect(mockTcrModel.updateMany).not.toHaveBeenCalled()
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
+  })
+
+  it('preserves persisted peerlyCvVerificationId when Peerly already has a CV request (existing-CV branch)', async () => {
+    // Existing record carries a CV id from a prior partial run.
+    const recordWithExistingCv = {
+      ...existingRecord,
+      peerlyCvVerificationId: 'cv-existing-from-prior-run',
+    }
+    mockTcrModel.findUnique.mockResolvedValueOnce(recordWithExistingCv)
+
+    // Peerly's GET shows an existing CV request, so the helper skips submit
+    // and returns null for cvVerificationId (the GET response shape carries
+    // no verification_id).
+    mockPeerly.getCampaignVerifyRequest.mockResolvedValueOnce({
+      verification_status: 'pending',
+    })
+
+    const result = await service.submitToPeerlyForAgent(user, campaign, input)
+
+    expect(mockPeerly.submitCampaignVerifyRequest).not.toHaveBeenCalled()
+    expect(mockTcrModel.update).toHaveBeenCalledWith({
+      where: { id: recordWithExistingCv.id },
+      data: expect.objectContaining({
+        peerlyCvVerificationId: 'cv-existing-from-prior-run',
+      }),
+    })
+    expect(result.peerlyVerificationId).toBe('cv-existing-from-prior-run')
+  })
+
+  it('surfaces BadRequestException and rolls back claim when campaignCommittee is absent (real submit10DlcBrand guard)', async () => {
+    // The real PeerlyIdentityService.submit10DlcBrand throws this when
+    // campaign.details.campaignCommittee is missing. The rest of this suite
+    // mocks the helper away; this test forces the real production-path error
+    // so we exercise error propagation + claim rollback.
+    const missingCommitteeErr = new BadRequestException(
+      'Campaign committee is required to submit 10DLC brand',
+    )
+    mockPeerly.submit10DlcBrand.mockRejectedValueOnce(missingCommitteeErr)
+
+    await expect(
+      service.submitToPeerlyForAgent(user, campaign, input),
+    ).rejects.toBe(missingCommitteeErr)
+
+    // Two updateMany calls: claim, then rollback scoped to our own timestamp.
+    expect(mockTcrModel.updateMany).toHaveBeenCalledTimes(2)
+    const claimCall = mockTcrModel.updateMany.mock.calls[0][0]
+    const rollbackCall = mockTcrModel.updateMany.mock.calls[1][0]
+    expect(rollbackCall).toEqual({
+      where: {
+        id: existingRecord.id,
+        peerlyIdentityId: null,
+        peerlySubmissionStartedAt: claimCall.data.peerlySubmissionStartedAt,
+      },
+      data: { peerlySubmissionStartedAt: null },
+    })
+    // Final write never happens on the failure path.
+    expect(mockTcrModel.update).not.toHaveBeenCalled()
   })
 })

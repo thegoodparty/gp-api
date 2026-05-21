@@ -41,10 +41,12 @@ model TcrCompliance {
   campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId     Int                  @unique @map("campaign_id")
 
-  peerlyIdentityId              String? @unique @map("peerly_identity_id")
-  peerlyRegistrationLink        String? @map("peerly_registration_link")
-  peerlyIdentityProfileLink     String? @map("peerly_identity_profile_link")
-  peerly10DLCBrandSubmissionKey String? @unique @map("peerly_10dlc_brand_submission_key")
+  peerlyIdentityId              String?   @unique @map("peerly_identity_id")
+  peerlyRegistrationLink        String?   @map("peerly_registration_link")
+  peerlyIdentityProfileLink     String?   @map("peerly_identity_profile_link")
+  peerly10DLCBrandSubmissionKey String?   @unique @map("peerly_10dlc_brand_submission_key")
+  peerlyCvVerificationId        String?   @map("peerly_cv_verification_id")
+  peerlySubmissionStartedAt     DateTime? @map("peerly_submission_started_at")
 
   @@map("tcr_compliance")
 }

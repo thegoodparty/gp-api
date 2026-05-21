@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -24,7 +25,6 @@ import {
 } from '../../../queue/queue.types'
 import { getUserFullName } from '../../../users/util/users.util'
 import {
-  PeerlyIdentity,
   PeerlyIdentityProfile,
   PeerlyIdentityProfileResponseBody,
   PeerlyIdentityUseCase,
@@ -38,6 +38,9 @@ import {
 } from '../campaignTcrCompliance.types'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CrmCampaignsService } from '../../services/crmCampaigns.service'
+import { ComplianceStateService } from './complianceState.service'
+import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
+import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -50,6 +53,18 @@ const AGENTIC_KICKOFF_SWEEP_INTERVAL = process.env
 
 const AGENTIC_KICKOFF_STALENESS_MINUTES = 10
 
+// Pre-Peerly claim TTL: a claim older than this is treated as stale (failed
+// without rollback) and re-claimable. Bounds the Peerly call's normal duration
+// plus a comfortable margin; tune if Peerly latency drifts.
+const PEERLY_SUBMISSION_CLAIM_TTL_MINUTES = 5
+
+type PeerlySubmissionResult = {
+  peerlyIdentityId: string
+  peerlyIdentityProfileLink: string | null
+  peerly10DLCBrandSubmissionKey: string | null
+  cvVerificationId: string | null
+}
+
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
   MODELS.TcrCompliance,
@@ -59,6 +74,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private readonly websitesService: WebsitesService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaignsService: CrmCampaignsService,
+    private readonly complianceStateService: ComplianceStateService,
     private queueService: QueueProducerService,
   ) {
     super()
@@ -172,25 +188,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     campaign: Campaign,
     tcrComplianceCreatePayload: CreateTcrCompliancePayload,
   ) {
-    const {
-      ein,
-      filingUrl,
-      email,
-      phone,
-      officeLevel,
-      fecCommitteeId,
-      committeeType,
-    } = tcrComplianceCreatePayload
-
-    const userFullName = getUserFullName(user!)
-    const { ballotLevel } = campaign.details as { ballotLevel?: string }
-
-    this.logger.info(
-      `[TCR Compliance] Starting registration flow for ` +
-        `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
-        `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
-    )
-
     const { domain } = await this.websitesService.findFirstOrThrow({
       where: {
         campaignId: campaign.id,
@@ -204,9 +201,67 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'Campaign must have a domain to create TCR compliance',
       )
     }
-    let tcrComplianceIdentity: PeerlyIdentity | null = null,
-      peerlyIdentityProfileLink: string | null = null,
-      peerly10DLCBrandSubmissionKey: string | null = null
+
+    const peerlyResult = await this.submitToPeerly(
+      user,
+      campaign,
+      tcrComplianceCreatePayload,
+      domain.name,
+    )
+
+    const newTcrCompliance = {
+      ...tcrComplianceCreatePayload,
+      postalAddress: campaign.formattedAddress!,
+      campaignId: campaign.id,
+      peerlyIdentityId: peerlyResult.peerlyIdentityId,
+      peerlyIdentityProfileLink: peerlyResult.peerlyIdentityProfileLink,
+      peerly10DLCBrandSubmissionKey: peerlyResult.peerly10DLCBrandSubmissionKey,
+      peerlyCvVerificationId: peerlyResult.cvVerificationId,
+    }
+
+    this.logger.debug(
+      { newTcrCompliance },
+      '[TCR Compliance] Step 5: Creating TCR Compliance record:',
+    )
+
+    const createdTcrCompliance = await this.model.create({
+      data: newTcrCompliance,
+    })
+
+    this.logger.info(
+      `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
+        `tcrComplianceId=${createdTcrCompliance.id}, ` +
+        `peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
+    )
+
+    return createdTcrCompliance
+  }
+
+  private async submitToPeerly(
+    user: User,
+    campaign: Campaign,
+    tcrComplianceCreatePayload: CreateTcrCompliancePayload,
+    domainName: string,
+  ): Promise<PeerlySubmissionResult> {
+    const {
+      ein,
+      filingUrl,
+      email,
+      phone,
+      officeLevel,
+      fecCommitteeId,
+      committeeType,
+    } = tcrComplianceCreatePayload
+
+    const userFullName = getUserFullName(user)
+    const { ballotLevel } = campaign.details as { ballotLevel?: string }
+
+    this.logger.info(
+      `[TCR Compliance] Starting registration flow for ` +
+        `campaignId=${campaign.id}, userId=${user.id}, ` +
+        `userName="${userFullName}", ein=${ein}, ` +
+        `ballotLevel=${ballotLevel || 'NOT_SET'}`,
+    )
 
     const tcrIdentityName = this.peerlyIdentityService.getTCRIdentityName(
       userFullName,
@@ -232,20 +287,25 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     }
 
-    tcrComplianceIdentity =
+    const tcrComplianceIdentity =
       existingIdentity ||
       (await this.peerlyIdentityService.createIdentity(
         tcrIdentityName,
         campaign,
-      )) ||
-      null
+      ))
+    if (!tcrComplianceIdentity) {
+      throw new BadGatewayException(
+        'Peerly did not return an identity after creation',
+      )
+    }
+    const peerlyIdentityId = tcrComplianceIdentity.identity_id
 
     let existingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       null
     try {
       existingIdentityProfileResponse =
         await this.peerlyIdentityService.getIdentityProfile(
-          tcrComplianceIdentity!.identity_id,
+          peerlyIdentityId,
           campaign,
         )
     } catch (error) {
@@ -267,96 +327,246 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     const peerlyIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       existingIdentityProfileResponse ||
       (await this.peerlyIdentityService.submitIdentityProfile(
-        tcrComplianceIdentity!.identity_id,
+        peerlyIdentityId,
         campaign,
       )) ||
       null
 
-    peerlyIdentityProfileLink = peerlyIdentityProfileResponse?.link || null
+    const peerlyIdentityProfileLink =
+      peerlyIdentityProfileResponse?.link || null
 
     const identityProfile: PeerlyIdentityProfile | null =
-      peerlyIdentityProfileResponse?.profile
-        ? peerlyIdentityProfileResponse?.profile
-        : null
+      peerlyIdentityProfileResponse?.profile ?? null
 
+    let peerly10DLCBrandSubmissionKey: string | null = null
     // Apparently, duck-typing whether `vertical` has been set or not, is the
     //  _only_ way to determine whether or not the given Identity has a 10DLC
     //  "brand" submitted for it or not. See Peerly Slack discussion here:
     //  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
     if (identityProfile?.vertical) {
       this.logger.debug(
-        `[TCR Compliance] Step 3: Existing 10DLC Brand derived from IdentityProfile (vertical=${identityProfile.vertical}), skipping creation`,
+        `[TCR Compliance] Step 3: Existing 10DLC Brand derived from ` +
+          `IdentityProfile (vertical=${identityProfile.vertical}), ` +
+          `skipping creation`,
       )
     } else {
       this.logger.debug(`[TCR Compliance] Step 3: Submitting 10DLC Brand`)
       peerly10DLCBrandSubmissionKey =
         (await this.peerlyIdentityService.submit10DlcBrand(
-          tcrComplianceIdentity!.identity_id,
+          peerlyIdentityId,
           tcrComplianceCreatePayload,
           campaign,
-          domain,
+          domainName,
         )) || null
     }
 
     const existingCampaignVerifyRequest =
       await this.peerlyIdentityService.getCampaignVerifyRequest(
-        tcrComplianceIdentity!.identity_id,
+        peerlyIdentityId,
         campaign,
       )
 
+    let cvVerificationId: string | null = null
     if (existingCampaignVerifyRequest?.verification_status) {
       this.logger.debug(
-        `[TCR Compliance] Step 4: Existing Campaign Verify Request found w/ status ${existingCampaignVerifyRequest?.verification_status}, skipping creation`,
+        `[TCR Compliance] Step 4: Existing Campaign Verify Request found ` +
+          `w/ status ${existingCampaignVerifyRequest.verification_status}, ` +
+          `skipping creation`,
       )
     } else {
       this.logger.debug(
-        `[TCR Compliance] Step 4: Submitting Campaign Verify Request for campaignId=${campaign.id}`,
+        `[TCR Compliance] Step 4: Submitting Campaign Verify Request for ` +
+          `campaignId=${campaign.id}`,
       )
 
-      await this.peerlyIdentityService.submitCampaignVerifyRequest(
-        {
-          ein,
-          filingUrl,
-          peerlyIdentityId: tcrComplianceIdentity!.identity_id,
-          email,
-          phone,
-          officeLevel,
-          fecCommitteeId: fecCommitteeId ?? null,
-          committeeType: committeeType,
-        },
-        user,
-        campaign,
-        domain!,
-      )
+      const cvResponse =
+        await this.peerlyIdentityService.submitCampaignVerifyRequest(
+          {
+            ein,
+            filingUrl,
+            peerlyIdentityId,
+            email,
+            phone,
+            officeLevel,
+            fecCommitteeId: fecCommitteeId ?? null,
+            committeeType: committeeType,
+          },
+          user,
+          campaign,
+          domainName,
+        )
+      cvVerificationId = cvResponse?.verification_id ?? null
       this.logger.info(
-        `[TCR Compliance] Step 4 SUCCESS: Campaign Verify Request submitted for campaignId=${campaign.id}`,
+        `[TCR Compliance] Step 4 SUCCESS: Campaign Verify Request submitted ` +
+          `for campaignId=${campaign.id}`,
       )
     }
 
-    const newTcrCompliance = {
-      ...tcrComplianceCreatePayload,
-      postalAddress: campaign.formattedAddress!,
-      campaignId: campaign.id,
-      peerlyIdentityId: tcrComplianceIdentity!.identity_id,
+    return {
+      peerlyIdentityId,
       peerlyIdentityProfileLink,
       peerly10DLCBrandSubmissionKey,
+      cvVerificationId,
+    }
+  }
+
+  async submitToPeerlyForAgent(
+    user: User,
+    campaign: Campaign,
+    input: SubmitToPeerlyDto,
+  ): Promise<SubmitToPeerlyOutput> {
+    const existing = await this.fetchByCampaignId(campaign.id)
+    if (!existing) {
+      throw new NotFoundException(
+        `TcrCompliance record not found for campaignId=${campaign.id}; ` +
+          `the agentic compliance flow must be initialized first`,
+      )
     }
 
-    this.logger.debug(
-      { newTcrCompliance },
-      '[TCR Compliance] Step 5: Creating TCR Compliance record:',
-    )
+    if (existing.peerlyIdentityId) {
+      return this.buildSubmitToPeerlyResponse(existing)
+    }
 
-    const createdTcrCompliance = await this.model.create({
-      data: newTcrCompliance,
+    // Stage gate: only proceed when the candidate's website is live + the
+    // domain is registered (derived stage = awaiting_pin with identity still
+    // null). Reject all earlier stages so an agent can't kick a Peerly brand
+    // submission for an unverified/unregistered domain.
+    const stateBeforeSubmit =
+      await this.complianceStateService.findStateForCampaign(campaign.id)
+    if (stateBeforeSubmit.stage !== ComplianceStage.awaiting_pin) {
+      throw new UnprocessableEntityException(
+        `Cannot submit TCR registration to Peerly until the candidate's ` +
+          `website is published and live. Current compliance stage: ` +
+          `${stateBeforeSubmit.stage}. Wait for stage = awaiting_pin.`,
+      )
+    }
+
+    // Pre-Peerly claim: only one concurrent caller may proceed past this
+    // point. The TTL allows re-claim if a prior caller crashed mid-flight
+    // without clearing its claim.
+    const staleBefore = subMinutes(
+      new Date(),
+      PEERLY_SUBMISSION_CLAIM_TTL_MINUTES,
+    )
+    const claimTimestamp = new Date()
+    const claim = await this.model.updateMany({
+      where: {
+        id: existing.id,
+        peerlyIdentityId: null,
+        OR: [
+          { peerlySubmissionStartedAt: null },
+          { peerlySubmissionStartedAt: { lt: staleBefore } },
+        ],
+      },
+      data: { peerlySubmissionStartedAt: claimTimestamp },
+    })
+
+    if (claim.count === 0) {
+      const current = await this.fetchByCampaignId(campaign.id)
+      if (current?.peerlyIdentityId) {
+        return this.buildSubmitToPeerlyResponse(current)
+      }
+      throw new ConflictException(
+        `A Peerly submission is already in progress for ` +
+          `campaignId=${campaign.id}; retry in a few seconds.`,
+      )
+    }
+
+    // Strip leading www. so Peerly's 10DLC brand `website` + `email` fields
+    // and the persisted websiteDomain all use the apex domain — matching the
+    // legacy create() path (which sources from Domain.name, an apex domain).
+    const hostname = new URL(input.websiteUrl).hostname.replace(/^www\./, '')
+    const helperPayload: CreateTcrCompliancePayload = {
+      ein: input.ein,
+      committeeName: input.committeeName,
+      filingUrl: input.filingUrl,
+      email: input.email,
+      phone: input.phone,
+      officeLevel: input.officeLevel,
+      fecCommitteeId: input.fecCommitteeId,
+      committeeType: input.committeeType,
+      websiteDomain: hostname,
+    }
+
+    let peerlyResult: PeerlySubmissionResult
+    try {
+      peerlyResult = await this.submitToPeerly(
+        user,
+        campaign,
+        helperPayload,
+        hostname,
+      )
+    } catch (error) {
+      // Roll back only this caller's claim by matching the exact timestamp we
+      // wrote. A TTL re-claimant (caller B, after our call exceeded TTL) will
+      // have a different timestamp, so its in-flight claim isn't disturbed.
+      await this.model.updateMany({
+        where: {
+          id: existing.id,
+          peerlyIdentityId: null,
+          peerlySubmissionStartedAt: claimTimestamp,
+        },
+        data: { peerlySubmissionStartedAt: null },
+      })
+      throw error
+    }
+
+    const updated = await this.model.update({
+      where: { id: existing.id },
+      data: {
+        ein: input.ein,
+        committeeName: input.committeeName,
+        filingUrl: input.filingUrl,
+        email: input.email,
+        phone: input.phone,
+        officeLevel: input.officeLevel,
+        fecCommitteeId: input.fecCommitteeId ?? null,
+        committeeType: input.committeeType,
+        websiteDomain: hostname,
+        postalAddress: campaign.formattedAddress ?? existing.postalAddress,
+        peerlyIdentityId: peerlyResult.peerlyIdentityId,
+        peerlyIdentityProfileLink: peerlyResult.peerlyIdentityProfileLink,
+        peerly10DLCBrandSubmissionKey:
+          peerlyResult.peerly10DLCBrandSubmissionKey,
+        // Peerly's GET-CV-request response doesn't carry verification_id, so
+        // when the helper skipped CV submission (existing CV found), it
+        // returns null. Fall back to the persisted value so a real ID isn't
+        // overwritten on retry.
+        peerlyCvVerificationId:
+          peerlyResult.cvVerificationId ?? existing.peerlyCvVerificationId,
+      },
     })
 
     this.logger.info(
-      `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
-        `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
+      `[TCR Compliance] submitToPeerlyForAgent complete for ` +
+        `campaignId=${campaign.id}, tcrComplianceId=${updated.id}, ` +
+        `peerlyIdentityId=${updated.peerlyIdentityId}`,
     )
 
-    return createdTcrCompliance
+    return this.buildSubmitToPeerlyResponse(updated)
+  }
+
+  private async buildSubmitToPeerlyResponse(
+    record: TcrCompliance,
+  ): Promise<SubmitToPeerlyOutput> {
+    const state = await this.complianceStateService.findStateForCampaign(
+      record.campaignId,
+    )
+    if (!record.peerlyIdentityId) {
+      throw new BadGatewayException(
+        `Cannot build submit-to-peerly response for tcrComplianceId=` +
+          `${record.id}: peerlyIdentityId is unexpectedly null`,
+      )
+    }
+    return {
+      tcrComplianceId: record.id,
+      peerlyIdentityId: record.peerlyIdentityId,
+      peerlyIdentityProfileLink: record.peerlyIdentityProfileLink,
+      peerly10DLCBrandSubmissionKey: record.peerly10DLCBrandSubmissionKey,
+      peerlyVerificationId: record.peerlyCvVerificationId,
+      stage: state.stage,
+      pinDeliveryChannels: { email: record.email, phone: record.phone },
+    }
   }
 
   async createAgentic(

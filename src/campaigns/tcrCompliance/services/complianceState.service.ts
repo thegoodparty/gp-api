@@ -50,7 +50,7 @@ export class ComplianceStateService extends createPrismaBase(MODELS.Campaign) {
           }
         : null,
       websiteId: website?.id ?? null,
-      peerlyVerificationId: tcrCompliance?.peerlyIdentityId ?? null,
+      peerlyVerificationId: tcrCompliance?.peerlyCvVerificationId ?? null,
     }
   }
 }
