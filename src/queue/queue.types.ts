@@ -66,11 +66,15 @@ export type DomainEmailForwardingMessage = {
   domainId: number
 }
 
-export type AgenticComplianceKickoffMessage = {
-  campaignId: number
-  tcrComplianceId: string
-  clerkUserId: string
-}
+export const AgenticComplianceKickoffMessageSchema = z.object({
+  campaignId: z.number().int(),
+  tcrComplianceId: z.string().cuid(),
+  clerkUserId: z.string().min(1),
+})
+
+export type AgenticComplianceKickoffMessage = z.infer<
+  typeof AgenticComplianceKickoffMessageSchema
+>
 
 export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(
   'status',

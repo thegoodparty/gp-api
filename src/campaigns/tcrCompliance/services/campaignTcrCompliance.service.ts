@@ -41,6 +41,9 @@ import { CrmCampaignsService } from '../../services/crmCampaigns.service'
 import { ComplianceStateService } from './complianceState.service'
 import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
 import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
+import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
+import { AgenticComplianceKickoffMessage } from '../../../queue/queue.types'
+import { ExperimentRunStatus } from '@prisma/client'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -76,6 +79,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private readonly crmCampaignsService: CrmCampaignsService,
     private readonly complianceStateService: ComplianceStateService,
     private queueService: QueueProducerService,
+    private readonly experimentRunsService: ExperimentRunsService,
   ) {
     super()
   }
@@ -713,6 +717,87 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return { record, created: true }
+  }
+
+  async handleAgenticKickoff(message: AgenticComplianceKickoffMessage) {
+    const { campaignId, tcrComplianceId, clerkUserId } = message
+
+    const record = await this.model.findUnique({
+      where: { id: tcrComplianceId },
+    })
+    if (!record || record.campaignId !== campaignId) {
+      this.logger.warn(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Kickoff for unknown or mismatched record; dropping',
+      )
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: campaignId },
+    })
+    if (!campaign) {
+      this.logger.warn(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Kickoff for unknown campaign; dropping',
+      )
+      return
+    }
+
+    // Idempotency filter intentionally excludes FAILED. Per CLAUDE.md
+    // "Idempotency check breadth", FAILED runs must remain eligible for
+    // re-dispatch — sweepStaleRuns flips RUNNING→FAILED at 45min, and
+    // dispatchRun writes RUNNING then flips to FAILED on SQS-send failure;
+    // including FAILED here would permanently strand both.
+    const existingRun = await this.experimentRunsService.findFirst({
+      where: {
+        experimentType: 'compliance_setup',
+        status: {
+          in: [ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED],
+        },
+        params: {
+          path: ['tcrComplianceId'],
+          equals: tcrComplianceId,
+        },
+      },
+    })
+    if (existingRun) {
+      this.logger.info(
+        {
+          tcrComplianceId,
+          existingRunId: existingRun.runId,
+          status: existingRun.status,
+        },
+        '[TCR Compliance] Agent run already dispatched for record; skipping',
+      )
+      return
+    }
+
+    const run = await this.experimentRunsService.dispatchRun({
+      type: 'compliance_setup',
+      organizationSlug: campaign.organizationSlug,
+      clerkUserId,
+      params: { campaignId, tcrComplianceId },
+    })
+
+    if (!run) {
+      // AGENT_DISPATCH_QUEUE_NAME is unset (preview envs by design — see
+      // src/agentExperiments/CLAUDE.md). The misconfiguration is permanent
+      // for the lifetime of this env, so retrying is futile. Log loudly and
+      // ack so the message doesn't churn through redrives until DLQ.
+      this.logger.error(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Agent dispatch queue not configured; ' +
+          'discarding kickoff message ' +
+          '(set AGENT_DISPATCH_QUEUE_NAME to enable)',
+      )
+      return
+    }
+
+    this.logger.info(
+      { campaignId, tcrComplianceId, runId: run.runId },
+      '[TCR Compliance] Dispatched compliance_setup agent run',
+    )
   }
 
   async delete(id: string) {

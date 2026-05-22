@@ -1076,7 +1076,12 @@ describe('QueueConsumerService - message type routing', () => {
             addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
-        { provide: CampaignTcrComplianceService, useValue: {} },
+        {
+          provide: CampaignTcrComplianceService,
+          useValue: {
+            handleAgenticKickoff: vi.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: ContactsService, useValue: {} },
         { provide: DomainsService, useValue: {} },
         { provide: ElectedOfficeService, useValue: {} },
@@ -1206,6 +1211,60 @@ describe('QueueConsumerService - message type routing', () => {
     }
 
     // withLegacyErrorSwallowing catches the Zod parse failure and returns true
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).not.toHaveBeenCalled()
+  })
+
+  it('routes agenticComplianceKickoff messages to the TCR compliance handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const validTcrCuid = 'ckpqr7s3z00010o9k1234abcd'
+    const message: Message = {
+      MessageId: 'msg-kickoff-ok',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: validTcrCuid,
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).toHaveBeenCalledOnce()
+    expect(handleSpy).toHaveBeenCalledWith({
+      campaignId: 42,
+      tcrComplianceId: validTcrCuid,
+      clerkUserId: 'user_clerk_xyz',
+    })
+  })
+
+  it('discards agenticComplianceKickoff with invalid payload and does not call handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-kickoff-invalid',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: 'not-a-cuid',
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)
