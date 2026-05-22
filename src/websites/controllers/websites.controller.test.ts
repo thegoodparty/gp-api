@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { HttpStatus } from '@nestjs/common'
 import { WebsiteStatus } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
