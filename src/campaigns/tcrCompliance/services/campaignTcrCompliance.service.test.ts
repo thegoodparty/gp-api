@@ -643,12 +643,11 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     await expect(service.handleAgenticKickoff(kickoff)).rejects.toBe(err)
   })
 
-  it('throws when dispatchRun returns no run (queue not configured in env)', async () => {
+  it('logs and acks (does not throw) when dispatchRun returns no run', async () => {
     mockExperimentRuns.dispatchRun.mockResolvedValueOnce(undefined)
 
-    await expect(service.handleAgenticKickoff(kickoff)).rejects.toThrow(
-      /Agent dispatch queue not configured/,
-    )
+    await expect(service.handleAgenticKickoff(kickoff)).resolves.toBeUndefined()
+    expect(mockExperimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
   })
 })
 

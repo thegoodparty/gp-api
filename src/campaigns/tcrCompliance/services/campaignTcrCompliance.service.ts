@@ -781,11 +781,17 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
 
     if (!run) {
-      throw new Error(
-        `[TCR Compliance] Agent dispatch queue not configured; ` +
-          `cannot kick off compliance_setup for tcrComplianceId=` +
-          `${tcrComplianceId}`,
+      // AGENT_DISPATCH_QUEUE_NAME is unset (preview envs by design — see
+      // src/agentExperiments/CLAUDE.md). The misconfiguration is permanent
+      // for the lifetime of this env, so retrying is futile. Log loudly and
+      // ack so the message doesn't churn through redrives until DLQ.
+      this.logger.error(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Agent dispatch queue not configured; ' +
+          'discarding kickoff message ' +
+          '(set AGENT_DISPATCH_QUEUE_NAME to enable)',
       )
+      return
     }
 
     this.logger.info(
