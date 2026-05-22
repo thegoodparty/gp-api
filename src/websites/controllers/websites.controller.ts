@@ -235,8 +235,8 @@ export class WebsitesController {
 
     if (
       body.status === WebsiteStatus.published &&
-      domain &&
-      !domain.registrantVerifiedAt
+      domain
+      // && !domain.registrantVerifiedAt // TODO: uncomment this when we have a way to verify domain ownership
     ) {
       throw new BadRequestException(
         'Domain registrant verification is not yet complete. The site cannot be published until Vercel confirms domain ownership.',
