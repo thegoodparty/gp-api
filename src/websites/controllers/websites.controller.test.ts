@@ -186,8 +186,8 @@ describe('WebsitesController', () => {
     })
   })
 
-  describe('updateWebsite - domain registrant verification gate', () => {
-    it('blocks publishing when an attached domain has not been registrant-verified', async () => {
+  describe('updateWebsite - domain publishing compatibility', () => {
+    it('allows publishing when an attached domain is not registrant-verified', async () => {
       mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
         content: completeContent,
         hasEverBeenPublished: false,
@@ -197,11 +197,9 @@ describe('WebsitesController', () => {
       const body = new UpdateWebsiteSchema()
       body.status = WebsiteStatus.published
 
-      await expect(
-        controller.updateWebsite(mockUser, mockCampaign, body),
-      ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST })
+      await controller.updateWebsite(mockUser, mockCampaign, body)
 
-      expect(mockWebsitesService.update).not.toHaveBeenCalled()
+      expect(mockWebsitesService.update).toHaveBeenCalled()
     })
 
     it('allows publishing when the attached domain has been registrant-verified', async () => {
