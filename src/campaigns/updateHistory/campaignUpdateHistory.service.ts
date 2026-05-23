@@ -45,9 +45,9 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
     })
   }
 
-  async delete(id: number) {
+  async delete(id: number, campaignId: number) {
     const existing = await this.findFirstOrThrow({
-      where: { id },
+      where: { id, campaignId },
       include: { campaign: true },
     })
 
