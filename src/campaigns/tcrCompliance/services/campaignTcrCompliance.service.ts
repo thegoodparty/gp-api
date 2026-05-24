@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
-import { subMinutes } from 'date-fns'
+import { isValid, parseISO, subMinutes } from 'date-fns'
 import {
   Campaign,
   ExperimentRun,
@@ -67,6 +67,8 @@ const PEERLY_SUBMISSION_CLAIM_TTL_MINUTES = 5
 // Bounds dispatchRun's normal duration (SQS sendMessage + tcr_compliance write)
 // plus a comfortable margin.
 const AGENTIC_DISPATCH_CLAIM_TTL_MINUTES = 5
+
+const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/
 
 type PeerlySubmissionResult = {
   peerlyIdentityId: string
@@ -752,12 +754,23 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return
     }
 
+    // campaign.details is a freeform JSON column; electionDate is typed as
+    // `string?` in the shadow types but the Zod input schema doesn't enforce
+    // YYYY-MM-DD. The agent uses this for {mm}/{month_abbreviation}/{yyyy}
+    // placeholder expansion, so a wrong-format value (e.g. "11/02/2027" or
+    // "November 2027") would feed malformed substrings into domain generation.
+    // Reject at the boundary instead of letting it propagate.
     const electionDate = campaign.details.electionDate
-    if (!electionDate) {
+    if (
+      !electionDate ||
+      !YYYY_MM_DD.test(electionDate) ||
+      !isValid(parseISO(electionDate))
+    ) {
       this.logger.error(
-        { campaignId, tcrComplianceId },
+        { campaignId, tcrComplianceId, electionDate },
         '[TCR Compliance] Cannot dispatch compliance_setup: ' +
-          'campaign.details.electionDate is unset',
+          'campaign.details.electionDate is missing or not a valid ' +
+          'YYYY-MM-DD date',
       )
       await this.model.update({
         where: { id: tcrComplianceId },
@@ -776,6 +789,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       AGENTIC_DISPATCH_CLAIM_TTL_MINUTES,
     )
     const claimTimestamp = new Date()
+    let isRecovery = false
     const claim = await this.model.updateMany({
       where: {
         id: tcrComplianceId,
@@ -837,6 +851,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
             )
             return
           }
+          // Signal to the agent that this is a re-dispatch over a prior failure;
+          // it will consult durable compliance state and skip completed steps
+          // instead of restarting from step 1 (re-buying domain, etc.).
+          isRecovery = true
         } else {
           // experiment_run row is missing — a concurrent worker is mid-dispatch
           // between its claim and ExperimentRunsService.dispatchRun creating
@@ -869,7 +887,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           candidate_last_name: campaign.user.lastName ?? '',
           clerk_user_id: clerkUserId,
           election_date: electionDate,
-          trigger: 'initial',
+          trigger: isRecovery ? 'recovery_resume' : 'initial',
         },
       })
     } catch (err) {
@@ -911,10 +929,27 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       return
     }
 
-    await this.model.update({
-      where: { id: tcrComplianceId },
+    // Stamp the runId scoped to our claim timestamp. If dispatchRun exceeded
+    // the TTL and a re-claimant took over and stamped its own runId, this
+    // updateMany matches zero rows — we don't clobber the live claim. The
+    // orphaned experiment_run row this caller created is RUNNING; sweepStaleRuns
+    // in ExperimentRunsService will flip it to FAILED at 45min.
+    const stamped = await this.model.updateMany({
+      where: {
+        id: tcrComplianceId,
+        agenticDispatchAttemptedAt: claimTimestamp,
+      },
       data: { agenticRunId: run.runId },
     })
+
+    if (stamped.count === 0) {
+      this.logger.error(
+        { campaignId, tcrComplianceId, runId: run.runId },
+        '[TCR Compliance] Claim expired before dispatch completed; ' +
+          'experiment_run is orphaned and will be FAILED by sweepStaleRuns',
+      )
+      return
+    }
 
     this.logger.info(
       { campaignId, tcrComplianceId, runId: run.runId },
