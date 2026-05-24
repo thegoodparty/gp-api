@@ -48,5 +48,8 @@ model TcrCompliance {
   peerlyCvVerificationId        String?   @map("peerly_cv_verification_id")
   peerlySubmissionStartedAt     DateTime? @map("peerly_submission_started_at")
 
+  agenticRunId                  String?   @unique @map("agentic_run_id")
+  agenticDispatchAttemptedAt    DateTime? @map("agentic_dispatch_attempted_at")
+
   @@map("tcr_compliance")
 }

@@ -1,3 +1,6 @@
+export type ComplianceSetupOutput = {
+  [k: string]: unknown
+}
 /**
  * v2 artifact schema for the meeting_briefing experiment. Drop into manifest.json's output_schema field at port time.
  */
@@ -7,6 +10,55 @@ export type MeetingBriefingOutput =
 export type MeetingSchedule = MeetingScheduleFound | MeetingScheduleNotFound
 
 export interface AgentJobContracts {
+  compliance_setup: {
+    Input: {
+      /**
+       * Numeric Campaign.id in gp-api. Foreign key the agent passes back to gp-api MCP tools for every state read/write.
+       */
+      campaign_id: number
+      /**
+       * Candidate first name. Used for the `{first_initial}` placeholder in the domain pattern catalog. Empty string skips the two patterns that depend on first_initial (per instruction.md: 'When unset or empty string, skip the two patterns that need it').
+       */
+      candidate_first_name: string
+      /**
+       * Candidate last name. Used for `{last_name}` and `{last_initial}` placeholders in the domain pattern catalog.
+       */
+      candidate_last_name: string
+      /**
+       * Clerk user id of the candidate. Broker mints actor-token sessions against this id when proxying MCP calls to gp-api.
+       */
+      clerk_user_id: string
+      /**
+       * Per-candidate domain budget. Agent searches at min($10, this) first; if no match and this > 10, retries once at this cap. Above this is a hard `budget_exceeded` blocker.
+       */
+      domain_budget_cap_usd?: number
+      /**
+       * YYYY-MM-DD. Drives the {mm}/{month_abbreviation}/{yyyy} placeholders in the domain pattern catalog (instruction.md).
+       */
+      election_date: string
+      /**
+       * Optional hint from the recovery loop indicating the last persisted stage. The agent treats it as a skip-list signal only — the durable compliance state read in Step 1 remains the truth.
+       */
+      resume_from_stage?:
+        | 'pending_dispatch'
+        | 'domain_search_started'
+        | 'domain_purchased'
+        | 'website_content_published'
+        | 'pending_website_live'
+        | 'website_verified_live'
+        | 'tcr_submitted'
+        | 'failed'
+      /**
+       * Fallback run identifier used only when the RUN_ID env var is absent. When RUN_ID is set, the agent must use RUN_ID and ignore this field. The platform's recovery loop correlates runs by the env-var value, so the artifact must never record this field's value if it differs from RUN_ID.
+       */
+      run_id?: string
+      /**
+       * Why this run was dispatched. `initial` = first dispatch after Pro purchase. `recovery_resume` = re-dispatch by the recovery loop (ENG-7554) after a wait condition cleared; the agent reads `resume_from_stage` as a skip-list hint but still trusts gp-api durable state as the source of truth.
+       */
+      trigger: 'initial' | 'recovery_resume'
+    }
+    Output: ComplianceSetupOutput
+  }
   district_issue_pulse: {
     Input: {
       /**

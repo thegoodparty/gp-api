@@ -504,10 +504,14 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
   let service: CampaignTcrComplianceService
   let mockCampaigns: { findUnique: ReturnType<typeof vi.fn> }
   let mockExperimentRuns: {
-    findFirst: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
     dispatchRun: ReturnType<typeof vi.fn>
   }
-  let mockModel: { findUnique: ReturnType<typeof vi.fn> }
+  let mockModel: {
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
   let mockPrisma: { tcrCompliance: typeof mockModel }
 
   const kickoff = {
@@ -518,21 +522,37 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
   const tcrRecord = {
     id: kickoff.tcrComplianceId,
     campaignId: kickoff.campaignId,
+    agenticRunId: null,
+    agenticDispatchAttemptedAt: null,
   }
-  const campaign = createMockCampaign({
-    id: kickoff.campaignId,
-    organizationSlug: 'org-jane-for-springfield',
+  const campaignUser = createMockUser({
+    firstName: 'Jane',
+    lastName: 'Doe',
+    clerkId: kickoff.clerkUserId,
   })
+  const campaign = {
+    ...createMockCampaign({
+      id: kickoff.campaignId,
+      userId: campaignUser.id,
+      organizationSlug: 'org-jane-for-springfield',
+      details: { electionDate: '2027-11-02' },
+    }),
+    user: campaignUser,
+  }
 
   const dispatchedRun = { runId: 'run-dispatched-xyz' }
 
   beforeEach(async () => {
     mockCampaigns = { findUnique: vi.fn().mockResolvedValue(campaign) }
     mockExperimentRuns = {
-      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
       dispatchRun: vi.fn().mockResolvedValue(dispatchedRun),
     }
-    mockModel = { findUnique: vi.fn().mockResolvedValue(tcrRecord) }
+    mockModel = {
+      findUnique: vi.fn().mockResolvedValue(tcrRecord),
+      update: vi.fn().mockResolvedValue(tcrRecord),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }
     mockPrisma = { tcrCompliance: mockModel }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -554,35 +574,71 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
 
     vi.clearAllMocks()
     mockCampaigns.findUnique.mockResolvedValue(campaign)
-    mockExperimentRuns.findFirst.mockResolvedValue(null)
+    mockExperimentRuns.findUnique.mockResolvedValue(null)
     mockExperimentRuns.dispatchRun.mockResolvedValue(dispatchedRun)
     mockModel.findUnique.mockResolvedValue(tcrRecord)
+    mockModel.update.mockResolvedValue(tcrRecord)
+    mockModel.updateMany.mockResolvedValue({ count: 1 })
   })
 
-  it('dispatches a compliance_setup run with the campaign and record ids', async () => {
+  it('claims the dispatch slot atomically before calling dispatchRun', async () => {
     await service.handleAgenticKickoff(kickoff)
 
-    expect(mockExperimentRuns.findFirst).toHaveBeenCalledWith({
-      where: {
-        experimentType: 'compliance_setup',
-        status: {
-          in: [ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED],
-        },
-        params: {
-          path: ['tcrComplianceId'],
-          equals: kickoff.tcrComplianceId,
-        },
-      },
+    const claimCall = mockModel.updateMany.mock.calls[0][0]
+    expect(claimCall.where).toMatchObject({
+      id: kickoff.tcrComplianceId,
+      agenticRunId: null,
+      OR: [
+        { agenticDispatchAttemptedAt: null },
+        { agenticDispatchAttemptedAt: { lt: expect.any(Date) } },
+      ],
     })
+    expect(claimCall.data.agenticDispatchAttemptedAt).toBeInstanceOf(Date)
+
+    const dispatchCallOrder =
+      mockExperimentRuns.dispatchRun.mock.invocationCallOrder[0]
+    const claimCallOrder = mockModel.updateMany.mock.invocationCallOrder[0]
+    expect(claimCallOrder).toBeLessThan(dispatchCallOrder)
+  })
+
+  it('dispatches a compliance_setup run with manifest-shaped params', async () => {
+    await service.handleAgenticKickoff(kickoff)
+
     expect(mockExperimentRuns.dispatchRun).toHaveBeenCalledWith({
       type: 'compliance_setup',
       organizationSlug: campaign.organizationSlug,
       clerkUserId: kickoff.clerkUserId,
       params: {
-        campaignId: kickoff.campaignId,
-        tcrComplianceId: kickoff.tcrComplianceId,
+        campaign_id: kickoff.campaignId,
+        candidate_first_name: 'Jane',
+        candidate_last_name: 'Doe',
+        clerk_user_id: kickoff.clerkUserId,
+        election_date: '2027-11-02',
+        trigger: 'initial',
       },
     })
+  })
+
+  it('stamps agenticRunId on the record after a successful dispatch', async () => {
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockModel.update).toHaveBeenCalledWith({
+      where: { id: kickoff.tcrComplianceId },
+      data: { agenticRunId: dispatchedRun.runId },
+    })
+  })
+
+  it('passes empty strings when candidate first/last name are null', async () => {
+    mockCampaigns.findUnique.mockResolvedValueOnce({
+      ...campaign,
+      user: { ...campaignUser, firstName: null, lastName: null },
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    const dispatchArg = mockExperimentRuns.dispatchRun.mock.calls[0][0]
+    expect(dispatchArg.params.candidate_first_name).toBe('')
+    expect(dispatchArg.params.candidate_last_name).toBe('')
   })
 
   it('does not include actor_token_url in the dispatch params', async () => {
@@ -594,9 +650,17 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
   })
 
   it.each([ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED])(
-    'skips dispatch when a %s run already exists for the record',
+    'skips dispatch when claim fails and existing run is %s',
     async (status) => {
-      mockExperimentRuns.findFirst.mockResolvedValueOnce({
+      const recordWithRun = {
+        ...tcrRecord,
+        agenticRunId: 'run-existing',
+      }
+      mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+      mockModel.findUnique
+        .mockResolvedValueOnce(recordWithRun)
+        .mockResolvedValueOnce(recordWithRun)
+      mockExperimentRuns.findUnique.mockResolvedValueOnce({
         runId: 'run-existing',
         status,
       })
@@ -607,13 +671,107 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     },
   )
 
+  it('re-dispatches when claim fails and existing run is FAILED', async () => {
+    const recordWithRun = {
+      ...tcrRecord,
+      agenticRunId: 'run-failed',
+    }
+    mockModel.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // initial claim
+      .mockResolvedValueOnce({ count: 1 }) // FAILED retake
+    mockModel.findUnique
+      .mockResolvedValueOnce(recordWithRun)
+      .mockResolvedValueOnce(recordWithRun)
+    mockExperimentRuns.findUnique.mockResolvedValueOnce({
+      runId: 'run-failed',
+      status: ExperimentRunStatus.FAILED,
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
+    const retakeCall = mockModel.updateMany.mock.calls[1][0]
+    expect(retakeCall.where).toMatchObject({
+      id: kickoff.tcrComplianceId,
+      agenticRunId: 'run-failed',
+    })
+    expect(retakeCall.data).toMatchObject({ agenticRunId: null })
+  })
+
+  it('skips when claim fails and the FAILED retake loses the race', async () => {
+    const recordWithRun = {
+      ...tcrRecord,
+      agenticRunId: 'run-failed',
+    }
+    mockModel.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // initial claim
+      .mockResolvedValueOnce({ count: 0 }) // FAILED retake lost
+    mockModel.findUnique
+      .mockResolvedValueOnce(recordWithRun)
+      .mockResolvedValueOnce(recordWithRun)
+    mockExperimentRuns.findUnique.mockResolvedValueOnce({
+      runId: 'run-failed',
+      status: ExperimentRunStatus.FAILED,
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('skips when claim fails, agenticRunId is set, but no experiment_run row is found', async () => {
+    const recordWithRun = {
+      ...tcrRecord,
+      agenticRunId: 'run-orphan',
+    }
+    mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    mockModel.findUnique
+      .mockResolvedValueOnce(recordWithRun)
+      .mockResolvedValueOnce(recordWithRun)
+    mockExperimentRuns.findUnique.mockResolvedValueOnce(null)
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('skips when claim fails because another worker holds an in-flight claim', async () => {
+    mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+    mockModel.findUnique.mockResolvedValueOnce({
+      ...tcrRecord,
+      agenticRunId: null,
+      agenticDispatchAttemptedAt: new Date(),
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+    expect(mockExperimentRuns.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('marks the record as error and skips dispatch when electionDate is missing', async () => {
+    mockCampaigns.findUnique.mockResolvedValueOnce({
+      ...campaign,
+      details: {},
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+    expect(mockModel.update).toHaveBeenCalledWith({
+      where: { id: kickoff.tcrComplianceId },
+      data: { status: TcrComplianceStatus.error },
+    })
+    expect(mockModel.updateMany).not.toHaveBeenCalled()
+  })
+
   it('drops silently when the TcrCompliance record does not exist', async () => {
     mockModel.findUnique.mockResolvedValueOnce(null)
 
     await service.handleAgenticKickoff(kickoff)
 
-    expect(mockExperimentRuns.findFirst).not.toHaveBeenCalled()
     expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+    expect(mockModel.updateMany).not.toHaveBeenCalled()
   })
 
   it('drops silently when the record belongs to a different campaign', async () => {
@@ -624,7 +782,6 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
 
     await service.handleAgenticKickoff(kickoff)
 
-    expect(mockExperimentRuns.findFirst).not.toHaveBeenCalled()
     expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
@@ -636,18 +793,52 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
     expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
-  it('propagates BadGatewayException from dispatchRun so the message redelivers', async () => {
+  it('drops silently when the campaign has no user', async () => {
+    mockCampaigns.findUnique.mockResolvedValueOnce({
+      ...campaign,
+      user: null,
+    })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the claim scoped to its timestamp on dispatchRun throw', async () => {
     const err = new BadGatewayException('SQS dispatch failed')
     mockExperimentRuns.dispatchRun.mockRejectedValueOnce(err)
 
     await expect(service.handleAgenticKickoff(kickoff)).rejects.toBe(err)
+
+    const claimTimestamp =
+      mockModel.updateMany.mock.calls[0][0].data.agenticDispatchAttemptedAt
+    expect(mockModel.updateMany).toHaveBeenLastCalledWith({
+      where: {
+        id: kickoff.tcrComplianceId,
+        agenticRunId: null,
+        agenticDispatchAttemptedAt: claimTimestamp,
+      },
+      data: { agenticDispatchAttemptedAt: null },
+    })
+    expect(mockModel.update).not.toHaveBeenCalled()
   })
 
-  it('logs and acks (does not throw) when dispatchRun returns no run', async () => {
+  it('rolls back the claim and acks when dispatchRun returns no run', async () => {
     mockExperimentRuns.dispatchRun.mockResolvedValueOnce(undefined)
 
     await expect(service.handleAgenticKickoff(kickoff)).resolves.toBeUndefined()
-    expect(mockExperimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
+
+    const claimTimestamp =
+      mockModel.updateMany.mock.calls[0][0].data.agenticDispatchAttemptedAt
+    expect(mockModel.updateMany).toHaveBeenLastCalledWith({
+      where: {
+        id: kickoff.tcrComplianceId,
+        agenticRunId: null,
+        agenticDispatchAttemptedAt: claimTimestamp,
+      },
+      data: { agenticDispatchAttemptedAt: null },
+    })
+    expect(mockModel.update).not.toHaveBeenCalled()
   })
 })
 

@@ -10,6 +10,7 @@ import { Interval } from '@nestjs/schedule'
 import { subMinutes } from 'date-fns'
 import {
   Campaign,
+  ExperimentRun,
   Prisma,
   TcrCompliance,
   TcrComplianceStatus,
@@ -60,6 +61,12 @@ const AGENTIC_KICKOFF_STALENESS_MINUTES = 10
 // without rollback) and re-claimable. Bounds the Peerly call's normal duration
 // plus a comfortable margin; tune if Peerly latency drifts.
 const PEERLY_SUBMISSION_CLAIM_TTL_MINUTES = 5
+
+// Agentic dispatch claim TTL: a claim older than this is treated as stale
+// (worker crashed between claim and dispatchRun completion) and re-claimable.
+// Bounds dispatchRun's normal duration (SQS sendMessage + tcr_compliance write)
+// plus a comfortable margin.
+const AGENTIC_DISPATCH_CLAIM_TTL_MINUTES = 5
 
 type PeerlySubmissionResult = {
   peerlyIdentityId: string
@@ -735,56 +742,166 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     const campaign = await this.campaignsService.findUnique({
       where: { id: campaignId },
+      include: { user: true },
     })
-    if (!campaign) {
+    if (!campaign || !campaign.user) {
       this.logger.warn(
         { campaignId, tcrComplianceId },
-        '[TCR Compliance] Kickoff for unknown campaign; dropping',
+        '[TCR Compliance] Kickoff for unknown campaign or user; dropping',
       )
       return
     }
 
-    // Idempotency filter intentionally excludes FAILED. Per CLAUDE.md
-    // "Idempotency check breadth", FAILED runs must remain eligible for
-    // re-dispatch — sweepStaleRuns flips RUNNING→FAILED at 45min, and
-    // dispatchRun writes RUNNING then flips to FAILED on SQS-send failure;
-    // including FAILED here would permanently strand both.
-    const existingRun = await this.experimentRunsService.findFirst({
+    const electionDate = campaign.details.electionDate
+    if (!electionDate) {
+      this.logger.error(
+        { campaignId, tcrComplianceId },
+        '[TCR Compliance] Cannot dispatch compliance_setup: ' +
+          'campaign.details.electionDate is unset',
+      )
+      await this.model.update({
+        where: { id: tcrComplianceId },
+        data: { status: TcrComplianceStatus.error },
+      })
+      return
+    }
+
+    // Atomic claim before dispatchRun to prevent duplicate dispatches under
+    // at-least-once SQS delivery (consumer crashes, redelivery, concurrent
+    // workers). Pattern mirrors the Peerly submission claim above. The claim
+    // is keyed by agenticRunId being null (no successful dispatch yet) and
+    // either no in-flight claim or a stale one past TTL.
+    const staleBefore = subMinutes(
+      new Date(),
+      AGENTIC_DISPATCH_CLAIM_TTL_MINUTES,
+    )
+    const claimTimestamp = new Date()
+    const claim = await this.model.updateMany({
       where: {
-        experimentType: 'compliance_setup',
-        status: {
-          in: [ExperimentRunStatus.RUNNING, ExperimentRunStatus.COMPLETED],
-        },
-        params: {
-          path: ['tcrComplianceId'],
-          equals: tcrComplianceId,
-        },
+        id: tcrComplianceId,
+        agenticRunId: null,
+        OR: [
+          { agenticDispatchAttemptedAt: null },
+          { agenticDispatchAttemptedAt: { lt: staleBefore } },
+        ],
       },
+      data: { agenticDispatchAttemptedAt: claimTimestamp },
     })
-    if (existingRun) {
-      this.logger.info(
-        {
-          tcrComplianceId,
-          existingRunId: existingRun.runId,
-          status: existingRun.status,
-        },
-        '[TCR Compliance] Agent run already dispatched for record; skipping',
-      )
-      return
+
+    if (claim.count === 0) {
+      // Idempotency branches intentionally exclude FAILED from the skip path.
+      // Per gp-api/CLAUDE.md "Idempotency check breadth", FAILED runs must
+      // remain eligible for re-dispatch — sweepStaleRuns flips RUNNING→FAILED
+      // at 45min, and dispatchRun writes RUNNING then flips to FAILED on
+      // SQS-send failure; including FAILED here would permanently strand both.
+      const current = await this.model.findUnique({
+        where: { id: tcrComplianceId },
+      })
+      if (!current) {
+        return
+      }
+      if (current.agenticRunId) {
+        const existingRun = await this.experimentRunsService.findUnique({
+          where: { runId: current.agenticRunId },
+        })
+        if (
+          existingRun &&
+          (existingRun.status === ExperimentRunStatus.RUNNING ||
+            existingRun.status === ExperimentRunStatus.COMPLETED)
+        ) {
+          this.logger.info(
+            {
+              tcrComplianceId,
+              existingRunId: existingRun.runId,
+              status: existingRun.status,
+            },
+            '[TCR Compliance] Agent run already dispatched for record; skipping',
+          )
+          return
+        }
+        if (existingRun?.status === ExperimentRunStatus.FAILED) {
+          const retake = await this.model.updateMany({
+            where: {
+              id: tcrComplianceId,
+              agenticRunId: current.agenticRunId,
+            },
+            data: {
+              agenticRunId: null,
+              agenticDispatchAttemptedAt: claimTimestamp,
+            },
+          })
+          if (retake.count === 0) {
+            this.logger.info(
+              { tcrComplianceId },
+              '[TCR Compliance] Lost race to re-dispatch FAILED run; skipping',
+            )
+            return
+          }
+        } else {
+          // experiment_run row is missing — a concurrent worker is mid-dispatch
+          // between its claim and ExperimentRunsService.dispatchRun creating
+          // the experiment_run row. SQS will redeliver if that worker crashes
+          // (claim TTL clears the slot in <=5min).
+          this.logger.info(
+            { tcrComplianceId, existingRunId: current.agenticRunId },
+            '[TCR Compliance] Concurrent dispatch in progress; skipping',
+          )
+          return
+        }
+      } else {
+        this.logger.info(
+          { tcrComplianceId },
+          '[TCR Compliance] Concurrent claim in progress; skipping',
+        )
+        return
+      }
     }
 
-    const run = await this.experimentRunsService.dispatchRun({
-      type: 'compliance_setup',
-      organizationSlug: campaign.organizationSlug,
-      clerkUserId,
-      params: { campaignId, tcrComplianceId },
-    })
+    let run: ExperimentRun | undefined
+    try {
+      run = await this.experimentRunsService.dispatchRun({
+        type: 'compliance_setup',
+        organizationSlug: campaign.organizationSlug,
+        clerkUserId,
+        params: {
+          campaign_id: campaignId,
+          candidate_first_name: campaign.user.firstName ?? '',
+          candidate_last_name: campaign.user.lastName ?? '',
+          clerk_user_id: clerkUserId,
+          election_date: electionDate,
+          trigger: 'initial',
+        },
+      })
+    } catch (err) {
+      // Roll back only this caller's claim by matching the exact timestamp we
+      // wrote. A TTL re-claimant (caller B, after our call exceeded TTL) will
+      // have a different timestamp, so its in-flight claim isn't disturbed.
+      // agenticRunId: null guards against clearing a parallel success.
+      await this.model.updateMany({
+        where: {
+          id: tcrComplianceId,
+          agenticRunId: null,
+          agenticDispatchAttemptedAt: claimTimestamp,
+        },
+        data: { agenticDispatchAttemptedAt: null },
+      })
+      throw err
+    }
 
     if (!run) {
       // AGENT_DISPATCH_QUEUE_NAME is unset (preview envs by design — see
       // src/agentExperiments/CLAUDE.md). The misconfiguration is permanent
-      // for the lifetime of this env, so retrying is futile. Log loudly and
-      // ack so the message doesn't churn through redrives until DLQ.
+      // for the lifetime of this env, so retrying is futile. Roll back the
+      // claim, log loudly, and ack so the message doesn't churn through
+      // redrives until DLQ.
+      await this.model.updateMany({
+        where: {
+          id: tcrComplianceId,
+          agenticRunId: null,
+          agenticDispatchAttemptedAt: claimTimestamp,
+        },
+        data: { agenticDispatchAttemptedAt: null },
+      })
       this.logger.error(
         { campaignId, tcrComplianceId },
         '[TCR Compliance] Agent dispatch queue not configured; ' +
@@ -793,6 +910,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
       return
     }
+
+    await this.model.update({
+      where: { id: tcrComplianceId },
+      data: { agenticRunId: run.runId },
+    })
 
     this.logger.info(
       { campaignId, tcrComplianceId, runId: run.runId },
