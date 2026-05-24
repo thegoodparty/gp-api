@@ -772,8 +772,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           'campaign.details.electionDate is missing or not a valid ' +
           'YYYY-MM-DD date',
       )
-      await this.model.update({
-        where: { id: tcrComplianceId },
+      // Guard on agenticRunId IS NULL: an SQS redelivery arriving after a
+      // successful dispatch (e.g., user edited the campaign and broke
+      // electionDate in between) must not overwrite status on a live record.
+      await this.model.updateMany({
+        where: { id: tcrComplianceId, agenticRunId: null },
         data: { status: TcrComplianceStatus.error },
       })
       return

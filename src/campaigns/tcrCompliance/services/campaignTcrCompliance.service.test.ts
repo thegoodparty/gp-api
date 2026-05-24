@@ -789,13 +789,32 @@ describe('CampaignTcrComplianceService - handleAgenticKickoff', () => {
       await service.handleAgenticKickoff(kickoff)
 
       expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
-      expect(mockModel.update).toHaveBeenCalledWith({
-        where: { id: kickoff.tcrComplianceId },
+      expect(mockModel.updateMany).toHaveBeenCalledWith({
+        where: { id: kickoff.tcrComplianceId, agenticRunId: null },
         data: { status: TcrComplianceStatus.error },
       })
-      expect(mockModel.updateMany).not.toHaveBeenCalled()
+      expect(mockModel.update).not.toHaveBeenCalled()
     },
   )
+
+  it('does not overwrite status on a record that already has agenticRunId set when electionDate becomes invalid', async () => {
+    mockCampaigns.findUnique.mockResolvedValueOnce({
+      ...campaign,
+      details: { electionDate: 'November 2027' },
+    })
+    // Simulate the prior successful dispatch having stamped agenticRunId.
+    mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+
+    await service.handleAgenticKickoff(kickoff)
+
+    expect(mockExperimentRuns.dispatchRun).not.toHaveBeenCalled()
+    // The updateMany ran but matched zero rows because the WHERE requires
+    // agenticRunId: null — the live dispatch isn't disturbed.
+    expect(mockModel.updateMany).toHaveBeenCalledWith({
+      where: { id: kickoff.tcrComplianceId, agenticRunId: null },
+      data: { status: TcrComplianceStatus.error },
+    })
+  })
 
   it('drops silently when the TcrCompliance record does not exist', async () => {
     mockModel.findUnique.mockResolvedValueOnce(null)
