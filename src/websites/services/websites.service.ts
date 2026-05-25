@@ -48,7 +48,10 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
     return this.model.update(args)
   }
 
-  async findByDomainName(domainName: string, include?: Prisma.WebsiteInclude) {
+  async findByDomainName<I extends Prisma.WebsiteInclude>(
+    domainName: string,
+    include?: I,
+  ) {
     const domainRecord = await this.client.domain.findUniqueOrThrow({
       where: { name: domainName },
       include: {
@@ -58,6 +61,8 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
       },
     })
 
-    return domainRecord.website
+    return domainRecord.website as Prisma.WebsiteGetPayload<{
+      include: I
+    }> | null
   }
 }
