@@ -52,7 +52,7 @@ export class PositionsController {
   @Delete(':id')
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.positionsService.delete(id)
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    await this.positionsService.delete(id)
   }
 }
