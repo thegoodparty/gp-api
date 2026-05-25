@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -391,7 +392,10 @@ export class WebsitesController {
       where: { id: websiteId },
       include: WEBSITE_CONTENT_INCLUDES,
     })
-    if (website?.campaign?.user) {
+    if (!website || website.status !== WebsiteStatus.published) {
+      throw new NotFoundException()
+    }
+    if (website.campaign?.user) {
       website.campaign.user = await this.clerkEnricher.enrichUser(
         website.campaign.user,
       )
