@@ -130,9 +130,12 @@ test.describe('Websites - CRUD Operations', () => {
       headers: authHeaders(authToken, orgSlug),
       multipart: {
         'main[title]': mainTitle,
+        'about[bio]': 'A test biography',
         'about[issues][0][title]': issueTitle,
         'about[issues][0][description]': issueDescription,
+        'contact[address]': '123 Main St',
         'contact[email]': contactEmail,
+        'contact[phone]': '5555555555',
         vanityPath: vanityPath,
         status: 'published',
       },
