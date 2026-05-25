@@ -385,10 +385,11 @@ export class WebsitesController {
   @Get('by-domain/:domain')
   @PublicAccess()
   async getWebsiteByDomain(@Param('domain') domain: string) {
-    const website = await this.websites.findByDomainName(
-      domain,
-      WEBSITE_CONTENT_INCLUDES,
-    )
+    const websiteId = await this.websites.getWebsiteIdByDomain(domain)
+    const website = await this.websites.findUnique({
+      where: { id: websiteId },
+      include: WEBSITE_CONTENT_INCLUDES,
+    })
     if (!website || website.status !== WebsiteStatus.published) {
       throw new NotFoundException()
     }

@@ -48,7 +48,8 @@ describe('WebsitesController', () => {
   }
   let mockWebsitesService: {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
-    findByDomainName: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+    getWebsiteIdByDomain: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
   }
   let mockClerkEnricher: ReturnType<typeof createMockClerkEnricher>
@@ -63,7 +64,8 @@ describe('WebsitesController', () => {
         content: completeContent,
         hasEverBeenPublished: false,
       }),
-      findByDomainName: vi.fn(),
+      findUnique: vi.fn(),
+      getWebsiteIdByDomain: vi.fn(),
       update: vi.fn().mockResolvedValue({
         id: 1,
         content: completeContent,
@@ -462,8 +464,12 @@ describe('WebsitesController', () => {
     const domain = 'example-candidate.com'
     const websiteId = 42
 
+    beforeEach(() => {
+      mockWebsitesService.getWebsiteIdByDomain.mockResolvedValue(websiteId)
+    })
+
     it('throws NotFoundException when website is null', async () => {
-      mockWebsitesService.findByDomainName.mockResolvedValue(null)
+      mockWebsitesService.findUnique.mockResolvedValue(null)
 
       await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
         NotFoundException,
@@ -471,7 +477,7 @@ describe('WebsitesController', () => {
     })
 
     it('throws NotFoundException when unpublished', async () => {
-      mockWebsitesService.findByDomainName.mockResolvedValue({
+      mockWebsitesService.findUnique.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.unpublished,
         content: completeContent,
@@ -483,26 +489,26 @@ describe('WebsitesController', () => {
     })
 
     it('returns published website and enriches user', async () => {
-      const mockUser = {
+      const mockDomainUser = {
         clerkId: 'clerk_123',
         firstName: 'Jane',
         lastName: 'Doe',
       }
-      mockWebsitesService.findByDomainName.mockResolvedValue({
+      mockWebsitesService.findUnique.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.published,
         content: completeContent,
-        campaign: { user: mockUser },
+        campaign: { user: mockDomainUser },
       })
 
       const result = await controller.getWebsiteByDomain(domain)
 
       expect(result.id).toBe(websiteId)
-      expect(mockClerkEnricher.enrichUser).toHaveBeenCalledWith(mockUser)
+      expect(mockClerkEnricher.enrichUser).toHaveBeenCalledWith(mockDomainUser)
     })
 
     it('skips enrichment when no user', async () => {
-      mockWebsitesService.findByDomainName.mockResolvedValue({
+      mockWebsitesService.findUnique.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.published,
         content: completeContent,
