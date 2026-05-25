@@ -222,9 +222,20 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
     const existingByEmail = await this.findUserByEmail(data.email)
     if (existingByEmail) {
+      if (existingByEmail.clerkId) {
+        this.logger.warn(
+          {
+            userId: existingByEmail.id,
+            existingClerkId: existingByEmail.clerkId,
+            incomingClerkId: data.clerkId,
+          },
+          'Refused clerkId rebind on user that already has a Clerk identity',
+        )
+        return null
+      }
       this.logger.info(
         { userId: existingByEmail.id, clerkId: data.clerkId },
-        'Linking existing user to Clerk account',
+        'Linking legacy user to Clerk account',
       )
       return this.updateUser(
         { id: existingByEmail.id },
