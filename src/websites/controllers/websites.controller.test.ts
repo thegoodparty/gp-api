@@ -469,74 +469,62 @@ describe('WebsitesController', () => {
     const websiteId = 42
 
     beforeEach(() => {
-      mockWebsitesService.client.domain.findUniqueOrThrow
-        .mockResolvedValue({ websiteId })
+      mockWebsitesService.client.domain.findUniqueOrThrow.mockResolvedValue({
+        websiteId,
+      })
     })
 
     it('throws NotFoundException when website is null', async () => {
       mockWebsitesService.findUnique.mockResolvedValue(null)
 
-      await expect(
-        controller.getWebsiteByDomain(domain),
-      ).rejects.toThrow(NotFoundException)
+      await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
+        NotFoundException,
+      )
     })
 
-    it(
-      'throws NotFoundException when website is unpublished',
-      async () => {
-        mockWebsitesService.findUnique.mockResolvedValue({
-          id: websiteId,
-          status: WebsiteStatus.unpublished,
-          content: completeContent,
-        })
+    it('throws NotFoundException when website is unpublished', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.unpublished,
+        content: completeContent,
+      })
 
-        await expect(
-          controller.getWebsiteByDomain(domain),
-        ).rejects.toThrow(NotFoundException)
-      },
-    )
+      await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
+        NotFoundException,
+      )
+    })
 
-    it(
-      'returns published website with enriched user',
-      async () => {
-        mockWebsitesService.findUnique.mockResolvedValue({
-          id: websiteId,
-          status: WebsiteStatus.published,
-          content: completeContent,
-          campaign: {
-            user: {
-              clerkId: 'clerk_123',
-              firstName: 'Jane',
-              lastName: 'Doe',
-            },
+    it('returns published website with enriched user', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.published,
+        content: completeContent,
+        campaign: {
+          user: {
+            clerkId: 'clerk_123',
+            firstName: 'Jane',
+            lastName: 'Doe',
           },
-        })
+        },
+      })
 
-        const result =
-          await controller.getWebsiteByDomain(domain)
+      const result = await controller.getWebsiteByDomain(domain)
 
-        expect(result.id).toBe(websiteId)
-        expect(result.status).toBe(
-          WebsiteStatus.published,
-        )
-      },
-    )
+      expect(result.id).toBe(websiteId)
+      expect(result.status).toBe(WebsiteStatus.published)
+    })
 
-    it(
-      'returns published website without user enrichment',
-      async () => {
-        mockWebsitesService.findUnique.mockResolvedValue({
-          id: websiteId,
-          status: WebsiteStatus.published,
-          content: completeContent,
-          campaign: { user: null },
-        })
+    it('returns published website without user enrichment', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.published,
+        content: completeContent,
+        campaign: { user: null },
+      })
 
-        const result =
-          await controller.getWebsiteByDomain(domain)
+      const result = await controller.getWebsiteByDomain(domain)
 
-        expect(result.id).toBe(websiteId)
-      },
-    )
+      expect(result.id).toBe(websiteId)
+    })
   })
 })
