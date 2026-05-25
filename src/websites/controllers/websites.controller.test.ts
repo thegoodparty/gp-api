@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { HttpStatus } from '@nestjs/common'
+import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { WebsiteStatus } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
@@ -48,8 +48,11 @@ describe('WebsitesController', () => {
   }
   let mockWebsitesService: {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+    getWebsiteIdByDomain: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
   }
+  let mockClerkEnricher: ReturnType<typeof createMockClerkEnricher>
 
   beforeEach(async () => {
     mockAnalytics = {
@@ -61,7 +64,12 @@ describe('WebsitesController', () => {
         content: completeContent,
         hasEverBeenPublished: false,
       }),
-      update: vi.fn().mockResolvedValue({ id: 1, content: completeContent }),
+      findUnique: vi.fn(),
+      getWebsiteIdByDomain: vi.fn(),
+      update: vi.fn().mockResolvedValue({
+        id: 1,
+        content: completeContent,
+      }),
     }
     mockFilesService = {
       uploadFile: vi.fn().mockResolvedValue('uploaded-file-url'),
@@ -78,7 +86,10 @@ describe('WebsitesController', () => {
         { provide: AnalyticsService, useValue: mockAnalytics },
         {
           provide: ClerkUserEnricherService,
-          useValue: createMockClerkEnricher(),
+          useFactory: () => {
+            mockClerkEnricher = createMockClerkEnricher()
+            return mockClerkEnricher
+          },
         },
         { provide: PinoLogger, useValue: createMockLogger() },
         WebsitesController,
@@ -446,6 +457,68 @@ describe('WebsitesController', () => {
 
       expect(mockFilesService.uploadFile).not.toHaveBeenCalled()
       expect(mockWebsitesService.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getWebsiteByDomain', () => {
+    const domain = 'example-candidate.com'
+    const websiteId = 42
+
+    beforeEach(() => {
+      mockWebsitesService.getWebsiteIdByDomain.mockResolvedValue(websiteId)
+    })
+
+    it('throws NotFoundException when website is null', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue(null)
+
+      await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
+        NotFoundException,
+      )
+    })
+
+    it('throws NotFoundException when unpublished', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.unpublished,
+        content: completeContent,
+      })
+
+      await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
+        NotFoundException,
+      )
+    })
+
+    it('returns published website and enriches user', async () => {
+      const mockDomainUser = {
+        clerkId: 'clerk_123',
+        firstName: 'Jane',
+        lastName: 'Doe',
+      }
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.published,
+        content: completeContent,
+        campaign: { user: mockDomainUser },
+      })
+
+      const result = await controller.getWebsiteByDomain(domain)
+
+      expect(result.id).toBe(websiteId)
+      expect(mockClerkEnricher.enrichUser).toHaveBeenCalledWith(mockDomainUser)
+    })
+
+    it('skips enrichment when no user', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue({
+        id: websiteId,
+        status: WebsiteStatus.published,
+        content: completeContent,
+        campaign: { user: null },
+      })
+
+      const result = await controller.getWebsiteByDomain(domain)
+
+      expect(result.id).toBe(websiteId)
+      expect(mockClerkEnricher.enrichUser).not.toHaveBeenCalled()
     })
   })
 })

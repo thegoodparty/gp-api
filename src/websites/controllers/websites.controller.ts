@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -384,14 +385,15 @@ export class WebsitesController {
   @Get('by-domain/:domain')
   @PublicAccess()
   async getWebsiteByDomain(@Param('domain') domain: string) {
-    const { websiteId } = await this.websites.client.domain.findUniqueOrThrow({
-      where: { name: domain },
-    })
+    const websiteId = await this.websites.getWebsiteIdByDomain(domain)
     const website = await this.websites.findUnique({
       where: { id: websiteId },
       include: WEBSITE_CONTENT_INCLUDES,
     })
-    if (website?.campaign?.user) {
+    if (!website || website.status !== WebsiteStatus.published) {
+      throw new NotFoundException()
+    }
+    if (website.campaign?.user) {
       website.campaign.user = await this.clerkEnricher.enrichUser(
         website.campaign.user,
       )
