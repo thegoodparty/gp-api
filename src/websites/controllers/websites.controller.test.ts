@@ -48,14 +48,10 @@ describe('WebsitesController', () => {
   }
   let mockWebsitesService: {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
-    findUnique: ReturnType<typeof vi.fn>
+    findByDomainName: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
-    client: {
-      domain: {
-        findUniqueOrThrow: ReturnType<typeof vi.fn>
-      }
-    }
   }
+  let mockClerkEnricher: ReturnType<typeof createMockClerkEnricher>
 
   beforeEach(async () => {
     mockAnalytics = {
@@ -67,16 +63,11 @@ describe('WebsitesController', () => {
         content: completeContent,
         hasEverBeenPublished: false,
       }),
-      findUnique: vi.fn(),
+      findByDomainName: vi.fn(),
       update: vi.fn().mockResolvedValue({
         id: 1,
         content: completeContent,
       }),
-      client: {
-        domain: {
-          findUniqueOrThrow: vi.fn(),
-        },
-      },
     }
     mockFilesService = {
       uploadFile: vi.fn().mockResolvedValue('uploaded-file-url'),
@@ -93,7 +84,10 @@ describe('WebsitesController', () => {
         { provide: AnalyticsService, useValue: mockAnalytics },
         {
           provide: ClerkUserEnricherService,
-          useValue: createMockClerkEnricher(),
+          useFactory: () => {
+            mockClerkEnricher = createMockClerkEnricher()
+            return mockClerkEnricher
+          },
         },
         { provide: PinoLogger, useValue: createMockLogger() },
         WebsitesController,
@@ -468,22 +462,16 @@ describe('WebsitesController', () => {
     const domain = 'example-candidate.com'
     const websiteId = 42
 
-    beforeEach(() => {
-      mockWebsitesService.client.domain.findUniqueOrThrow.mockResolvedValue({
-        websiteId,
-      })
-    })
-
     it('throws NotFoundException when website is null', async () => {
-      mockWebsitesService.findUnique.mockResolvedValue(null)
+      mockWebsitesService.findByDomainName.mockResolvedValue(null)
 
       await expect(controller.getWebsiteByDomain(domain)).rejects.toThrow(
         NotFoundException,
       )
     })
 
-    it('throws NotFoundException when website is unpublished', async () => {
-      mockWebsitesService.findUnique.mockResolvedValue({
+    it('throws NotFoundException when unpublished', async () => {
+      mockWebsitesService.findByDomainName.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.unpublished,
         content: completeContent,
@@ -494,28 +482,27 @@ describe('WebsitesController', () => {
       )
     })
 
-    it('returns published website with enriched user', async () => {
-      mockWebsitesService.findUnique.mockResolvedValue({
+    it('returns published website and enriches user', async () => {
+      const mockUser = {
+        clerkId: 'clerk_123',
+        firstName: 'Jane',
+        lastName: 'Doe',
+      }
+      mockWebsitesService.findByDomainName.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.published,
         content: completeContent,
-        campaign: {
-          user: {
-            clerkId: 'clerk_123',
-            firstName: 'Jane',
-            lastName: 'Doe',
-          },
-        },
+        campaign: { user: mockUser },
       })
 
       const result = await controller.getWebsiteByDomain(domain)
 
       expect(result.id).toBe(websiteId)
-      expect(result.status).toBe(WebsiteStatus.published)
+      expect(mockClerkEnricher.enrichUser).toHaveBeenCalledWith(mockUser)
     })
 
-    it('returns published website without user enrichment', async () => {
-      mockWebsitesService.findUnique.mockResolvedValue({
+    it('skips enrichment when no user', async () => {
+      mockWebsitesService.findByDomainName.mockResolvedValue({
         id: websiteId,
         status: WebsiteStatus.published,
         content: completeContent,
@@ -525,6 +512,7 @@ describe('WebsitesController', () => {
       const result = await controller.getWebsiteByDomain(domain)
 
       expect(result.id).toBe(websiteId)
+      expect(mockClerkEnricher.enrichUser).not.toHaveBeenCalled()
     })
   })
 })
