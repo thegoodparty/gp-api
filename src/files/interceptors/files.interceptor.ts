@@ -126,7 +126,7 @@ export function FilesInterceptor(
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               part.value as Prisma.JsonValue,
             )
-          } else {
+          } else if (!FORBIDDEN_KEYS.has(part.fieldname)) {
             // Multipart form value to Prisma JSON — no shared type between fastify and Prisma
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             req.body[part.fieldname] = part.value as Prisma.JsonValue
@@ -138,6 +138,12 @@ export function FilesInterceptor(
     }
   }
 }
+
+const FORBIDDEN_KEYS = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+])
 
 /**
  * Helper function to set nested object properties
@@ -151,11 +157,16 @@ function setNestedProperty(
   value: Prisma.JsonValue,
 ) {
   if (!path.includes('[') || !path.includes(']')) {
+    if (FORBIDDEN_KEYS.has(path)) return
     obj[path] = value
     return
   }
 
-  const keys = path.split(/[\[\]]/).filter((key) => key !== '')
+  const keys = path
+    .split(/[\[\]]/)
+    .filter((key) => key !== '')
+
+  if (keys.some((k) => FORBIDDEN_KEYS.has(k))) return
 
   let current = obj
 
@@ -169,9 +180,15 @@ function setNestedProperty(
       current[key] = isNextKeyNumeric ? [] : {}
     } else if (typeof current[key] !== 'object') {
       current[key] = isNextKeyNumeric ? [] : {}
-    } else if (isNextKeyNumeric && !Array.isArray(current[key])) {
+    } else if (
+      isNextKeyNumeric &&
+      !Array.isArray(current[key])
+    ) {
       current[key] = []
-    } else if (!isNextKeyNumeric && Array.isArray(current[key])) {
+    } else if (
+      !isNextKeyNumeric &&
+      Array.isArray(current[key])
+    ) {
       current[key] = {}
     }
 
