@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { HttpStatus } from '@nestjs/common'
+import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { WebsiteStatus } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
@@ -48,7 +48,13 @@ describe('WebsitesController', () => {
   }
   let mockWebsitesService: {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
+    client: {
+      domain: {
+        findUniqueOrThrow: ReturnType<typeof vi.fn>
+      }
+    }
   }
 
   beforeEach(async () => {
@@ -61,7 +67,16 @@ describe('WebsitesController', () => {
         content: completeContent,
         hasEverBeenPublished: false,
       }),
-      update: vi.fn().mockResolvedValue({ id: 1, content: completeContent }),
+      findUnique: vi.fn(),
+      update: vi.fn().mockResolvedValue({
+        id: 1,
+        content: completeContent,
+      }),
+      client: {
+        domain: {
+          findUniqueOrThrow: vi.fn(),
+        },
+      },
     }
     mockFilesService = {
       uploadFile: vi.fn().mockResolvedValue('uploaded-file-url'),
@@ -447,5 +462,81 @@ describe('WebsitesController', () => {
       expect(mockFilesService.uploadFile).not.toHaveBeenCalled()
       expect(mockWebsitesService.update).not.toHaveBeenCalled()
     })
+  })
+
+  describe('getWebsiteByDomain', () => {
+    const domain = 'example-candidate.com'
+    const websiteId = 42
+
+    beforeEach(() => {
+      mockWebsitesService.client.domain.findUniqueOrThrow
+        .mockResolvedValue({ websiteId })
+    })
+
+    it('throws NotFoundException when website is null', async () => {
+      mockWebsitesService.findUnique.mockResolvedValue(null)
+
+      await expect(
+        controller.getWebsiteByDomain(domain),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it(
+      'throws NotFoundException when website is unpublished',
+      async () => {
+        mockWebsitesService.findUnique.mockResolvedValue({
+          id: websiteId,
+          status: WebsiteStatus.unpublished,
+          content: completeContent,
+        })
+
+        await expect(
+          controller.getWebsiteByDomain(domain),
+        ).rejects.toThrow(NotFoundException)
+      },
+    )
+
+    it(
+      'returns published website with enriched user',
+      async () => {
+        mockWebsitesService.findUnique.mockResolvedValue({
+          id: websiteId,
+          status: WebsiteStatus.published,
+          content: completeContent,
+          campaign: {
+            user: {
+              clerkId: 'clerk_123',
+              firstName: 'Jane',
+              lastName: 'Doe',
+            },
+          },
+        })
+
+        const result =
+          await controller.getWebsiteByDomain(domain)
+
+        expect(result.id).toBe(websiteId)
+        expect(result.status).toBe(
+          WebsiteStatus.published,
+        )
+      },
+    )
+
+    it(
+      'returns published website without user enrichment',
+      async () => {
+        mockWebsitesService.findUnique.mockResolvedValue({
+          id: websiteId,
+          status: WebsiteStatus.published,
+          content: completeContent,
+          campaign: { user: null },
+        })
+
+        const result =
+          await controller.getWebsiteByDomain(domain)
+
+        expect(result.id).toBe(websiteId)
+      },
+    )
   })
 })
