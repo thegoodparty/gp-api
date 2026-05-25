@@ -48,15 +48,19 @@ export class CampaignPositionsController {
 
   @Put(':positionId')
   update(
+    @Param('id', ParseIntPipe) id: number,
     @Param('positionId', ParseIntPipe) positionId: number,
     @Body() body: UpdateCampaignPositionSchema,
   ) {
-    return this.campaignPositionsService.update(positionId, body)
+    return this.campaignPositionsService.update(positionId, id, body)
   }
 
   @Delete(':positionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('positionId', ParseIntPipe) positionId: number) {
-    return this.campaignPositionsService.delete(positionId)
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('positionId', ParseIntPipe) positionId: number,
+  ) {
+    await this.campaignPositionsService.delete(positionId, id)
   }
 }
