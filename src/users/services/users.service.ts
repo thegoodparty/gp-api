@@ -229,7 +229,21 @@ export class UsersService extends createPrismaBase(MODELS.User) {
             existingClerkId: existingByEmail.clerkId,
             incomingClerkId: data.clerkId,
           },
-          'Refused clerkId rebind on user that already has a Clerk identity',
+          'Refused clerkId rebind: user already has a Clerk identity',
+        )
+        return null
+      }
+      const updated = await this.model.updateMany({
+        where: { id: existingByEmail.id, clerkId: null },
+        data: { clerkId: data.clerkId },
+      })
+      if (updated.count === 0) {
+        this.logger.warn(
+          {
+            userId: existingByEmail.id,
+            incomingClerkId: data.clerkId,
+          },
+          'Refused clerkId rebind: concurrent writer set clerkId first',
         )
         return null
       }
@@ -237,10 +251,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         { userId: existingByEmail.id, clerkId: data.clerkId },
         'Linking legacy user to Clerk account',
       )
-      return this.updateUser(
-        { id: existingByEmail.id },
-        { clerkId: data.clerkId },
-      )
+      return this.findUser({ id: existingByEmail.id })
     }
 
     try {

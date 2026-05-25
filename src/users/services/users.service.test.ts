@@ -422,6 +422,111 @@ describe('UsersService', () => {
     })
   })
 
+  describe('findOrProvisionByClerk', () => {
+    it('returns existing user when found by clerkId', async () => {
+      const existing = await service.prisma.user.create({
+        data: {
+          email: 'clerk-existing@test.goodparty.org',
+          clerkId: 'user_existing_clerk',
+          firstName: 'Existing',
+          lastName: 'User',
+        },
+      })
+
+      const result = await usersService.findOrProvisionByClerk({
+        clerkId: 'user_existing_clerk',
+        email: 'clerk-existing@test.goodparty.org',
+        firstName: 'Existing',
+        lastName: 'User',
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.id).toBe(existing.id)
+    })
+
+    it('returns null when email matches a user that already has a clerkId', async () => {
+      await service.prisma.user.create({
+        data: {
+          email: 'victim@test.goodparty.org',
+          clerkId: 'user_victim_clerk',
+          firstName: 'Victim',
+          lastName: 'User',
+        },
+      })
+
+      const result = await usersService.findOrProvisionByClerk({
+        clerkId: 'user_attacker_clerk',
+        email: 'victim@test.goodparty.org',
+        firstName: 'Attacker',
+        lastName: 'User',
+      })
+
+      expect(result).toBeNull()
+    })
+
+    it('does not overwrite clerkId on a user that already has one', async () => {
+      const victim = await service.prisma.user.create({
+        data: {
+          email: 'no-rebind@test.goodparty.org',
+          clerkId: 'user_original_clerk',
+          firstName: 'Original',
+          lastName: 'User',
+        },
+      })
+
+      await usersService.findOrProvisionByClerk({
+        clerkId: 'user_attacker_clerk',
+        email: 'no-rebind@test.goodparty.org',
+        firstName: 'Attacker',
+        lastName: 'User',
+      })
+
+      const after = await service.prisma.user.findUnique({
+        where: { id: victim.id },
+      })
+      expect(after?.clerkId).toBe('user_original_clerk')
+    })
+
+    it('links legacy user with null clerkId to new Clerk identity', async () => {
+      const legacy = await service.prisma.user.create({
+        data: {
+          email: 'legacy@test.goodparty.org',
+          clerkId: null,
+          firstName: 'Legacy',
+          lastName: 'User',
+        },
+      })
+
+      const result = await usersService.findOrProvisionByClerk({
+        clerkId: 'user_new_clerk',
+        email: 'legacy@test.goodparty.org',
+        firstName: 'Legacy',
+        lastName: 'User',
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.id).toBe(legacy.id)
+
+      const after = await service.prisma.user.findUnique({
+        where: { id: legacy.id },
+      })
+      expect(after?.clerkId).toBe('user_new_clerk')
+    })
+
+    it('creates a new user when no match by clerkId or email', async () => {
+      const result = await usersService.findOrProvisionByClerk({
+        clerkId: 'user_brand_new',
+        email: 'brand-new@test.goodparty.org',
+        firstName: 'Brand',
+        lastName: 'New',
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.clerkId).toBe('user_brand_new')
+      expect(result?.email).toBe('brand-new@test.goodparty.org')
+    })
+  })
+
   describe('deleteUser', () => {
     let clerkClient: ClerkClient
     let analyticsService: AnalyticsService
