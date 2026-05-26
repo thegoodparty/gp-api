@@ -29,7 +29,16 @@ const getSSMParameter = async (name: string) => {
   return Parameter.Value
 }
 
-const run = (cmd: string, opts?: ExecSyncOptions) => {
+type RunOptions = ExecSyncOptions & {
+  // When true, a non-zero exit from `cmd` is swallowed: no console.error,
+  // no process.exit. Use this for commands whose stderr stream is captured
+  // into a file that must stay clean (e.g. `pulumi preview --json` in CI,
+  // see the diff handler below).
+  silentOnFailure?: boolean
+}
+
+const run = (cmd: string, opts?: RunOptions) => {
+  const { silentOnFailure, ...execOpts } = opts ?? {}
   try {
     execSync(cmd, {
       stdio: 'inherit',
@@ -41,9 +50,10 @@ const run = (cmd: string, opts?: ExecSyncOptions) => {
         GRAFANA_AUTH,
         GRAFANA_SM_ACCESS_TOKEN,
       },
-      ...opts,
+      ...execOpts,
     })
   } catch (e) {
+    if (silentOnFailure) return
     console.error(`\nCommand failed: ${cmd}`)
     // Caught error has no static type — extracting exit code for process.exit
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -109,23 +119,47 @@ const setupStack = async (env: string) => {
   GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
   GRAFANA_SM_ACCESS_TOKEN = await getSSMParameter('grafana-sm-access-token')
 
-  run('pulumi login s3://goodparty-iac-state', {
-    // Ignore stdio -- we need the output to be pure JSON for diffs in CI
-    stdio: process.env.CI ? ['inherit', 'ignore', 'inherit'] : 'inherit',
+  // In CI, every setup pulumi command must keep both stdout AND stderr fully
+  // silenced. The infrastructure-diffs workflow runs the diff with
+  // `> /tmp/preview-$env.json 2>&1`, so any stream a child process inherits
+  // ends up in the JSON file and breaks jq parsing. Pulumi setup commands
+  // write success/configuration lines (the original culprit, fixed by
+  // ignoring stdout) and occasionally backend-state warnings to stderr; both
+  // need to go to /dev/null in CI.
+  //
+  // The trade-off: if a setup command fails in CI we lose pulumi's underlying
+  // error message. The `try/catch` in `run()` still surfaces the failed
+  // command and exit code via console.error, so the workflow log will still
+  // show *that* a command failed, just not pulumi's specific reason. A
+  // failed setup is also rare (these are non-mutating reads + idempotent
+  // config writes). Worth it to keep CI green.
+  const setupStdio: ExecSyncOptions['stdio'] = process.env.CI
+    ? ['inherit', 'ignore', 'ignore']
+    : 'inherit'
+
+  run('pulumi login s3://goodparty-iac-state', { stdio: setupStdio })
+  run(`pulumi stack select ${stack} --create`, { stdio: setupStdio })
+  run(`pulumi config set aws:region ${AWS_REGION}`, { stdio: setupStdio })
+  run(`pulumi config set environment ${env}`, { stdio: setupStdio })
+  run(`pulumi config set imageUri ${imageUri}`, { stdio: setupStdio })
+  run('pulumi config set grafana:url https://goodparty.grafana.net', {
+    stdio: setupStdio,
   })
-  run(`pulumi stack select ${stack} --create`)
-  run(`pulumi config set aws:region ${AWS_REGION}`)
-  run(`pulumi config set environment ${env}`)
-  run(`pulumi config set imageUri ${imageUri}`)
-  run('pulumi config set grafana:url https://goodparty.grafana.net')
   run(
     'pulumi config set grafana:smUrl https://synthetic-monitoring-api-us-east-3.grafana.net',
+    { stdio: setupStdio },
   )
   if (env === 'preview') {
-    run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`)
+    run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`, {
+      stdio: setupStdio,
+    })
   }
-  run(`pulumi config set --path aws:defaultTags.tags.Environment ${env}`)
-  run(`pulumi config set --path aws:defaultTags.tags.Project gp-api`)
+  run(`pulumi config set --path aws:defaultTags.tags.Environment ${env}`, {
+    stdio: setupStdio,
+  })
+  run(`pulumi config set --path aws:defaultTags.tags.Project gp-api`, {
+    stdio: setupStdio,
+  })
 }
 
 yargs(hideBin(process.argv))
@@ -148,7 +182,24 @@ yargs(hideBin(process.argv))
         }),
     async (argv) => {
       await setupStack(argv.environment)
-      run(argv.json ? 'pulumi preview --json' : 'pulumi preview --diff')
+      // In CI, the `--json` variant is consumed by jq (see
+      // .github/workflows/infrastructure-diffs.yml). The workflow redirects
+      // with `> file 2>&1`, so any byte we let into stderr lands in the
+      // JSON file and breaks jq parsing. Two sources to silence:
+      //   1. pulumi's own stderr (progress lines, warnings).
+      //   2. our `run()` wrapper's "Command failed: ..." console.error,
+      //      which fires when pulumi exits non-zero (and pulumi exits
+      //      non-zero whenever the preview surfaces ANY error in
+      //      .diagnostics, even though the JSON it emits is well-formed
+      //      and complete).
+      // The workflow already inspects .diagnostics for errors and prints
+      // them in the PR comment (infrastructure-diffs.yml:66), so we're
+      // not losing information.
+      const isJsonInCi = argv.json && Boolean(process.env.CI)
+      run(argv.json ? 'pulumi preview --json' : 'pulumi preview --diff', {
+        stdio: isJsonInCi ? ['inherit', 'inherit', 'ignore'] : 'inherit',
+        silentOnFailure: isJsonInCi,
+      })
     },
   )
   .command(

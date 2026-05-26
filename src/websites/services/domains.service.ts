@@ -3,6 +3,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -644,12 +645,24 @@ export class DomainsService
   async purchaseDomainForCampaign(
     campaign: Campaign & { user: User },
     domainName: string,
+    maxPrice: number,
   ): Promise<{
     website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
     domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
     alreadyExisted: boolean
     message: string
   }> {
+    // The skip-payment branch below bills GP's Vercel team account; gate to
+    // Pro campaigns so non-Pro browser callers can't bypass Stripe Checkout.
+    // (Pro covers the bundled domain per the product design.) Strict
+    // agent-only discrimination would require an actor-token claim from the
+    // broker — tracked separately.
+    if (!campaign.isPro) {
+      throw new ForbiddenException(
+        'Domain purchase requires an active Pro subscription',
+      )
+    }
+
     const preflightHit = await this.preflightDomainPurchase(
       campaign.id,
       domainName,
@@ -680,6 +693,12 @@ export class DomainsService
 
     const price = await this.lookupDomainPrice(domainName)
 
+    if (price > maxPrice) {
+      throw new ConflictException(
+        `Domain ${domainName} price ${price} exceeds maxPrice ${maxPrice}`,
+      )
+    }
+
     const locked = await this.reserveDomainForCampaign(
       campaign.id,
       domainName,
@@ -697,24 +716,45 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-    // NOTE: this method only reserves the Domain row (status=pending) and
-    // does NOT call completeDomainRegistration — that requires a non-null
-    // paymentId and must be invoked after payment is confirmed (e.g. via a
-    // Stripe webhook). No HTTP route should call this method directly until
-    // that payment-confirmation leg is wired up, or domains will stall in
-    // DomainStatus.pending with no recovery path.
+    // Agent purchases handle registration inline (no Stripe charge — domain
+    // billed to GP's Vercel team account; the maxPrice check above is the
+    // safety bound). Browser purchases flow through handleDomainPostPurchase,
+    // which sets paymentId so completeDomainRegistration's default guard fires.
+    try {
+      const website = await this.client.website.findUniqueOrThrow({
+        where: { id: websiteSummary.id },
+        select: { content: true },
+      })
+      const contactInfo = this.buildContactInfo(campaign.user, website.content)
+      await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
+        skipPaymentVerification: true,
+      })
+    } catch (error) {
+      // Mark inactive so preflight on retry falls through to a fresh reservation
+      // instead of returning alreadyExisted: true for a stuck pending row.
+      // completeDomainRegistration's Vercel-failure path sets this itself, but
+      // other failure modes (the website lookup above, top-level
+      // findUniqueOrThrow, !domain.price, getDomainDetails rethrow, final
+      // status update) do not — this is the safety net for those.
+      await this.model.update({
+        where: { id: createdDomain.id },
+        data: { status: DomainStatus.inactive },
+      })
+      throw error
+    }
 
+    // completeDomainRegistration unconditionally sets status=submitted; reuse
+    // the reservation row's fields rather than re-reading from the DB.
     return {
       website: websiteSummary,
       domain: {
         id: createdDomain.id,
         name: createdDomain.name,
-        status: createdDomain.status,
+        status: DomainStatus.submitted,
         price: createdDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
-      message:
-        'Domain reserved; registration will complete after payment confirmation',
+      message: 'Domain registration submitted',
     }
   }
 
@@ -957,26 +997,31 @@ export class DomainsService
   async completeDomainRegistration(
     websiteId: number,
     contact: RegisterDomainSchema,
+    options: { skipPaymentVerification?: boolean } = {},
   ) {
     const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
 
-    if (!domain.paymentId) {
-      throw new BadRequestException({
-        message: 'No payment ID found for domain',
-        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
-      })
-    }
+    if (!options.skipPaymentVerification) {
+      if (!domain.paymentId) {
+        throw new BadRequestException({
+          message: 'No payment ID found for domain',
+          errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
+        })
+      }
 
-    const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
-
-    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
-      throw new BadRequestException(
-        `Payment not completed. Current status: ${paymentIntent.status}`,
+      const paymentIntent = await this.payments.retrievePayment(
+        domain.paymentId,
       )
+
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
+        throw new BadRequestException(
+          `Payment not completed. Current status: ${paymentIntent.status}`,
+        )
+      }
     }
 
     if (!domain.price) {
@@ -1125,6 +1170,81 @@ export class DomainsService
       verified: verifyResult,
       status: 'configured',
       message: 'Domain configured successfully with Vercel',
+    }
+  }
+
+  async submitRegistrantVerification(
+    domainName: string,
+    verificationUrl: string,
+  ) {
+    const normalized = domainName.toLowerCase()
+    const domain = await this.model.findUnique({
+      where: { name: normalized },
+    })
+    if (!domain) {
+      throw new NotFoundException(
+        `No managed domain found matching ${normalized}`,
+      )
+    }
+
+    if (domain.registrantVerifiedAt) {
+      return {
+        domain: domain.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: domain.registrantVerifiedAt,
+      }
+    }
+
+    try {
+      await this.vercel.submitDomainRegistrantVerification(verificationUrl)
+    } catch {
+      throw new BadGatewayException(
+        `Failed to submit registrant verification for ${normalized}`,
+      )
+    }
+
+    let confirmedVerified: boolean
+    try {
+      const detail = await this.vercel.getDomainDetails(domain.name)
+      confirmedVerified = detail.domain.verified === true
+    } catch (error) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but failed to confirm Vercel domain state: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+
+    if (!confirmedVerified) {
+      throw new BadGatewayException(
+        `Submitted verification URL for ${domain.name} but Vercel still reports the domain as unverified; retry expected via webhook redelivery.`,
+      )
+    }
+
+    const { count } = await this.model.updateMany({
+      where: { id: domain.id, registrantVerifiedAt: null },
+      data: { registrantVerifiedAt: new Date() },
+    })
+
+    if (count === 0) {
+      const current = await this.model.findUniqueOrThrow({
+        where: { id: domain.id },
+      })
+      return {
+        domain: current.name,
+        alreadyVerified: true,
+        registrantVerifiedAt: current.registrantVerifiedAt,
+      }
+    }
+
+    const stamped = await this.model.findUniqueOrThrow({
+      where: { id: domain.id },
+    })
+
+    return {
+      domain: stamped.name,
+      alreadyVerified: false,
+      registrantVerifiedAt: stamped.registrantVerifiedAt,
     }
   }
 

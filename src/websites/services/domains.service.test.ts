@@ -23,6 +23,8 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
@@ -38,6 +40,7 @@ const mockDomain: Domain = {
   status: DomainStatus.pending,
   operationId: null,
   emailForwardingDomainId: null,
+  registrantVerifiedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -59,6 +62,8 @@ describe('DomainsService', () => {
     listDnsRecords: ReturnType<typeof vi.fn>
     createMXRecords: ReturnType<typeof vi.fn>
     createTXTVerificationRecord: ReturnType<typeof vi.fn>
+    submitDomainRegistrantVerification: ReturnType<typeof vi.fn>
+    getDomainDetails: ReturnType<typeof vi.fn>
   }
   let mockForwardEmail: {
     getDomain: ReturnType<typeof vi.fn>
@@ -72,8 +77,10 @@ describe('DomainsService', () => {
     domain: {
       findMany: ReturnType<typeof vi.fn>
       update: ReturnType<typeof vi.fn>
+      updateMany: ReturnType<typeof vi.fn>
       create: ReturnType<typeof vi.fn>
       delete: ReturnType<typeof vi.fn>
+      findUnique: ReturnType<typeof vi.fn>
       findUniqueOrThrow: ReturnType<typeof vi.fn>
     }
     website: {
@@ -98,6 +105,12 @@ describe('DomainsService', () => {
       listDnsRecords: vi.fn().mockResolvedValue([]),
       createMXRecords: vi.fn().mockResolvedValue(undefined),
       createTXTVerificationRecord: vi.fn().mockResolvedValue(undefined),
+      submitDomainRegistrantVerification: vi
+        .fn()
+        .mockResolvedValue({ status: HttpStatus.OK }),
+      getDomainDetails: vi.fn().mockResolvedValue({
+        domain: { verified: true, name: 'test-domain.com' },
+      }),
     }
     mockForwardEmail = {
       getDomain: vi.fn().mockResolvedValue(null),
@@ -130,8 +143,10 @@ describe('DomainsService', () => {
       domain: {
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockResolvedValue(mockDomain),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         create: vi.fn().mockResolvedValue(mockDomain),
         delete: vi.fn().mockResolvedValue(mockDomain),
+        findUnique: vi.fn().mockResolvedValue(mockDomain),
         findUniqueOrThrow: vi.fn().mockResolvedValue(mockDomain),
       },
       website: {
@@ -468,9 +483,10 @@ describe('DomainsService', () => {
   })
 
   describe('purchaseDomainForCampaign', () => {
-    const campaign = createMockCampaign({ id: 42 })
+    const campaign = createMockCampaign({ id: 42, isPro: true })
     const campaignWithUser = { ...campaign, user: mockUser }
     const domainName = 'vote-oneill.run'
+    const maxPrice = 50
 
     const baseWebsite = {
       id: 10,
@@ -485,9 +501,31 @@ describe('DomainsService', () => {
       mockPrisma.website.findUnique.mockResolvedValue(null)
 
       await expect(
-        service.purchaseDomainForCampaign(campaignWithUser, domainName),
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
       ).rejects.toBeInstanceOf(NotFoundException)
 
+      expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
+    })
+
+    it('throws ForbiddenException when the campaign is not Pro', async () => {
+      const nonProCampaign = {
+        ...createMockCampaign({ id: 42, isPro: false }),
+        user: mockUser,
+      }
+
+      await expect(
+        service.purchaseDomainForCampaign(
+          nonProCampaign,
+          domainName,
+          maxPrice,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+
+      expect(mockPrisma.website.findUnique).not.toHaveBeenCalled()
       expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
 
@@ -507,6 +545,7 @@ describe('DomainsService', () => {
         const result = await service.purchaseDomainForCampaign(
           campaignWithUser,
           mockDomain.name,
+          maxPrice,
         )
 
         expect(result.alreadyExisted).toBe(true)
@@ -537,7 +576,11 @@ describe('DomainsService', () => {
         })
 
         await expect(
-          service.purchaseDomainForCampaign(campaignWithUser, domainName),
+          service.purchaseDomainForCampaign(
+            campaignWithUser,
+            domainName,
+            maxPrice,
+          ),
         ).rejects.toBeInstanceOf(ConflictException)
 
         expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
@@ -574,7 +617,11 @@ describe('DomainsService', () => {
         message: 'Disabled',
       })
 
-      await service.purchaseDomainForCampaign(campaignWithUser, domainName)
+      await service.purchaseDomainForCampaign(
+        campaignWithUser,
+        domainName,
+        maxPrice,
+      )
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
       expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1)
@@ -611,7 +658,11 @@ describe('DomainsService', () => {
         message: 'Disabled',
       })
 
-      await service.purchaseDomainForCampaign(campaignWithUser, domainName)
+      await service.purchaseDomainForCampaign(
+        campaignWithUser,
+        domainName,
+        maxPrice,
+      )
 
       const route53Order =
         mockRoute53.checkDomainAvailability.mock.invocationCallOrder[0]
@@ -664,6 +715,7 @@ describe('DomainsService', () => {
       const result = await service.purchaseDomainForCampaign(
         campaignWithUser,
         domainName,
+        maxPrice,
       )
 
       expect(mockPrisma.domain.delete).toHaveBeenCalledWith({
@@ -692,7 +744,11 @@ describe('DomainsService', () => {
       })
 
       await expect(
-        service.purchaseDomainForCampaign(campaignWithUser, domainName),
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
       ).rejects.toBeInstanceOf(ConflictException)
 
       expect(mockPrisma.domain.create).not.toHaveBeenCalled()
@@ -705,13 +761,17 @@ describe('DomainsService', () => {
       })
 
       await expect(
-        service.purchaseDomainForCampaign(campaignWithUser, domainName),
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
       ).rejects.toBeInstanceOf(ConflictException)
 
       expect(mockRoute53.getDomainSuggestions).not.toHaveBeenCalled()
     })
 
-    it('creates a Domain row with paymentId=null on the happy path', async () => {
+    it('creates a Domain row with paymentId=null and returns post-registration status on the happy path', async () => {
       mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
       mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
         content: { contact: {} },
@@ -740,12 +800,12 @@ describe('DomainsService', () => {
       const result = await service.purchaseDomainForCampaign(
         campaignWithUser,
         domainName,
+        maxPrice,
       )
 
       expect(result.alreadyExisted).toBe(false)
       expect(result.domain.name).toBe(domainName)
-      expect(result.domain.status).toBe(DomainStatus.pending)
-      expect(result.website.campaignId).toBe(campaign.id)
+      expect(result.domain.status).toBe(DomainStatus.submitted)
       expect(result.website.campaignId).toBe(campaign.id)
       expect(mockPrisma.domain.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -755,6 +815,109 @@ describe('DomainsService', () => {
           status: DomainStatus.pending,
         }),
       })
+    })
+
+    it('invokes completeDomainRegistration with skipPaymentVerification after reservation', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      const created = {
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      }
+      mockPrisma.domain.create.mockResolvedValue(created)
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...created,
+        status: DomainStatus.submitted,
+      })
+      const completeSpy = vi
+        .spyOn(service, 'completeDomainRegistration')
+        .mockResolvedValue({
+          vercelResult: null,
+          projectResult: null,
+          message: 'Disabled',
+        })
+
+      await service.purchaseDomainForCampaign(
+        campaignWithUser,
+        domainName,
+        maxPrice,
+      )
+
+      expect(completeSpy).toHaveBeenCalledTimes(1)
+      const [websiteIdArg, , optionsArg] = completeSpy.mock.calls[0]
+      expect(websiteIdArg).toBe(baseWebsite.id)
+      expect(optionsArg).toEqual({ skipPaymentVerification: true })
+      const completeOrder = completeSpy.mock.invocationCallOrder[0]
+      const createOrder = mockPrisma.domain.create.mock.invocationCallOrder[0]
+      expect(completeOrder).toBeGreaterThan(createOrder)
+    })
+
+    it('throws ConflictException when looked-up price exceeds maxPrice; no Domain row created', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 75 })
+      const completeSpy = vi.spyOn(service, 'completeDomainRegistration')
+
+      await expect(
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException)
+
+      expect(mockPrisma.domain.create).not.toHaveBeenCalled()
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled()
+      expect(completeSpy).not.toHaveBeenCalled()
+    })
+
+    it('marks the Domain row inactive and re-throws when inline registration fails', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      const created = {
+        ...mockDomain,
+        id: 555,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      }
+      mockPrisma.domain.create.mockResolvedValue(created)
+      const registrationError = new Error(
+        'Error getting domain details from Vercel:',
+      )
+      vi.spyOn(service, 'completeDomainRegistration').mockRejectedValue(
+        registrationError,
+      )
+
+      await expect(
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
+      ).rejects.toBe(registrationError)
+
+      expect(mockPrisma.domain.update).toHaveBeenCalledWith({
+        where: { id: created.id },
+        data: { status: DomainStatus.inactive },
+      })
+      expect(mockPrisma.domain.findUniqueOrThrow).not.toHaveBeenCalled()
     })
   })
 
@@ -801,6 +964,42 @@ describe('DomainsService', () => {
         errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
       })
       expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
+    })
+
+    it('skips the payment guard when skipPaymentVerification is true', async () => {
+      Object.assign(mockPrisma.domain, {
+        findFirst: vi.fn(),
+        findFirstOrThrow: vi.fn(),
+        findUnique: vi.fn(),
+        count: vi.fn(),
+      })
+      service.onModuleInit()
+      vi.spyOn(service, 'shouldEnableDomainPurchase').mockReturnValue(true)
+      const purchaseDomainMock = vi.fn().mockResolvedValue({})
+      Object.assign(mockVercel, {
+        getDomainDetails: vi.fn().mockRejectedValue(new Error('not found')),
+        isVercelNotFoundError: vi.fn().mockReturnValue(true),
+        purchaseDomain: purchaseDomainMock,
+        getProjectDomain: vi.fn().mockRejectedValue(new Error('not found')),
+        addDomainToProject: vi.fn().mockResolvedValue({}),
+      })
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...mockDomain,
+        paymentId: null,
+        price: new Decimal(12),
+      })
+
+      await service.completeDomainRegistration(10, contact, {
+        skipPaymentVerification: true,
+      })
+
+      expect(mockPayments.retrievePayment).not.toHaveBeenCalled()
+      expect(purchaseDomainMock).toHaveBeenCalled()
+      expect(mockPrisma.domain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: DomainStatus.submitted }),
+        }),
+      )
     })
   })
 
@@ -915,6 +1114,126 @@ describe('DomainsService', () => {
       const result = await service.setupDomainEmailForwarding(mockDomain)
 
       expect(result).toMatchObject({ id: 'fed_1' })
+    })
+  })
+
+  describe('submitRegistrantVerification', () => {
+    const verifyUrl =
+      'https://vercel.com/verify-domain?token=abc&domain=foo.com'
+
+    it('submits to Vercel, confirms via getDomainDetails, and stamps registrantVerifiedAt', async () => {
+      const unverified = { ...mockDomain, name: 'foo.com' }
+      const verifiedAt = new Date('2026-05-13T10:00:00.000Z')
+      mockPrisma.domain.findUnique.mockResolvedValue(unverified)
+      mockVercel.getDomainDetails.mockResolvedValue({
+        domain: { verified: true, name: 'foo.com' },
+      })
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...unverified,
+        registrantVerifiedAt: verifiedAt,
+      })
+
+      const result = await service.submitRegistrantVerification(
+        'FOO.COM',
+        verifyUrl,
+      )
+
+      expect(mockPrisma.domain.findUnique).toHaveBeenCalledWith({
+        where: { name: 'foo.com' },
+      })
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).toHaveBeenCalledWith(verifyUrl)
+      expect(mockVercel.getDomainDetails).toHaveBeenCalledWith('foo.com')
+      expect(mockPrisma.domain.updateMany).toHaveBeenCalledWith({
+        where: { id: unverified.id, registrantVerifiedAt: null },
+        data: { registrantVerifiedAt: expect.any(Date) },
+      })
+      expect(result).toMatchObject({
+        domain: 'foo.com',
+        alreadyVerified: false,
+        registrantVerifiedAt: verifiedAt,
+      })
+    })
+
+    it('does NOT stamp when Vercel still reports the domain as unverified after submit', async () => {
+      const unverified = { ...mockDomain, name: 'foo.com' }
+      mockPrisma.domain.findUnique.mockResolvedValue(unverified)
+      mockVercel.getDomainDetails.mockResolvedValue({
+        domain: { verified: false, name: 'foo.com' },
+      })
+
+      await expect(
+        service.submitRegistrantVerification('foo.com', verifyUrl),
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
+
+      expect(mockVercel.submitDomainRegistrantVerification).toHaveBeenCalled()
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('wraps getDomainDetails failures as BadGatewayException without stamping', async () => {
+      mockPrisma.domain.findUnique.mockResolvedValue({
+        ...mockDomain,
+        name: 'foo.com',
+      })
+      mockVercel.getDomainDetails.mockRejectedValueOnce(
+        new Error('vercel API timed out'),
+      )
+
+      await expect(
+        service.submitRegistrantVerification('foo.com', verifyUrl),
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('is idempotent — already-verified domains are not re-submitted', async () => {
+      const alreadyVerifiedAt = new Date('2026-05-12T00:00:00.000Z')
+      mockPrisma.domain.findUnique.mockResolvedValue({
+        ...mockDomain,
+        name: 'foo.com',
+        registrantVerifiedAt: alreadyVerifiedAt,
+      })
+
+      const result = await service.submitRegistrantVerification(
+        'foo.com',
+        verifyUrl,
+      )
+
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).not.toHaveBeenCalled()
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        domain: 'foo.com',
+        alreadyVerified: true,
+        registrantVerifiedAt: alreadyVerifiedAt,
+      })
+    })
+
+    it('throws NotFoundException when the domain is not managed', async () => {
+      mockPrisma.domain.findUnique.mockResolvedValue(null)
+
+      await expect(
+        service.submitRegistrantVerification('unknown.com', verifyUrl),
+      ).rejects.toBeInstanceOf(NotFoundException)
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('wraps Vercel failures as BadGatewayException and does not stamp', async () => {
+      mockPrisma.domain.findUnique.mockResolvedValue({
+        ...mockDomain,
+        name: 'foo.com',
+      })
+      mockVercel.submitDomainRegistrantVerification.mockRejectedValueOnce(
+        new Error('500 from vercel'),
+      )
+
+      await expect(
+        service.submitRegistrantVerification('foo.com', verifyUrl),
+      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
+      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
     })
   })
 

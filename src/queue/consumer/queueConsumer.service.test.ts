@@ -2,6 +2,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
+import { AnnotationAttachmentService } from '@/annotations/services/annotationAttachment.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
@@ -217,6 +219,8 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -778,6 +782,8 @@ describe('QueueConsumerService - handleDomainEmailForwardingMessage', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -961,6 +967,8 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -1068,7 +1076,12 @@ describe('QueueConsumerService - message type routing', () => {
             addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
-        { provide: CampaignTcrComplianceService, useValue: {} },
+        {
+          provide: CampaignTcrComplianceService,
+          useValue: {
+            handleAgenticKickoff: vi.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: ContactsService, useValue: {} },
         { provide: DomainsService, useValue: {} },
         { provide: ElectedOfficeService, useValue: {} },
@@ -1085,6 +1098,14 @@ describe('QueueConsumerService - message type routing', () => {
           useValue: { handleWeeklyTasksDigest: vi.fn() },
         },
         { provide: ExperimentRunsService, useValue: {} },
+        {
+          provide: MeetingBriefingsService,
+          useValue: { onExperimentRunCompleted: vi.fn() },
+        },
+        {
+          provide: AnnotationAttachmentService,
+          useValue: { runOcr: vi.fn() },
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()
@@ -1190,6 +1211,60 @@ describe('QueueConsumerService - message type routing', () => {
     }
 
     // withLegacyErrorSwallowing catches the Zod parse failure and returns true
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).not.toHaveBeenCalled()
+  })
+
+  it('routes agenticComplianceKickoff messages to the TCR compliance handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const validTcrCuid = 'ckpqr7s3z00010o9k1234abcd'
+    const message: Message = {
+      MessageId: 'msg-kickoff-ok',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: validTcrCuid,
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).toHaveBeenCalledOnce()
+    expect(handleSpy).toHaveBeenCalledWith({
+      campaignId: 42,
+      tcrComplianceId: validTcrCuid,
+      clerkUserId: 'user_clerk_xyz',
+    })
+  })
+
+  it('discards agenticComplianceKickoff with invalid payload and does not call handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-kickoff-invalid',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: 'not-a-cuid',
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)

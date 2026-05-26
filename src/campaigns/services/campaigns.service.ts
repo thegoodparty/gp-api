@@ -249,6 +249,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
     scalarFields?: Prisma.CampaignUpdateInput,
+    outerTx?: Prisma.TransactionClient,
   ) {
     const {
       data,
@@ -260,89 +261,79 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       overrideDistrictId,
     } = body
 
-    const updatedCampaign = await this.client.$transaction(
-      async (tx) => {
-        this.logger.debug({ id, body }, 'Updating campaign json fields')
-        // TODO: This should be .findUniqueOrThrow which would remove the need
-        //  for the null check below and subsequently simplify the return
-        //  signature of this method
-        //  https://goodparty.atlassian.net/browse/WEB-4384
-        const campaign = await tx.campaign.findFirst({
-          where: { id },
-        })
+    const runUpdate = async (tx: Prisma.TransactionClient) => {
+      this.logger.debug({ id, body }, 'Updating campaign json fields')
+      const campaign = await tx.campaign.findFirst({
+        where: { id },
+      })
 
-        if (!campaign) return false
+      if (!campaign) return false
 
-        const campaignUpdateData: Prisma.CampaignUpdateInput = {
-          ...scalarFields,
-        }
-        if (data) {
-          campaignUpdateData.data = deepMerge(campaign.data as object, data)
-        }
-        if (formattedAddress !== undefined) {
-          campaignUpdateData.formattedAddress = formattedAddress
-        }
-        if (placeId !== undefined) {
-          campaignUpdateData.placeId = placeId
-        }
-        if (canDownloadFederal !== undefined) {
-          campaignUpdateData.canDownloadFederal = canDownloadFederal
-        }
-        if (details) {
-          const mergedDetails = deepMerge(
-            campaign.details as object,
-            details,
-          ) as PrismaJson.CampaignDetails
-          if (details?.customIssues) {
-            // If this isn't done, customIssues' entries duplicate
-            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            mergedDetails.customIssues = details.customIssues as Array<{
-              position: string
-              title: string
-            }>
-          }
-          if (details.runningAgainst) {
-            // If this isn't done, runningAgainst's entries duplicate
-            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            mergedDetails.runningAgainst = details.runningAgainst as Array<{
-              name: string
-              party: string
-              description: string
-            }>
-          }
-          campaignUpdateData.details = mergedDetails
-        }
-        if (objectNotEmpty(aiContent)) {
-          // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+      const campaignUpdateData: Prisma.CampaignUpdateInput = {
+        ...scalarFields,
+      }
+      if (data) {
+        campaignUpdateData.data = deepMerge(campaign.data as object, data)
+      }
+      if (formattedAddress !== undefined) {
+        campaignUpdateData.formattedAddress = formattedAddress
+      }
+      if (placeId !== undefined) {
+        campaignUpdateData.placeId = placeId
+      }
+      if (canDownloadFederal !== undefined) {
+        campaignUpdateData.canDownloadFederal = canDownloadFederal
+      }
+      if (details) {
+        const mergedDetails = deepMerge(
+          campaign.details as object,
+          details,
+        ) as PrismaJson.CampaignDetails
+        if (details?.customIssues) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          campaignUpdateData.aiContent = deepMerge(
-            (campaign.aiContent as object) || {},
-            aiContent,
-          ) as PrismaJson.CampaignAiContent
+          mergedDetails.customIssues = details.customIssues as Array<{
+            position: string
+            title: string
+          }>
         }
-
-        if (overrideDistrictId !== undefined) {
-          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-          const districtId = overrideDistrictId ?? null
-          await tx.organization.update({
-            where: { slug: orgSlug },
-            data: { overrideDistrictId: districtId },
-          })
+        if (details.runningAgainst) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          mergedDetails.runningAgainst = details.runningAgainst as Array<{
+            name: string
+            party: string
+            description: string
+          }>
         }
+        campaignUpdateData.details = mergedDetails
+      }
+      if (objectNotEmpty(aiContent)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        campaignUpdateData.aiContent = deepMerge(
+          (campaign.aiContent as object) || {},
+          aiContent,
+        ) as PrismaJson.CampaignAiContent
+      }
 
-        // TODO: Also should be .findUniqueOrThrow
-        //  https://goodparty.atlassian.net/browse/WEB-4384
-        return tx.campaign.update({
-          where: { id: campaign.id },
-          data: campaignUpdateData,
+      if (overrideDistrictId !== undefined) {
+        const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const districtId = overrideDistrictId ?? null
+        await tx.organization.update({
+          where: { slug: orgSlug },
+          data: { overrideDistrictId: districtId },
         })
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      },
-    )
+      }
+
+      return tx.campaign.update({
+        where: { id: campaign.id },
+        data: campaignUpdateData,
+      })
+    }
+
+    const updatedCampaign = outerTx
+      ? await runUpdate(outerTx)
+      : await this.client.$transaction(runUpdate, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        })
 
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384

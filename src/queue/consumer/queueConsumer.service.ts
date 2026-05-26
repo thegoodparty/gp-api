@@ -28,6 +28,7 @@ import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { MeetingBriefingsService } from 'src/meetings/services/meetingBriefings.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import {
@@ -46,11 +47,13 @@ import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
+  AgenticComplianceKickoffMessageSchema,
   CampaignPlanCompleteMessage,
   CampaignPlanCompleteMessageSchema,
   AgentExperimentResultSchema,
   DomainEmailForwardingMessage,
   WeeklyTasksDigestMessageSchema,
+  OcrAttachmentMessageSchema,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -63,6 +66,7 @@ import {
   SqsConsumerErrorEventName,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { AnnotationAttachmentService } from '@/annotations/services/annotationAttachment.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { WeeklyTasksDigestHandlerService } from '../../campaigns/tasks/services/weeklyTasksDigestHandler.service'
@@ -119,6 +123,8 @@ export class QueueConsumerService {
     private readonly organizationsService: OrganizationsService,
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly experimentRunsService: ExperimentRunsService,
+    private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly annotationAttachments: AnnotationAttachmentService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -369,6 +375,23 @@ export class QueueConsumerService {
         return await this.handleAgentExperimentResult(
           AgentExperimentResultSchema.parse(queueMessage.data),
         )
+      case QueueType.AGENTIC_COMPLIANCE_KICKOFF:
+        this.logger.info('received agenticComplianceKickoff message')
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const kickoff = AgenticComplianceKickoffMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.tcrComplianceService.handleAgenticKickoff(kickoff)
+          return true
+        })
+      case QueueType.OCR_ATTACHMENT:
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          const { attachmentId } = OcrAttachmentMessageSchema.parse(
+            queueMessage.data,
+          )
+          await this.annotationAttachments.runOcr(attachmentId)
+          return true
+        })
       default:
         this.logger.warn(
           { messageId: message.MessageId, body: message.Body },
@@ -852,6 +875,16 @@ export class QueueConsumerService {
       { updatedRun, data },
       'Updated experiment run from queue event',
     )
+
+    await this.meetingBriefings
+      .onExperimentRunCompleted(updatedRun)
+      .catch((err: unknown) =>
+        this.logger.error(
+          { err, runId: updatedRun.runId },
+          'onExperimentRunCompleted failed after run update',
+        ),
+      )
+
     return true
   }
 

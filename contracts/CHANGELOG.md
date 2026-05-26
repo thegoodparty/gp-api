@@ -1,5 +1,54 @@
 # @goodparty_org/contracts
 
+## 0.6.0
+
+### Minor Changes
+
+- Add `'generative'` to `SpeechSynthesisEngineSchema` and `'Amy'` to
+  `SpeechSynthesisVoiceSchema`. Export `GENERATIVE_VOICE_VALUES` — the
+  subset of voices that support the generative engine (`Joanna`, `Matthew`,
+  `Salli`, `Ruth`, `Stephen`, `Amy`). Update default voice/engine from
+  `Joanna`/`neural` to `Amy`/`generative`. Add a cross-field refine to
+  `SynthesizeSpeechRequestSchema` that rejects any `voiceId` × `engine:
+  'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
+
+## 0.5.0
+
+### Minor Changes
+
+- Add annotations contracts (`AnnotationKindSchema`,
+  `AnnotationAnchorSchema`, `CreateAnnotationRequestSchema`,
+  `UpdateNoteRequestSchema`, `AnnotationSchema`,
+  `AnnotationResponseSchema`, `AnnotationsListResponseSchema`) and
+  their inferred types. Backs the briefing annotations endpoints
+  (`/v1/meeting-briefings/:briefingId/annotations`,
+  `/v1/annotations/:annotationId`). Snake_case at the API boundary.
+  Anchor allows all-set or all-null for top-level annotations;
+  `CreateAnnotationRequest` is a discriminated union on `kind`
+  (`note` and `bug_report` only; `chat` is reserved).
+
+## 0.4.0
+
+### Breaking Changes
+
+- Remove the meetings module schemas added in 0.3.0
+  (`MeetingScheduleArtifact`, `MeetingsListResponse`,
+  `MeetingBriefingResponse`). The corresponding gp-api endpoints
+  (`GET /v1/meetings`, `GET /v1/meetings/:date/briefing`) no longer
+  wrap their responses in Zod validation — they pass through the
+  agent's camelCase artifact and return a typed camelCase object
+  from the controller respectively. Consumers that imported these
+  schemas should remove the imports and rely on their own types.
+
+## 0.3.0
+
+### Minor Changes
+
+- Add meetings module schemas for the Meeting Briefings V2 feature
+  (`MeetingScheduleArtifact`, `MeetingsListResponse`, `MeetingBriefingResponse`)
+  and their inferred types. Snake_case throughout to match the raw S3 artifact
+  shape — no transform layer.
+
 ## 0.2.0
 
 ### Minor Changes

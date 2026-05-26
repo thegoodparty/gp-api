@@ -1,0 +1,28 @@
+model MeetingBriefing {
+  id String @id @default(uuid(7))
+
+  electedOfficeId String        @map("elected_office_id")
+  electedOffice   ElectedOffice @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
+
+  meetingDate     DateTime @map("meeting_date") @db.Date
+  meetingTime     String   @map("meeting_time")
+  meetingTimezone String   @map("meeting_timezone")
+
+  experimentRunId String        @map("experiment_run_id")
+  experimentRun   ExperimentRun @relation(fields: [experimentRunId], references: [runId], onDelete: Restrict)
+
+  artifactBucket String @map("artifact_bucket")
+  artifactKey    String @map("artifact_key")
+
+  artifactFeedback ArtifactFeedback[]
+
+  /// [MeetingBriefingArtifact]
+  artifact Json? @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([electedOfficeId, meetingDate])
+  @@index([electedOfficeId, meetingDate])
+  @@map("meeting_briefing")
+}

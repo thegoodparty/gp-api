@@ -1,7 +1,9 @@
 import { forwardRef, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { DomainsController } from './controllers/domains.controller'
+import { InboundDomainVerificationController } from './controllers/inboundDomainVerification.controller'
 import { DomainsService } from './services/domains.service'
+import { VercelDomainEmailParserService } from './services/vercelDomainEmailParser.service'
 import { WebsitesService } from './services/websites.service'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { VercelModule } from 'src/vendors/vercel/vercel.module'
@@ -35,9 +37,14 @@ import { ClerkModule } from '@/vendors/clerk/clerk.module'
     QueueProducerModule,
     AnalyticsModule,
   ],
-  controllers: [DomainsController, WebsitesController],
+  controllers: [
+    DomainsController,
+    InboundDomainVerificationController,
+    WebsitesController,
+  ],
   providers: [
     DomainsService,
+    VercelDomainEmailParserService,
     WebsitesService,
     WebsiteContactsService,
     WebsiteViewsService,

@@ -1,0 +1,10 @@
+model AnnotationBugReport {
+  id String @id @default(cuid())
+
+  description String   @db.Text
+  submittedAt DateTime @default(now()) @map("submitted_at")
+
+  annotation Annotation?
+
+  @@map("annotation_bug_report")
+}

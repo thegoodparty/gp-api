@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -53,6 +55,53 @@ const WEBSITE_CONTENT_INCLUDES = {
       },
     },
   },
+}
+
+const isNonEmpty = (value: string | undefined | null) =>
+  typeof value === 'string' && value.trim().length > 0
+
+type WebsiteIssueForPublish = {
+  title?: string | null
+  description?: string | null
+}
+
+const isIssueReadyToPublish = (
+  issue: WebsiteIssueForPublish,
+): issue is { title: string; description: string } =>
+  isNonEmpty(issue.title) && isNonEmpty(issue.description)
+
+const REQUIRED_PUBLISH_FIELDS: Array<{
+  path: string
+  check: (content: PrismaJson.WebsiteContent) => boolean
+}> = [
+  { path: 'main.title', check: (c) => isNonEmpty(c.main?.title) },
+  { path: 'about.bio', check: (c) => isNonEmpty(c.about?.bio) },
+  {
+    path: 'about.issues',
+    check: (c) =>
+      Array.isArray(c.about?.issues) &&
+      c.about.issues.length > 0 &&
+      c.about.issues.every(
+        (issue) =>
+          typeof issue === 'object' &&
+          issue !== null &&
+          isIssueReadyToPublish(issue as WebsiteIssueForPublish),
+      ),
+  },
+  { path: 'contact.address', check: (c) => isNonEmpty(c.contact?.address) },
+  { path: 'contact.email', check: (c) => isNonEmpty(c.contact?.email) },
+  { path: 'contact.phone', check: (c) => isNonEmpty(c.contact?.phone) },
+]
+
+const assertReadyToPublish = (content: PrismaJson.WebsiteContent) => {
+  const missing = REQUIRED_PUBLISH_FIELDS.filter(
+    ({ check }) => !check(content),
+  ).map(({ path }) => path)
+  if (missing.length > 0) {
+    throw new BadRequestException(
+      `Website content is missing required fields for publishing: ${missing.join(', ')}`,
+    )
+  }
 }
 
 @Controller('websites')
@@ -177,10 +226,21 @@ export class WebsitesController {
         where: { campaignId },
         select: {
           content: true,
-          domain: true,
           hasEverBeenPublished: true,
         },
       })
+
+    // TODO: Restore this gate when registrant verification is required
+    // for the new publish flow.
+    // if (
+    //   body.status === WebsiteStatus.published &&
+    //   domain &&
+    //   !domain.registrantVerifiedAt
+    // ) {
+    //   throw new BadRequestException(
+    //     'Domain registrant verification is not yet complete. The site cannot be published until Vercel confirms domain ownership.',
+    //   )
+    // }
 
     const updatedContent: PrismaJson.WebsiteContent = merge(
       currentContent || {},
@@ -191,6 +251,13 @@ export class WebsitesController {
       updatedContent.about = updatedContent.about || {}
       updatedContent.about.issues = body.about.issues
     }
+
+    if (body.status === WebsiteStatus.published) {
+      assertReadyToPublish(updatedContent)
+    }
+
+    const isFirstPublish =
+      body.status === WebsiteStatus.published && !hasEverBeenPublished
 
     const [logo, hero] = await Promise.all([
       logoFile ? this.files.uploadFile(logoFile, 'uploads') : null,
@@ -210,9 +277,6 @@ export class WebsitesController {
       updatedContent.main ||= {}
       updatedContent.main.image = undefined
     }
-
-    const isFirstPublish =
-      body.status === WebsiteStatus.published && !hasEverBeenPublished
 
     const result = await this.websites.update({
       where: { campaignId },
@@ -321,14 +385,15 @@ export class WebsitesController {
   @Get('by-domain/:domain')
   @PublicAccess()
   async getWebsiteByDomain(@Param('domain') domain: string) {
-    const { websiteId } = await this.websites.client.domain.findUniqueOrThrow({
-      where: { name: domain },
-    })
+    const websiteId = await this.websites.getWebsiteIdByDomain(domain)
     const website = await this.websites.findUnique({
       where: { id: websiteId },
       include: WEBSITE_CONTENT_INCLUDES,
     })
-    if (website?.campaign?.user) {
+    if (!website || website.status !== WebsiteStatus.published) {
+      throw new NotFoundException()
+    }
+    if (website.campaign?.user) {
       website.campaign.user = await this.clerkEnricher.enrichUser(
         website.campaign.user,
       )

@@ -217,19 +217,25 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     firstName: string
     lastName: string
   }): Promise<User | null> {
-    const existingByClerkId = await this.findUser({ clerkId: data.clerkId })
+    const existingByClerkId = await this.findUser({
+      clerkId: data.clerkId,
+    })
     if (existingByClerkId) return existingByClerkId
 
     const existingByEmail = await this.findUserByEmail(data.email)
     if (existingByEmail) {
-      this.logger.info(
-        { userId: existingByEmail.id, clerkId: data.clerkId },
-        'Linking existing user to Clerk account',
-      )
-      return this.updateUser(
-        { id: existingByEmail.id },
-        { clerkId: data.clerkId },
-      )
+      if (existingByEmail.clerkId) {
+        this.logger.warn(
+          {
+            userId: existingByEmail.id,
+            existingClerkId: existingByEmail.clerkId,
+            incomingClerkId: data.clerkId,
+          },
+          'Refused clerkId rebind: user already has a Clerk identity',
+        )
+        return null
+      }
+      return this.tryBindClerkId(existingByEmail.id, data.clerkId)
     }
 
     try {
@@ -252,23 +258,72 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         err instanceof PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
-        this.logger.debug(
-          { clerkId: data.clerkId },
-          'Concurrent provisioning detected, fetching existing user',
-        )
-        const existing =
-          (await this.findUser({ clerkId: data.clerkId })) ??
-          (await this.findUserByEmail(data.email))
-        if (!existing) {
-          this.logger.error(
-            { clerkId: data.clerkId, email: data.email },
-            'P2002 race but user not found by clerkId or email',
-          )
-        }
-        return existing
+        return this.resolveAfterP2002(data)
       }
       throw err
     }
+  }
+
+  private async tryBindClerkId(
+    userId: number,
+    clerkId: string,
+  ): Promise<User | null> {
+    const updated = await this.model.updateMany({
+      where: { id: userId, clerkId: null },
+      data: { clerkId },
+    })
+    if (updated.count === 0) {
+      const refetched = await this.findUser({ id: userId })
+      if (refetched?.clerkId === clerkId) return refetched
+      this.logger.warn(
+        { userId, incomingClerkId: clerkId },
+        'Refused clerkId rebind: concurrent writer set clerkId first',
+      )
+      return null
+    }
+    this.logger.info(
+      { userId, clerkId },
+      'Linking legacy user to Clerk account',
+    )
+    return this.findUser({ id: userId })
+  }
+
+  private async resolveAfterP2002(data: {
+    clerkId: string
+    email: string
+  }): Promise<User | null> {
+    this.logger.debug(
+      { clerkId: data.clerkId },
+      'Concurrent provisioning detected, fetching existing user',
+    )
+    const byClerkId = await this.findUser({
+      clerkId: data.clerkId,
+    })
+    if (byClerkId) return byClerkId
+
+    const byEmail = await this.findUserByEmail(data.email)
+    if (!byEmail) {
+      this.logger.error(
+        { clerkId: data.clerkId, email: data.email },
+        'P2002 race but user not found by clerkId or email',
+      )
+      return null
+    }
+    if (byEmail.clerkId && byEmail.clerkId !== data.clerkId) {
+      this.logger.warn(
+        {
+          userId: byEmail.id,
+          existingClerkId: byEmail.clerkId,
+          incomingClerkId: data.clerkId,
+        },
+        'P2002 race: email match has different clerkId, refusing rebind',
+      )
+      return null
+    }
+    if (!byEmail.clerkId) {
+      return this.tryBindClerkId(byEmail.id, data.clerkId)
+    }
+    return byEmail
   }
 
   async updateUser(where: Prisma.UserWhereUniqueInput, data: Partial<User>) {
@@ -585,6 +640,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         this.clerkClient.users.getUserList({
           limit: 500,
           query: TEST_USER_DOMAIN,
+          orderBy: '+created_at',
         }),
       )
 

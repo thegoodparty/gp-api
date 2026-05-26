@@ -60,4 +60,11 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
 
     return domainRecord.website
   }
+
+  async getWebsiteIdByDomain(domainName: string) {
+    const { websiteId } = await this.client.domain.findUniqueOrThrow({
+      where: { name: domainName },
+    })
+    return websiteId
+  }
 }

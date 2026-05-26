@@ -109,6 +109,16 @@ test.describe('Candidate Website', () => {
       },
       data: {
         status: 'published',
+        main: { title: 'Test Campaign' },
+        about: {
+          bio: 'A test biography',
+          issues: [{ title: 'Issue One', description: 'Description one' }],
+        },
+        contact: {
+          address: '123 Main St',
+          email: 'test@example.com',
+          phone: '5555555555',
+        },
       },
     })
 

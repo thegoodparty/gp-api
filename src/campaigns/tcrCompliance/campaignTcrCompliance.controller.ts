@@ -12,10 +12,15 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
+import { ComplianceStateService } from './services/complianceState.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
+import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplianceDto.schema'
+import { SubmitToPeerlyDto } from './schemas/submitToPeerlyDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
@@ -27,6 +32,12 @@ import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { McpTool } from '@/mcp/decorators/McpTool.decorator'
+import {
+  ComplianceStateOutputSchema,
+  SubmitToPeerlyOutputSchema,
+} from '@goodparty_org/contracts'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -34,6 +45,7 @@ export class CampaignTcrComplianceController {
   constructor(
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
+    private readonly complianceStateService: ComplianceStateService,
     private readonly campaignsService: CampaignsService,
     private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,
@@ -53,6 +65,102 @@ export class CampaignTcrComplianceController {
       )
     }
     return tcrCompliance
+  }
+
+  @Get('mine/compliance-state')
+  @UseCampaign()
+  @UseInterceptors(ZodResponseInterceptor)
+  @ResponseSchema(ComplianceStateOutputSchema)
+  @McpTool({
+    description:
+      "Read the calling campaign's full compliance-setup pipeline " +
+      'state: which stages are completed, in progress, or pending ' +
+      '(profile, domain purchase, domain verification, website ' +
+      'publish, TCR submission, CV PIN entry). Call this at the start ' +
+      'of every compliance_setup agent run to decide which steps to ' +
+      'skip and which still need work; the response is the canonical ' +
+      'view across Campaign, Website, Domain, and TcrCompliance ' +
+      'tables, so the agent does not have to read those individually. ' +
+      'Read-only; safe to call repeatedly during a run.',
+  })
+  async getMyComplianceState(@ReqCampaign() campaign: Campaign) {
+    return this.complianceStateService.findStateForCampaign(campaign.id)
+  }
+
+  @Post('submit-to-peerly')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(ZodResponseInterceptor)
+  @ResponseSchema(SubmitToPeerlyOutputSchema)
+  @McpTool({
+    description:
+      "Submit the candidate's TCR/Identity registration to Peerly for " +
+      '10DLC compliance. Precondition (enforced by the route): the ' +
+      'compliance stage must be `awaiting_pin` — i.e., the domain is ' +
+      "registered and the candidate's website is published and " +
+      'verified live. Calls with any earlier stage return 422. ' +
+      'Required inputs: EIN, committee name, office level, election ' +
+      'filing details, contact email and phone, and the verified ' +
+      'website URL. Creates the Peerly Identity, Identity Profile, ' +
+      '10DLC Brand, and Campaign Verify Request; Peerly then sends a ' +
+      'PIN to the candidate via the contact channels supplied. ' +
+      'Returns the Peerly identity id, CV verification id, derived ' +
+      'compliance stage (`awaiting_pin`), and the PIN delivery ' +
+      'channels (from the persisted record) the candidate should ' +
+      'check. Idempotent on retry: a second call returns the existing ' +
+      'record without re-submitting to Peerly.',
+  })
+  async submitToPeerly(
+    @ReqCampaign() campaign: Campaign,
+    @Body() input: SubmitToPeerlyDto,
+  ) {
+    const user = await this.userService.findByCampaign(campaign)
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
+    return this.tcrComplianceService.submitToPeerlyForAgent(
+      user,
+      campaign,
+      input,
+    )
+  }
+
+  @Post('agentic')
+  @UseCampaign()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async createAgenticTcrCompliance(
+    @ReqCampaign() campaign: Campaign,
+    @Body()
+    tcrComplianceDto: CreateAgenticTcrComplianceDto,
+  ) {
+    const user = await this.userService.findByCampaign(campaign)
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
+    const { record, created } = await this.tcrComplianceService.createAgentic(
+      user,
+      campaign,
+      tcrComplianceDto,
+    )
+
+    if (created) {
+      try {
+        await this.analytics.track(
+          user.id,
+          EVENTS.Outreach.ComplianceFormSubmitted,
+          { source: 'agentic_compliance_flow' },
+        )
+      } catch (e) {
+        this.logger.error(
+          { e },
+          `Failed to track agentic compliance form submitted event for user ${user.id}`,
+        )
+      }
+    }
+
+    return record
   }
 
   @Post()
