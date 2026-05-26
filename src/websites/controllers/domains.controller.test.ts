@@ -236,9 +236,7 @@ describe('DomainsController.purchaseDomain MCP discoverability', () => {
 
     expect(purchase).toBeDefined()
     expect(purchase!.description).toMatch(/Reserve a specific available domain/)
-    expect(purchase!.description).toMatch(
-      /poll GET \/v1\/websites\/domains\/status/,
-    )
+    expect(purchase!.description).toMatch(/Poll GET \/v1\/domains\/status/)
     expect(purchase!.outputSchema).toBe(PurchaseDomainResponseSchema)
     expect(purchase!.inputDeclarations.body.declared).toBe(true)
     expect(purchase!.inputDeclarations.body.schema).toBe(

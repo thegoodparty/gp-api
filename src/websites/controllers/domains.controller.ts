@@ -94,7 +94,8 @@ export class DomainsController {
       'alreadyExisted: true. Conflicts (a different in-progress domain ' +
       'for the campaign, or the domain is no longer available) return ' +
       '4xx. On success the domain is created in DomainStatus.pending; ' +
-      'poll GET /v1/websites/domains/status to observe progression.',
+      'registration completion is handled by a separate post-purchase ' +
+      'pipeline. Poll GET /v1/domains/status to observe progression.',
   })
   async purchaseDomain(
     @ReqCampaign() campaign: Campaign & { user: User },

@@ -1,10 +1,14 @@
 import { DomainStatus } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
+import { isFQDN } from 'validator'
 import { z } from 'zod'
 
 export class PurchaseDomainBodySchema extends createZodDto(
   z.object({
-    domain: z.string().min(1).max(253),
+    domain: z.string().refine((v) => isFQDN(v), {
+      message:
+        'Invalid domain format. Must be a Fully Qualified Domain Name (e.g., example.com or foo.example.com)',
+    }),
   }),
 ) {}
 
