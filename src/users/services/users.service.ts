@@ -278,16 +278,27 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           { clerkId: data.clerkId },
           'Concurrent provisioning detected, fetching existing user',
         )
-        const existing =
-          (await this.findUser({ clerkId: data.clerkId })) ??
-          (await this.findUserByEmail(data.email))
-        if (!existing) {
+        const byClerkId = await this.findUser({ clerkId: data.clerkId })
+        if (byClerkId) return byClerkId
+        const byEmail = await this.findUserByEmail(data.email)
+        if (byEmail?.clerkId && byEmail.clerkId !== data.clerkId) {
+          this.logger.warn(
+            {
+              userId: byEmail.id,
+              existingClerkId: byEmail.clerkId,
+              incomingClerkId: data.clerkId,
+            },
+            'P2002 race resolved to email match with different clerkId: refusing rebind',
+          )
+          return null
+        }
+        if (!byEmail) {
           this.logger.error(
             { clerkId: data.clerkId, email: data.email },
             'P2002 race but user not found by clerkId or email',
           )
         }
-        return existing
+        return byEmail
       }
       throw err
     }
