@@ -6,6 +6,11 @@ import { UserOwnerOrAdminGuard } from './UserOwnerOrAdmin.guard'
 describe('UserOwnerOrAdminGuard', () => {
   const guard = new UserOwnerOrAdminGuard()
 
+  const candidateUser = (id: number) => ({
+    id,
+    roles: [UserRole.candidate],
+  })
+
   const mockContext = (req: object) =>
     ({
       switchToHttp: () => ({ getRequest: () => req }),
@@ -21,7 +26,7 @@ describe('UserOwnerOrAdminGuard', () => {
   it('allows owner accessing own resource', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 5, roles: [UserRole.candidate] },
+        user: candidateUser(5),
         params: { id: '5' },
       }),
     )
@@ -41,7 +46,7 @@ describe('UserOwnerOrAdminGuard', () => {
   it('rejects non-owner non-admin', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 5, roles: [UserRole.candidate] },
+        user: candidateUser(5),
         params: { id: '99' },
       }),
     )
@@ -56,7 +61,7 @@ describe('UserOwnerOrAdminGuard', () => {
   it('rejects scientific notation even when it equals user id', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 100, roles: [UserRole.candidate] },
+        user: candidateUser(100),
         params: { id: '1e2' },
       }),
     )
@@ -66,7 +71,7 @@ describe('UserOwnerOrAdminGuard', () => {
   it('rejects trailing-text IDs that parseInt would misparse', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 5, roles: [UserRole.candidate] },
+        user: candidateUser(5),
         params: { id: '5abc' },
       }),
     )
@@ -76,7 +81,7 @@ describe('UserOwnerOrAdminGuard', () => {
   it('rejects non-numeric param', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 1, roles: [UserRole.candidate] },
+        user: candidateUser(1),
         params: { id: 'abc' },
       }),
     )
