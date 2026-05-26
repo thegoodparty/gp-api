@@ -1140,27 +1140,11 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       })
     })
 
-    it('falls back to position-side filingFee when race-hash lookup errors out', async () => {
-      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockRejectedValue(
-        new Error('election-api down'),
-      )
-
-      const result =
-        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
-
-      expect(result).toEqual({
-        projectedTurnout: 10000,
-        winNumber: 5001,
-        voterContactGoal: 25005,
-        filingFee: 250,
-        filingRequirementsText: 'Position-side text.',
-      })
-    })
-
     it('falls back to position-side filingFee when race-hash returns null', async () => {
       // `fetchFilingFeeByRaceHash` returns null when the underlying election-api
-      // call failed (e.g. 5xx, network). Distinct from the "found, no fee"
-      // case above, which returns { filingFee: null, ...} (an object).
+      // call failed (e.g. 5xx, network) — it catches internally and never
+      // rejects. Distinct from the "found, no fee" case above, which returns
+      // { filingFee: null, ...} (an object).
       vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
 
       const result =

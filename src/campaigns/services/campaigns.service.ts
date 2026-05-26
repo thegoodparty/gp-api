@@ -786,7 +786,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     // filing fee on the positionId branch when raceId is missing or the
     // race-hash lookup fails.
     const filingFeeFromRaceHash = raceId
-      ? await this.elections.fetchFilingFeeByRaceHash(raceId).catch(() => null)
+      ? await this.elections.fetchFilingFeeByRaceHash(raceId)
       : null
 
     if (org.overrideDistrictId) {
