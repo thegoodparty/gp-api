@@ -2,7 +2,6 @@ import { useTestService } from '@/test-service'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { ClerkClient } from '@clerk/backend'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersService, type ResolvedActorIdentity } from './users.service'
 import { AnalyticsService } from '@/analytics/analytics.service'
@@ -501,17 +500,12 @@ describe('UsersService', () => {
     })
 
     describe('P2002 race recovery', () => {
-      const p2002 = new PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: '5.0.0' },
-      )
-
       it('returns user found by clerkId', async () => {
         const existing = await createUser(
           'p2002-clerk@test.goodparty.org',
           'user_p2002_winner',
         )
-        vi.spyOn(service.prisma.user, 'create').mockRejectedValueOnce(p2002)
+        vi.spyOn(usersService, 'findUserByEmail').mockResolvedValueOnce(null)
         const result = await provision(
           'user_p2002_winner',
           'p2002-clerk@test.goodparty.org',
@@ -521,7 +515,7 @@ describe('UsersService', () => {
 
       it('returns null when email match has different clerkId', async () => {
         await createUser('p2002-diff@test.goodparty.org', 'user_p2002_other')
-        vi.spyOn(service.prisma.user, 'create').mockRejectedValueOnce(p2002)
+        vi.spyOn(usersService, 'findUserByEmail').mockResolvedValueOnce(null)
         const result = await provision(
           'user_p2002_attacker',
           'p2002-diff@test.goodparty.org',
@@ -531,7 +525,7 @@ describe('UsersService', () => {
 
       it('links legacy user with null clerkId', async () => {
         const legacy = await createUser('p2002-legacy@test.goodparty.org')
-        vi.spyOn(service.prisma.user, 'create').mockRejectedValueOnce(p2002)
+        vi.spyOn(usersService, 'findUserByEmail').mockResolvedValueOnce(null)
         const result = await provision(
           'user_p2002_linker',
           'p2002-legacy@test.goodparty.org',
@@ -544,7 +538,9 @@ describe('UsersService', () => {
       })
 
       it('returns null when neither lookup resolves', async () => {
-        vi.spyOn(service.prisma.user, 'create').mockRejectedValueOnce(p2002)
+        await createUser('p2002-ghost@test.goodparty.org', 'user_p2002_taken')
+        vi.spyOn(usersService, 'findUserByEmail').mockResolvedValueOnce(null)
+        vi.spyOn(usersService, 'findUser').mockResolvedValueOnce(null)
         const result = await provision(
           'user_p2002_ghost',
           'p2002-ghost@test.goodparty.org',
