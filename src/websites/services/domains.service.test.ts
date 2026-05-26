@@ -23,6 +23,7 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common'
@@ -482,7 +483,7 @@ describe('DomainsService', () => {
   })
 
   describe('purchaseDomainForCampaign', () => {
-    const campaign = createMockCampaign({ id: 42 })
+    const campaign = createMockCampaign({ id: 42, isPro: true })
     const campaignWithUser = { ...campaign, user: mockUser }
     const domainName = 'vote-oneill.run'
     const maxPrice = 50
@@ -507,6 +508,24 @@ describe('DomainsService', () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundException)
 
+      expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
+    })
+
+    it('throws ForbiddenException when the campaign is not Pro', async () => {
+      const nonProCampaign = {
+        ...createMockCampaign({ id: 42, isPro: false }),
+        user: mockUser,
+      }
+
+      await expect(
+        service.purchaseDomainForCampaign(
+          nonProCampaign,
+          domainName,
+          maxPrice,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+
+      expect(mockPrisma.website.findUnique).not.toHaveBeenCalled()
       expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
 

@@ -3,6 +3,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -651,6 +652,17 @@ export class DomainsService
     alreadyExisted: boolean
     message: string
   }> {
+    // The skip-payment branch below bills GP's Vercel team account; gate to
+    // Pro campaigns so non-Pro browser callers can't bypass Stripe Checkout.
+    // (Pro covers the bundled domain per the product design.) Strict
+    // agent-only discrimination would require an actor-token claim from the
+    // broker — tracked separately.
+    if (!campaign.isPro) {
+      throw new ForbiddenException(
+        'Domain purchase requires an active Pro subscription',
+      )
+    }
+
     const preflightHit = await this.preflightDomainPurchase(
       campaign.id,
       domainName,
