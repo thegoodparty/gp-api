@@ -518,11 +518,7 @@ describe('DomainsService', () => {
       }
 
       await expect(
-        service.purchaseDomainForCampaign(
-          nonProCampaign,
-          domainName,
-          maxPrice,
-        ),
+        service.purchaseDomainForCampaign(nonProCampaign, domainName, maxPrice),
       ).rejects.toBeInstanceOf(ForbiddenException)
 
       expect(mockPrisma.website.findUnique).not.toHaveBeenCalled()
