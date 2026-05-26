@@ -9,6 +9,7 @@ export class PurchaseDomainBodySchema extends createZodDto(
       message:
         'Invalid domain format. Must be a Fully Qualified Domain Name (e.g., example.com or foo.example.com)',
     }),
+    maxPrice: z.number().positive(),
   }),
 ) {}
 

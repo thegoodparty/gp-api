@@ -86,24 +86,28 @@ export class DomainsController {
   @ResponseSchema(PurchaseDomainResponseSchema)
   @McpTool({
     description:
-      'Reserve a specific available domain for the calling campaign. ' +
+      'Purchase a specific available domain for the calling campaign. ' +
       'Call AFTER searchDomains has returned a candidate and the agent ' +
-      'has chosen one under the price cap. Idempotent per campaign via ' +
-      'a Postgres advisory transaction lock — safe to retry on ' +
-      'transient errors; a repeated call for the same domain returns ' +
+      'has chosen one. Pass the same maxPrice that searchDomains was ' +
+      'called with; the server re-checks the live price against this ' +
+      'cap and rejects with 409 if Vercel returned a higher price ' +
+      'between search and purchase. Idempotent per campaign via a ' +
+      'Postgres advisory transaction lock — safe to retry on transient ' +
+      'errors; a repeated call for the same domain returns ' +
       'alreadyExisted: true. Conflicts (a different in-progress domain ' +
       'for the campaign, or the domain is no longer available) return ' +
-      '4xx. On success the domain is created in DomainStatus.pending; ' +
-      'registration completion is handled by a separate post-purchase ' +
-      'pipeline. Poll GET /v1/domains/status to observe progression.',
+      '4xx. On success the domain reaches DomainStatus.submitted. ' +
+      'Poll GET /v1/domains/status to observe progression to ' +
+      'registered / active.',
   })
   async purchaseDomain(
     @ReqCampaign() campaign: Campaign & { user: User },
-    @Body() { domain }: PurchaseDomainBodySchema,
+    @Body() { domain, maxPrice }: PurchaseDomainBodySchema,
   ) {
     const result = await this.domains.purchaseDomainForCampaign(
       campaign,
       domain,
+      maxPrice,
     )
     return {
       domain: result.domain,

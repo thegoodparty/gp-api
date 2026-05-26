@@ -644,6 +644,7 @@ export class DomainsService
   async purchaseDomainForCampaign(
     campaign: Campaign & { user: User },
     domainName: string,
+    maxPrice: number,
   ): Promise<{
     website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
     domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
@@ -680,6 +681,12 @@ export class DomainsService
 
     const price = await this.lookupDomainPrice(domainName)
 
+    if (price > maxPrice) {
+      throw new ConflictException(
+        `Domain ${domainName} price ${price} exceeds maxPrice ${maxPrice}`,
+      )
+    }
+
     const locked = await this.reserveDomainForCampaign(
       campaign.id,
       domainName,
@@ -697,24 +704,33 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-    // NOTE: this method only reserves the Domain row (status=pending) and
-    // does NOT call completeDomainRegistration — that requires a non-null
-    // paymentId and must be invoked after payment is confirmed (e.g. via a
-    // Stripe webhook). No HTTP route should call this method directly until
-    // that payment-confirmation leg is wired up, or domains will stall in
-    // DomainStatus.pending with no recovery path.
+    // Agent purchases handle registration inline (no Stripe charge — domain
+    // billed to GP's Vercel team account; the maxPrice check above is the
+    // safety bound). Browser purchases flow through handleDomainPostPurchase,
+    // which sets paymentId so completeDomainRegistration's default guard fires.
+    const website = await this.client.website.findUniqueOrThrow({
+      where: { id: websiteSummary.id },
+      select: { content: true },
+    })
+    const contactInfo = this.buildContactInfo(campaign.user, website.content)
+    await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
+      skipPaymentVerification: true,
+    })
+
+    const registered = await this.model.findUniqueOrThrow({
+      where: { id: createdDomain.id },
+    })
 
     return {
       website: websiteSummary,
       domain: {
-        id: createdDomain.id,
-        name: createdDomain.name,
-        status: createdDomain.status,
-        price: createdDomain.price?.toNumber() ?? null,
+        id: registered.id,
+        name: registered.name,
+        status: registered.status,
+        price: registered.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
-      message:
-        'Domain reserved; registration will complete after payment confirmation',
+      message: 'Domain registration submitted',
     }
   }
 
@@ -957,26 +973,31 @@ export class DomainsService
   async completeDomainRegistration(
     websiteId: number,
     contact: RegisterDomainSchema,
+    options: { skipPaymentVerification?: boolean } = {},
   ) {
     const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
 
-    if (!domain.paymentId) {
-      throw new BadRequestException({
-        message: 'No payment ID found for domain',
-        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
-      })
-    }
+    if (!options.skipPaymentVerification) {
+      if (!domain.paymentId) {
+        throw new BadRequestException({
+          message: 'No payment ID found for domain',
+          errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
+        })
+      }
 
-    const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
-
-    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
-      throw new BadRequestException(
-        `Payment not completed. Current status: ${paymentIntent.status}`,
+      const paymentIntent = await this.payments.retrievePayment(
+        domain.paymentId,
       )
+
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
+        throw new BadRequestException(
+          `Payment not completed. Current status: ${paymentIntent.status}`,
+        )
+      }
     }
 
     if (!domain.price) {
