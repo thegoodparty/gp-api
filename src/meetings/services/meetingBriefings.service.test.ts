@@ -571,6 +571,41 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
       }),
     )
   })
+
+  it('skips EOs created before 2026-03-01', async () => {
+    const orgSlug = `eo-cron-old-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-old' })
+    const campaign = await service.prisma.campaign.findFirst({
+      where: { organizationSlug: orgSlug },
+    })
+    await service.prisma.electedOffice.create({
+      data: {
+        organizationSlug: orgSlug,
+        userId: service.user.id,
+        campaignId: campaign?.id,
+        createdAt: new Date('2026-02-28T23:59:59.000Z'),
+      },
+    })
+
+    vi.spyOn(
+      service.app.get(ElectionsService),
+      'getPositionById',
+    ).mockResolvedValue({
+      id: 'pos-real-id',
+      brPositionId: 'br-pos-cron-old',
+      brDatabaseId: 'br-db-cron-old',
+      state: 'MN',
+      name: 'City Council',
+    })
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('MeetingBriefingsService.dispatchManual', () => {

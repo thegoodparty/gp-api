@@ -30,6 +30,10 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
 
+const DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR = new Date(
+  '2026-03-01T00:00:00.000Z',
+)
+
 const isAutomationEnabled = () =>
   process.env.MEETINGS_AUTOMATION_ENABLED === 'true'
 
@@ -203,6 +207,9 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
     const offices = await this.client.electedOffice.findMany({
+      where: {
+        createdAt: { gte: DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR },
+      },
       select: { id: true, organizationSlug: true, userId: true },
     })
 
