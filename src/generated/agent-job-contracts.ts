@@ -315,7 +315,239 @@ export interface MeetingBriefingFull {
    */
   disclosure: string
   estimated_read_minutes: number
-  executive_summary: string
+  executive_summary: {
+    /**
+     * One entry per featured item in top-level items[], in the same order. Empty when no items qualify as featured (and for placeholder briefing_status values).
+     *
+     * @maxItems 5
+     */
+    items:
+      | []
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+    /**
+     * Single framing sentence at the top of the briefing. For briefing_ready artifacts: defaults to 'The following items on your agenda require action and/or have a vote:' (with trailing colon when items follow). For awaiting_agenda / no_meeting_found / error: a check-back or no-meeting message; items[] is empty.
+     */
+    lead_in: string
+  }
   /**
    * Experiment id, echoed from PARAMS.
    */
@@ -829,6 +1061,14 @@ export interface MeetingBriefingFull {
    * Official name of the meeting body as the source refers to it (e.g. 'City Council', 'Planning Board'). Used as the list-row title in the candidate dashboard. Mirrors meeting_schedule.meeting_name when a schedule exists.
    */
   meeting_name: string
+  /**
+   * Start time of the meeting in 24-hour HH:MM format, in the local timezone given by meeting_timezone. Briefings own this independently of meeting_schedule so the row is self-sufficient.
+   */
+  meeting_time: string
+  /**
+   * IANA timezone name for meeting_time (e.g. 'America/Chicago'). Use the timezone the governing body publishes the meeting in, not UTC.
+   */
+  meeting_timezone: string
   official_name: string
   required_data_points: {
     allowed_source_types?: (
@@ -912,7 +1152,239 @@ export interface MeetingBriefingPlaceholder {
    */
   disclosure: string
   estimated_read_minutes: number
-  executive_summary: string
+  executive_summary: {
+    /**
+     * One entry per featured item in top-level items[], in the same order. Empty when no items qualify as featured (and for placeholder briefing_status values).
+     *
+     * @maxItems 5
+     */
+    items:
+      | []
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+      | [
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+          {
+            /**
+             * Must resolve to an entry in top-level items[] with tier='featured'. UI uses this to link the entry to the corresponding deep-dive panel.
+             */
+            item_id: string
+            /**
+             * One-sentence distillation of items[item_id].display.summary (the Step 9 Overview) — same facts, tighter framing.
+             */
+            overview: string
+            /**
+             * Item title shown before the em-dash. Must verbatim equal items[item_id].title (denormalized for renderer convenience).
+             */
+            title: string
+          },
+        ]
+    /**
+     * Single framing sentence at the top of the briefing. For briefing_ready artifacts: defaults to 'The following items on your agenda require action and/or have a vote:' (with trailing colon when items follow). For awaiting_agenda / no_meeting_found / error: a check-back or no-meeting message; items[] is empty.
+     */
+    lead_in: string
+  }
   /**
    * Experiment id, echoed from PARAMS.
    */
@@ -992,6 +1464,14 @@ export interface MeetingBriefingPlaceholder {
    * Official name of the meeting body (e.g. 'City Council'). Required-but-may-be-empty: populate when the meeting is identified (awaiting_agenda), emit an empty string when no_meeting_found or error.
    */
   meeting_name: string
+  /**
+   * Start time of the meeting in 24-hour HH:MM format, in the local timezone given by meeting_timezone. Required-but-may-be-empty: populate when the meeting is identified (awaiting_agenda), emit an empty string when no_meeting_found or error.
+   */
+  meeting_time: string
+  /**
+   * IANA timezone name for meeting_time (e.g. 'America/Chicago'). Required-but-may-be-empty: populate when the meeting is identified, emit an empty string when no_meeting_found or error.
+   */
+  meeting_timezone: string
   official_name: string
   required_data_points: {
     allowed_source_types?: (

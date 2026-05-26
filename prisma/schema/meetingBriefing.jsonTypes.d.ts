@@ -12,6 +12,8 @@ declare global {
         | 'no_meeting_found'
         | 'error'
       meeting_date?: string
+      meeting_time?: string
+      meeting_timezone?: string
       meeting_name?: string
       location?: string
       [key: string]: Prisma.JsonValue | undefined

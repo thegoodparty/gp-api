@@ -120,14 +120,14 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (!isAutomationEnabled()) {
       this.logger.info(
         { electedOfficeId: electedOffice.id },
-        'meetings automation disabled; skipping auto schedule dispatch',
+        'meetings automation disabled; skipping auto dispatch',
       )
       return
     }
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    await this.dispatchSchedule(ctx)
+    await Promise.all([this.dispatchSchedule(ctx), this.dispatchBriefing(ctx)])
   }
 
   private async dispatchSchedule(ctx: DispatchContext): Promise<void> {
@@ -181,18 +181,6 @@ export class MeetingBriefingsService extends createPrismaBase(
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
     if (run.status !== ExperimentRunStatus.COMPLETED) return
 
-    if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
-      if (!isAutomationEnabled()) {
-        this.logger.info(
-          { runId: run.runId },
-          'meetings automation disabled; skipping briefing dispatch on schedule completion',
-        )
-        return
-      }
-      await this.dispatchFirstBriefingForOrg(run.organizationSlug)
-      return
-    }
-
     if (run.experimentType === BRIEFING_EXPERIMENT_TYPE) {
       await this.upsertBriefingRow(run)
     }
@@ -244,31 +232,6 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (!ctx) return
 
     await this.dispatchBriefing(ctx)
-  }
-
-  private async dispatchFirstBriefingForOrg(
-    organizationSlug: string,
-  ): Promise<void> {
-    const eo = await this.client.electedOffice.findFirst({
-      where: { organizationSlug },
-    })
-    if (!eo) return
-
-    const ctx = await this.resolveDispatchContext(eo)
-    if (!ctx) return
-
-    await this.experimentRuns.dispatchRun({
-      type: BRIEFING_EXPERIMENT_TYPE,
-      organizationSlug: ctx.organizationSlug,
-      clerkUserId: ctx.clerkUserId,
-      params: {
-        officialName: ctx.officialName,
-        state: ctx.state,
-        positionName: ctx.positionName,
-        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
-        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
-      },
-    })
   }
 
   private async resolveDispatchContext(
@@ -407,16 +370,27 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const schedule = await this.loadLatestScheduleForOrg(run.organizationSlug)
-    if (!schedule || schedule.status === 'not_found') {
+    const meetingTime =
+      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
+    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(meetingTime)) {
       this.logger.error(
-        { runId: run.runId, organizationSlug: run.organizationSlug },
-        'meeting_briefing completed but no schedule found for the org',
+        { runId: run.runId, meetingTime },
+        'meeting_briefing artifact has invalid meeting_time',
       )
       return
     }
-    const meetingTime = schedule.time
-    const meetingTimezone = schedule.timezone
+
+    const meetingTimezone =
+      typeof artifact.meeting_timezone === 'string'
+        ? artifact.meeting_timezone
+        : ''
+    if (!meetingTimezone) {
+      this.logger.error(
+        { runId: run.runId },
+        'meeting_briefing artifact missing meeting_timezone',
+      )
+      return
+    }
 
     await this.model.upsert({
       where: {
