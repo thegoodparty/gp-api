@@ -36,6 +36,7 @@ type SlackBlocksParams = {
   formattedAudience: Array<AudienceSlackBlock>
   audienceRequest?: string
   peerlyJobUrl?: string
+  campaignPlanDueDate?: string
 }
 
 export function buildSlackBlocks({
@@ -53,6 +54,7 @@ export function buildSlackBlocks({
   formattedAudience,
   audienceRequest,
   peerlyJobUrl,
+  campaignPlanDueDate,
 }: SlackBlocksParams) {
   const blocks = [
     {
@@ -196,9 +198,6 @@ export function buildSlackBlocks({
                 },
               ],
             },
-            // Hardcoded 'N/A': downstream automation parses this message
-            // and expects the "Due Date" line. The original source value was
-            // removed and we don't have a replacement yet.
             {
               type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
@@ -211,7 +210,7 @@ export function buildSlackBlocks({
                 },
                 {
                   type: SlackMessageType.TEXT,
-                  text: 'N/A',
+                  text: campaignPlanDueDate || 'N/A',
                 },
               ],
             },

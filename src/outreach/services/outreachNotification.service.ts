@@ -55,6 +55,7 @@ interface NotifySuccessParams {
   campaign: Campaign
   outreach: OutreachWithVoterFileFilter
   audienceRequest?: string
+  campaignPlanDueDate?: string
 }
 
 interface NotifyFailureParams {
@@ -86,6 +87,7 @@ export class OutreachNotificationService {
     campaign,
     outreach,
     audienceRequest,
+    campaignPlanDueDate,
   }: NotifySuccessParams): Promise<void> {
     if (!shouldNotifyCAS(outreach.outreachType)) return
 
@@ -138,6 +140,7 @@ export class OutreachNotificationService {
           formattedAudience: this.formatAudienceFiltersForSlack(audience),
           audienceRequest,
           peerlyJobUrl,
+          campaignPlanDueDate,
         }),
         TARGET_CHANNEL,
       )

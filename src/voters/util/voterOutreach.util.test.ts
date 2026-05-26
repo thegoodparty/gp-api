@@ -33,11 +33,22 @@ const findDueDateValue = (
 }
 
 describe('buildSlackBlocks - campaignPlanDueDate', () => {
-  it('always renders "N/A" for the Due Date line', () => {
+  const baseParams = {
+    type: OutreachType.text,
+    formattedAudience: [],
+  }
+
+  it('renders the due date as-is when a YYYY-MM-DD string is provided', () => {
     const { blocks } = buildSlackBlocks({
-      type: OutreachType.text,
-      formattedAudience: [],
+      ...baseParams,
+      campaignPlanDueDate: '2026-04-19',
     })
+
+    expect(findDueDateValue(blocks)).toBe('2026-04-19')
+  })
+
+  it('renders "N/A" when campaignPlanDueDate is omitted', () => {
+    const { blocks } = buildSlackBlocks(baseParams)
 
     expect(findDueDateValue(blocks)).toBe('N/A')
   })

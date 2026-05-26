@@ -34,6 +34,10 @@ export class CreateOutreachSchema extends createZodDto(
         .max(50, 'didNpaSubset cannot exceed 50 area codes')
         .optional(),
       title: z.string().optional(),
+      campaignPlanDueDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'campaignPlanDueDate must be YYYY-MM-DD')
+        .optional(),
     })
     .strict()
     .superRefine((data, ctx) => {
