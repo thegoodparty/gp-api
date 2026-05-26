@@ -720,6 +720,10 @@ export class DomainsService
     } catch (error) {
       // Mark inactive so preflight on retry falls through to a fresh reservation
       // instead of returning alreadyExisted: true for a stuck pending row.
+      // completeDomainRegistration's Vercel-failure path sets this itself, but
+      // other failure modes (top-level findUniqueOrThrow, !domain.price,
+      // getDomainDetails rethrow, final status update) do not — this is the
+      // safety net for those.
       await this.model.update({
         where: { id: createdDomain.id },
         data: { status: DomainStatus.inactive },
@@ -727,17 +731,15 @@ export class DomainsService
       throw error
     }
 
-    const registered = await this.model.findUniqueOrThrow({
-      where: { id: createdDomain.id },
-    })
-
+    // completeDomainRegistration unconditionally sets status=submitted; reuse
+    // the reservation row's fields rather than re-reading from the DB.
     return {
       website: websiteSummary,
       domain: {
-        id: registered.id,
-        name: registered.name,
-        status: registered.status,
-        price: registered.price?.toNumber() ?? null,
+        id: createdDomain.id,
+        name: createdDomain.name,
+        status: DomainStatus.submitted,
+        price: createdDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
       message: 'Domain registration submitted',
