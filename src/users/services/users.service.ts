@@ -238,6 +238,10 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         data: { clerkId: data.clerkId },
       })
       if (updated.count === 0) {
+        const refetched = await this.findUser({
+          id: existingByEmail.id,
+        })
+        if (refetched?.clerkId === data.clerkId) return refetched
         this.logger.warn(
           {
             userId: existingByEmail.id,
@@ -278,25 +282,52 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           { clerkId: data.clerkId },
           'Concurrent provisioning detected, fetching existing user',
         )
-        const byClerkId = await this.findUser({ clerkId: data.clerkId })
+        const byClerkId = await this.findUser({
+          clerkId: data.clerkId,
+        })
         if (byClerkId) return byClerkId
+
         const byEmail = await this.findUserByEmail(data.email)
-        if (byEmail?.clerkId && byEmail.clerkId !== data.clerkId) {
+        if (!byEmail) {
+          this.logger.error(
+            { clerkId: data.clerkId, email: data.email },
+            'P2002 race but user not found by clerkId or email',
+          )
+          return null
+        }
+        if (byEmail.clerkId && byEmail.clerkId !== data.clerkId) {
           this.logger.warn(
             {
               userId: byEmail.id,
               existingClerkId: byEmail.clerkId,
               incomingClerkId: data.clerkId,
             },
-            'P2002 race resolved to email match with different clerkId: refusing rebind',
+            'P2002 race: email match has different clerkId, refusing rebind',
           )
           return null
         }
-        if (!byEmail) {
-          this.logger.error(
-            { clerkId: data.clerkId, email: data.email },
-            'P2002 race but user not found by clerkId or email',
-          )
+        if (!byEmail.clerkId) {
+          const linked = await this.model.updateMany({
+            where: { id: byEmail.id, clerkId: null },
+            data: { clerkId: data.clerkId },
+          })
+          if (linked.count === 0) {
+            const refetched = await this.findUser({
+              id: byEmail.id,
+            })
+            if (refetched?.clerkId === data.clerkId) {
+              return refetched
+            }
+            this.logger.warn(
+              {
+                userId: byEmail.id,
+                incomingClerkId: data.clerkId,
+              },
+              'P2002 race: concurrent writer set clerkId first',
+            )
+            return null
+          }
+          return this.findUser({ id: byEmail.id })
         }
         return byEmail
       }

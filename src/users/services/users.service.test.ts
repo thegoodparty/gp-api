@@ -2,6 +2,7 @@ import { useTestService } from '@/test-service'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { ClerkClient } from '@clerk/backend'
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersService, type ResolvedActorIdentity } from './users.service'
 import { AnalyticsService } from '@/analytics/analytics.service'
@@ -524,6 +525,133 @@ describe('UsersService', () => {
       expect(result).not.toBeNull()
       expect(result?.clerkId).toBe('user_brand_new')
       expect(result?.email).toBe('brand-new@test.goodparty.org')
+    })
+
+    it('returns user when updateMany count=0 but concurrent writer bound same clerkId', async () => {
+      const legacy = await service.prisma.user.create({
+        data: {
+          email: 'occ-same@test.goodparty.org',
+          clerkId: null,
+          firstName: 'OCC',
+          lastName: 'Same',
+        },
+      })
+      await service.prisma.user.update({
+        where: { id: legacy.id },
+        data: { clerkId: 'user_same_clerk' },
+      })
+
+      const result = await usersService.findOrProvisionByClerk({
+        clerkId: 'user_same_clerk',
+        email: 'occ-same@test.goodparty.org',
+        firstName: 'OCC',
+        lastName: 'Same',
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.id).toBe(legacy.id)
+      expect(result?.clerkId).toBe('user_same_clerk')
+    })
+
+    describe('P2002 race recovery', () => {
+      const p2002 = new PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        { code: 'P2002', clientVersion: '5.0.0' },
+      )
+
+      it('returns user when P2002 and found by clerkId', async () => {
+        const existing = await service.prisma.user.create({
+          data: {
+            email: 'p2002-clerk@test.goodparty.org',
+            clerkId: 'user_p2002_winner',
+            firstName: 'P2002',
+            lastName: 'Winner',
+          },
+        })
+        vi.spyOn(
+          usersService.model,
+          'create',
+        ).mockRejectedValueOnce(p2002)
+
+        const result = await usersService.findOrProvisionByClerk({
+          clerkId: 'user_p2002_winner',
+          email: 'p2002-clerk@test.goodparty.org',
+          firstName: 'P2002',
+          lastName: 'Winner',
+        })
+
+        expect(result).not.toBeNull()
+        expect(result?.id).toBe(existing.id)
+      })
+
+      it('returns null when P2002 and email match has different clerkId', async () => {
+        await service.prisma.user.create({
+          data: {
+            email: 'p2002-diff@test.goodparty.org',
+            clerkId: 'user_p2002_other',
+            firstName: 'P2002',
+            lastName: 'Other',
+          },
+        })
+        vi.spyOn(
+          usersService.model,
+          'create',
+        ).mockRejectedValueOnce(p2002)
+
+        const result = await usersService.findOrProvisionByClerk({
+          clerkId: 'user_p2002_attacker',
+          email: 'p2002-diff@test.goodparty.org',
+          firstName: 'Attacker',
+          lastName: 'User',
+        })
+
+        expect(result).toBeNull()
+      })
+
+      it('links legacy user when P2002 and email match has null clerkId', async () => {
+        const legacy = await service.prisma.user.create({
+          data: {
+            email: 'p2002-legacy@test.goodparty.org',
+            clerkId: null,
+            firstName: 'P2002',
+            lastName: 'Legacy',
+          },
+        })
+        vi.spyOn(
+          usersService.model,
+          'create',
+        ).mockRejectedValueOnce(p2002)
+
+        const result = await usersService.findOrProvisionByClerk({
+          clerkId: 'user_p2002_linker',
+          email: 'p2002-legacy@test.goodparty.org',
+          firstName: 'P2002',
+          lastName: 'Legacy',
+        })
+
+        expect(result).not.toBeNull()
+        expect(result?.id).toBe(legacy.id)
+        const after = await service.prisma.user.findUnique({
+          where: { id: legacy.id },
+        })
+        expect(after?.clerkId).toBe('user_p2002_linker')
+      })
+
+      it('returns null when P2002 and neither lookup resolves', async () => {
+        vi.spyOn(
+          usersService.model,
+          'create',
+        ).mockRejectedValueOnce(p2002)
+
+        const result = await usersService.findOrProvisionByClerk({
+          clerkId: 'user_p2002_ghost',
+          email: 'p2002-ghost@test.goodparty.org',
+          firstName: 'Ghost',
+          lastName: 'User',
+        })
+
+        expect(result).toBeNull()
+      })
     })
   })
 
