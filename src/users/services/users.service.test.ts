@@ -498,6 +498,44 @@ describe('UsersService', () => {
       expect(result?.id).toBe(legacy.id)
       expect(result?.clerkId).toBe('user_same')
     })
+
+    describe('resolveAfterP2002 (race recovery)', () => {
+      const resolveAfterP2002 = (clerkId: string, email: string) =>
+        // @ts-expect-error accessing private method for test coverage
+        usersService.resolveAfterP2002({ clerkId, email }) as Promise<
+          Awaited<ReturnType<typeof usersService.findUser>>
+        >
+
+      it('returns null when email match has different clerkId', async () => {
+        await createUser('p2002-diff@test.goodparty.org', 'user_p2002_other')
+        const result = await resolveAfterP2002(
+          'user_p2002_attacker',
+          'p2002-diff@test.goodparty.org',
+        )
+        expect(result).toBeNull()
+      })
+
+      it('links legacy user with null clerkId', async () => {
+        const legacy = await createUser('p2002-legacy@test.goodparty.org')
+        const result = await resolveAfterP2002(
+          'user_p2002_linker',
+          'p2002-legacy@test.goodparty.org',
+        )
+        expect(result?.id).toBe(legacy.id)
+        const after = await service.prisma.user.findUnique({
+          where: { id: legacy.id },
+        })
+        expect(after?.clerkId).toBe('user_p2002_linker')
+      })
+
+      it('returns null when neither lookup resolves', async () => {
+        const result = await resolveAfterP2002(
+          'user_p2002_ghost',
+          'p2002-ghost@test.goodparty.org',
+        )
+        expect(result).toBeNull()
+      })
+    })
   })
 
   describe('deleteUser', () => {
