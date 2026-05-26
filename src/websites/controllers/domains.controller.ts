@@ -19,6 +19,10 @@ import {
   SearchDomainsBodySchema,
   SearchDomainsResponseSchema,
 } from '../schemas/SearchDomains.schema'
+import {
+  PurchaseDomainBodySchema,
+  PurchaseDomainResponseSchema,
+} from '../schemas/PurchaseDomain.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
@@ -74,6 +78,37 @@ export class DomainsController {
     @Body() { patterns, maxPrice }: SearchDomainsBodySchema,
   ): Promise<PatternedDomainSearchResult> {
     return this.domains.searchDomainsForCampaign(campaign, patterns, maxPrice)
+  }
+
+  @Post('purchase')
+  @UseCampaign({ include: { user: true } })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ResponseSchema(PurchaseDomainResponseSchema)
+  @McpTool({
+    description:
+      'Reserve a specific available domain for the calling campaign. ' +
+      'Call AFTER searchDomains has returned a candidate and the agent ' +
+      'has chosen one under the price cap. Idempotent per campaign via ' +
+      'a Postgres advisory transaction lock — safe to retry on ' +
+      'transient errors; a repeated call for the same domain returns ' +
+      'alreadyExisted: true. Conflicts (a different in-progress domain ' +
+      'for the campaign, or the domain is no longer available) return ' +
+      '4xx. On success the domain is created in DomainStatus.pending; ' +
+      'poll GET /v1/websites/domains/status to observe progression.',
+  })
+  async purchaseDomain(
+    @ReqCampaign() campaign: Campaign & { user: User },
+    @Body() { domain }: PurchaseDomainBodySchema,
+  ) {
+    const result = await this.domains.purchaseDomainForCampaign(
+      campaign,
+      domain,
+    )
+    return {
+      domain: result.domain,
+      alreadyExisted: result.alreadyExisted,
+      message: result.message,
+    }
   }
 
   @Get('status')
