@@ -713,9 +713,19 @@ export class DomainsService
       select: { content: true },
     })
     const contactInfo = this.buildContactInfo(campaign.user, website.content)
-    await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
-      skipPaymentVerification: true,
-    })
+    try {
+      await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
+        skipPaymentVerification: true,
+      })
+    } catch (error) {
+      // Mark inactive so preflight on retry falls through to a fresh reservation
+      // instead of returning alreadyExisted: true for a stuck pending row.
+      await this.model.update({
+        where: { id: createdDomain.id },
+        data: { status: DomainStatus.inactive },
+      })
+      throw error
+    }
 
     const registered = await this.model.findUniqueOrThrow({
       where: { id: createdDomain.id },

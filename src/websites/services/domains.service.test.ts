@@ -861,6 +861,45 @@ describe('DomainsService', () => {
       expect(mockPrisma.$transaction).not.toHaveBeenCalled()
       expect(completeSpy).not.toHaveBeenCalled()
     })
+
+    it('marks the Domain row inactive and re-throws when inline registration fails', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      const created = {
+        ...mockDomain,
+        id: 555,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      }
+      mockPrisma.domain.create.mockResolvedValue(created)
+      const registrationError = new Error(
+        'Error getting domain details from Vercel:',
+      )
+      vi.spyOn(service, 'completeDomainRegistration').mockRejectedValue(
+        registrationError,
+      )
+
+      await expect(
+        service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+        ),
+      ).rejects.toBe(registrationError)
+
+      expect(mockPrisma.domain.update).toHaveBeenCalledWith({
+        where: { id: created.id },
+        data: { status: DomainStatus.inactive },
+      })
+      expect(mockPrisma.domain.findUniqueOrThrow).not.toHaveBeenCalled()
+    })
   })
 
   describe('completeDomainRegistration', () => {
