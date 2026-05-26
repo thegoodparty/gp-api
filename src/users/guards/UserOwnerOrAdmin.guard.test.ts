@@ -53,10 +53,10 @@ describe('UserOwnerOrAdminGuard', () => {
     expect(result).toBe(false)
   })
 
-  it('rejects scientific notation that parseInt would misparse', () => {
+  it('rejects scientific notation even when it equals user id', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { id: 1, roles: [UserRole.candidate] },
+        user: { id: 100, roles: [UserRole.candidate] },
         params: { id: '1e2' },
       }),
     )

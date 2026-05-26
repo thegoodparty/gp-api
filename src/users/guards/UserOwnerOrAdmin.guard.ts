@@ -15,7 +15,8 @@ export class UserOwnerOrAdminGuard implements CanActivate {
     }>()
     return Boolean(
       m2mToken ||
-        user?.id === Number(params.id) ||
+        (/^\d+$/.test(params.id) &&
+          user?.id === Number(params.id)) ||
         user?.roles.includes(UserRole.admin),
     )
   }
