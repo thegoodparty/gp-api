@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
+import { calcTextAmountInCents } from 'src/shared/util/textPricing.util'
 import { UsersService } from 'src/users/services/users.service'
 import { version as uuidVersion } from 'uuid'
 import z from 'zod'
@@ -49,13 +50,6 @@ const PollPurchaseMetadataSchema = z.union([
   }),
 ])
 
-const PRICE_PER_TEXT_TENTH_CENTS = 35
-
-function calcAmountInCents(textCount: number): number {
-  const totalTenthCents = textCount * PRICE_PER_TEXT_TENTH_CENTS // integer
-  return Math.floor((totalTenthCents + 5) / 10)
-}
-
 @Injectable()
 export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   constructor(
@@ -78,8 +72,8 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
     return metadata.pollPurchaseType === PollPurchaseType.expansion
-      ? calcAmountInCents(metadata.count)
-      : calcAmountInCents(metadata.audienceSize)
+      ? calcTextAmountInCents(metadata.count)
+      : calcTextAmountInCents(metadata.audienceSize)
   }
 
   async handlePollPostPurchase(
