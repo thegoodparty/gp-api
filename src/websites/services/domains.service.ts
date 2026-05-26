@@ -708,12 +708,12 @@ export class DomainsService
     // billed to GP's Vercel team account; the maxPrice check above is the
     // safety bound). Browser purchases flow through handleDomainPostPurchase,
     // which sets paymentId so completeDomainRegistration's default guard fires.
-    const website = await this.client.website.findUniqueOrThrow({
-      where: { id: websiteSummary.id },
-      select: { content: true },
-    })
-    const contactInfo = this.buildContactInfo(campaign.user, website.content)
     try {
+      const website = await this.client.website.findUniqueOrThrow({
+        where: { id: websiteSummary.id },
+        select: { content: true },
+      })
+      const contactInfo = this.buildContactInfo(campaign.user, website.content)
       await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
         skipPaymentVerification: true,
       })
@@ -721,9 +721,9 @@ export class DomainsService
       // Mark inactive so preflight on retry falls through to a fresh reservation
       // instead of returning alreadyExisted: true for a stuck pending row.
       // completeDomainRegistration's Vercel-failure path sets this itself, but
-      // other failure modes (top-level findUniqueOrThrow, !domain.price,
-      // getDomainDetails rethrow, final status update) do not — this is the
-      // safety net for those.
+      // other failure modes (the website lookup above, top-level
+      // findUniqueOrThrow, !domain.price, getDomainDetails rethrow, final
+      // status update) do not — this is the safety net for those.
       await this.model.update({
         where: { id: createdDomain.id },
         data: { status: DomainStatus.inactive },
