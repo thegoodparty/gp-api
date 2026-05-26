@@ -424,133 +424,80 @@ describe('UsersService', () => {
   })
 
   describe('findOrProvisionByClerk', () => {
+    const provision = (
+      clerkId: string,
+      email: string,
+      first = 'Test',
+      last = 'User',
+    ) =>
+      usersService.findOrProvisionByClerk({
+        clerkId,
+        email,
+        firstName: first,
+        lastName: last,
+      })
+
+    const createUser = (email: string, clerkId: string | null = null) =>
+      service.prisma.user.create({
+        data: { email, clerkId },
+      })
+
     it('returns existing user when found by clerkId', async () => {
-      const existing = await service.prisma.user.create({
-        data: {
-          email: 'clerk-existing@test.goodparty.org',
-          clerkId: 'user_existing_clerk',
-          firstName: 'Existing',
-          lastName: 'User',
-        },
-      })
-
-      const result = await usersService.findOrProvisionByClerk({
-        clerkId: 'user_existing_clerk',
-        email: 'clerk-existing@test.goodparty.org',
-        firstName: 'Existing',
-        lastName: 'User',
-      })
-
-      expect(result).not.toBeNull()
+      const existing = await createUser(
+        'clerk-existing@test.goodparty.org',
+        'user_existing',
+      )
+      const result = await provision(
+        'user_existing',
+        'clerk-existing@test.goodparty.org',
+      )
       expect(result?.id).toBe(existing.id)
     })
 
-    it('returns null when email matches a user that already has a clerkId', async () => {
-      await service.prisma.user.create({
-        data: {
-          email: 'victim@test.goodparty.org',
-          clerkId: 'user_victim_clerk',
-          firstName: 'Victim',
-          lastName: 'User',
-        },
-      })
-
-      const result = await usersService.findOrProvisionByClerk({
-        clerkId: 'user_attacker_clerk',
-        email: 'victim@test.goodparty.org',
-        firstName: 'Attacker',
-        lastName: 'User',
-      })
-
+    it('returns null and preserves clerkId when email matches a user that already has one', async () => {
+      const victim = await createUser(
+        'victim@test.goodparty.org',
+        'user_victim',
+      )
+      const result = await provision(
+        'user_attacker',
+        'victim@test.goodparty.org',
+      )
       expect(result).toBeNull()
-    })
-
-    it('does not overwrite clerkId on a user that already has one', async () => {
-      const victim = await service.prisma.user.create({
-        data: {
-          email: 'no-rebind@test.goodparty.org',
-          clerkId: 'user_original_clerk',
-          firstName: 'Original',
-          lastName: 'User',
-        },
-      })
-
-      await usersService.findOrProvisionByClerk({
-        clerkId: 'user_attacker_clerk',
-        email: 'no-rebind@test.goodparty.org',
-        firstName: 'Attacker',
-        lastName: 'User',
-      })
-
       const after = await service.prisma.user.findUnique({
         where: { id: victim.id },
       })
-      expect(after?.clerkId).toBe('user_original_clerk')
+      expect(after?.clerkId).toBe('user_victim')
     })
 
-    it('links legacy user with null clerkId to new Clerk identity', async () => {
-      const legacy = await service.prisma.user.create({
-        data: {
-          email: 'legacy@test.goodparty.org',
-          clerkId: null,
-          firstName: 'Legacy',
-          lastName: 'User',
-        },
-      })
-
-      const result = await usersService.findOrProvisionByClerk({
-        clerkId: 'user_new_clerk',
-        email: 'legacy@test.goodparty.org',
-        firstName: 'Legacy',
-        lastName: 'User',
-      })
-
-      expect(result).not.toBeNull()
+    it('links legacy user with null clerkId', async () => {
+      const legacy = await createUser('legacy@test.goodparty.org')
+      const result = await provision('user_new', 'legacy@test.goodparty.org')
       expect(result?.id).toBe(legacy.id)
-
       const after = await service.prisma.user.findUnique({
         where: { id: legacy.id },
       })
-      expect(after?.clerkId).toBe('user_new_clerk')
+      expect(after?.clerkId).toBe('user_new')
     })
 
-    it('creates a new user when no match by clerkId or email', async () => {
-      const result = await usersService.findOrProvisionByClerk({
-        clerkId: 'user_brand_new',
-        email: 'brand-new@test.goodparty.org',
-        firstName: 'Brand',
-        lastName: 'New',
-      })
-
-      expect(result).not.toBeNull()
+    it('creates a new user when no match', async () => {
+      const result = await provision(
+        'user_brand_new',
+        'brand-new@test.goodparty.org',
+      )
       expect(result?.clerkId).toBe('user_brand_new')
       expect(result?.email).toBe('brand-new@test.goodparty.org')
     })
 
-    it('returns user when updateMany count=0 but concurrent writer bound same clerkId', async () => {
-      const legacy = await service.prisma.user.create({
-        data: {
-          email: 'occ-same@test.goodparty.org',
-          clerkId: null,
-          firstName: 'OCC',
-          lastName: 'Same',
-        },
-      })
+    it('returns user when updateMany loses race to same clerkId', async () => {
+      const legacy = await createUser('occ-same@test.goodparty.org')
       await service.prisma.user.update({
         where: { id: legacy.id },
-        data: { clerkId: 'user_same_clerk' },
+        data: { clerkId: 'user_same' },
       })
-
-      const result = await usersService.findOrProvisionByClerk({
-        clerkId: 'user_same_clerk',
-        email: 'occ-same@test.goodparty.org',
-        firstName: 'OCC',
-        lastName: 'Same',
-      })
-
-      expect(result).not.toBeNull()
+      const result = await provision('user_same', 'occ-same@test.goodparty.org')
       expect(result?.id).toBe(legacy.id)
-      expect(result?.clerkId).toBe('user_same_clerk')
+      expect(result?.clerkId).toBe('user_same')
     })
 
     describe('P2002 race recovery', () => {
@@ -558,78 +505,39 @@ describe('UsersService', () => {
         'Unique constraint failed',
         { code: 'P2002', clientVersion: '5.0.0' },
       )
+      const stubP2002 = () =>
+        vi.spyOn(usersService.model, 'create').mockRejectedValueOnce(p2002)
 
-      it('returns user when P2002 and found by clerkId', async () => {
-        const existing = await service.prisma.user.create({
-          data: {
-            email: 'p2002-clerk@test.goodparty.org',
-            clerkId: 'user_p2002_winner',
-            firstName: 'P2002',
-            lastName: 'Winner',
-          },
-        })
-        vi.spyOn(
-          usersService.model,
-          'create',
-        ).mockRejectedValueOnce(p2002)
-
-        const result = await usersService.findOrProvisionByClerk({
-          clerkId: 'user_p2002_winner',
-          email: 'p2002-clerk@test.goodparty.org',
-          firstName: 'P2002',
-          lastName: 'Winner',
-        })
-
-        expect(result).not.toBeNull()
+      it('returns user found by clerkId', async () => {
+        const existing = await createUser(
+          'p2002-clerk@test.goodparty.org',
+          'user_p2002_winner',
+        )
+        stubP2002()
+        const result = await provision(
+          'user_p2002_winner',
+          'p2002-clerk@test.goodparty.org',
+        )
         expect(result?.id).toBe(existing.id)
       })
 
-      it('returns null when P2002 and email match has different clerkId', async () => {
-        await service.prisma.user.create({
-          data: {
-            email: 'p2002-diff@test.goodparty.org',
-            clerkId: 'user_p2002_other',
-            firstName: 'P2002',
-            lastName: 'Other',
-          },
-        })
-        vi.spyOn(
-          usersService.model,
-          'create',
-        ).mockRejectedValueOnce(p2002)
-
-        const result = await usersService.findOrProvisionByClerk({
-          clerkId: 'user_p2002_attacker',
-          email: 'p2002-diff@test.goodparty.org',
-          firstName: 'Attacker',
-          lastName: 'User',
-        })
-
+      it('returns null when email match has different clerkId', async () => {
+        await createUser('p2002-diff@test.goodparty.org', 'user_p2002_other')
+        stubP2002()
+        const result = await provision(
+          'user_p2002_attacker',
+          'p2002-diff@test.goodparty.org',
+        )
         expect(result).toBeNull()
       })
 
-      it('links legacy user when P2002 and email match has null clerkId', async () => {
-        const legacy = await service.prisma.user.create({
-          data: {
-            email: 'p2002-legacy@test.goodparty.org',
-            clerkId: null,
-            firstName: 'P2002',
-            lastName: 'Legacy',
-          },
-        })
-        vi.spyOn(
-          usersService.model,
-          'create',
-        ).mockRejectedValueOnce(p2002)
-
-        const result = await usersService.findOrProvisionByClerk({
-          clerkId: 'user_p2002_linker',
-          email: 'p2002-legacy@test.goodparty.org',
-          firstName: 'P2002',
-          lastName: 'Legacy',
-        })
-
-        expect(result).not.toBeNull()
+      it('links legacy user with null clerkId', async () => {
+        const legacy = await createUser('p2002-legacy@test.goodparty.org')
+        stubP2002()
+        const result = await provision(
+          'user_p2002_linker',
+          'p2002-legacy@test.goodparty.org',
+        )
         expect(result?.id).toBe(legacy.id)
         const after = await service.prisma.user.findUnique({
           where: { id: legacy.id },
@@ -637,19 +545,12 @@ describe('UsersService', () => {
         expect(after?.clerkId).toBe('user_p2002_linker')
       })
 
-      it('returns null when P2002 and neither lookup resolves', async () => {
-        vi.spyOn(
-          usersService.model,
-          'create',
-        ).mockRejectedValueOnce(p2002)
-
-        const result = await usersService.findOrProvisionByClerk({
-          clerkId: 'user_p2002_ghost',
-          email: 'p2002-ghost@test.goodparty.org',
-          firstName: 'Ghost',
-          lastName: 'User',
-        })
-
+      it('returns null when neither lookup resolves', async () => {
+        stubP2002()
+        const result = await provision(
+          'user_p2002_ghost',
+          'p2002-ghost@test.goodparty.org',
+        )
         expect(result).toBeNull()
       })
     })
