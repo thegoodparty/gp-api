@@ -471,6 +471,18 @@ describe('UsersController', () => {
         signedUploadUrl: 'https://s3.example.com/signed-url',
       })
     })
+
+    it('throws UnauthorizedException when user is null (M2M bypass)', async () => {
+      const args = {
+        bucket: 'uploads',
+        fileName: 'doc.pdf',
+        fileType: 'application/pdf' as const,
+      }
+
+      await expect(
+        controller.generateSignedUploadUrl(null as never, args),
+      ).rejects.toThrow(UnauthorizedException)
+    })
   })
 
   describe('updatePassword', () => {
