@@ -17,6 +17,7 @@ import {
   District,
   DistrictNameItem,
   DistrictTypeItem,
+  FilingFeeByBrHashResult,
   PositionWithOptionalDistrict,
   ProjectedTurnout,
   RaceTargetDetailsResult,
@@ -131,7 +132,10 @@ export class ElectionsService {
 
   private calculateRaceTargetMetrics(
     projectedTurnout: number,
-  ): RaceTargetMetrics {
+  ): Pick<
+    RaceTargetMetrics,
+    'winNumber' | 'voterContactGoal' | 'projectedTurnout'
+  > {
     const winNumber =
       Math.ceil(projectedTurnout * ElectionsService.WIN_NUMBER_MULTIPLIER) + 1
     return {
@@ -262,11 +266,13 @@ export class ElectionsService {
           electionDate: string | undefined
           includeDistrict: boolean
           includeTurnout: boolean
+          includeFilingFee: boolean
         }
       >(path, {
         electionDate: electionDate ?? undefined,
         includeDistrict: true,
         includeTurnout,
+        includeFilingFee: true,
       })
 
       const { district } = positionWithDistrict ?? {}
@@ -304,6 +310,9 @@ export class ElectionsService {
               voterContactGoal: -1,
               projectedTurnout: -1,
             }),
+        filingFee: positionWithDistrict.filingFee ?? null,
+        filingRequirementsText:
+          positionWithDistrict.filingRequirementsText ?? null,
       }
     } catch (error) {
       const { district } = positionWithDistrict ?? {}
@@ -388,6 +397,37 @@ export class ElectionsService {
         error,
         channel: SlackChannel.botDev,
       })
+      return null
+    }
+  }
+
+  /**
+   * Resolve a filing fee for a race identified by its BallotReady race hash
+   * (`Race.br_hash_id` in election-api). This bypasses the Position-based
+   * lookup (`getPositionMatchedRaceTargetDetails`) which is currently broken
+   * because `Position.placeId` isn't projected by the election-api dbt mart.
+   *
+   * The campaign stores this hash on `details.raceId` (set by the office
+   * picker after the office-picker fix). Returns `null` on any error —
+   * callers must fall back to the Position-based path or accept no filing
+   * fee. We deliberately don't throw so this stays an opt-in enrichment.
+   */
+  async fetchFilingFeeByRaceHash(
+    brHashId: string,
+  ): Promise<FilingFeeByBrHashResult | null> {
+    if (!brHashId) return null
+    const route = ElectionApiRoutes.races.filingFeeByBrHashId
+    const path = `${route.path}/${encodeURIComponent(brHashId)}/${route.filingFeeSuffix}`
+    try {
+      return await this.electionApiGet<FilingFeeByBrHashResult, object>(
+        path,
+        {},
+      )
+    } catch (error) {
+      this.logger.warn(
+        { error, brHashId },
+        'Election API GET races/by-br-hash-id filing-fee failed',
+      )
       return null
     }
   }
