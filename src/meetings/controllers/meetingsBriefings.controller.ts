@@ -7,10 +7,9 @@ import {
   Post,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, UserRole } from '@prisma/client'
+import { ElectedOffice } from '@prisma/client'
 import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
-import { Roles } from '@/authentication/decorators/Roles.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
@@ -170,7 +169,6 @@ export class MeetingsBriefingsController {
     }
   }
 
-  @Roles(UserRole.admin)
   @Post('briefings/dispatch')
   async dispatchAgent(
     @Body(new ZodValidationPipe(DispatchMeetingAgentSchema))

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus, UserRole } from '@prisma/client'
+import { ExperimentRunStatus } from '@prisma/client'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { addDays, getDay, parseISO } from 'date-fns'
@@ -654,22 +654,7 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
     vi.unstubAllEnvs()
   })
 
-  const makeAdmin = () =>
-    service.prisma.user.update({
-      where: { id: service.user.id },
-      data: { roles: [UserRole.admin] },
-    })
-
-  it('returns 403 when caller is not an admin', async () => {
-    const result = await service.client.post(
-      '/v1/meetings/briefings/dispatch',
-      { electedOfficeId: 'any-id', kind: 'schedule' },
-    )
-    expect(result.status).toBe(403)
-  })
-
   it('returns 400 when body is missing required fields', async () => {
-    await makeAdmin()
     const result = await service.client.post(
       '/v1/meetings/briefings/dispatch',
       {},
@@ -678,7 +663,6 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
   })
 
   it('returns 404 when elected office is not found', async () => {
-    await makeAdmin()
     const result = await service.client.post(
       '/v1/meetings/briefings/dispatch',
       { electedOfficeId: 'nonexistent', kind: 'schedule' },
@@ -687,7 +671,6 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
   })
 
   it('returns 200 and dispatches when admin sends a valid request', async () => {
-    await makeAdmin()
     const orgSlug = `eo-dispatch-${Date.now()}`
     await service.prisma.organization.create({
       data: { slug: orgSlug, ownerId: service.user.id, positionId: 'br-pos-d' },
