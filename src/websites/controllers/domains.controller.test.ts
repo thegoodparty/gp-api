@@ -199,6 +199,20 @@ describe('DomainsController.purchaseDomain', () => {
     expect(mcpMeta).toBeDefined()
     expect(mcpMeta.description).toMatch(/Purchase a specific available domain/)
   })
+
+  it('PurchaseDomainBodySchema enforces server-side maxPrice ceiling', () => {
+    const validResult = PurchaseDomainBodySchema.schema.safeParse({
+      domain: 'voteforjane.run',
+      maxPrice: 50,
+    })
+    expect(validResult.success).toBe(true)
+
+    const overCeilingResult = PurchaseDomainBodySchema.schema.safeParse({
+      domain: 'voteforjane.run',
+      maxPrice: 200,
+    })
+    expect(overCeilingResult.success).toBe(false)
+  })
 })
 
 describe('DomainsController.purchaseDomain MCP discoverability', () => {
