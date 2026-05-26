@@ -9,6 +9,11 @@ export class PurchaseDomainBodySchema extends createZodDto(
       message:
         'Invalid domain format. Must be a Fully Qualified Domain Name (e.g., example.com or foo.example.com)',
     }),
+    // Defense-in-depth ceiling: caller-supplied cap can't be larger than this.
+    // Standard campaign domains run ~$10–30; premium TLDs occasionally $50–90.
+    // $100 leaves headroom while bounding the blast radius of a compromised
+    // or misconfigured caller passing maxPrice: 999999.
+    maxPrice: z.number().positive().max(100),
   }),
 ) {}
 

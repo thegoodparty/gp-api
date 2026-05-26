@@ -105,12 +105,11 @@ describe('DomainsController.purchaseDomain', () => {
         domain: {
           id: 99,
           name: 'voteforjane.run',
-          status: DomainStatus.pending,
+          status: DomainStatus.submitted,
           price: 8,
         },
         alreadyExisted: false,
-        message:
-          'Domain reserved; registration will complete after payment confirmation',
+        message: 'Domain registration submitted',
       }),
     }
 
@@ -136,22 +135,23 @@ describe('DomainsController.purchaseDomain', () => {
 
     const result = await controller.purchaseDomain(campaign, {
       domain: 'voteforjane.run',
+      maxPrice: 50,
     })
 
     expect(mockDomains.purchaseDomainForCampaign).toHaveBeenCalledWith(
       campaign,
       'voteforjane.run',
+      50,
     )
     expect(result).toEqual({
       domain: {
         id: 99,
         name: 'voteforjane.run',
-        status: DomainStatus.pending,
+        status: DomainStatus.submitted,
         price: 8,
       },
       alreadyExisted: false,
-      message:
-        'Domain reserved; registration will complete after payment confirmation',
+      message: 'Domain registration submitted',
     })
     expect(result).not.toHaveProperty('website')
   })
@@ -167,7 +167,10 @@ describe('DomainsController.purchaseDomain', () => {
     }
 
     await expect(
-      controller.purchaseDomain(campaign, { domain: 'voteforjane.run' }),
+      controller.purchaseDomain(campaign, {
+        domain: 'voteforjane.run',
+        maxPrice: 50,
+      }),
     ).rejects.toBeInstanceOf(ConflictException)
   })
 
@@ -194,7 +197,21 @@ describe('DomainsController.purchaseDomain', () => {
 
     const mcpMeta = reflector.get(MCP_TOOL_KEY, controller.purchaseDomain)
     expect(mcpMeta).toBeDefined()
-    expect(mcpMeta.description).toMatch(/Reserve a specific available domain/)
+    expect(mcpMeta.description).toMatch(/Purchase a specific available domain/)
+  })
+
+  it('PurchaseDomainBodySchema enforces server-side maxPrice ceiling', () => {
+    const validResult = PurchaseDomainBodySchema.schema.safeParse({
+      domain: 'voteforjane.run',
+      maxPrice: 50,
+    })
+    expect(validResult.success).toBe(true)
+
+    const overCeilingResult = PurchaseDomainBodySchema.schema.safeParse({
+      domain: 'voteforjane.run',
+      maxPrice: 200,
+    })
+    expect(overCeilingResult.success).toBe(false)
   })
 })
 
@@ -235,7 +252,9 @@ describe('DomainsController.purchaseDomain MCP discoverability', () => {
     const purchase = tools.find((t) => t.toolName === 'POST_domains_purchase')
 
     expect(purchase).toBeDefined()
-    expect(purchase!.description).toMatch(/Reserve a specific available domain/)
+    expect(purchase!.description).toMatch(
+      /Purchase a specific available domain/,
+    )
     expect(purchase!.description).toMatch(/Poll GET \/v1\/domains\/status/)
     expect(purchase!.outputSchema).toBe(PurchaseDomainResponseSchema)
     expect(purchase!.inputDeclarations.body.declared).toBe(true)
