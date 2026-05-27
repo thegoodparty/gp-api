@@ -105,4 +105,20 @@ describe('ImpersonationInterceptor', () => {
     expect(captured).toBe(true)
     expect(result).toBe('result')
   })
+
+  it('sets isImpersonating to true when actorSub is set and user is absent (M2M path)', async () => {
+    let captured: boolean | undefined
+
+    const context = createMockContext(undefined, 'admin@goodparty.org')
+    const handler = createMockHandler(() => {
+      captured = getImpersonationContext()
+      return 'result'
+    })
+
+    const result$ = interceptor.intercept(context, handler)
+    const result = await lastValueFrom(result$)
+
+    expect(captured).toBe(true)
+    expect(result).toBe('result')
+  })
 })
