@@ -28,8 +28,10 @@ import { BriefingsPdfRateLimitGuard } from './briefingsPdfRateLimit.guard'
  * - `BriefingsPdfRateLimitGuard` puts a per-IP token bucket in front of the
  *   handler. This is a stopgap; real production rate limiting belongs at
  *   the edge (Vercel/Cloudflare WAF).
- * - Every hit is logged with the briefing id so operators can correlate
- *   abuse patterns from the access log.
+ * - Every hit is logged with a *truncated* briefing-id prefix so operators
+ *   can correlate abuse patterns without the full share token landing in
+ *   any log sink. The NestJS request-id (injected by the global logger)
+ *   already provides per-request correlation if more precision is needed.
  */
 @Controller('briefings')
 @UseGuards(BriefingsPdfRateLimitGuard)
@@ -43,7 +45,11 @@ export class BriefingsPdfController {
   async getBriefingPdf(
     @Param('uuid', new ParseUUIDPipe({ version: '7' })) uuid: string,
   ): Promise<StreamableFile> {
-    this.logger.log(`getBriefingPdf: serving briefing ${uuid}`)
+    // The full UUID is the share secret — anyone who reads the logs would
+    // otherwise harvest valid share tokens, bypassing the rate-limit guard.
+    // The 8-character prefix is enough to disambiguate adjacent requests
+    // when triaging together with the global request-id.
+    this.logger.log(`getBriefingPdf: serving briefing ${uuid.slice(0, 8)}…`)
     const liveBriefingBaseUrl = getEnv('APP_ROOT_URL')
     const { buffer, filename } = await this.briefingPdf.renderById(
       uuid,

@@ -126,20 +126,26 @@ export class BriefingPdfService extends createPrismaBase(
         },
       },
     })
+    // Truncate the briefing id in every warn/info line: the full UUID is the
+    // share secret, and logging it in plain text would let anyone with read
+    // access to log sinks (Datadog, CloudWatch, etc.) harvest working share
+    // tokens. The first 8 chars are still useful for triage when paired with
+    // the global request id.
+    const idPrefix = `${briefingId.slice(0, 8)}…`
     if (!row) {
-      this.renderLogger.warn(`renderById: row not found for ${briefingId}`)
+      this.renderLogger.warn(`renderById: row not found for ${idPrefix}`)
       throw new NotFoundException()
     }
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) {
       this.renderLogger.warn(
-        `renderById: S3 artifact missing for ${briefingId} (s3://${row.artifactBucket}/${row.artifactKey})`,
+        `renderById: S3 artifact missing for ${idPrefix} (s3://${row.artifactBucket}/${row.artifactKey})`,
       )
       throw new NotFoundException()
     }
 
-    const artifact = parseArtifact(raw, this.renderLogger, briefingId)
+    const artifact = parseArtifact(raw, this.renderLogger, idPrefix)
 
     const meetingDateIso = formatInTimeZone(
       row.meetingDate,
@@ -328,20 +334,22 @@ function isBriefingType(value: unknown): value is BriefingType {
 function parseArtifact(
   raw: string,
   logger: Logger,
-  briefingId: string,
+  briefingIdPrefix: string,
 ): BriefingArtifact {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw) as unknown
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    logger.warn(`parseArtifact: invalid JSON for ${briefingId}: ${message}`)
+    logger.warn(
+      `parseArtifact: invalid JSON for ${briefingIdPrefix}: ${message}`,
+    )
     throw new NotFoundException()
   }
   const result = briefingArtifactSchema.safeParse(parsed)
   if (!result.success) {
     logger.warn(
-      `parseArtifact: schema mismatch for ${briefingId}: ${result.error.message}`,
+      `parseArtifact: schema mismatch for ${briefingIdPrefix}: ${result.error.message}`,
     )
     throw new NotFoundException()
   }

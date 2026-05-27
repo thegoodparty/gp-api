@@ -180,6 +180,21 @@ describe('renderBriefingPdf', () => {
     }
   })
 
+  it('renders the live briefing URL + QR code branch on the cover', async () => {
+    // Exercises the otherwise-untested QR code / liveBriefingUrl cover
+    // branch: QRCode.toBuffer is async and could reject, the layout
+    // arithmetic uses `widthOfString`, and `doc.image()` consumes the
+    // resulting Buffer. Asserting the URL text on the cover proves the
+    // branch ran end-to-end without throwing and produced a parseable PDF.
+    const liveBriefingUrl =
+      'https://goodparty.org/dashboard/briefings/2026-06-08'
+    const buf = await renderBriefingPdf(makeArtifact(), { liveBriefingUrl })
+    expect(buf).toBeInstanceOf(Buffer)
+    expect(buf.slice(0, 4).toString('latin1')).toBe('%PDF')
+    const { text } = await extractText(buf)
+    expect(text).toContain('goodparty.org/dashboard/briefings/2026-06-08')
+  })
+
   it('paginates the TOC across multiple pages when there are many featured items', async () => {
     // 25 featured items exceeds the 20 rows/page TOC reservation, so the
     // TOC needs two pages. Regression test for the case where pdfkit's
