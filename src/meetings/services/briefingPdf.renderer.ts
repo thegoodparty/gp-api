@@ -138,8 +138,10 @@ export async function renderBriefingPdf(
 
     // 7. Draw running header/footer on every non-cover page. We iterate the
     //    full buffer (so any overflow page auto-added by pdfkit gets chrome
-    //    too) and skip whichever page we marked as the cover.
-    drawRunningChrome(doc, pages, options.meetingMetaLine)
+    //    too) and skip whichever page we marked as the cover. The header
+    //    line is the recipient-aware "Briefing for X – Y meeting – Z date"
+    //    label; the cover keeps the wider `meetingMetaLine` for venue/time.
+    drawRunningChrome(doc, pages, options.headerLine ?? options.meetingMetaLine)
 
     doc.end()
   })
@@ -260,16 +262,10 @@ function drawCoverPage(
     })
   cursorY = doc.y + 18
 
-  // NOTE: We intentionally do *not* render a "Prepared for <name>" line on
-  // the cover. The endpoint that serves this PDF is unauthenticated, and the
-  // share URL acts as a bearer token — anyone with the link can fetch the
-  // PDF. Surfacing the elected official's full name in the document would
-  // turn every leaked share link into a PII disclosure, so the renderer
-  // ignores `options.preparedForLine` even when the service sets it.
-  // (The option is kept in the type so the cover can re-add it later behind
-  // a `forAuthenticatedOwner: true` toggle without a breaking change.)
-  void options.preparedForLine
-
+  // The cover no longer carries a separate "Prepared for <name>" block —
+  // that information is now consolidated into the running header (which
+  // appears on every non-cover page) so any single page of the printed
+  // PDF identifies both the recipient and the meeting.
   const metaLine = options.meetingMetaLine ?? briefing.meeting_date ?? ''
   if (metaLine) {
     doc
@@ -744,7 +740,7 @@ function drawNewsBullet(
 function drawRunningChrome(
   doc: PDFKit.PDFDocument,
   pages: PageInfo[],
-  meetingMetaLine?: string,
+  headerLine?: string,
 ): void {
   // Walk the entire buffered page range — not just the entries we explicitly
   // recorded in `pages`. pdfkit auto-paginates `.text()` calls and the
@@ -758,15 +754,12 @@ function drawRunningChrome(
     if (info?.kind === 'cover') continue
 
     doc.switchToPage(start + i)
-    drawRunningHeader(doc, meetingMetaLine)
+    drawRunningHeader(doc, headerLine)
     drawRunningFooter(doc, start + i + 1, count)
   }
 }
 
-function drawRunningHeader(
-  doc: PDFKit.PDFDocument,
-  meetingMetaLine?: string,
-): void {
+function drawRunningHeader(doc: PDFKit.PDFDocument, headerLine?: string): void {
   const left = PAGE_PADDING_X
   const right = LETTER_W - PAGE_PADDING_X
   const top = 24
@@ -782,7 +775,7 @@ function drawRunningHeader(
     preserveAspectRatio: 'xMidYMid meet',
   })
 
-  const metaText = meetingMetaLine ?? 'Meeting briefing'
+  const metaText = headerLine ?? 'Meeting briefing'
   const brandText = 'GoodParty.org'
 
   doc.font(FONT.regular).fontSize(9)
@@ -792,8 +785,8 @@ function drawRunningHeader(
 
   // pdfkit's `lineBreak: false` + `ellipsis: true` does not reliably enforce
   // a single line on long strings, so pre-truncate against the measured glyph
-  // width and append an explicit ellipsis. This keeps the meeting line bounded
-  // above the horizontal rule for cities with long venue names.
+  // width and append an explicit ellipsis. This keeps the header line bounded
+  // above the horizontal rule for long EO names and venues.
   doc.font(FONT.bold).fontSize(12)
   const displayMetaText = truncateToWidth(doc, metaText, metaWidth)
 

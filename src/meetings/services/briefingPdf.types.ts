@@ -60,12 +60,17 @@ export interface BriefingArtifact {
 
 export interface RenderBriefingPdfOptions {
   /**
-   * Optional name to render under the title (e.g. "Prepared for <official name>").
+   * Optional running-header line shown on every non-cover page, e.g.
+   * `Briefing for Joe Smith - City Council Meeting - May 26th, 2026`.
+   * Falls back to `meetingMetaLine`, then a generic "Meeting briefing"
+   * label so the chrome is always populated.
    */
-  preparedForLine?: string
+  headerLine?: string
   /**
-   * Optional meeting meta line (e.g. "City Council — May 11, 2026") rendered on
-   * the cover and in the running header. Falls back to `meeting_date` on cover.
+   * Optional meeting meta line (e.g.
+   * `City Council · Mon May 11 · 6:00 PM · City Hall`) rendered on the
+   * cover. Carries the longer-form venue/time information that we don't
+   * have room for on the running header.
    */
   meetingMetaLine?: string
   /**

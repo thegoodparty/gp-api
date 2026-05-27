@@ -19,6 +19,18 @@ const BRIEFING_TYPE_LABEL: Record<BriefingType, string> = {
 }
 
 /**
+ * Title-cased variant used in the per-page running header
+ * (`Briefing for X - City Council Meeting - May 26th, 2026`). The lowercase
+ * label above stays for sentence-style strings like the cover title
+ * (`City Council meeting briefing for May 11, 2026`).
+ */
+const BRIEFING_TYPE_HEADER_LABEL: Record<BriefingType, string> = {
+  city_council_meeting: 'City Council Meeting',
+  county_legislature_meeting: 'County Legislature Meeting',
+  school_board_meeting: 'School Board Meeting',
+}
+
+/**
  * Zod schema for the subset of `MeetingBriefingArtifact` the renderer
  * actually consumes. The artifact lives in S3 and is written by the agent
  * pipeline outside this service, so we validate the shape before handing it
@@ -100,6 +112,18 @@ export class BriefingPdfService extends createPrismaBase(
         meetingTimezone: true,
         artifactBucket: true,
         artifactKey: true,
+        // The running header carries "Briefing for <EO name>" by product
+        // direction so any single printed page identifies its recipient.
+        // Anyone with the share URL can read the PDF, so the EO's name is
+        // effectively public for that briefing; this is an intentional
+        // tradeoff, not a leak.
+        electedOffice: {
+          select: {
+            user: {
+              select: { firstName: true, lastName: true, name: true },
+            },
+          },
+        },
       },
     })
     if (!row) {
@@ -136,6 +160,13 @@ export class BriefingPdfService extends createPrismaBase(
       meetingTime,
       meetingTimezone,
     })
+    const recipientName = buildRecipientName(row.electedOffice?.user)
+    const headerLine = buildHeaderLine(
+      artifact,
+      briefingType,
+      meetingDateIso,
+      recipientName,
+    )
 
     const liveBriefingUrl = liveBriefingBaseUrl
       ? `${liveBriefingBaseUrl.replace(/\/$/, '')}/dashboard/briefings/${meetingDateIso}`
@@ -143,6 +174,7 @@ export class BriefingPdfService extends createPrismaBase(
 
     const options: RenderBriefingPdfOptions = {
       title,
+      headerLine,
       meetingMetaLine,
       liveBriefingUrl,
     }
@@ -160,6 +192,67 @@ function buildTitle(
   const label = briefingType ? BRIEFING_TYPE_LABEL[briefingType] : 'Meeting'
   const formatted = format(parseISO(meetingDateIso), 'MMMM d, yyyy')
   return `${label} briefing for ${formatted}`
+}
+
+/**
+ * Build the per-page running header. Final shape:
+ *   `Briefing for Joe Smith - City Council Meeting - May 26th, 2026`
+ *
+ * Each segment is optional and silently drops out when the underlying data
+ * isn't available:
+ *   - No recipient name -> "Meeting Briefing - ..."
+ *   - No briefing_type  -> falls back to `artifact.meeting_name`, then 'Meeting'.
+ *   - Date is always present (Prisma column is non-null).
+ */
+function buildHeaderLine(
+  artifact: BriefingArtifact,
+  briefingType: BriefingType | null,
+  meetingDateIso: string,
+  recipientName: string | undefined,
+): string {
+  const recipientSegment = recipientName
+    ? `Briefing for ${recipientName}`
+    : 'Meeting Briefing'
+  const meetingSegment = briefingType
+    ? BRIEFING_TYPE_HEADER_LABEL[briefingType]
+    : artifact.meeting_name || 'Meeting'
+  const dateSegment = formatHeaderDate(meetingDateIso)
+  return [recipientSegment, meetingSegment, dateSegment]
+    .filter(Boolean)
+    .join(' - ')
+}
+
+/**
+ * Long-form date with an English ordinal day, e.g. `May 26th, 2026`.
+ * date-fns `do` token emits `1st, 2nd, 3rd, 4th, ...` which matches the
+ * format Farhad signed off on for the header line.
+ */
+function formatHeaderDate(meetingDateIso: string): string {
+  try {
+    return format(parseISO(meetingDateIso), 'MMMM do, yyyy')
+  } catch {
+    return meetingDateIso
+  }
+}
+
+/**
+ * Resolve the elected official's display name for the header. Prefers
+ * `firstName + lastName` (matches the screenshot Farhad shared, e.g.
+ * "Joe Smith"), falls back to the legacy combined `name` field, and finally
+ * `undefined` so the header gracefully degrades to "Meeting Briefing - ...".
+ */
+function buildRecipientName(
+  user:
+    | { firstName: string | null; lastName: string | null; name: string | null }
+    | null
+    | undefined,
+): string | undefined {
+  if (!user) return undefined
+  const first = user.firstName?.trim() ?? ''
+  const last = user.lastName?.trim() ?? ''
+  const full = [first, last].filter(Boolean).join(' ').trim()
+  if (full) return full
+  return user.name?.trim() || undefined
 }
 
 function buildMeetingMetaLine(

@@ -114,20 +114,40 @@ describe('renderBriefingPdf', () => {
     expect(text).toContain('Full Agenda')
   })
 
-  it('does not render "Prepared for <name>" even when the option is set', async () => {
-    // PII guard: the public PDF endpoint must not leak the official's name.
+  it('does not render a "Prepared for <name>" block on the cover', async () => {
+    // The recipient line moved out of the cover and into the running header.
+    // The cover should not surface a separate "Prepared for" block anymore.
     const buf = await renderBriefingPdf(makeArtifact(), {
-      preparedForLine: 'Jane Q. Public',
+      headerLine:
+        'Briefing for Jane Q. Public - City Council Meeting - May 26th, 2026',
     })
     const { text } = await extractText(buf)
     expect(text).not.toContain('Prepared for')
-    expect(text).not.toContain('Jane Q. Public')
   })
 
-  it('falls back to a default header text when no meetingMetaLine is supplied', async () => {
+  it('renders the headerLine on every non-cover page', async () => {
+    const headerLine =
+      'Briefing for Joe Smith - City Council Meeting - May 26th, 2026'
+    const buf = await renderBriefingPdf(makeArtifact(), { headerLine })
+    const { text } = await extractText(buf)
+    // pdf-parse concatenates all page text, so a single match is enough to
+    // confirm the header was emitted. (Per-page assertion would require a
+    // page-by-page parse which is overkill for this guarantee.)
+    expect(text).toContain('Briefing for Joe Smith')
+    expect(text).toContain('City Council Meeting')
+    expect(text).toContain('May 26th, 2026')
+  })
+
+  it('falls back to meetingMetaLine for the running header when headerLine is omitted', async () => {
+    const meetingMetaLine = 'City Council · Mon May 11 · 6:00 PM · City Hall'
+    const buf = await renderBriefingPdf(makeArtifact(), { meetingMetaLine })
+    const { text } = await extractText(buf)
+    expect(text).toContain('City Council')
+  })
+
+  it('falls back to a default header text when neither headerLine nor meetingMetaLine is supplied', async () => {
     const buf = await renderBriefingPdf(makeArtifact())
     const { text } = await extractText(buf)
-    // The renderer ships a "Meeting briefing" fallback on the running header.
     expect(text).toContain('Meeting briefing')
   })
 
