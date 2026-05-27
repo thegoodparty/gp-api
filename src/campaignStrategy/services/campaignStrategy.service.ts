@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import { Campaign, CampaignStrategy, User } from '@prisma/client'
 import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'
-import { InternalServerErrorException } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import { getUserFullName } from '@/users/util/users.util'
@@ -13,26 +16,39 @@ import {
   RaceCandidate,
   RaceContext,
 } from '../types/electionApi.types'
-import { ElectionApiMockService } from './electionApiMock.service'
+import { ElectionApiService } from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
 
 // Defensive Zod parse over Campaign.details — the column is Prisma JSON,
-// so we can't trust the shadow type at runtime. Only the two keys we read
-// here are declared; everything else passes through silently.
-const PartyDetailsSchema = z
+// so we can't trust the shadow type at runtime. Only the keys we read here
+// are declared; everything else passes through silently. raceId is the
+// BallotReady race hash that election-api keys on.
+const CampaignDetailsSchema = z
   .object({
     party: z.string().optional(),
     otherParty: z.string().optional(),
+    raceId: z.string().optional(),
   })
   .partial()
 
 const resolvePartyAffiliation = (details: Campaign['details']): string => {
-  const parsed = PartyDetailsSchema.safeParse(details)
+  const parsed = CampaignDetailsSchema.safeParse(details)
   if (!parsed.success) return ''
   const party = parsed.data.party ?? ''
   const otherParty = parsed.data.otherParty ?? ''
   if (party === 'Other' && otherParty) return otherParty
   return party
+}
+
+const resolveRaceId = (details: Campaign['details']): string => {
+  const parsed = CampaignDetailsSchema.safeParse(details)
+  const raceId = parsed.success ? (parsed.data.raceId ?? '').trim() : ''
+  if (raceId.length === 0) {
+    throw new BadRequestException(
+      'Campaign has no raceId — finish onboarding before generating a strategy.',
+    )
+  }
+  return raceId
 }
 
 const normalize = (value: string | null | undefined): string =>
@@ -70,7 +86,7 @@ export class CampaignStrategyService extends createPrismaBase(
 ) {
   constructor(
     private readonly strategicLandscape: StrategicLandscapeService,
-    private readonly electionApi: ElectionApiMockService,
+    private readonly electionApi: ElectionApiService,
   ) {
     super()
   }
@@ -88,7 +104,7 @@ export class CampaignStrategyService extends createPrismaBase(
     const cached = await this.readStrategicLandscape(plan.id)
     if (cached) return cached
 
-    const ctx = this.buildRaceContext(campaign)
+    const ctx = await this.buildRaceContext(campaign)
     try {
       return await this.strategicLandscape.generate(plan.id, campaign.id, ctx)
     } catch (error) {
@@ -104,8 +120,11 @@ export class CampaignStrategyService extends createPrismaBase(
     }
   }
 
-  private buildRaceContext(campaign: CampaignWith<'user'>): RaceContext {
-    const fromApi = this.electionApi.getRaceContext(campaign.id)
+  private async buildRaceContext(
+    campaign: CampaignWith<'user'>,
+  ): Promise<RaceContext> {
+    const brHashId = resolveRaceId(campaign.details)
+    const fromApi = await this.electionApi.getRaceContext(brHashId)
     return {
       ...fromApi,
       candidates: campaign.user

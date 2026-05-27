@@ -3,8 +3,9 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { Campaign, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { BadRequestException } from '@nestjs/common'
 import { CampaignStrategyService } from './campaignStrategy.service'
-import { ElectionApiMockService } from './electionApiMock.service'
+import { ElectionApiService } from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { RaceContextFromApi } from '../types/electionApi.types'
@@ -71,7 +72,7 @@ const buildCampaign = (
     updatedAt: new Date(),
     isActive: true,
     userId: 1,
-    details: { party: 'Independent' },
+    details: { party: 'Independent', raceId: 'hash-abc' },
     data: {},
     aiContent: {},
     vendorTsData: {},
@@ -115,13 +116,13 @@ describe('CampaignStrategyService', () => {
       },
     }
     mockStrategic = { generate: vi.fn() }
-    mockElectionApi = { getRaceContext: vi.fn().mockReturnValue(apiCtx) }
+    mockElectionApi = { getRaceContext: vi.fn().mockResolvedValue(apiCtx) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: PrismaService, useValue: mockPrisma },
         { provide: StrategicLandscapeService, useValue: mockStrategic },
-        { provide: ElectionApiMockService, useValue: mockElectionApi },
+        { provide: ElectionApiService, useValue: mockElectionApi },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignStrategyService,
       ],
@@ -198,7 +199,7 @@ describe('CampaignStrategyService', () => {
           userPartyAffiliation: 'Independent',
         }),
       )
-      expect(mockElectionApi.getRaceContext).toHaveBeenCalledWith(99)
+      expect(mockElectionApi.getRaceContext).toHaveBeenCalledWith('hash-abc')
     })
 
     it('falls back to the cached read when a concurrent write trips P2002', async () => {
@@ -242,7 +243,11 @@ describe('CampaignStrategyService', () => {
 
       await service.getOrGenerateStrategicLandscape(
         buildCampaign({
-          details: { party: 'Other', otherParty: 'Pirate Party' },
+          details: {
+            party: 'Other',
+            otherParty: 'Pirate Party',
+            raceId: 'hash-abc',
+          },
         }),
       )
 
@@ -262,7 +267,7 @@ describe('CampaignStrategyService', () => {
       })
 
       await service.getOrGenerateStrategicLandscape(
-        buildCampaign({ details: { party: 'Green' } }),
+        buildCampaign({ details: { party: 'Green', raceId: 'hash-abc' } }),
       )
 
       expect(mockStrategic.generate).toHaveBeenCalledWith(
@@ -389,7 +394,7 @@ describe('CampaignStrategyService', () => {
         opponents: [],
       })
 
-      mockElectionApi.getRaceContext.mockReturnValueOnce({
+      mockElectionApi.getRaceContext.mockResolvedValueOnce({
         ...apiCtx,
         candidates: [
           {
@@ -424,7 +429,7 @@ describe('CampaignStrategyService', () => {
       })
 
       // Candidate seeded with double-space; user fullName has single space.
-      mockElectionApi.getRaceContext.mockReturnValueOnce({
+      mockElectionApi.getRaceContext.mockResolvedValueOnce({
         ...apiCtx,
         candidates: [
           {
@@ -494,6 +499,30 @@ describe('CampaignStrategyService', () => {
       await expect(
         service.getOrGenerateStrategicLandscape(buildCampaign()),
       ).rejects.toThrow('llm down')
+    })
+
+    it('throws BadRequest when campaign.details has no raceId', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+
+      await expect(
+        service.getOrGenerateStrategicLandscape(
+          buildCampaign({ details: { party: 'Independent' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequest when campaign.details.raceId is whitespace-only', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+
+      await expect(
+        service.getOrGenerateStrategicLandscape(
+          buildCampaign({
+            details: { party: 'Independent', raceId: '   ' },
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
     })
   })
 })
