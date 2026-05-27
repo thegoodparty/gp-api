@@ -138,13 +138,18 @@ export class ElectionApiMockService {
   }
 
   getRaceContext(campaignId: number): RaceContextFromApi {
-    // Hard-fail in production. The mock ignores campaignId and returns a
-    // hardcoded LA County Assessor fixture; shipping it would silently
+    // Hard-fail in the prod deploy. The mock ignores campaignId and returns
+    // a hardcoded LA County Assessor fixture; shipping it would silently
     // serve wrong data to every campaign. When the real election-api
     // client lands, this service is replaced entirely.
-    if (process.env.NODE_ENV === 'production') {
+    //
+    // OTEL_SERVICE_ENVIRONMENT distinguishes preview/dev/qa/prod (set in
+    // deploy/index.ts). We deliberately don't use NODE_ENV/IS_PROD here —
+    // those are 'production' in every Docker deploy and would block the
+    // mock in dev and qa where we still need it.
+    if (process.env.OTEL_SERVICE_ENVIRONMENT === 'prod') {
       throw new InternalServerErrorException(
-        'ElectionApiMockService cannot run in production',
+        'ElectionApiMockService cannot run in the prod deploy',
       )
     }
     this.logger.debug(
