@@ -316,6 +316,40 @@ describe('CampaignPlanService', () => {
       )
     })
 
+    it('treats the plan as cached when opportunities are empty but challenges or opponents exist', async () => {
+      mockPrisma.campaignPlan.findUnique.mockResolvedValue(
+        buildPlanRow({
+          opportunities: [],
+          challenges: [
+            { order: 1, content: 'c1' },
+            { order: 2, content: 'c2' },
+            { order: 3, content: 'c3' },
+          ],
+          opponents: [],
+        }),
+      )
+
+      const result =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+
+      expect(result.challenges).toEqual(['c1', 'c2', 'c3'])
+      expect(result.opportunities).toEqual([])
+      expect(mockStrategic.generate).not.toHaveBeenCalled()
+    })
+
+    it('regenerates only when no section has any content', async () => {
+      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockStrategic.generate.mockResolvedValue({
+        opportunities: ['fresh'],
+        challenges: ['fresh'],
+        opponents: [],
+      })
+
+      await service.getOrGenerateStrategicLandscape(buildCampaign())
+
+      expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
+    })
+
     it('flags the candidate matching the user email as isUser=true', async () => {
       mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
@@ -390,6 +424,51 @@ describe('CampaignPlanService', () => {
       })
 
       await service.getOrGenerateStrategicLandscape(buildCampaign())
+
+      const call = mockStrategic.generate.mock.calls[0]
+      const candidates = (
+        call[2] as { candidates: Array<{ fullName: string; isUser: boolean }> }
+      ).candidates
+      expect(candidates[0].isUser).toBe(true)
+    })
+
+    it('collapses internal whitespace before matching by name', async () => {
+      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockStrategic.generate.mockResolvedValue({
+        opportunities: ['a', 'b', 'c'],
+        challenges: ['a', 'b', 'c'],
+        opponents: [],
+      })
+
+      // Candidate seeded with double-space; user fullName has single space.
+      mockElectionApi.getRaceContext.mockReturnValueOnce({
+        ...apiCtx,
+        candidates: [
+          {
+            gpCandidateId: 'z',
+            firstName: 'Rose ',
+            lastName: 'Ashton ',
+            fullName: 'Rose  Ashton ',
+            email: null,
+            websiteUrl: null,
+            party: null,
+            isIncumbent: null,
+          },
+        ],
+        candidateCount: 1,
+      })
+
+      await service.getOrGenerateStrategicLandscape(
+        buildCampaign({
+          user: {
+            id: 1,
+            firstName: 'Rose',
+            lastName: 'Ashton',
+            name: 'Rose Ashton',
+            email: null,
+          } as User,
+        }),
+      )
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (

@@ -25,7 +25,7 @@ const resolvePartyAffiliation = (details: Campaign['details']): string => {
 }
 
 const normalize = (value: string | null | undefined): string =>
-  (value ?? '').trim().toLowerCase()
+  (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 // election-api doesn't return an is_user flag — we stitch it here by
 // matching the requesting user against the candidate list. Email is the
@@ -128,7 +128,17 @@ export class CampaignPlanService extends createPrismaBase(MODELS.CampaignPlan) {
       },
     })
 
-    if (!plan || plan.opportunities.length === 0) return null
+    if (!plan) return null
+    // A generation is considered cached if ANY of the three section tables
+    // has at least one row. Guarding on opportunities alone would mis-treat a
+    // pathological LLM run that produced empty opportunities but populated
+    // challenges/opponents as "never generated", causing infinite re-runs
+    // and unbounded duplicate child rows.
+    const hasAnySectionContent =
+      plan.opportunities.length > 0 ||
+      plan.challenges.length > 0 ||
+      plan.opponents.length > 0
+    if (!hasAnySectionContent) return null
 
     return {
       opportunities: plan.opportunities.map((o) => o.content),

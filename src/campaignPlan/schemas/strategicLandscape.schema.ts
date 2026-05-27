@@ -1,11 +1,17 @@
 import { z } from 'zod'
 
+// At least one bullet is required so that an empty array can't be persisted
+// as a "completed" generation. The cache check downstream needs SOMETHING in
+// the DB to recognize the section as done; if every bullet array could be
+// empty, a degenerate LLM run would silently re-trigger generation on every
+// request and accumulate duplicate challenges/opponents (no unique guard
+// fires when opportunities is empty).
 export const OpportunitiesSchema = z.object({
-  opportunities: z.array(z.string().min(1)).max(3),
+  opportunities: z.array(z.string().min(1)).min(1).max(3),
 })
 
 export const ChallengesSchema = z.object({
-  challenges: z.array(z.string().min(1)).max(3),
+  challenges: z.array(z.string().min(1)).min(1).max(3),
 })
 
 const HttpsOrHttpUrl = z
@@ -45,8 +51,8 @@ export const OpponentSchema = z.object({
 })
 
 export const StrategicLandscapeResultSchema = z.object({
-  opportunities: z.array(z.string().min(1)).max(3),
-  challenges: z.array(z.string().min(1)).max(3),
+  opportunities: z.array(z.string().min(1)).min(1).max(3),
+  challenges: z.array(z.string().min(1)).min(1).max(3),
   opponents: z.array(OpponentSchema),
 })
 
