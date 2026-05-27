@@ -603,10 +603,10 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.status).toBe(404)
   })
 
-  it('returns the artifact JSON as-is on success (no shape validation)', async () => {
+  it('returns the artifact JSON augmented with the Prisma row briefing_id', async () => {
     const orgSlug = 'eo-passthrough'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, {
+    const seeded = await seedBriefing(eo.id, orgSlug, {
       meetingDate: '2026-06-08',
       artifactBucket: 'briefing-bucket',
       artifactKey: 'partial.json',
@@ -621,7 +621,14 @@ describe('GET /v1/meetings/:date/briefing', () => {
     )
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ id: 'b1', status: 'briefing_ready' })
+    // The controller passes the artifact through verbatim and tacks the
+    // Prisma row UUID onto it so the share URL can be built without a
+    // second round-trip.
+    expect(result.data).toEqual({
+      id: 'b1',
+      status: 'briefing_ready',
+      briefing_id: seeded.id,
+    })
   })
 
   it('returns the parsed briefing artifact on success', async () => {

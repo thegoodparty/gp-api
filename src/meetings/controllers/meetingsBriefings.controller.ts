@@ -160,13 +160,16 @@ export class MeetingsBriefingsController {
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) throw new NotFoundException()
 
+    let artifact: Record<string, unknown>
     try {
-      // JSON.parse returns unknown — pass through artifact as-is
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(raw)
+      // JSON.parse returns unknown — cast to a record so we can spread it back
+      // out alongside `briefing_id` for the client.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      artifact = JSON.parse(raw) as Record<string, unknown>
     } catch {
       throw new NotFoundException()
     }
+    return { ...artifact, briefing_id: row.id }
   }
 
   @Post('briefings/dispatch')
