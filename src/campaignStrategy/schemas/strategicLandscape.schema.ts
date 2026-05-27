@@ -69,3 +69,26 @@ export type Opponent = z.infer<typeof OpponentSchema>
 export type StrategicLandscapeResult = z.infer<
   typeof StrategicLandscapeResultSchema
 >
+
+// Polling response. A cache hit returns { status: 'ready', data }; otherwise
+// the call kicks off (or joins) a background generation and returns
+// { status: 'generating' } so the client polls again on a short interval.
+// 30s proxy timeouts in local dev forced this shape — the synchronous
+// happy path frequently exceeds 30s across three parallel Gemini pipelines.
+export const StrategicLandscapeReadySchema = z.object({
+  status: z.literal('ready'),
+  data: StrategicLandscapeResultSchema,
+})
+
+export const StrategicLandscapeGeneratingSchema = z.object({
+  status: z.literal('generating'),
+})
+
+export const StrategicLandscapeResponseSchema = z.discriminatedUnion('status', [
+  StrategicLandscapeReadySchema,
+  StrategicLandscapeGeneratingSchema,
+])
+
+export type StrategicLandscapeResponse = z.infer<
+  typeof StrategicLandscapeResponseSchema
+>

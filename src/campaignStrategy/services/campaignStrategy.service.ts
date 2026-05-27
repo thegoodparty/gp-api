@@ -10,7 +10,10 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import { getUserFullName } from '@/users/util/users.util'
 import { toLowerAndTrim } from '@/shared/util/strings.util'
-import { StrategicLandscapeResult } from '../schemas/strategicLandscape.schema'
+import {
+  StrategicLandscapeResponse,
+  StrategicLandscapeResult,
+} from '../schemas/strategicLandscape.schema'
 import {
   ApiCandidate,
   RaceCandidate,
@@ -84,6 +87,14 @@ const stitchIsUser = (
 export class CampaignStrategyService extends createPrismaBase(
   MODELS.CampaignStrategy,
 ) {
+  // Per-pod in-flight tracker: keyed by campaign id, holds the background
+  // generation promise. Polls that arrive while a generation is in flight
+  // return { status: 'generating' } without re-kicking. The map clears on
+  // settle (success OR failure), so a failed run is auto-retried by the
+  // next poll. Cross-pod racing is handled at persist time by the existing
+  // @@unique constraint + isUniqueConstraintError fallback below.
+  private readonly inFlight = new Map<number, Promise<void>>()
+
   constructor(
     private readonly strategicLandscape: StrategicLandscapeService,
     private readonly electionApi: ElectionApiService,
@@ -93,37 +104,70 @@ export class CampaignStrategyService extends createPrismaBase(
 
   async getOrGenerateStrategicLandscape(
     campaign: CampaignWith<'user'>,
-  ): Promise<StrategicLandscapeResult> {
+  ): Promise<StrategicLandscapeResponse> {
     if (!campaign.user) {
       throw new InternalServerErrorException(
         'Campaign has no associated user — check @UseCampaign include',
       )
     }
+
+    // Resolve raceId synchronously up front so a 400 surfaces to THIS call
+    // rather than getting swallowed in the background, where it would leave
+    // the client stuck in a generating poll loop.
+    const brHashId = resolveRaceId(campaign.details)
+
     const plan = await this.upsertForCampaign(campaign.id)
-
     const cached = await this.readStrategicLandscape(plan.id)
-    if (cached) return cached
+    if (cached) return { status: 'ready', data: cached }
 
-    const ctx = await this.buildRaceContext(campaign)
+    if (!this.inFlight.has(campaign.id)) {
+      // map.set must happen synchronously before any await so a same-tick
+      // second poll sees the entry. Node's event loop guarantees no
+      // interleaving between the .has() check above and the .set() here.
+      const work = this.runGeneration(campaign, plan.id, brHashId)
+      this.inFlight.set(campaign.id, work)
+    }
+    return { status: 'generating' }
+  }
+
+  // Waits for every background generation currently in flight to settle.
+  // Used by tests; also a sensible hook for graceful-shutdown wiring.
+  async drainInFlight(): Promise<void> {
+    await Promise.all(this.inFlight.values())
+  }
+
+  private async runGeneration(
+    campaign: CampaignWith<'user'>,
+    planId: number,
+    brHashId: string,
+  ): Promise<void> {
     try {
-      return await this.strategicLandscape.generate(plan.id, campaign.id, ctx)
-    } catch (error) {
-      // If two concurrent requests both miss the cache, the second one trips
-      // the @@unique([campaignStrategyId, order]) on CampaignStrategyOpportunity at
-      // persist time. Treat that as "someone else just wrote it" and return
-      // their result instead of surfacing the error.
-      if (isUniqueConstraintError(error)) {
-        const winner = await this.readStrategicLandscape(plan.id)
-        if (winner) return winner
+      const ctx = await this.buildRaceContext(campaign, brHashId)
+      try {
+        await this.strategicLandscape.generate(planId, campaign.id, ctx)
+      } catch (error) {
+        // If a concurrent generation (other pod / restart) wrote first, the
+        // @@unique([campaignStrategyId, order]) trips here. Treat as "their
+        // result wins" — the next poll's cache read will pick it up.
+        if (!isUniqueConstraintError(error)) throw error
       }
-      throw error
+    } catch (error) {
+      this.logger.error(
+        {
+          campaignId: campaign.id,
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'Strategic landscape generation failed; next poll will retry',
+      )
+    } finally {
+      this.inFlight.delete(campaign.id)
     }
   }
 
   private async buildRaceContext(
     campaign: CampaignWith<'user'>,
+    brHashId: string,
   ): Promise<RaceContext> {
-    const brHashId = resolveRaceId(campaign.details)
     const fromApi = await this.electionApi.getRaceContext(brHashId)
     return {
       ...fromApi,

@@ -86,6 +86,22 @@ const buildCampaign = (
     ...overrides,
   }) as Campaign & { user: User }
 
+const cachedPlan = (overrides: Record<string, unknown> = {}) =>
+  buildPlanRow({
+    opportunities: [
+      { order: 1, content: 'o1' },
+      { order: 2, content: 'o2' },
+      { order: 3, content: 'o3' },
+    ],
+    challenges: [
+      { order: 1, content: 'c1' },
+      { order: 2, content: 'c2' },
+      { order: 3, content: 'c3' },
+    ],
+    opponents: [],
+    ...overrides,
+  })
+
 describe('CampaignStrategyService', () => {
   let service: CampaignStrategyService
   let mockPrisma: {
@@ -132,20 +148,10 @@ describe('CampaignStrategyService', () => {
     service = module.get<CampaignStrategyService>(CampaignStrategyService)
   })
 
-  describe('getOrGenerateStrategicLandscape', () => {
-    it('returns cached data when opportunities already exist', async () => {
+  describe('getOrGenerateStrategicLandscape — cache hits', () => {
+    it('returns { status: ready, data } when opportunities already exist', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue(
-        buildPlanRow({
-          opportunities: [
-            { order: 1, content: 'o1' },
-            { order: 2, content: 'o2' },
-            { order: 3, content: 'o3' },
-          ],
-          challenges: [
-            { order: 1, content: 'c1' },
-            { order: 2, content: 'c2' },
-            { order: 3, content: 'c3' },
-          ],
+        cachedPlan({
           opponents: [
             {
               fullName: 'Bob',
@@ -162,22 +168,52 @@ describe('CampaignStrategyService', () => {
       const result =
         await service.getOrGenerateStrategicLandscape(buildCampaign())
 
-      expect(result.opportunities).toEqual(['o1', 'o2', 'o3'])
-      expect(result.challenges).toEqual(['c1', 'c2', 'c3'])
-      expect(result.opponents).toEqual([
-        {
-          fullName: 'Bob',
-          partyAffiliation: 'Nonpartisan',
-          incumbent: true,
-          politicalSummary: 'background',
-          keyFacts: ['fact1'],
-          websites: ['https://bob.example'],
+      expect(result).toEqual({
+        status: 'ready',
+        data: {
+          opportunities: ['o1', 'o2', 'o3'],
+          challenges: ['c1', 'c2', 'c3'],
+          opponents: [
+            {
+              fullName: 'Bob',
+              partyAffiliation: 'Nonpartisan',
+              incumbent: true,
+              politicalSummary: 'background',
+              keyFacts: ['fact1'],
+              websites: ['https://bob.example'],
+            },
+          ],
         },
-      ])
+      })
       expect(mockStrategic.generate).not.toHaveBeenCalled()
     })
 
-    it('generates and returns fresh data when no opportunities exist', async () => {
+    it('treats the plan as cached when opportunities are empty but challenges or opponents exist', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(
+        buildPlanRow({
+          opportunities: [],
+          challenges: [
+            { order: 1, content: 'c1' },
+            { order: 2, content: 'c2' },
+            { order: 3, content: 'c3' },
+          ],
+          opponents: [],
+        }),
+      )
+
+      const result =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') return
+      expect(result.data.challenges).toEqual(['c1', 'c2', 'c3'])
+      expect(result.data.opportunities).toEqual([])
+      expect(mockStrategic.generate).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getOrGenerateStrategicLandscape — cache misses kick off background generation', () => {
+    it('returns { status: generating } immediately and runs generate in the background', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
@@ -188,7 +224,10 @@ describe('CampaignStrategyService', () => {
       const result =
         await service.getOrGenerateStrategicLandscape(buildCampaign())
 
-      expect(result.opportunities).toEqual(['a', 'b', 'c'])
+      expect(result).toEqual({ status: 'generating' })
+
+      await service.drainInFlight()
+
       const { candidates: _candidates, ...apiCtxScalars } = apiCtx
       expect(mockStrategic.generate).toHaveBeenCalledWith(
         42,
@@ -202,19 +241,61 @@ describe('CampaignStrategyService', () => {
       expect(mockElectionApi.getRaceContext).toHaveBeenCalledWith('hash-abc')
     })
 
-    it('falls back to the cached read when a concurrent write trips P2002', async () => {
-      const winnerRow = buildPlanRow({
+    it('subsequent polls during the same in-flight generation do not re-kick generate', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      let resolveGenerate: () => void = () => undefined
+      mockStrategic.generate.mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveGenerate = resolve
+        }),
+      )
+
+      const first =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      const second =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      const third =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+
+      expect(first).toEqual({ status: 'generating' })
+      expect(second).toEqual({ status: 'generating' })
+      expect(third).toEqual({ status: 'generating' })
+      expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
+
+      resolveGenerate()
+      await service.drainInFlight()
+    })
+
+    it('once generation completes, the next poll returns ready from cache', async () => {
+      mockPrisma.campaignStrategy.findUnique
+        .mockResolvedValueOnce(buildPlanRow())
+        .mockResolvedValueOnce(cachedPlan())
+      mockStrategic.generate.mockResolvedValue({
+        opportunities: ['a', 'b', 'c'],
+        challenges: ['x', 'y', 'z'],
+        opponents: [],
+      })
+
+      const kickoff =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(kickoff).toEqual({ status: 'generating' })
+
+      await service.drainInFlight()
+
+      const followUp =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(followUp.status).toBe('ready')
+      if (followUp.status !== 'ready') return
+      expect(followUp.data.opportunities).toEqual(['o1', 'o2', 'o3'])
+    })
+
+    it('swallows P2002 concurrent-write failures so the next poll picks up the winner', async () => {
+      const winnerRow = cachedPlan({
         opportunities: [
           { order: 1, content: 'w1' },
           { order: 2, content: 'w2' },
           { order: 3, content: 'w3' },
         ],
-        challenges: [
-          { order: 1, content: 'c1' },
-          { order: 2, content: 'c2' },
-          { order: 3, content: 'c3' },
-        ],
-        opponents: [],
       })
       mockPrisma.campaignStrategy.findUnique
         .mockResolvedValueOnce(buildPlanRow())
@@ -226,13 +307,44 @@ describe('CampaignStrategyService', () => {
       })
       mockStrategic.generate.mockRejectedValue(p2002)
 
-      const result =
+      const kickoff =
         await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(kickoff).toEqual({ status: 'generating' })
 
-      expect(result.opportunities).toEqual(['w1', 'w2', 'w3'])
+      await service.drainInFlight()
+
+      const followUp =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(followUp.status).toBe('ready')
+      if (followUp.status !== 'ready') return
+      expect(followUp.data.opportunities).toEqual(['w1', 'w2', 'w3'])
       expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
     })
 
+    it('clears the in-flight slot on non-P2002 failure so the next poll retries', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      mockStrategic.generate.mockRejectedValueOnce(new Error('llm down'))
+
+      const first =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(first).toEqual({ status: 'generating' })
+      await service.drainInFlight()
+
+      mockStrategic.generate.mockResolvedValueOnce({
+        opportunities: ['a', 'b', 'c'],
+        challenges: ['x', 'y', 'z'],
+        opponents: [],
+      })
+      const second =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(second).toEqual({ status: 'generating' })
+
+      await service.drainInFlight()
+      expect(mockStrategic.generate).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('getOrGenerateStrategicLandscape — race context stitching', () => {
     it('falls back to details.otherParty when party is "Other"', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
@@ -250,6 +362,7 @@ describe('CampaignStrategyService', () => {
           },
         }),
       )
+      await service.drainInFlight()
 
       expect(mockStrategic.generate).toHaveBeenCalledWith(
         42,
@@ -269,6 +382,7 @@ describe('CampaignStrategyService', () => {
       await service.getOrGenerateStrategicLandscape(
         buildCampaign({ details: { party: 'Green', raceId: 'hash-abc' } }),
       )
+      await service.drainInFlight()
 
       expect(mockStrategic.generate).toHaveBeenCalledWith(
         42,
@@ -296,46 +410,13 @@ describe('CampaignStrategyService', () => {
           } as User,
         }),
       )
+      await service.drainInFlight()
 
       expect(mockStrategic.generate).toHaveBeenCalledWith(
         42,
         99,
         expect.objectContaining({ userFullName: 'Solo Name' }),
       )
-    })
-
-    it('treats the plan as cached when opportunities are empty but challenges or opponents exist', async () => {
-      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(
-        buildPlanRow({
-          opportunities: [],
-          challenges: [
-            { order: 1, content: 'c1' },
-            { order: 2, content: 'c2' },
-            { order: 3, content: 'c3' },
-          ],
-          opponents: [],
-        }),
-      )
-
-      const result =
-        await service.getOrGenerateStrategicLandscape(buildCampaign())
-
-      expect(result.challenges).toEqual(['c1', 'c2', 'c3'])
-      expect(result.opportunities).toEqual([])
-      expect(mockStrategic.generate).not.toHaveBeenCalled()
-    })
-
-    it('regenerates only when no section has any content', async () => {
-      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
-      mockStrategic.generate.mockResolvedValue({
-        opportunities: ['fresh'],
-        challenges: ['fresh'],
-        opponents: [],
-      })
-
-      await service.getOrGenerateStrategicLandscape(buildCampaign())
-
-      expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
     })
 
     it('flags the candidate matching the user email as isUser=true', async () => {
@@ -347,6 +428,7 @@ describe('CampaignStrategyService', () => {
       })
 
       await service.getOrGenerateStrategicLandscape(buildCampaign())
+      await service.drainInFlight()
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (
@@ -376,6 +458,7 @@ describe('CampaignStrategyService', () => {
           } as User,
         }),
       )
+      await service.drainInFlight()
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (
@@ -412,6 +495,7 @@ describe('CampaignStrategyService', () => {
       })
 
       await service.getOrGenerateStrategicLandscape(buildCampaign())
+      await service.drainInFlight()
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (
@@ -428,7 +512,6 @@ describe('CampaignStrategyService', () => {
         opponents: [],
       })
 
-      // Candidate seeded with double-space; user fullName has single space.
       mockElectionApi.getRaceContext.mockResolvedValueOnce({
         ...apiCtx,
         candidates: [
@@ -457,6 +540,7 @@ describe('CampaignStrategyService', () => {
           } as User,
         }),
       )
+      await service.drainInFlight()
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (
@@ -484,6 +568,7 @@ describe('CampaignStrategyService', () => {
           } as User,
         }),
       )
+      await service.drainInFlight()
 
       const call = mockStrategic.generate.mock.calls[0]
       const candidates = (
@@ -491,16 +576,9 @@ describe('CampaignStrategyService', () => {
       ).candidates
       expect(candidates.every((c) => !c.isUser)).toBe(true)
     })
+  })
 
-    it('re-throws non-P2002 errors from generate', async () => {
-      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
-      mockStrategic.generate.mockRejectedValue(new Error('llm down'))
-
-      await expect(
-        service.getOrGenerateStrategicLandscape(buildCampaign()),
-      ).rejects.toThrow('llm down')
-    })
-
+  describe('getOrGenerateStrategicLandscape — preconditions', () => {
     it('throws BadRequest when campaign.details has no raceId', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
 
@@ -510,6 +588,7 @@ describe('CampaignStrategyService', () => {
         ),
       ).rejects.toThrow(BadRequestException)
       expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+      expect(mockStrategic.generate).not.toHaveBeenCalled()
     })
 
     it('throws BadRequest when campaign.details.raceId is whitespace-only', async () => {

@@ -1,4 +1,12 @@
-import { Controller, Post, UseInterceptors, UsePipes } from '@nestjs/common'
+import {
+  Controller,
+  HttpStatus,
+  Post,
+  Res,
+  UseInterceptors,
+  UsePipes,
+} from '@nestjs/common'
+import { FastifyReply } from 'fastify'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
@@ -7,7 +15,10 @@ import { CampaignWith } from '@/campaigns/campaigns.types'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { CampaignStrategyService } from './services/campaignStrategy.service'
-import { StrategicLandscapeResultSchema } from './schemas/strategicLandscape.schema'
+import {
+  StrategicLandscapeResponse,
+  StrategicLandscapeResponseSchema,
+} from './schemas/strategicLandscape.schema'
 
 @Controller('campaignStrategy')
 @UsePipes(ZodValidationPipe)
@@ -21,11 +32,17 @@ export class CampaignStrategyController {
   }
 
   @Post('mine/strategic-landscape')
-  @ResponseSchema(StrategicLandscapeResultSchema)
+  @ResponseSchema(StrategicLandscapeResponseSchema)
   @UseCampaign({ include: { user: true } })
   async generateStrategicLandscape(
     @ReqCampaign() campaign: CampaignWith<'user'>,
-  ) {
-    return this.campaignStrategy.getOrGenerateStrategicLandscape(campaign)
+    @Res({ passthrough: true }) res: FastifyReply,
+  ): Promise<StrategicLandscapeResponse> {
+    const response =
+      await this.campaignStrategy.getOrGenerateStrategicLandscape(campaign)
+    if (response.status === 'generating') {
+      res.status(HttpStatus.ACCEPTED)
+    }
+    return response
   }
 }
