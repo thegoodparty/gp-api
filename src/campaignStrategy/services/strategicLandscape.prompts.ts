@@ -84,13 +84,24 @@ export const buildPromptVariables = (
   candidates: serializeCandidates(ctx.candidates),
 })
 
+// Keys whose values should NOT be HTML-escaped. `candidates` is a JSON
+// string — values are already escaped at the JSON layer — adding htmlEscape
+// on top corrupts URLs (e.g. `?a=1&b=2` → `?a=1&amp;b=2`). `searchResults`
+// is trusted stage-1 LLM output that the structured extractor is told to
+// preserve verbatim, including citation URLs.
+const RAW_PROMPT_KEYS: ReadonlySet<string> = new Set([
+  'candidates',
+  'searchResults',
+])
+
 export const renderPrompt = (
   template: string,
   variables: Record<string, string | undefined>,
 ): string =>
   Object.entries(variables).reduce((rendered, [key, value]) => {
     if (value === undefined) return rendered
-    const escapedValue = htmlEscape(value).replace(/\$/g, '$$$$')
+    const safe = RAW_PROMPT_KEYS.has(key) ? value : htmlEscape(value)
+    const escapedValue = safe.replace(/\$/g, '$$$$')
     return rendered.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), escapedValue)
   }, template)
 

@@ -107,7 +107,7 @@ describe('GeminiService', () => {
     })
 
     it('wraps SDK errors in BadGateway without leaking upstream detail', async () => {
-      generateContent.mockRejectedValueOnce(new Error('rate limited'))
+      generateContent.mockRejectedValue(new Error('rate limited'))
 
       await expect(service.generateWithSearch('q')).rejects.toThrow(
         BadGatewayException,

@@ -50,9 +50,14 @@ export const OpponentSchema = z.object({
   websites: z.array(HttpsOrHttpUrl),
 })
 
+// Response shape — intentionally looser than the LLM-stage schemas above.
+// A cached read can return an empty array for one section while others are
+// populated (see readStrategicLandscape's "any section content" cache check
+// and the comment there). Keeping .min(1) here would 500 on those partial
+// reads via ZodResponseInterceptor.
 export const StrategicLandscapeResultSchema = z.object({
-  opportunities: z.array(z.string().min(1)).min(1).max(3),
-  challenges: z.array(z.string().min(1)).min(1).max(3),
+  opportunities: z.array(z.string().min(1)).max(3),
+  challenges: z.array(z.string().min(1)).max(3),
   opponents: z.array(OpponentSchema),
 })
 

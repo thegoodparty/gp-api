@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { ApiCandidate, RaceContextFromApi } from '../types/electionApi.types'
 
@@ -138,6 +138,15 @@ export class ElectionApiMockService {
   }
 
   getRaceContext(campaignId: number): RaceContextFromApi {
+    // Hard-fail in production. The mock ignores campaignId and returns a
+    // hardcoded LA County Assessor fixture; shipping it would silently
+    // serve wrong data to every campaign. When the real election-api
+    // client lands, this service is replaced entirely.
+    if (process.env.NODE_ENV === 'production') {
+      throw new InternalServerErrorException(
+        'ElectionApiMockService cannot run in production',
+      )
+    }
     this.logger.debug(
       { campaignId },
       'Returning mock race context (election-api not yet integrated)',

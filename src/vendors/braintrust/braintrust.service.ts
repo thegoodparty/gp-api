@@ -158,8 +158,12 @@ export class BraintrustService {
         `Braintrust tracing failed for "${name}": ${error instanceof Error ? error.message : String(error)}`,
       )
 
-      if (captured.ran && captured.value !== undefined) {
-        return captured.value
+      if (captured.ran) {
+        // captured.value is set in lockstep with captured.ran, but TS can't
+        // narrow that across the closure. Cast preserves the fn() result
+        // even when fn legitimately returns undefined (or T = void).
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return captured.value as T
       }
       return fn()
     }
