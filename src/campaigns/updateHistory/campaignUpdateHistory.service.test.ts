@@ -95,6 +95,7 @@ describe('CampaignUpdateHistoryService', () => {
 
       await service.delete(5, 1)
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockDeleteMany).toHaveBeenCalledWith({
         where: { id: 5, campaignId: 1 },
       })
@@ -120,6 +121,7 @@ describe('CampaignUpdateHistoryService', () => {
 
       await service.delete(7, 1)
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockCampaignFindUniqueOrThrow).not.toHaveBeenCalled()
       expect(mockCampaignUpdate).not.toHaveBeenCalled()
     })
@@ -138,6 +140,7 @@ describe('CampaignUpdateHistoryService', () => {
 
       await service.delete(7, 1)
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockCampaignUpdate).not.toHaveBeenCalled()
     })
 
@@ -160,6 +163,7 @@ describe('CampaignUpdateHistoryService', () => {
 
       await service.delete(8, 1)
 
+      expect(mockExecuteRaw).toHaveBeenCalled()
       expect(mockCampaignUpdate).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {
