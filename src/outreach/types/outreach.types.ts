@@ -6,7 +6,7 @@ export type OutreachWithVoterFileFilter = Prisma.OutreachGetPayload<{
 }>
 export interface OutreachPurchaseMetadata extends BasePurchaseMetadata {
   contactCount: number
-  pricePerContact: number
+  pricePerContact?: number
   outreachType: string
   audienceSize: number
   audienceRequest?: string

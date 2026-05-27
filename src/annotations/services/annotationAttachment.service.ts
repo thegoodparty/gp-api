@@ -21,7 +21,7 @@ import { OcrService } from '@/ocr/ocr.service'
 import { QueueProducerService } from '@/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from '@/queue/queue.types'
 
-const MAX_ATTACHMENTS_PER_NOTE = 1
+const MAX_ATTACHMENTS_PER_NOTE = 20
 const UPLOAD_URL_EXPIRES_IN = 60 * 15 // 15 minutes
 const OCR_TEXT_MAX_BYTES = 200_000
 
@@ -101,8 +101,8 @@ export class AnnotationAttachmentService extends createPrismaBase(
 
   /**
    * Creates a pending attachment row and returns a presigned S3 PUT URL.
-   * Per Phase 2 v1, one attachment per note — caller hitting this twice
-   * gets a 403.
+   * Capped at MAX_ATTACHMENTS_PER_NOTE per note; exceeding callers get a
+   * 403 (`attachment_limit_reached`).
    */
   async createPresign(
     annotationId: string,

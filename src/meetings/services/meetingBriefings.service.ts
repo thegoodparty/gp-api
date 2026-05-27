@@ -12,6 +12,10 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { SegmentService } from '@/vendors/segment/segment.service'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+import { LlmService } from '@/llm/services/llm.service'
+import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { getUserFullName } from '@/users/util/users.util'
@@ -29,6 +33,10 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
+
+const DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR = new Date(
+  '2026-03-01T00:00:00.000Z',
+)
 
 const isAutomationEnabled = () =>
   process.env.MEETINGS_AUTOMATION_ENABLED === 'true'
@@ -60,6 +68,9 @@ export class MeetingBriefingsService extends createPrismaBase(
     private readonly s3: S3Service,
     private readonly elections: ElectionsService,
     private readonly experimentRuns: ExperimentRunsService,
+    private readonly segment: SegmentService,
+    private readonly llm: LlmService,
+    private readonly braintrust: BraintrustService,
   ) {
     super()
   }
@@ -116,14 +127,14 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (!isAutomationEnabled()) {
       this.logger.info(
         { electedOfficeId: electedOffice.id },
-        'meetings automation disabled; skipping auto schedule dispatch',
+        'meetings automation disabled; skipping auto dispatch',
       )
       return
     }
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    await this.dispatchSchedule(ctx)
+    await Promise.all([this.dispatchSchedule(ctx), this.dispatchBriefing(ctx)])
   }
 
   private async dispatchSchedule(ctx: DispatchContext): Promise<void> {
@@ -177,18 +188,6 @@ export class MeetingBriefingsService extends createPrismaBase(
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
     if (run.status !== ExperimentRunStatus.COMPLETED) return
 
-    if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
-      if (!isAutomationEnabled()) {
-        this.logger.info(
-          { runId: run.runId },
-          'meetings automation disabled; skipping briefing dispatch on schedule completion',
-        )
-        return
-      }
-      await this.dispatchFirstBriefingForOrg(run.organizationSlug)
-      return
-    }
-
     if (run.experimentType === BRIEFING_EXPERIMENT_TYPE) {
       await this.upsertBriefingRow(run)
     }
@@ -203,6 +202,9 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
     const offices = await this.client.electedOffice.findMany({
+      where: {
+        createdAt: { gte: DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR },
+      },
       select: { id: true, organizationSlug: true, userId: true },
     })
 
@@ -237,31 +239,6 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (!ctx) return
 
     await this.dispatchBriefing(ctx)
-  }
-
-  private async dispatchFirstBriefingForOrg(
-    organizationSlug: string,
-  ): Promise<void> {
-    const eo = await this.client.electedOffice.findFirst({
-      where: { organizationSlug },
-    })
-    if (!eo) return
-
-    const ctx = await this.resolveDispatchContext(eo)
-    if (!ctx) return
-
-    await this.experimentRuns.dispatchRun({
-      type: BRIEFING_EXPERIMENT_TYPE,
-      organizationSlug: ctx.organizationSlug,
-      clerkUserId: ctx.clerkUserId,
-      params: {
-        officialName: ctx.officialName,
-        state: ctx.state,
-        positionName: ctx.positionName,
-        ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
-        ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
-      },
-    })
   }
 
   private async resolveDispatchContext(
@@ -333,7 +310,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { organizationSlug: run.organizationSlug },
-      select: { id: true },
+      select: { id: true, userId: true },
     })
     if (!electedOffice) {
       this.logger.error(
@@ -400,16 +377,27 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const schedule = await this.loadLatestScheduleForOrg(run.organizationSlug)
-    if (!schedule || schedule.status === 'not_found') {
+    const meetingTime =
+      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
+    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(meetingTime)) {
       this.logger.error(
-        { runId: run.runId, organizationSlug: run.organizationSlug },
-        'meeting_briefing completed but no schedule found for the org',
+        { runId: run.runId, meetingTime },
+        'meeting_briefing artifact has invalid meeting_time',
       )
       return
     }
-    const meetingTime = schedule.time
-    const meetingTimezone = schedule.timezone
+
+    const meetingTimezone =
+      typeof artifact.meeting_timezone === 'string'
+        ? artifact.meeting_timezone
+        : ''
+    if (!meetingTimezone) {
+      this.logger.error(
+        { runId: run.runId },
+        'meeting_briefing artifact missing meeting_timezone',
+      )
+      return
+    }
 
     await this.model.upsert({
       where: {
@@ -437,5 +425,166 @@ export class MeetingBriefingsService extends createPrismaBase(
         artifact,
       },
     })
+
+    await this.trackAgendaPickedUp({
+      userId: electedOffice.userId,
+      artifact,
+      dateString,
+      meetingTime,
+      meetingTimezone,
+    })
   }
+
+  private async trackAgendaPickedUp({
+    userId,
+    artifact,
+    dateString,
+    meetingTime,
+    meetingTimezone,
+  }: {
+    userId: number
+    artifact: PrismaJson.MeetingBriefingArtifact
+    dateString: string
+    meetingTime: string
+    meetingTimezone: string
+  }): Promise<void> {
+    const meetingType = artifact.meeting_name ?? ''
+    const topItems = readTopAgendaItems(artifact, 3)
+    const execSummary = await this.generateAgendaHook({
+      userId,
+      meetingType,
+      meetingDate: dateString,
+      topItems,
+      leadInFallback: readLeadIn(artifact),
+    })
+
+    try {
+      await this.segment.trackEvent(userId, 'Agenda Picked Up', {
+        agenda_id: dateString,
+        meeting_date: dateString,
+        meeting_time: meetingTime,
+        meeting_timezone: meetingTimezone,
+        meeting_place: artifact.location ?? '',
+        meeting_type: meetingType,
+        exec_summary: execSummary,
+        top_3_agenda_items: topItems.map((it) => it.title),
+      })
+    } catch (err) {
+      this.logger.error(
+        { err, userId },
+        '[SEGMENT] Failed to track Agenda Picked Up',
+      )
+    }
+  }
+
+  private async generateAgendaHook({
+    userId,
+    meetingType,
+    meetingDate,
+    topItems,
+    leadInFallback,
+  }: {
+    userId: number
+    meetingType: string
+    meetingDate: string
+    topItems: { title: string; overview: string }[]
+    leadInFallback: string
+  }): Promise<string> {
+    if (topItems.length === 0) return leadInFallback
+
+    const itemsBlock = topItems
+      .map(
+        (it, i) =>
+          `${i + 1}. ${it.title}${it.overview ? `\n   ${it.overview}` : ''}`,
+      )
+      .join('\n')
+
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content:
+          'You write short, attention-grabbing previews that get a sitting elected official to open their meeting briefing. Lead with what is at stake. Be concrete, never breathless. No greetings, no meta ("this briefing covers..."), no hedging. Maximum 2 sentences, ideally 1. Second person ("you"). Plain language. End with a period.',
+      },
+      {
+        role: 'user',
+        content: `Meeting: ${meetingType || 'Upcoming meeting'} on ${meetingDate}\n\nTop 3 items (in order of importance):\n${itemsBlock}\n\nWrite a 1-2 sentence hook that previews what this meeting is really about, based on these three items only. Focus on the votes or decisions, not procedure.`,
+      },
+    ]
+
+    try {
+      const result = await this.braintrust.traced(
+        'agenda-picked-up-hook',
+        () =>
+          this.llm.chatCompletion({
+            messages,
+            models: ['claude-haiku-4-5', 'claude-sonnet-4-6'],
+            temperature: 0.4,
+            maxTokens: 200,
+            userId: String(userId),
+          }),
+        {
+          input: { meetingType, meetingDate, topItems },
+          metadata: { userId, feature: 'agenda_picked_up' },
+        },
+      )
+      const hook = result.content.trim()
+      return hook || leadInFallback
+    } catch (err) {
+      this.logger.error(
+        { err, userId, meetingDate },
+        'Failed to generate Agenda Picked Up hook; falling back to lead_in',
+      )
+      return leadInFallback
+    }
+  }
+}
+
+const isRecord = (
+  value: Prisma.JsonValue | undefined,
+): value is { [key: string]: Prisma.JsonValue } =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const readLeadIn = (artifact: PrismaJson.MeetingBriefingArtifact): string => {
+  const es = artifact['executive_summary']
+  if (!isRecord(es)) return ''
+  const leadIn = es['lead_in']
+  return typeof leadIn === 'string' ? leadIn : ''
+}
+
+const readTopAgendaItems = (
+  artifact: PrismaJson.MeetingBriefingArtifact,
+  limit: number,
+): { title: string; overview: string }[] => {
+  const items = artifact['items']
+  if (!Array.isArray(items)) return []
+  const summaryItems = readExecutiveSummaryItems(artifact)
+  return items
+    .slice(0, limit)
+    .map((item) => {
+      if (!isRecord(item)) return { title: '', overview: '' }
+      const title = typeof item['title'] === 'string' ? item['title'] : ''
+      const itemId = typeof item['id'] === 'string' ? item['id'] : ''
+      const overview = itemId ? (summaryItems.get(itemId) ?? '') : ''
+      return { title, overview }
+    })
+    .filter((it) => it.title.length > 0)
+}
+
+const readExecutiveSummaryItems = (
+  artifact: PrismaJson.MeetingBriefingArtifact,
+): Map<string, string> => {
+  const map = new Map<string, string>()
+  const es = artifact['executive_summary']
+  if (!isRecord(es)) return map
+  const items = es['items']
+  if (!Array.isArray(items)) return map
+  for (const item of items) {
+    if (!isRecord(item)) continue
+    const itemId = item['item_id']
+    const overview = item['overview']
+    if (typeof itemId === 'string' && typeof overview === 'string') {
+      map.set(itemId, overview)
+    }
+  }
+  return map
 }

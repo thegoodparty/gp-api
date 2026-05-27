@@ -4,12 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { ImpersonationInterceptor } from './Impersonation.interceptor'
 import { getImpersonationContext } from '../impersonation-context'
 
-function createMockContext(user?: {
-  impersonating?: boolean
-}): ExecutionContext {
+function createMockContext(
+  user?: { impersonating?: boolean },
+  actorSub?: string,
+): ExecutionContext {
   return {
     switchToHttp: () => ({
-      getRequest: () => ({ user }),
+      getRequest: () => ({ user, actorSub }),
     }),
   } as unknown as ExecutionContext
 }
@@ -84,5 +85,40 @@ describe('ImpersonationInterceptor', () => {
 
     expect(captured).toBe(true)
     expect(result).toBe('async-result')
+  })
+
+  it('sets isImpersonating to true for degraded actor (actorSub set, impersonating false)', async () => {
+    let captured: boolean | undefined
+
+    const context = createMockContext(
+      { impersonating: false },
+      'admin@goodparty.org',
+    )
+    const handler = createMockHandler(() => {
+      captured = getImpersonationContext()
+      return 'result'
+    })
+
+    const result$ = interceptor.intercept(context, handler)
+    const result = await lastValueFrom(result$)
+
+    expect(captured).toBe(true)
+    expect(result).toBe('result')
+  })
+
+  it('sets isImpersonating to true when actorSub is set and user is absent (M2M path)', async () => {
+    let captured: boolean | undefined
+
+    const context = createMockContext(undefined, 'admin@goodparty.org')
+    const handler = createMockHandler(() => {
+      captured = getImpersonationContext()
+      return 'result'
+    })
+
+    const result$ = interceptor.intercept(context, handler)
+    const result = await lastValueFrom(result$)
+
+    expect(captured).toBe(true)
+    expect(result).toBe('result')
   })
 })

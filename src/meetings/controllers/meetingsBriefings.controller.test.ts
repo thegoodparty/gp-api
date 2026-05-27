@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus, UserRole } from '@prisma/client'
+import { ExperimentRunStatus } from '@prisma/client'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { addDays, getDay, parseISO } from 'date-fns'
@@ -603,10 +603,10 @@ describe('GET /v1/meetings/:date/briefing', () => {
     expect(result.status).toBe(404)
   })
 
-  it('returns the artifact JSON as-is on success (no shape validation)', async () => {
+  it('returns the artifact JSON augmented with the Prisma row briefing_id', async () => {
     const orgSlug = 'eo-passthrough'
     const eo = await seedElectedOffice(orgSlug)
-    await seedBriefing(eo.id, orgSlug, {
+    const seeded = await seedBriefing(eo.id, orgSlug, {
       meetingDate: '2026-06-08',
       artifactBucket: 'briefing-bucket',
       artifactKey: 'partial.json',
@@ -621,7 +621,14 @@ describe('GET /v1/meetings/:date/briefing', () => {
     )
 
     expect(result.status).toBe(200)
-    expect(result.data).toEqual({ id: 'b1', status: 'briefing_ready' })
+    // The controller passes the artifact through verbatim and tacks the
+    // Prisma row UUID onto it so the share URL can be built without a
+    // second round-trip.
+    expect(result.data).toEqual({
+      id: 'b1',
+      status: 'briefing_ready',
+      briefing_id: seeded.id,
+    })
   })
 
   it('returns the parsed briefing artifact on success', async () => {
@@ -654,22 +661,7 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
     vi.unstubAllEnvs()
   })
 
-  const makeAdmin = () =>
-    service.prisma.user.update({
-      where: { id: service.user.id },
-      data: { roles: [UserRole.admin] },
-    })
-
-  it('returns 403 when caller is not an admin', async () => {
-    const result = await service.client.post(
-      '/v1/meetings/briefings/dispatch',
-      { electedOfficeId: 'any-id', kind: 'schedule' },
-    )
-    expect(result.status).toBe(403)
-  })
-
   it('returns 400 when body is missing required fields', async () => {
-    await makeAdmin()
     const result = await service.client.post(
       '/v1/meetings/briefings/dispatch',
       {},
@@ -678,7 +670,6 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
   })
 
   it('returns 404 when elected office is not found', async () => {
-    await makeAdmin()
     const result = await service.client.post(
       '/v1/meetings/briefings/dispatch',
       { electedOfficeId: 'nonexistent', kind: 'schedule' },
@@ -687,7 +678,6 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
   })
 
   it('returns 200 and dispatches when admin sends a valid request', async () => {
-    await makeAdmin()
     const orgSlug = `eo-dispatch-${Date.now()}`
     await service.prisma.organization.create({
       data: { slug: orgSlug, ownerId: service.user.id, positionId: 'br-pos-d' },

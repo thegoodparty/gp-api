@@ -64,6 +64,13 @@ const topLevelNote = {
   payload: { body: 'Top-level note.' },
 }
 
+const cardLevelNote = {
+  kind: 'note' as const,
+  // Card-level: json_path identifies the whole card; start/end are null.
+  anchor: { json_path: '/items/0', start: null, end: null },
+  payload: { body: 'A note about the whole card.' },
+}
+
 const bugReport = {
   kind: 'bug_report' as const,
   anchor: {
@@ -119,6 +126,27 @@ describe('POST /v1/meetings/:date/briefing/annotations', () => {
     })
   })
 
+  it('creates a card-level note when json_path is set but start/end are null', async () => {
+    const orgSlug = 'eo-cardlevel'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    const result = await service.client.post(
+      '/v1/meetings/2026-06-08/briefing/annotations',
+      cardLevelNote,
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(201)
+    expect(result.data).toMatchObject({
+      kind: 'note',
+      json_path: '/items/0',
+      start: null,
+      end: null,
+      note: { body: 'A note about the whole card.' },
+    })
+  })
+
   it('creates a bug_report', async () => {
     const orgSlug = 'eo-bug'
     const eo = await seedElectedOffice(orgSlug)
@@ -151,7 +179,10 @@ describe('POST /v1/meetings/:date/briefing/annotations', () => {
     expect(result.status).toBe(400)
   })
 
-  it('rejects mixed anchor (some fields null)', async () => {
+  it('rejects an anchor with offsets but no json_path', async () => {
+    // Card-level (json_path only) and briefing-wide (all null) are valid;
+    // only the inverse shape — offsets with no json_path to apply them to
+    // — is rejected.
     const orgSlug = 'eo-mixed-anchor'
     const eo = await seedElectedOffice(orgSlug)
     await seedBriefing(eo.id, orgSlug, '2026-06-08')
@@ -160,8 +191,8 @@ describe('POST /v1/meetings/:date/briefing/annotations', () => {
       '/v1/meetings/2026-06-08/briefing/annotations',
       {
         kind: 'note',
-        anchor: { json_path: '/items/0/title', start: null, end: null },
-        payload: { body: 'mismatch' },
+        anchor: { json_path: null, start: 0, end: 10 },
+        payload: { body: 'orphan offsets' },
       },
       orgHeader(orgSlug),
     )

@@ -113,23 +113,27 @@ describe('POST /v1/annotations/:annotationId/note/attachments/presign', () => {
     expect(s3.upload).toHaveBeenCalledOnce()
   })
 
-  it('rejects a second attachment per note (one-per-note cap)', async () => {
+  it('rejects another attachment once the per-note cap is reached', async () => {
     const { annotation } = await seedBriefingAndNote('eo-cap')
     mockS3()
 
-    const first = await service.client.post(
-      `/v1/annotations/${annotation.id}/note/attachments/presign`,
-      validPresign,
-      orgHeader('eo-cap'),
-    )
-    expect(first.status).toBe(201)
+    // The service caps attachments at 20 per note. Fill it up, then assert
+    // the 21st request is forbidden.
+    for (let i = 0; i < 20; i++) {
+      const accepted = await service.client.post(
+        `/v1/annotations/${annotation.id}/note/attachments/presign`,
+        validPresign,
+        orgHeader('eo-cap'),
+      )
+      expect(accepted.status).toBe(201)
+    }
 
-    const second = await service.client.post(
+    const overflow = await service.client.post(
       `/v1/annotations/${annotation.id}/note/attachments/presign`,
       validPresign,
       orgHeader('eo-cap'),
     )
-    expect(second.status).toBe(403)
+    expect(overflow.status).toBe(403)
   })
 
   it('rejects disallowed mime types', async () => {
