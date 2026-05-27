@@ -116,6 +116,18 @@ describe('GeminiService', () => {
         /rate limited/,
       )
     })
+
+    it('passes BadGatewayException through unchanged so the disabled-client message survives', async () => {
+      generateContent.mockRejectedValue(
+        new BadGatewayException(
+          'GEMINI_API_KEY not set; Gemini calls disabled',
+        ),
+      )
+
+      await expect(service.generateWithSearch('q')).rejects.toThrow(
+        /GEMINI_API_KEY not set/,
+      )
+    })
   })
 
   describe('generateStructured', () => {

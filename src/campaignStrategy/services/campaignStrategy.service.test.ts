@@ -371,6 +371,28 @@ describe('CampaignStrategyService', () => {
       )
     })
 
+    it('returns empty userPartyAffiliation when party is "Other" but otherParty is missing', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      mockStrategic.generate.mockResolvedValue({
+        opportunities: ['a', 'b', 'c'],
+        challenges: ['a', 'b', 'c'],
+        opponents: [],
+      })
+
+      await service.getOrGenerateStrategicLandscape(
+        buildCampaign({
+          details: { party: 'Other', raceId: 'hash-abc' },
+        }),
+      )
+      await service.drainInFlight()
+
+      expect(mockStrategic.generate).toHaveBeenCalledWith(
+        42,
+        99,
+        expect.objectContaining({ userPartyAffiliation: '' }),
+      )
+    })
+
     it('uses details.party verbatim when not "Other"', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({

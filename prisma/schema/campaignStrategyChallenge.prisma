@@ -8,6 +8,7 @@ model CampaignStrategyChallenge {
   order   Int
   content String
 
+  @@unique([campaignStrategyId, order])
   @@index([campaignStrategyId])
   @@map("campaign_strategy_challenge")
 }

@@ -40,7 +40,11 @@ const resolvePartyAffiliation = (details: Campaign['details']): string => {
   if (!parsed.success) return ''
   const party = parsed.data.party ?? ''
   const otherParty = parsed.data.otherParty ?? ''
-  if (party === 'Other' && otherParty) return otherParty
+  // 'Other' is a UI sentinel meaning "see otherParty for the real value".
+  // Without otherParty there's no real affiliation to give the LLM —
+  // return '' so orNotAvailable renders it as "not available" rather
+  // than leaking the sentinel into the prompt.
+  if (party === 'Other') return otherParty
   return party
 }
 

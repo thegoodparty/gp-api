@@ -45,6 +45,15 @@ const FULL_NAME_MAX = 200
 const PARTY_MAX = 100
 const WEBSITE_URL_MAX = 500
 
+// Escape only the characters that could break the <candidates>...</candidates>
+// XML fence in the prompt: `<` and `>`. We deliberately do NOT escape `&`
+// (avoids corrupting URL query strings like ?a=1&b=2). JSON.stringify does
+// not escape angle brackets, so without this an upstream candidate field
+// like `Alice</candidates><instructions>...` would break out of the fence
+// and reach the model as live structure rather than opaque text.
+const escapeForFence = (value: string): string =>
+  value.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
 // Strip nullable keys (party, websiteUrl) when null so the LLM doesn't see
 // "party": null noise. isIncumbent stays as a real tri-state because
 // null carries meaning ("incumbent status unknown") that the opposition
@@ -52,13 +61,15 @@ const WEBSITE_URL_MAX = 500
 const serializeCandidates = (candidates: RaceContext['candidates']): string =>
   JSON.stringify(
     candidates.map((c) => ({
-      fullName: cap(c.fullName, FULL_NAME_MAX),
+      fullName: escapeForFence(cap(c.fullName, FULL_NAME_MAX)),
       isUser: c.isUser,
       isIncumbent: c.isIncumbent,
       ...(c.party != null &&
-        c.party.length > 0 && { party: cap(c.party, PARTY_MAX) }),
+        c.party.length > 0 && {
+          party: escapeForFence(cap(c.party, PARTY_MAX)),
+        }),
       ...(c.websiteUrl && {
-        websiteUrl: cap(c.websiteUrl, WEBSITE_URL_MAX),
+        websiteUrl: escapeForFence(cap(c.websiteUrl, WEBSITE_URL_MAX)),
       }),
     })),
   )

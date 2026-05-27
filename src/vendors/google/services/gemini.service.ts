@@ -161,6 +161,10 @@ export class GeminiService {
       })
     } catch (error) {
       this.logger.error({ err: error, model }, 'Gemini API call failed')
+      // Let BadGatewayException pass through so the disabled-client message
+      // (e.g., 'GEMINI_API_KEY is not set') survives instead of getting
+      // rewrapped as a generic 'LLM provider error'.
+      if (error instanceof BadGatewayException) throw error
       throw new BadGatewayException('LLM provider error')
     }
   }

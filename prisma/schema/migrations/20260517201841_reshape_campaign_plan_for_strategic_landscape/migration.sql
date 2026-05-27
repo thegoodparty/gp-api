@@ -85,6 +85,9 @@ CREATE INDEX "campaign_strategy_opportunity_campaign_strategy_id_idx" ON "campai
 -- CreateIndex
 CREATE UNIQUE INDEX "campaign_strategy_opportunity_campaign_strategy_id_order_key" ON "campaign_strategy_opportunity"("campaign_strategy_id", "order");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "campaign_strategy_challenge_campaign_strategy_id_order_key" ON "campaign_strategy_challenge"("campaign_strategy_id", "order");
+
 -- AddForeignKey
 ALTER TABLE "campaign_strategy" ADD CONSTRAINT "campaign_strategy_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

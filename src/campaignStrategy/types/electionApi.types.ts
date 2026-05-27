@@ -1,4 +1,4 @@
-// Shape election-api returns on the campaign-plan-context endpoint. Most
+// Shape election-api returns on the campaign-strategy-context endpoint. Most
 // fields are nullable per the contract — first/last/full name on candidates
 // are the only guaranteed strings on the candidate, and every field on the
 // race is independently nullable.
