@@ -94,7 +94,7 @@ export class StrategicLandscapeService {
         }
       },
       {
-        input: { campaignId, campaignStrategyId },
+        input: { campaignId, campaignStrategyId, variables },
         metadata: { campaignStrategyId, candidateOffice: ctx.candidateOffice },
         type: 'task',
       },
@@ -128,7 +128,11 @@ export class StrategicLandscapeService {
           config.schema,
         )
       },
-      { type: 'task', metadata: { pipeline: config.pipelineTag } },
+      {
+        input: { variables },
+        type: 'task',
+        metadata: { pipeline: config.pipelineTag },
+      },
     )
   }
 
