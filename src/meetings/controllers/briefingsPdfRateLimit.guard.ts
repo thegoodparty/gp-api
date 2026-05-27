@@ -37,9 +37,13 @@ import type { FastifyRequest } from 'fastify'
 export class BriefingsPdfRateLimitGuard implements CanActivate {
   private readonly logger = new Logger(BriefingsPdfRateLimitGuard.name)
 
-  // 30 requests per 60s, with a burst of 10. Numbers picked to leave plenty
-  // of headroom for legitimate "click the link, refresh, share with team"
-  // patterns while shutting down random-UUID enumeration quickly.
+  // Token-bucket policy: a fresh IP starts with `capacity` tokens (the
+  // burst budget) and refills at `refillPerMs` tokens per millisecond.
+  //   - capacity = 30  → up to 30 back-to-back requests from a new IP.
+  //   - refillPerMs = 30/60_000 → sustained 30 requests / 60s.
+  // Picked to leave plenty of headroom for legitimate
+  // "click the link, refresh, share with team" patterns while shutting
+  // down random-UUID enumeration quickly.
   private readonly capacity = 30
   private readonly refillPerMs = 30 / 60_000
 
