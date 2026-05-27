@@ -186,13 +186,22 @@ describe('renderBriefingPdf', () => {
     // arithmetic uses `widthOfString`, and `doc.image()` consumes the
     // resulting Buffer. Asserting the URL text on the cover proves the
     // branch ran end-to-end without throwing and produced a parseable PDF.
+    // Mirror what the service actually passes: the public share URL on
+    // the marketing-domain rewrite (which serves the same PDF for any
+    // recipient, authenticated or not). The renderer just prints whatever
+    // string it's given; the test is about the QR branch firing.
     const liveBriefingUrl =
-      'https://goodparty.org/dashboard/briefings/2026-06-08'
+      'https://goodparty.org/api/v1/briefings/0192b1d6-3b8e-7a4e-b3c4-9aa1c4d5e6f0'
     const buf = await renderBriefingPdf(makeArtifact(), { liveBriefingUrl })
     expect(buf).toBeInstanceOf(Buffer)
     expect(buf.slice(0, 4).toString('latin1')).toBe('%PDF')
     const { text } = await extractText(buf)
-    expect(text).toContain('goodparty.org/dashboard/briefings/2026-06-08')
+    // The cover lays the URL out next to the QR code with a fixed width,
+    // so a long URL can wrap across lines in the extracted text stream
+    // (pdf-parse joins runs with line breaks). Assert on a unique
+    // substring that's short enough to fit on a single rendered line.
+    expect(text).toContain('/api/v1/briefings/')
+    expect(text).toContain('0192b1d6')
   })
 
   it('paginates the TOC across multiple pages when there are many featured items', async () => {

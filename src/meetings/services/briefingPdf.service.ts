@@ -139,11 +139,12 @@ export class BriefingPdfService extends createPrismaBase(
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) {
-      // Intentionally leave bucket/key out of the warn line: artifact paths
-      // typically encode campaign or user identifiers and any engineer with
-      // access to log sinks could harvest them. The S3 layer logs the
-      // bucket+key separately at DEBUG when fetches fail, which is enough
-      // for triage without leaking PII to the broader log audience.
+      // Intentionally leave the bucket/key out of the warn line: artifact
+      // keys typically embed the briefing id (the share secret) and other
+      // identifiers, and we don't want anyone with read access to log sinks
+      // to harvest them. Operators with the truncated `idPrefix` can join
+      // back to the `meeting_briefing` Prisma row to recover the exact
+      // bucket/key when they need to inspect S3 directly.
       this.renderLogger.warn(`renderById: S3 artifact missing for ${idPrefix}`)
       throw new NotFoundException()
     }
@@ -177,8 +178,14 @@ export class BriefingPdfService extends createPrismaBase(
       recipientName,
     )
 
+    // The QR code on the cover must work for *any* recipient — including
+    // unauthenticated ones who got the PDF forwarded via email/SMS. The
+    // previous target (`/dashboard/briefings/<date>`) lives behind the
+    // elected-office guard and rejects anonymous scans. Point the QR at
+    // the same public share URL the drawer publishes so it stays a
+    // drop-in for an unauth viewer.
     const liveBriefingUrl = liveBriefingBaseUrl
-      ? `${liveBriefingBaseUrl.replace(/\/$/, '')}/dashboard/briefings/${meetingDateIso}`
+      ? `${liveBriefingBaseUrl.replace(/\/$/, '')}/api/v1/briefings/${briefingId}`
       : undefined
 
     const options: RenderBriefingPdfOptions = {

@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { PublicAccess } from '@/authentication/decorators/PublicAccess.decorator'
-import { getEnv } from '@/shared/util/env.util'
+import { WEBAPP_ROOT } from '@/shared/util/appEnvironment.util'
 import { BriefingPdfService } from '../services/briefingPdf.service'
 import { BriefingsPdfRateLimitGuard } from './briefingsPdfRateLimit.guard'
 
@@ -50,10 +50,14 @@ export class BriefingsPdfController {
     // The 8-character prefix is enough to disambiguate adjacent requests
     // when triaging together with the global request-id.
     this.logger.log(`getBriefingPdf: serving briefing ${uuid.slice(0, 8)}…`)
-    const liveBriefingBaseUrl = getEnv('APP_ROOT_URL')
+    // The QR code on the cover targets the public share URL on the
+    // marketing domain (rewritten to this controller via Vercel) so it
+    // works for unauthenticated recipients of the forwarded PDF. Use the
+    // shared `WEBAPP_ROOT` constant — `requireEnv`'s missing-value error
+    // makes that fail at startup rather than silently dropping the QR.
     const { buffer, filename } = await this.briefingPdf.renderById(
       uuid,
-      liveBriefingBaseUrl,
+      WEBAPP_ROOT,
     )
     return new StreamableFile(buffer, {
       type: 'application/pdf',
