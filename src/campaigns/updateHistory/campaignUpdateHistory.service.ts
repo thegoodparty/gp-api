@@ -69,6 +69,6 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
       })
     }
 
-    return this.model.delete({ where: { id } })
+    await this.model.deleteMany({ where: { id, campaignId } })
   }
 }
