@@ -1,5 +1,17 @@
 # @goodparty_org/contracts
 
+## 0.8.0
+
+### Minor Changes
+
+- Add `AttachmentDownloadUrlResponseSchema` /
+  `AttachmentDownloadUrlResponse`. Backs a new
+  `GET /v1/annotations/:annotationId/note/attachments/:attachmentId/download-url`
+  endpoint that returns a short-lived presigned S3 GET URL plus an ISO
+  `expires_at`. Clients render image attachments via `<img src>` and open
+  document attachments in a new tab against this URL; bytes never pass
+  through gp-api.
+
 ## 0.7.0
 
 ### Minor Changes
