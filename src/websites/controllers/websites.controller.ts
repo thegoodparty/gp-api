@@ -371,12 +371,12 @@ export class WebsitesController {
       'Single-shot fetch of `https://<attached-domain>/` — does NOT ' +
       'retry. If the live URL is not reachable yet (DNS not propagated, ' +
       'site not deployed), `checks.http_200` will be false; the caller ' +
-      'is responsible for backoff via `next_action.wait_*` and the ' +
-      'recovery loop. Returns `{ verified, url, checks: { http_200, ' +
-      'has_privacy_policy, has_terms, has_candidate_identity } }`. ' +
-      'Requires an attached custom domain; returns 400 if no domain is ' +
-      'attached. Call AFTER `PUT /v1/websites/mine` with ' +
-      '`status: "published"` has succeeded.',
+      'is responsible for implementing its own backoff and retry loop. ' +
+      'Returns `{ verified, url, checks: { http_200, has_privacy_policy, ' +
+      'has_terms, has_candidate_identity } }`. Requires an attached ' +
+      'custom domain; returns 400 if no domain is attached, or if the ' +
+      'domain resolves to a non-public IP address. Call AFTER ' +
+      '`PUT /v1/websites/mine` with `status: "published"` has succeeded.',
   })
   verifyLive(@ReqCampaign() { id: campaignId }: Campaign) {
     return this.websites.verifyLive(campaignId)

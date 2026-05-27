@@ -6,9 +6,15 @@ import {
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, User } from '@prisma/client'
 import axios from 'axios'
+import * as dns from 'node:dns'
+import { promisify } from 'node:util'
+import * as https from 'node:https'
+import ipaddr from 'ipaddr.js'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { getUserFullName } from 'src/users/util/users.util'
 import { VerifyLiveResponse } from '../schemas/VerifyLive.schema'
+
+const dnsLookup = promisify(dns.lookup)
 
 type PositionWithTopIssue = Prisma.CampaignPositionGetPayload<{
   include: { topIssue: true }
@@ -97,6 +103,7 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
     }
 
     const url = `https://${website.domain.name}/`
+    await assertPublicHostname(website.domain.name)
     const html = await fetchLiveHtml(url)
     const user = website.campaign?.user
     const candidateName = user
@@ -109,13 +116,69 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
 
 type LiveFetchResult = { status: number; body: string | null }
 
+export const isPublicAddress = (address: string): boolean => {
+  if (ipaddr.IPv6.isValid(address)) {
+    const v6 = ipaddr.IPv6.parse(address)
+    return v6.isIPv4MappedAddress()
+      ? v6.toIPv4Address().range() === 'unicast'
+      : v6.range() === 'unicast'
+  }
+  if (ipaddr.IPv4.isValid(address)) {
+    return ipaddr.IPv4.parse(address).range() === 'unicast'
+  }
+  return false
+}
+
+export const assertPublicHostname = async (hostname: string): Promise<void> => {
+  const addresses = await dnsLookup(hostname, { all: true }).catch(
+    () => [] as dns.LookupAddress[],
+  )
+  if (addresses.length === 0) {
+    return
+  }
+  const offending = addresses.find(({ address }) => !isPublicAddress(address))
+  if (offending) {
+    throw new BadRequestException(
+      `${hostname} resolves to a non-public IP address (${offending.address})`,
+    )
+  }
+}
+
+const ssrfSafeLookup: NonNullable<https.AgentOptions['lookup']> = (
+  hostname,
+  options,
+  callback,
+) => {
+  const opts = typeof options === 'number' ? { family: options } : options || {}
+  dns.lookup(hostname, { ...opts, all: true }, (err, addresses) => {
+    if (err) {
+      return callback(err, '', 0)
+    }
+    const list = Array.isArray(addresses) ? addresses : [addresses]
+    const offending = list.find(({ address }) => !isPublicAddress(address))
+    if (offending) {
+      return callback(
+        new Error(
+          `Refusing to connect to ${hostname} — resolved to non-public IP ${offending.address}`,
+        ),
+        '',
+        0,
+      )
+    }
+    const first = list[0]
+    callback(null, first.address, first.family)
+  })
+}
+
 const fetchLiveHtml = async (url: string): Promise<LiveFetchResult> => {
   try {
     const res = await axios.get<string>(url, {
       timeout: 10_000,
       responseType: 'text',
       validateStatus: () => true,
+      maxRedirects: 0,
       transformResponse: [(data: string) => data],
+      httpsAgent: new https.Agent({ lookup: ssrfSafeLookup }),
     })
     const body = typeof res.data === 'string' ? res.data : null
     return { status: res.status, body }

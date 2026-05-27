@@ -4,14 +4,47 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
-import { WebsitesService } from './websites.service'
+import * as dns from 'node:dns'
+import { WebsitesService, isPublicAddress } from './websites.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 vi.mock('axios', () => ({
   default: { get: vi.fn() },
 }))
 
+vi.mock('node:dns', async (orig) => {
+  const real = await orig<typeof import('node:dns')>()
+  return { ...real, default: real, lookup: vi.fn() }
+})
+
 const mockedAxiosGet = vi.mocked(axios.get)
+const mockedDnsLookup = vi.mocked(dns.lookup)
+
+type LookupCallback = (
+  err: NodeJS.ErrnoException | null,
+  result: dns.LookupAddress[],
+) => void
+
+const stubDnsLookup = (addresses: dns.LookupAddress[] | Error) => {
+  mockedDnsLookup.mockImplementation(
+    (
+      _hostname: string,
+      optionsOrCallback: unknown,
+      maybeCallback?: unknown,
+    ) => {
+      const cb = (
+        typeof optionsOrCallback === 'function'
+          ? optionsOrCallback
+          : maybeCallback
+      ) as LookupCallback
+      if (addresses instanceof Error) {
+        cb(addresses as NodeJS.ErrnoException, [])
+      } else {
+        cb(null, addresses)
+      }
+    },
+  )
+}
 
 const buildHtml = ({
   candidateName = 'Jane Doe',
@@ -58,6 +91,7 @@ describe('WebsitesService.verifyLive', () => {
 
     service = module.get<WebsitesService>(WebsitesService)
     vi.clearAllMocks()
+    stubDnsLookup([{ address: '93.184.216.34', family: 4 }])
   })
 
   it('returns verified=true when HTTP 200 + all required sections + identity present', async () => {
@@ -152,5 +186,102 @@ describe('WebsitesService.verifyLive', () => {
       NotFoundException,
     )
     expect(mockedAxiosGet).not.toHaveBeenCalled()
+  })
+
+  it('throws BadRequestException without fetching when domain resolves to a private IPv4 (10.x.x.x)', async () => {
+    stubDnsLookup([{ address: '10.0.0.1', family: 4 }])
+
+    await expect(service.verifyLive(1)).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(mockedAxiosGet).not.toHaveBeenCalled()
+  })
+
+  it('throws BadRequestException when domain resolves to the AWS metadata IP (169.254.169.254)', async () => {
+    stubDnsLookup([{ address: '169.254.169.254', family: 4 }])
+
+    await expect(service.verifyLive(1)).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(mockedAxiosGet).not.toHaveBeenCalled()
+  })
+
+  it('throws BadRequestException when domain resolves to loopback (127.0.0.1)', async () => {
+    stubDnsLookup([{ address: '127.0.0.1', family: 4 }])
+
+    await expect(service.verifyLive(1)).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(mockedAxiosGet).not.toHaveBeenCalled()
+  })
+
+  it('throws BadRequestException when any resolved address is private (mixed v4 + v6)', async () => {
+    stubDnsLookup([
+      { address: '93.184.216.34', family: 4 },
+      { address: 'fe80::1', family: 6 },
+    ])
+
+    await expect(service.verifyLive(1)).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(mockedAxiosGet).not.toHaveBeenCalled()
+  })
+
+  it('proceeds to fetch when domain resolves to a public unicast address', async () => {
+    stubDnsLookup([{ address: '93.184.216.34', family: 4 }])
+    mockedAxiosGet.mockResolvedValue({ status: 200, data: buildHtml() })
+
+    const result = await service.verifyLive(1)
+
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(1)
+    expect(result.verified).toBe(true)
+  })
+
+  it('proceeds (and the fetch naturally fails) when DNS lookup fails — does not pre-emptively block', async () => {
+    stubDnsLookup(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' }))
+    mockedAxiosGet.mockRejectedValue(new Error('ENOTFOUND'))
+
+    const result = await service.verifyLive(1)
+
+    expect(result.verified).toBe(false)
+    expect(result.checks.http_200).toBe(false)
+  })
+})
+
+describe('isPublicAddress', () => {
+  it.each([
+    '10.0.0.1',
+    '10.255.255.254',
+    '172.16.0.1',
+    '172.31.255.254',
+    '192.168.1.1',
+    '127.0.0.1',
+    '169.254.169.254',
+    '100.64.0.1',
+    '0.0.0.0',
+    '255.255.255.255',
+    '224.0.0.1',
+    '::1',
+    'fe80::1',
+    'fc00::1',
+    '::',
+    '::ffff:10.0.0.1',
+  ])('rejects %s as non-public', (ip) => {
+    expect(isPublicAddress(ip)).toBe(false)
+  })
+
+  it.each([
+    '8.8.8.8',
+    '1.1.1.1',
+    '93.184.216.34',
+    '2001:4860:4860::8888',
+    '2606:4700:4700::1111',
+  ])('accepts %s as public unicast', (ip) => {
+    expect(isPublicAddress(ip)).toBe(true)
+  })
+
+  it('rejects garbage input', () => {
+    expect(isPublicAddress('not-an-ip')).toBe(false)
+    expect(isPublicAddress('')).toBe(false)
   })
 })
