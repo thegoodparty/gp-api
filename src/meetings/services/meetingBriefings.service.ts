@@ -12,6 +12,10 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { SegmentService } from '@/vendors/segment/segment.service'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+import { LlmService } from '@/llm/services/llm.service'
+import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { getUserFullName } from '@/users/util/users.util'
@@ -64,6 +68,9 @@ export class MeetingBriefingsService extends createPrismaBase(
     private readonly s3: S3Service,
     private readonly elections: ElectionsService,
     private readonly experimentRuns: ExperimentRunsService,
+    private readonly segment: SegmentService,
+    private readonly llm: LlmService,
+    private readonly braintrust: BraintrustService,
   ) {
     super()
   }
@@ -303,7 +310,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { organizationSlug: run.organizationSlug },
-      select: { id: true },
+      select: { id: true, userId: true },
     })
     if (!electedOffice) {
       this.logger.error(
@@ -418,5 +425,166 @@ export class MeetingBriefingsService extends createPrismaBase(
         artifact,
       },
     })
+
+    await this.trackAgendaPickedUp({
+      userId: electedOffice.userId,
+      artifact,
+      dateString,
+      meetingTime,
+      meetingTimezone,
+    })
   }
+
+  private async trackAgendaPickedUp({
+    userId,
+    artifact,
+    dateString,
+    meetingTime,
+    meetingTimezone,
+  }: {
+    userId: number
+    artifact: PrismaJson.MeetingBriefingArtifact
+    dateString: string
+    meetingTime: string
+    meetingTimezone: string
+  }): Promise<void> {
+    const meetingType = artifact.meeting_name ?? ''
+    const topItems = readTopAgendaItems(artifact, 3)
+    const execSummary = await this.generateAgendaHook({
+      userId,
+      meetingType,
+      meetingDate: dateString,
+      topItems,
+      leadInFallback: readLeadIn(artifact),
+    })
+
+    try {
+      await this.segment.trackEvent(userId, 'Agenda Picked Up', {
+        agenda_id: dateString,
+        meeting_date: dateString,
+        meeting_time: meetingTime,
+        meeting_timezone: meetingTimezone,
+        meeting_place: artifact.location ?? '',
+        meeting_type: meetingType,
+        exec_summary: execSummary,
+        top_3_agenda_items: topItems.map((it) => it.title),
+      })
+    } catch (err) {
+      this.logger.error(
+        { err, userId },
+        '[SEGMENT] Failed to track Agenda Picked Up',
+      )
+    }
+  }
+
+  private async generateAgendaHook({
+    userId,
+    meetingType,
+    meetingDate,
+    topItems,
+    leadInFallback,
+  }: {
+    userId: number
+    meetingType: string
+    meetingDate: string
+    topItems: { title: string; overview: string }[]
+    leadInFallback: string
+  }): Promise<string> {
+    if (topItems.length === 0) return leadInFallback
+
+    const itemsBlock = topItems
+      .map(
+        (it, i) =>
+          `${i + 1}. ${it.title}${it.overview ? `\n   ${it.overview}` : ''}`,
+      )
+      .join('\n')
+
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content:
+          'You write short, attention-grabbing previews that get a sitting elected official to open their meeting briefing. Lead with what is at stake. Be concrete, never breathless. No greetings, no meta ("this briefing covers..."), no hedging. Maximum 2 sentences, ideally 1. Second person ("you"). Plain language. End with a period.',
+      },
+      {
+        role: 'user',
+        content: `Meeting: ${meetingType || 'Upcoming meeting'} on ${meetingDate}\n\nTop 3 items (in order of importance):\n${itemsBlock}\n\nWrite a 1-2 sentence hook that previews what this meeting is really about, based on these three items only. Focus on the votes or decisions, not procedure.`,
+      },
+    ]
+
+    try {
+      const result = await this.braintrust.traced(
+        'agenda-picked-up-hook',
+        () =>
+          this.llm.chatCompletion({
+            messages,
+            models: ['claude-haiku-4-5', 'claude-sonnet-4-6'],
+            temperature: 0.4,
+            maxTokens: 200,
+            userId: String(userId),
+          }),
+        {
+          input: { meetingType, meetingDate, topItems },
+          metadata: { userId, feature: 'agenda_picked_up' },
+        },
+      )
+      const hook = result.content.trim()
+      return hook || leadInFallback
+    } catch (err) {
+      this.logger.error(
+        { err, userId, meetingDate },
+        'Failed to generate Agenda Picked Up hook; falling back to lead_in',
+      )
+      return leadInFallback
+    }
+  }
+}
+
+const isRecord = (
+  value: Prisma.JsonValue | undefined,
+): value is { [key: string]: Prisma.JsonValue } =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const readLeadIn = (artifact: PrismaJson.MeetingBriefingArtifact): string => {
+  const es = artifact['executive_summary']
+  if (!isRecord(es)) return ''
+  const leadIn = es['lead_in']
+  return typeof leadIn === 'string' ? leadIn : ''
+}
+
+const readTopAgendaItems = (
+  artifact: PrismaJson.MeetingBriefingArtifact,
+  limit: number,
+): { title: string; overview: string }[] => {
+  const items = artifact['items']
+  if (!Array.isArray(items)) return []
+  const summaryItems = readExecutiveSummaryItems(artifact)
+  return items
+    .slice(0, limit)
+    .map((item) => {
+      if (!isRecord(item)) return { title: '', overview: '' }
+      const title = typeof item['title'] === 'string' ? item['title'] : ''
+      const itemId = typeof item['id'] === 'string' ? item['id'] : ''
+      const overview = itemId ? (summaryItems.get(itemId) ?? '') : ''
+      return { title, overview }
+    })
+    .filter((it) => it.title.length > 0)
+}
+
+const readExecutiveSummaryItems = (
+  artifact: PrismaJson.MeetingBriefingArtifact,
+): Map<string, string> => {
+  const map = new Map<string, string>()
+  const es = artifact['executive_summary']
+  if (!isRecord(es)) return map
+  const items = es['items']
+  if (!Array.isArray(items)) return map
+  for (const item of items) {
+    if (!isRecord(item)) continue
+    const itemId = item['item_id']
+    const overview = item['overview']
+    if (typeof itemId === 'string' && typeof overview === 'string') {
+      map.set(itemId, overview)
+    }
+  }
+  return map
 }
