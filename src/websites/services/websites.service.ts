@@ -144,7 +144,7 @@ export const assertPublicHostname = async (hostname: string): Promise<void> => {
   }
 }
 
-const ssrfSafeLookup: NonNullable<https.AgentOptions['lookup']> = (
+export const ssrfSafeLookup: NonNullable<https.AgentOptions['lookup']> = (
   hostname,
   options,
   callback,
@@ -154,8 +154,10 @@ const ssrfSafeLookup: NonNullable<https.AgentOptions['lookup']> = (
     if (err) {
       return callback(err, '', 0)
     }
-    const list = Array.isArray(addresses) ? addresses : [addresses]
-    const offending = list.find(({ address }) => !isPublicAddress(address))
+    if (addresses.length === 0) {
+      return callback(new Error(`No addresses resolved for ${hostname}`), '', 0)
+    }
+    const offending = addresses.find(({ address }) => !isPublicAddress(address))
     if (offending) {
       return callback(
         new Error(
@@ -165,7 +167,7 @@ const ssrfSafeLookup: NonNullable<https.AgentOptions['lookup']> = (
         0,
       )
     }
-    const first = list[0]
+    const first = addresses[0]
     callback(null, first.address, first.family)
   })
 }

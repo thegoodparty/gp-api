@@ -311,6 +311,34 @@ describe('WebsitesController', () => {
 
       expect(mockWebsitesService.update).toHaveBeenCalled()
     })
+
+    it('allows republish for a legacy site (hasEverBeenPublished=true) without a custom domain', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: completeContent,
+        hasEverBeenPublished: true,
+        domain: null,
+      })
+
+      await controller.updateWebsite(mockUser, mockCampaign, publishBody())
+
+      expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+
+    it('still rejects publish when domain is attached but in a non-publishable status, even on legacy sites', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: completeContent,
+        hasEverBeenPublished: true,
+        domain: { status: DomainStatus.pending },
+      })
+
+      await expect(
+        controller.updateWebsite(mockUser, mockCampaign, publishBody()),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        message: expect.stringContaining('pending'),
+      })
+      expect(mockWebsitesService.update).not.toHaveBeenCalled()
+    })
   })
 
   describe('updateWebsite - content completeness gate', () => {

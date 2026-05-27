@@ -5,7 +5,11 @@ import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
 import * as dns from 'node:dns'
-import { WebsitesService, isPublicAddress } from './websites.service'
+import {
+  WebsitesService,
+  isPublicAddress,
+  ssrfSafeLookup,
+} from './websites.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 vi.mock('axios', () => ({
@@ -283,5 +287,91 @@ describe('isPublicAddress', () => {
   it('rejects garbage input', () => {
     expect(isPublicAddress('not-an-ip')).toBe(false)
     expect(isPublicAddress('')).toBe(false)
+  })
+})
+
+describe('ssrfSafeLookup (connection-time defense)', () => {
+  const invoke = (
+    hostname = 'example.com',
+  ): Promise<{
+    err: NodeJS.ErrnoException | null
+    address: string
+    family: number
+  }> =>
+    new Promise((resolve) => {
+      ssrfSafeLookup(hostname, {}, (err, address, family) =>
+        resolve({
+          err,
+          address: typeof address === 'string' ? address : '',
+          family: family ?? 0,
+        }),
+      )
+    })
+
+  beforeEach(() => {
+    mockedDnsLookup.mockReset()
+  })
+
+  it('passes the address through when DNS resolves to a single public unicast IP', async () => {
+    stubDnsLookup([{ address: '93.184.216.34', family: 4 }])
+
+    const { err, address, family } = await invoke()
+
+    expect(err).toBeNull()
+    expect(address).toBe('93.184.216.34')
+    expect(family).toBe(4)
+  })
+
+  it('propagates the dns.lookup error to the callback', async () => {
+    stubDnsLookup(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' }))
+
+    const { err, address, family } = await invoke()
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err?.message).toBe('ENOTFOUND')
+    expect(address).toBe('')
+    expect(family).toBe(0)
+  })
+
+  it('rejects when any resolved address is non-public (single private result)', async () => {
+    stubDnsLookup([{ address: '10.0.0.1', family: 4 }])
+
+    const { err, address } = await invoke('attacker.example.com')
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err?.message).toMatch(/non-public IP 10\.0\.0\.1/)
+    expect(address).toBe('')
+  })
+
+  it('rejects when any resolved address is non-public (mixed v4 public + v6 link-local)', async () => {
+    stubDnsLookup([
+      { address: '93.184.216.34', family: 4 },
+      { address: 'fe80::1', family: 6 },
+    ])
+
+    const { err } = await invoke()
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err?.message).toMatch(/non-public IP fe80::1/)
+  })
+
+  it('rejects with a clear error when dns.lookup returns an empty array', async () => {
+    stubDnsLookup([])
+
+    const { err, address, family } = await invoke('empty.example.com')
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err?.message).toMatch(/No addresses resolved/)
+    expect(address).toBe('')
+    expect(family).toBe(0)
+  })
+
+  it('rejects the AWS metadata IP (169.254.169.254)', async () => {
+    stubDnsLookup([{ address: '169.254.169.254', family: 4 }])
+
+    const { err } = await invoke()
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err?.message).toMatch(/169\.254\.169\.254/)
   })
 })
