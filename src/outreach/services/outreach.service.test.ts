@@ -27,6 +27,7 @@ const mockOutreachFindMany = vi.fn()
 const mockTcrFindFirstOrThrow = vi.fn()
 const mockPeerlyCreateJob = vi.fn()
 const mockResolveP2pJobGeography = vi.fn()
+const mockNotifySuccess = vi.fn()
 
 vi.mock('../util/campaignGeography.util', () => ({
   resolveP2pJobGeography: (
@@ -80,6 +81,8 @@ describe('OutreachService', () => {
     mockTcrFindFirstOrThrow.mockReset()
     mockPeerlyCreateJob.mockReset()
     mockResolveP2pJobGeography.mockReset()
+    mockNotifySuccess.mockReset()
+    mockNotifySuccess.mockResolvedValue(undefined)
 
     const mockPrismaService = {
       outreach: {
@@ -111,7 +114,7 @@ describe('OutreachService', () => {
         },
         {
           provide: OutreachNotificationService,
-          useValue: { notifySuccess: vi.fn().mockResolvedValue(undefined) },
+          useValue: { notifySuccess: mockNotifySuccess },
         },
         OutreachService,
       ],
@@ -151,6 +154,24 @@ describe('OutreachService', () => {
         include: { voterFileFilter: true },
       })
       expect(result).toEqual(created)
+    })
+
+    it('forwards campaignPlanDueDate from the DTO into notifySuccess', async () => {
+      const dto: CreateOutreachSchema = {
+        ...baseCreateDto,
+        campaignPlanDueDate: '2026-04-19',
+      }
+      mockOutreachCreate.mockResolvedValue({
+        id: 1,
+        ...dto,
+        voterFileFilter: null,
+      })
+
+      await service.create(mockUser, mockCampaign, dto, undefined, undefined)
+
+      expect(mockNotifySuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ campaignPlanDueDate: '2026-04-19' }),
+      )
     })
 
     it('creates non-P2P outreach without imageUrl when both omitted', async () => {
