@@ -31,8 +31,12 @@ export class ContactsController {
     @ReqOrganization() organization: Organization,
     @Res() res: FastifyReply,
   ) {
-    res.header('Content-Type', 'text/csv')
-    res.header('Content-Disposition', 'attachment; filename="contacts.csv"')
+    // Headers (Content-Type, Content-Disposition, Set-Cookie) are written and
+    // flushed inside the service AFTER pre-flight checks pass and the
+    // upstream people-api stream is in hand. That keeps a structured 4xx/5xx
+    // possible if the org isn't pro or the upstream call fails, instead of
+    // committing `attachment; filename="contacts.csv"` to the wire and then
+    // serving a JSON error body the browser would save to disk.
     await this.contactsService.downloadContacts(dto, res, organization)
   }
 

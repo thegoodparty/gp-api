@@ -158,13 +158,34 @@ describe('ContactsService', () => {
     })
 
     describe('downloadContacts', () => {
-      it('throws when organization is not pro', async () => {
+      const makeMockStream = () => ({
+        destroyed: false,
+        pipe: vi.fn(),
+        destroy: vi.fn(),
+        on: vi.fn((event: string, cb: (err?: Error) => void) => {
+          if (event === 'end') setImmediate(() => cb())
+        }),
+      })
+
+      const makeMockReply = (headersSent = false) => {
+        const flushHeaders = vi.fn()
+        const setHeader = vi.fn()
+        const on = vi.fn()
+        return {
+          flushHeaders,
+          setHeader,
+          on,
+          res: { raw: { headersSent, flushHeaders, setHeader, on } } as never,
+        }
+      }
+
+      it('throws when organization is not pro and never touches response headers', async () => {
         const org = makeOrganization({
           slug: 'campaign-1',
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
         mockCampaignsService.findFirst.mockResolvedValue({ isPro: false })
-        const res = { raw: {} } as never
+        const { res, flushHeaders, setHeader } = makeMockReply()
 
         await expect(
           service.downloadContacts({ segment: 'all' }, res, org),
@@ -172,6 +193,31 @@ describe('ContactsService', () => {
         await expect(
           service.downloadContacts({ segment: 'all' }, res, org),
         ).rejects.toThrow('Campaign is not pro')
+
+        // Critical: pre-flight failures must NOT leave Content-Disposition,
+        // Set-Cookie, or a flushed 200 on the wire — otherwise the browser
+        // saves the JSON error body as `contacts.csv` and the client cookie
+        // poll falsely flips to "Download started".
+        expect(setHeader).not.toHaveBeenCalled()
+        expect(flushHeaders).not.toHaveBeenCalled()
+      })
+
+      it('throws when the upstream people-api call fails and never touches response headers', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        mockHttpService.post.mockImplementationOnce(() => {
+          throw new Error('upstream blew up')
+        })
+        const { res, flushHeaders, setHeader } = makeMockReply()
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, res, org),
+        ).rejects.toThrow('Failed to download contacts from people API')
+
+        expect(setHeader).not.toHaveBeenCalled()
+        expect(flushHeaders).not.toHaveBeenCalled()
       })
 
       it('allows download when campaign is pro (isPro) even with a non-EO org', async () => {
@@ -181,14 +227,8 @@ describe('ContactsService', () => {
         })
         mockCampaignsService.findFirst.mockResolvedValue({ isPro: true })
 
-        const mockStream = {
-          pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
-          }),
-        }
-        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
+        mockHttpService.post.mockReturnValue(of({ data: makeMockStream() }))
+        const { res } = makeMockReply()
 
         await expect(
           service.downloadContacts({ segment: 'all' }, res, org),
@@ -200,18 +240,95 @@ describe('ContactsService', () => {
           slug: 'eo-office-1',
           overrideDistrictId: OVERRIDE_DISTRICT_ID,
         })
-        const mockStream = {
-          pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
-          }),
-        }
-        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
+        mockHttpService.post.mockReturnValue(of({ data: makeMockStream() }))
+        const { res } = makeMockReply()
 
         await expect(
           service.downloadContacts({ segment: 'all' }, res, org),
         ).resolves.toBeUndefined()
+      })
+
+      it('sets download headers (Content-Type, Content-Disposition, Set-Cookie) and flushes once the upstream stream is ready, then pipes', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        const mockStream = makeMockStream()
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const { res, flushHeaders, setHeader } = makeMockReply()
+
+        await service.downloadContacts({ segment: 'all' }, res, org)
+
+        expect(setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv')
+        expect(setHeader).toHaveBeenCalledWith(
+          'Content-Disposition',
+          'attachment; filename="contacts.csv"',
+        )
+        // Cookie must be present, name=gp_download with a UUID value, and
+        // include Secure (production hygiene) + SameSite=Lax (the cookie
+        // travels on a top-level GET download navigation).
+        const cookieCall = setHeader.mock.calls.find(
+          (call) => call[0] === 'Set-Cookie',
+        )
+        expect(cookieCall).toBeDefined()
+        const cookieValue = cookieCall?.[1] as string
+        expect(cookieValue).toMatch(
+          /^gp_download=[0-9a-f-]{36};.*Path=\/.*Max-Age=30.*SameSite=Lax.*Secure/,
+        )
+
+        expect(flushHeaders).toHaveBeenCalledTimes(1)
+        expect(mockStream.pipe).toHaveBeenCalledTimes(1)
+      })
+
+      it('skips flushHeaders when headers were already sent but still pipes the body', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        const mockStream = makeMockStream()
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const { res, flushHeaders } = makeMockReply(true)
+
+        await service.downloadContacts({ segment: 'all' }, res, org)
+
+        // Negative + positive: an early-return regression that bails on the
+        // whole pipe path can no longer pass this test.
+        expect(flushHeaders).not.toHaveBeenCalled()
+        expect(mockStream.pipe).toHaveBeenCalledTimes(1)
+      })
+
+      it('destroys the upstream stream when the client closes the connection mid-download', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        const mockStream = makeMockStream()
+        // Override 'end' so the resolver isn't auto-fired; we want the
+        // res.raw 'close' handler to drive resolution.
+        mockStream.on = vi.fn()
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const { res, on: rawOn } = makeMockReply()
+
+        const completion = service.downloadContacts(
+          { segment: 'all' },
+          res,
+          org,
+        )
+
+        // `downloadContacts` resolves the segment + district asynchronously
+        // before constructing the streaming Promise, so wait until the
+        // service has wired its `'close'` listener on res.raw.
+        await vi.waitFor(() => {
+          expect(rawOn.mock.calls.some((call) => call[0] === 'close')).toBe(
+            true,
+          )
+        })
+        const closeCall = rawOn.mock.calls.find((call) => call[0] === 'close')
+        const closeHandler = closeCall?.[1] as () => void
+        closeHandler()
+
+        await expect(completion).resolves.toBeUndefined()
+        expect(mockStream.destroy).toHaveBeenCalledTimes(1)
       })
     })
 
@@ -370,13 +487,22 @@ describe('ContactsService', () => {
         })
 
         const mockStream = {
+          destroyed: false,
           pipe: vi.fn(),
-          on: vi.fn((event: string, cb: () => void) => {
-            if (event === 'end') setImmediate(cb)
+          destroy: vi.fn(),
+          on: vi.fn((event: string, cb: (err?: Error) => void) => {
+            if (event === 'end') setImmediate(() => cb())
           }),
         }
         mockHttpService.post.mockReturnValue(of({ data: mockStream }))
-        const res = { raw: {} } as never
+        const res = {
+          raw: {
+            headersSent: false,
+            flushHeaders: vi.fn(),
+            setHeader: vi.fn(),
+            on: vi.fn(),
+          },
+        } as never
 
         await service.downloadContacts({ segment: 'all' }, res, org)
 
