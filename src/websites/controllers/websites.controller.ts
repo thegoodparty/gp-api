@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
   Post,
@@ -13,7 +15,7 @@ import {
   Query,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
-import { Campaign, User, WebsiteStatus } from '@prisma/client'
+import { Campaign, DomainStatus, User, WebsiteStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
@@ -39,6 +41,17 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { McpTool } from '@/mcp/decorators/McpTool.decorator'
+import { MyWebsiteResponseSchema } from '../schemas/WebsiteResponse.schema'
+import { VerifyLiveResponseSchema } from '../schemas/VerifyLive.schema'
+import { serializeWebsiteWithDomain } from '../util/serializeWebsite.util'
+
+const PUBLISHABLE_DOMAIN_STATUSES: DomainStatus[] = [
+  DomainStatus.submitted,
+  DomainStatus.registered,
+  DomainStatus.active,
+]
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -139,13 +152,23 @@ export class WebsitesController {
 
   @Get('mine')
   @UseCampaign()
-  getMyWebsite(@ReqCampaign() { id: campaignId }: Campaign) {
-    return this.websites.findUniqueOrThrow({
+  @ResponseSchema(MyWebsiteResponseSchema)
+  @McpTool({
+    description:
+      "Read the calling campaign's website, including current content " +
+      '(main, about, contact sections) and the attached custom domain ' +
+      '(if any) with its registration status. Call before merging ' +
+      'updates so the agent can preserve fields it does not intend to ' +
+      'change. Returns the Website row with `domain` populated when ' +
+      'a custom domain has been purchased; `domain` is null otherwise. ' +
+      'Read-only; safe to retry.',
+  })
+  async getMyWebsite(@ReqCampaign() { id: campaignId }: Campaign) {
+    const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
-      include: {
-        domain: true,
-      },
+      include: { domain: true },
     })
+    return serializeWebsiteWithDomain(website)
   }
 
   @Get('mine/contacts')
@@ -201,6 +224,22 @@ export class WebsitesController {
 
   @Put('mine')
   @UseCampaign()
+  @ResponseSchema(MyWebsiteResponseSchema)
+  @McpTool({
+    description:
+      "Update the calling campaign's website content and optionally " +
+      'publish it. The body deep-merges into Website.content; pass only ' +
+      'fields you want to change. To publish, send `status: "published"` ' +
+      '— this requires (1) the required content sections (main.title, ' +
+      'about.bio, about.issues with title+description, contact.address, ' +
+      'contact.email, contact.phone) to be present, and (2) a custom ' +
+      'domain attached to the website with Domain.status of `submitted`, ' +
+      '`registered`, or `active`. Calling with `status: "published"` ' +
+      'without an attached domain (or with the domain still `pending` / ' +
+      '`inactive`) returns 400. After a successful publish call, poll ' +
+      '`POST /v1/websites/mine/verify-live` to confirm the live URL ' +
+      'serves the rendered site with required TCR sections.',
+  })
   @UseInterceptors(
     FilesInterceptor([LOGO_FIELDNAME, HERO_FIELDNAME], {
       mode: 'buffer',
@@ -221,26 +260,32 @@ export class WebsitesController {
     const logoFile = files?.find((file) => file.fieldname === LOGO_FIELDNAME)
     const heroFile = files?.find((file) => file.fieldname === HERO_FIELDNAME)
 
-    const { content: currentContent, hasEverBeenPublished } =
-      await this.websites.findUniqueOrThrow({
-        where: { campaignId },
-        select: {
-          content: true,
-          hasEverBeenPublished: true,
-        },
-      })
+    const {
+      content: currentContent,
+      hasEverBeenPublished,
+      domain,
+    } = await this.websites.findUniqueOrThrow({
+      where: { campaignId },
+      select: {
+        content: true,
+        hasEverBeenPublished: true,
+        domain: { select: { status: true } },
+      },
+    })
 
-    // TODO: Restore this gate when registrant verification is required
-    // for the new publish flow.
-    // if (
-    //   body.status === WebsiteStatus.published &&
-    //   domain &&
-    //   !domain.registrantVerifiedAt
-    // ) {
-    //   throw new BadRequestException(
-    //     'Domain registrant verification is not yet complete. The site cannot be published until Vercel confirms domain ownership.',
-    //   )
-    // }
+    if (body.status === WebsiteStatus.published) {
+      if (!domain) {
+        throw new BadRequestException(
+          'Cannot publish: no custom domain is attached to this website.',
+        )
+      }
+      if (!PUBLISHABLE_DOMAIN_STATUSES.includes(domain.status)) {
+        throw new BadRequestException(
+          `Cannot publish: attached domain is in status "${domain.status}". ` +
+            'Domain must reach status `submitted` or later before publish.',
+        )
+      }
+    }
 
     const updatedContent: PrismaJson.WebsiteContent = merge(
       currentContent || {},
@@ -312,7 +357,29 @@ export class WebsitesController {
       }
     }
 
-    return result
+    return serializeWebsiteWithDomain(result)
+  }
+
+  @Post('mine/verify-live')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(VerifyLiveResponseSchema)
+  @McpTool({
+    description:
+      "Verify that the calling campaign's website is live and contains " +
+      'the sections TCR / Peerly look for during 10DLC review. ' +
+      'Single-shot fetch of `https://<attached-domain>/` — does NOT ' +
+      'retry. If the live URL is not reachable yet (DNS not propagated, ' +
+      'site not deployed), `checks.http_200` will be false; the caller ' +
+      'is responsible for backoff via `next_action.wait_*` and the ' +
+      'recovery loop. Returns `{ verified, url, checks: { http_200, ' +
+      'has_privacy_policy, has_terms, has_candidate_identity } }`. ' +
+      'Requires an attached custom domain; returns 400 if no domain is ' +
+      'attached. Call AFTER `PUT /v1/websites/mine` with ' +
+      '`status: "published"` has succeeded.',
+  })
+  verifyLive(@ReqCampaign() { id: campaignId }: Campaign) {
+    return this.websites.verifyLive(campaignId)
   }
 
   @Post('validate-vanity-path')
