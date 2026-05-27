@@ -118,7 +118,13 @@ export class UsersController {
   }
 
   @Put('files/generate-signed-upload-url')
-  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
+  async generateSignedUploadUrl(
+    @ReqUser() user: User,
+    @Body() args: GenerateSignedUploadUrlArgsDto,
+  ) {
+    if (!user) {
+      throw new UnauthorizedException('User session required')
+    }
     return {
       signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
     }
