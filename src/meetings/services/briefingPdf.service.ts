@@ -288,7 +288,22 @@ function formatMeetingTime(meetingTime: string | undefined): string {
   const [hhRaw, mmRaw] = meetingTime.split(':')
   const h24 = Number(hhRaw)
   const mm = mmRaw ?? ''
-  if (!Number.isFinite(h24) || mm.length !== 2) return meetingTime
+  const mmNum = Number(mm)
+  // Validate range, not just shape. "25:00" or "-1:00" parsed as raw numbers
+  // would silently produce "1:00 PM" / "-1:00 AM" otherwise; return the raw
+  // input instead so the meta line shows the user's value verbatim rather
+  // than a misleading normalized time.
+  if (
+    !Number.isFinite(h24) ||
+    h24 < 0 ||
+    h24 > 23 ||
+    mm.length !== 2 ||
+    !Number.isFinite(mmNum) ||
+    mmNum < 0 ||
+    mmNum > 59
+  ) {
+    return meetingTime
+  }
   const ampm = h24 >= 12 ? 'PM' : 'AM'
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   return `${h12}:${mm} ${ampm}`
