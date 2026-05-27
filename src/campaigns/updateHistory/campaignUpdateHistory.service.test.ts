@@ -60,9 +60,7 @@ describe('CampaignUpdateHistoryService', () => {
     it('deletes record and decrements voter goals', async () => {
       const campaign = makeCampaign({
         data: {
-          reportedVoterGoals: {
-            doorKnocking: 100,
-          },
+          reportedVoterGoals: { doorKnocking: 100 },
         },
       })
 
@@ -73,11 +71,13 @@ describe('CampaignUpdateHistoryService', () => {
         quantity: 30,
         campaign,
       })
-      mockModel.deleteMany.mockResolvedValue({
-        count: 1,
-      })
+      mockModel.deleteMany.mockResolvedValue({ count: 1 })
 
       await service.delete(5, 1)
+
+      expect(mockModel.deleteMany).toHaveBeenCalledWith({
+        where: { id: 5, campaignId: 1 },
+      })
 
       expect(mockCampaignsService.update).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -87,31 +87,65 @@ describe('CampaignUpdateHistoryService', () => {
           }),
         },
       })
-
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
-        where: { id: 5, campaignId: 1 },
-      })
     })
 
-    it('skips goal update when no matching voter goals', async () => {
-      const campaign = makeCampaign({ data: {} })
-
+    it('skips goal update when deleteMany returns zero rows', async () => {
       mockModel.findFirstOrThrow.mockResolvedValue({
         id: 7,
         campaignId: 1,
         type: CampaignUpdateHistoryType.calls,
         quantity: 10,
-        campaign,
+        campaign: makeCampaign({
+          data: { reportedVoterGoals: { calls: 10 } },
+        }),
       })
-      mockModel.deleteMany.mockResolvedValue({
-        count: 1,
-      })
+      mockModel.deleteMany.mockResolvedValue({ count: 0 })
 
       await service.delete(7, 1)
 
       expect(mockCampaignsService.update).not.toHaveBeenCalled()
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
-        where: { id: 7, campaignId: 1 },
+    })
+
+    it('skips goal update when no matching voter goals', async () => {
+      mockModel.findFirstOrThrow.mockResolvedValue({
+        id: 7,
+        campaignId: 1,
+        type: CampaignUpdateHistoryType.calls,
+        quantity: 10,
+        campaign: makeCampaign({ data: {} }),
+      })
+      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+
+      await service.delete(7, 1)
+
+      expect(mockCampaignsService.update).not.toHaveBeenCalled()
+    })
+
+    it('clamps voter goal at zero', async () => {
+      const campaign = makeCampaign({
+        data: {
+          reportedVoterGoals: { doorKnocking: 5 },
+        },
+      })
+
+      mockModel.findFirstOrThrow.mockResolvedValue({
+        id: 8,
+        campaignId: 1,
+        type: CampaignUpdateHistoryType.doorKnocking,
+        quantity: 20,
+        campaign,
+      })
+      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+
+      await service.delete(8, 1)
+
+      expect(mockCampaignsService.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: expect.objectContaining({
+            reportedVoterGoals: { doorKnocking: 0 },
+          }),
+        },
       })
     })
   })

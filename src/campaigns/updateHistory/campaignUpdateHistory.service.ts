@@ -51,24 +51,29 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
       include: { campaign: true },
     })
 
+    const { count } = await this.model.deleteMany({
+      where: { id, campaignId },
+    })
+
+    if (count === 0) return
+
     const { campaign } = existing
     const { data } = campaign
     const { reportedVoterGoals } = data
     const existingType = existing.type
 
     if (reportedVoterGoals?.[existingType] && existing.quantity) {
-      reportedVoterGoals[existingType] -= existing.quantity
+      reportedVoterGoals[existingType] = Math.max(
+        0,
+        reportedVoterGoals[existingType] - existing.quantity,
+      )
 
       data.reportedVoterGoals = { ...reportedVoterGoals }
 
       await this.campaigns.update({
         where: { id: campaign.id },
-        data: {
-          data,
-        },
+        data: { data },
       })
     }
-
-    await this.model.deleteMany({ where: { id, campaignId } })
   }
 }
