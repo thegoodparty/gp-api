@@ -2,7 +2,7 @@ import { Domain } from '@prisma/client'
 
 type WithMaybeDomain<W> = W & Partial<{ domain: Domain | null }>
 type SerializedDomain = Omit<Domain, 'price'> & { price: number | null }
-type Serialized<W> = W & { domain: SerializedDomain | null }
+type Serialized<W> = Omit<W, 'domain'> & { domain: SerializedDomain | null }
 
 export const serializeWebsiteWithDomain = <W extends object>(
   website: WithMaybeDomain<W>,
