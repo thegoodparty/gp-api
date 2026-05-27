@@ -215,28 +215,12 @@ describe('WebsitesController', () => {
     })
   })
 
-  describe('updateWebsite - domain publish precondition', () => {
+  describe('updateWebsite - attached-domain publish gate', () => {
     const publishBody = () => {
       const body = new UpdateWebsiteSchema()
       body.status = WebsiteStatus.published
       return body
     }
-
-    it('rejects publish when no custom domain is attached', async () => {
-      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
-        content: completeContent,
-        hasEverBeenPublished: false,
-        domain: null,
-      })
-
-      await expect(
-        controller.updateWebsite(mockUser, mockCampaign, publishBody()),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        message: expect.stringContaining('no custom domain'),
-      })
-      expect(mockWebsitesService.update).not.toHaveBeenCalled()
-    })
 
     it('rejects publish when attached domain.status is pending', async () => {
       mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
@@ -282,6 +266,18 @@ describe('WebsitesController', () => {
       expect(mockWebsitesService.update).toHaveBeenCalled()
     })
 
+    it('allows publish without an attached domain (non-Pro / GP-hosted candidate site)', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: completeContent,
+        hasEverBeenPublished: false,
+        domain: null,
+      })
+
+      await controller.updateWebsite(mockUser, mockCampaign, publishBody())
+
+      expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+
     it('does not gate non-published status transitions (no domain required)', async () => {
       mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
         content: {},
@@ -310,34 +306,6 @@ describe('WebsitesController', () => {
       await controller.updateWebsite(mockUser, mockCampaign, body)
 
       expect(mockWebsitesService.update).toHaveBeenCalled()
-    })
-
-    it('allows republish for a legacy site (hasEverBeenPublished=true) without a custom domain', async () => {
-      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
-        content: completeContent,
-        hasEverBeenPublished: true,
-        domain: null,
-      })
-
-      await controller.updateWebsite(mockUser, mockCampaign, publishBody())
-
-      expect(mockWebsitesService.update).toHaveBeenCalled()
-    })
-
-    it('still rejects publish when domain is attached but in a non-publishable status, even on legacy sites', async () => {
-      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
-        content: completeContent,
-        hasEverBeenPublished: true,
-        domain: { status: DomainStatus.pending },
-      })
-
-      await expect(
-        controller.updateWebsite(mockUser, mockCampaign, publishBody()),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        message: expect.stringContaining('pending'),
-      })
-      expect(mockWebsitesService.update).not.toHaveBeenCalled()
     })
   })
 
@@ -383,7 +351,7 @@ describe('WebsitesController', () => {
       await expect(
         controller.updateWebsite(mockUser, mockCampaign, publishBody()),
       ).rejects.toMatchObject({
-        message: expect.stringContaining('contact.phone'),
+        message: expect.stringContaining('contact.email'),
       })
     })
 
@@ -512,6 +480,46 @@ describe('WebsitesController', () => {
       await controller.updateWebsite(mockUser, mockCampaign, publishBody())
 
       expect(mockWebsitesService.update).toHaveBeenCalled()
+    })
+
+    it('fills contact.address and contact.phone from GP_DOMAIN_CONTACT when blank, then publishes', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: {
+          ...completeContent,
+          contact: { email: completeContent.contact!.email },
+        },
+        hasEverBeenPublished: false,
+        domain: { status: DomainStatus.submitted },
+      })
+
+      await controller.updateWebsite(mockUser, mockCampaign, publishBody())
+
+      const updateCall = mockWebsitesService.update.mock.calls[0][0]
+      expect(updateCall.data.content.contact.address).toBe(
+        '916 Silver Spur Rd, Rolling Hills Estates, CA 90274',
+      )
+      expect(updateCall.data.content.contact.phone).toBe('+1.3126851162')
+      expect(updateCall.data.content.contact.email).toBe(
+        completeContent.contact!.email,
+      )
+    })
+
+    it('does not overwrite candidate-provided contact.address or contact.phone', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: completeContent,
+        hasEverBeenPublished: false,
+        domain: { status: DomainStatus.submitted },
+      })
+
+      await controller.updateWebsite(mockUser, mockCampaign, publishBody())
+
+      const updateCall = mockWebsitesService.update.mock.calls[0][0]
+      expect(updateCall.data.content.contact.address).toBe(
+        completeContent.contact!.address,
+      )
+      expect(updateCall.data.content.contact.phone).toBe(
+        completeContent.contact!.phone,
+      )
     })
 
     it('does not gate non-published status transitions', async () => {
