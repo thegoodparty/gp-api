@@ -96,7 +96,7 @@ const RAW_PROMPT_KEYS: ReadonlySet<string> = new Set([
 
 export const renderPrompt = (
   template: string,
-  variables: Record<string, string | undefined>,
+  variables: PromptVariables,
 ): string =>
   Object.entries(variables).reduce((rendered, [key, value]) => {
     if (value === undefined) return rendered

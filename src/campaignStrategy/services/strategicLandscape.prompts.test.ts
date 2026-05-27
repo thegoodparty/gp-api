@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildPromptVariables,
   OPPORTUNITIES_SEARCH_PROMPT,
+  PromptVariables,
   renderPrompt,
 } from './strategicLandscape.prompts'
 import { RaceContext } from '../types/electionApi.types'
@@ -211,12 +212,12 @@ describe('buildPromptVariables', () => {
 
 describe('renderPrompt', () => {
   it('substitutes {{var}} placeholders', () => {
-    const result = renderPrompt('Hello {{name}}, you live in {{state}}.', {
-      name: 'Jane',
-      state: 'CA',
-    })
+    const result = renderPrompt(
+      'Hello {{user_full_name}}, you live in {{state}}.',
+      buildPromptVariables(baseCtx),
+    )
 
-    expect(result).toBe('Hello Jane, you live in CA.')
+    expect(result).toBe('Hello Jane Doe, you live in CA.')
   })
 
   it('does not HTML-escape candidates JSON so URLs with & survive', () => {
@@ -258,10 +259,12 @@ describe('renderPrompt', () => {
   })
 
   it('does not HTML-escape searchResults so stage-1 citations pass through verbatim', () => {
-    const result = renderPrompt('Notes:\n{{searchResults}}', {
+    const vars: PromptVariables = {
+      ...buildPromptVariables(baseCtx),
       searchResults:
         'Parks & Recreation Department at https://example.com?a=1&b=2',
-    })
+    }
+    const result = renderPrompt('Notes:\n{{searchResults}}', vars)
 
     expect(result).toContain('Parks & Recreation Department')
     expect(result).toContain('https://example.com?a=1&b=2')
@@ -269,9 +272,14 @@ describe('renderPrompt', () => {
   })
 
   it('HTML-escapes values so untrusted input cannot break out of XML-style tags', () => {
-    const result = renderPrompt('Office: <office>{{office}}</office>', {
-      office: 'Mayor</office><script>alert(1)</script>',
+    const vars = buildPromptVariables({
+      ...baseCtx,
+      candidateOffice: 'Mayor</office><script>alert(1)</script>',
     })
+    const result = renderPrompt(
+      'Office: <office>{{candidate_office}}</office>',
+      vars,
+    )
 
     expect(result).toContain('&lt;/office&gt;')
     expect(result).toContain('&lt;script&gt;')
@@ -279,9 +287,12 @@ describe('renderPrompt', () => {
   })
 
   it('leaves untemplated placeholders alone', () => {
-    const result = renderPrompt('{{a}} and {{b}}', { a: 'x' })
+    const result = renderPrompt(
+      '{{user_full_name}} and {{nonexistent_key}}',
+      buildPromptVariables(baseCtx),
+    )
 
-    expect(result).toBe('x and {{b}}')
+    expect(result).toBe('Jane Doe and {{nonexistent_key}}')
   })
 })
 
