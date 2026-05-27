@@ -358,7 +358,9 @@ describe('AiService', () => {
             message: {
               content: null,
               tool_calls: [
-                { function: { name: 'extractLocation', arguments: prettyJson } },
+                {
+                  function: { name: 'extractLocation', arguments: prettyJson },
+                },
               ],
             },
           },

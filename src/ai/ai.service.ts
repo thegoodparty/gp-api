@@ -210,9 +210,10 @@ export class AiService {
     })
   }
 
-  private extractToolContent(
-    message: ChatCompletion.Choice['message'],
-  ): { content: string; fromToolCall: boolean } {
+  private extractToolContent(message: ChatCompletion.Choice['message']): {
+    content: string
+    fromToolCall: boolean
+  } {
     const toolCalls = message.tool_calls
     if (toolCalls?.length) {
       const args = toolCalls[0]?.function?.arguments
@@ -251,7 +252,8 @@ export class AiService {
             ...(isTogetherAi && {
               reasoning: {
                 enabled: enableReasoning,
-                ...(enableReasoning && reasoningEffort && { effort: reasoningEffort }),
+                ...(enableReasoning &&
+                  reasoningEffort && { effort: reasoningEffort }),
               },
             }),
             ...(maxTokens !== undefined && { max_tokens: maxTokens }),

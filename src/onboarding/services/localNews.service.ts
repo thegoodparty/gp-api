@@ -227,7 +227,12 @@ export class OnboardingLocalNewsService {
       const validated = aiOutletsToolResultSchema.safeParse(parsedJson)
       if (!validated.success) {
         this.logger.error(
-          { issues: validated.error.issues, parsed: parsedJson, campaignId, office },
+          {
+            issues: validated.error.issues,
+            parsed: parsedJson,
+            campaignId,
+            office,
+          },
           'AI local news response failed schema validation',
         )
         throw new Error('AI returned unexpected outlet shape')
