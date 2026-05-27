@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  OnModuleDestroy,
 } from '@nestjs/common'
 import { Campaign, CampaignStrategy, User } from '@prisma/client'
 import { z } from 'zod'
@@ -83,10 +84,18 @@ const stitchIsUser = (
   })
 }
 
+// Max wall-clock time a single background generation is allowed to occupy
+// the inFlight slot. The three parallel Gemini pipelines typically settle
+// in 30-90s; this is a generous cap that lets the slot clear if Gemini
+// wedges, so the next poll can re-kick instead of seeing 'generating'
+// forever.
+const GENERATION_WATCHDOG_MS = 5 * 60 * 1000
+
 @Injectable()
-export class CampaignStrategyService extends createPrismaBase(
-  MODELS.CampaignStrategy,
-) {
+export class CampaignStrategyService
+  extends createPrismaBase(MODELS.CampaignStrategy)
+  implements OnModuleDestroy
+{
   // Per-pod in-flight tracker: keyed by campaign id, holds the background
   // generation promise. Polls that arrive while a generation is in flight
   // return { status: 'generating' } without re-kicking. The map clears on
@@ -124,16 +133,32 @@ export class CampaignStrategyService extends createPrismaBase(
       // map.set must happen synchronously before any await so a same-tick
       // second poll sees the entry. Node's event loop guarantees no
       // interleaving between the .has() check above and the .set() here.
-      const work = this.runGeneration(campaign, plan.id, brHashId)
+      //
+      // The outer .catch on the stored promise is belt-and-suspenders:
+      // runGeneration already absorbs its own errors, but if the logger
+      // itself throws inside the catch, the unwrapped promise would reject
+      // and crash any Promise.allSettled / await caller down the line.
+      const work = this.runGeneration(campaign, plan.id, brHashId).catch(
+        () => undefined,
+      )
       this.inFlight.set(campaign.id, work)
     }
     return { status: 'generating' }
   }
 
-  // Waits for every background generation currently in flight to settle.
-  // Used by tests; also a sensible hook for graceful-shutdown wiring.
+  // Graceful-shutdown hook. NestJS calls onModuleDestroy on shutdown; we
+  // wait for any background generation to settle before the process exits
+  // so in-flight DB writes finish cleanly. Also useful in tests to wait
+  // for kicked-off work without polling.
+  async onModuleDestroy(): Promise<void> {
+    await this.drainInFlight()
+  }
+
   async drainInFlight(): Promise<void> {
-    await Promise.all(this.inFlight.values())
+    // allSettled (not all) so a rejecting promise — should never happen
+    // given the outer .catch on stored promises, but defense in depth —
+    // can't crash callers.
+    await Promise.allSettled(this.inFlight.values())
   }
 
   private async runGeneration(
@@ -142,15 +167,15 @@ export class CampaignStrategyService extends createPrismaBase(
     brHashId: string,
   ): Promise<void> {
     try {
-      const ctx = await this.buildRaceContext(campaign, brHashId)
-      try {
-        await this.strategicLandscape.generate(planId, campaign.id, ctx)
-      } catch (error) {
-        // If a concurrent generation (other pod / restart) wrote first, the
-        // @@unique([campaignStrategyId, order]) trips here. Treat as "their
-        // result wins" — the next poll's cache read will pick it up.
-        if (!isUniqueConstraintError(error)) throw error
-      }
+      // Watchdog: a wedged upstream (Gemini hang, election-api timeout)
+      // would otherwise hold the inFlight slot until the pod restarts,
+      // blocking every subsequent poll for this campaign. On timeout we
+      // log + fall through to finally, which clears the slot; the next
+      // poll then kicks a fresh attempt.
+      await this.withWatchdog(
+        this.runGenerationCore(campaign, planId, brHashId),
+        GENERATION_WATCHDOG_MS,
+      )
     } catch (error) {
       this.logger.error(
         {
@@ -161,6 +186,37 @@ export class CampaignStrategyService extends createPrismaBase(
       )
     } finally {
       this.inFlight.delete(campaign.id)
+    }
+  }
+
+  private async runGenerationCore(
+    campaign: CampaignWith<'user'>,
+    planId: number,
+    brHashId: string,
+  ): Promise<void> {
+    const ctx = await this.buildRaceContext(campaign, brHashId)
+    try {
+      await this.strategicLandscape.generate(planId, campaign.id, ctx)
+    } catch (error) {
+      // If a concurrent generation (other pod / restart) wrote first, the
+      // @@unique([campaignStrategyId, order]) trips here. Treat as "their
+      // result wins" — the next poll's cache read will pick it up.
+      if (!isUniqueConstraintError(error)) throw error
+    }
+  }
+
+  private async withWatchdog<T>(work: Promise<T>, ms: number): Promise<T> {
+    let timer: NodeJS.Timeout | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`generation watchdog tripped after ${ms}ms`)),
+        ms,
+      )
+    })
+    try {
+      return await Promise.race([work, timeout])
+    } finally {
+      if (timer) clearTimeout(timer)
     }
   }
 
