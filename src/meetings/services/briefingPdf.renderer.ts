@@ -650,15 +650,17 @@ function drawRunningHeader(
   const metaLeft = left + logoSize + 8
   const metaWidth = right - metaLeft - brandWidth - 16
 
-  doc
-    .font(FONT.bold)
-    .fontSize(12)
-    .fillColor(COLOR.navy)
-    .text(metaText, metaLeft, top, {
-      width: metaWidth,
-      lineBreak: false,
-      ellipsis: true,
-    })
+  // pdfkit's `lineBreak: false` + `ellipsis: true` does not reliably enforce
+  // a single line on long strings, so pre-truncate against the measured glyph
+  // width and append an explicit ellipsis. This keeps the meeting line bounded
+  // above the horizontal rule for cities with long venue names.
+  doc.font(FONT.bold).fontSize(12)
+  const displayMetaText = truncateToWidth(doc, metaText, metaWidth)
+
+  doc.fillColor(COLOR.navy).text(displayMetaText, metaLeft, top, {
+    width: metaWidth,
+    lineBreak: false,
+  })
 
   doc
     .font(FONT.regular)
@@ -729,4 +731,35 @@ function drawRunningFooter(
     .font(FONT.regular)
     .fillColor(COLOR.muted)
     .text(pageOfTotal, { lineBreak: false })
+}
+
+/**
+ * Truncate `text` to fit inside `maxWidth` at the doc's currently active font
+ * + size, appending an ellipsis when truncation is required. Returns the
+ * original string unchanged when it already fits. Caller is responsible for
+ * setting the desired font/size before calling — otherwise the measurement
+ * won't match the eventual draw.
+ */
+function truncateToWidth(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  maxWidth: number,
+): string {
+  if (maxWidth <= 0) return ''
+  if (doc.widthOfString(text) <= maxWidth) return text
+  const ellipsis = '…'
+  const ellipsisWidth = doc.widthOfString(ellipsis)
+  // Binary search for the longest prefix that, with the ellipsis, still fits.
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    const prefixWidth = doc.widthOfString(text.slice(0, mid))
+    if (prefixWidth + ellipsisWidth <= maxWidth) {
+      lo = mid
+    } else {
+      hi = mid - 1
+    }
+  }
+  return `${text.slice(0, lo).trimEnd()}${ellipsis}`
 }
