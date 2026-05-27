@@ -38,16 +38,21 @@ const COL_NUM_W = 60
 const COL_DETAIL_W = 90
 const COL_ITEM_W = CONTENT_W - COL_NUM_W - COL_DETAIL_W
 
+type PageKind = 'cover' | 'toc' | 'content'
+
 interface PageInfo {
-  isCover: boolean
+  kind: PageKind
 }
 
 /**
  * Render a meeting briefing artifact to a PDF buffer using pdfkit.
  *
  * Layout mirrors gp-webapp/app/shared/briefings/pdf/BriefingPdfDocument.tsx
- * (react-pdf). Page numbers in the TOC are computed the same way the legacy
- * doc does (`4 + i`, assuming one page per featured item) for visual parity.
+ * (react-pdf), but with one structural improvement: page references in the
+ * TOC and the Full Agenda's "See p. N" column are captured from the actual
+ * buffered-page index at draw time, so items whose body overflows a single
+ * page no longer desync the cross-references. The TOC page is reserved
+ * up-front and drawn last via `switchToPage` once all content pages exist.
  */
 export async function renderBriefingPdf(
   briefing: BriefingArtifact,
@@ -84,30 +89,72 @@ export async function renderBriefingPdf(
       FEATURED_TIERS.has(item.tier),
     )
 
+    // 1. Cover (always page index 0).
     drawCoverPage(doc, briefing, options, liveQrPngBuffer)
-    pages.push({ isCover: true })
+    pages.push({ kind: 'cover' })
 
-    addContentPage(doc, pages)
-    drawTocPage(doc, featured)
+    // 2. Reserve TOC. We draw onto it at the end of the run with real
+    //    page numbers captured from the content rendered below.
+    addContentPage(doc, pages, 'toc')
+    const tocPageIndex = currentPageIndex(doc)
 
-    addContentPage(doc, pages)
-    drawExecutiveSummaryPage(doc, briefing, featured)
+    // 3. Executive summary. The table inside paginates on its own if there
+    //    are enough featured items to need more than one page.
+    addContentPage(doc, pages, 'content')
+    const execSummaryPageIndex = currentPageIndex(doc)
+    drawExecutiveSummaryPage(doc, briefing, featured, pages)
 
+    // 4. One section per featured item. pdfkit auto-paginates the text body
+    //    on its own; we capture the first page of each item before drawing
+    //    so the TOC / "See p. N" labels point at the right one.
+    const itemPageIndices: number[] = []
     featured.forEach((item, i) => {
-      addContentPage(doc, pages)
-      drawItemPage(doc, item, i + 1, briefing.items.length)
+      addContentPage(doc, pages, 'content')
+      itemPageIndices.push(currentPageIndex(doc))
+      drawItemPage(doc, item, i + 1, briefing.items.length, pages)
     })
 
-    addContentPage(doc, pages)
-    drawFullAgendaPage(doc, briefing, featured)
+    // 5. Full agenda — its table almost always overflows on real councils,
+    //    so the table helper takes care of cross-page row striping.
+    addContentPage(doc, pages, 'content')
+    const fullAgendaPageIndex = currentPageIndex(doc)
+    drawFullAgendaPage(
+      doc,
+      briefing,
+      featured,
+      itemPageIndices.map(toOneBased),
+      pages,
+    )
 
+    // 6. Fill in the TOC with the real page numbers we just captured.
+    doc.switchToPage(tocPageIndex)
+    doc.x = PAGE_PADDING_X
+    doc.y = PAGE_PADDING_TOP + 28
+    drawTocPage(doc, featured, {
+      execSummary: toOneBased(execSummaryPageIndex),
+      featured: itemPageIndices.map(toOneBased),
+      fullAgenda: toOneBased(fullAgendaPageIndex),
+    })
+
+    // 7. Draw running header/footer on every non-cover page. We iterate the
+    //    full buffer (so any overflow page auto-added by pdfkit gets chrome
+    //    too) and skip whichever page we marked as the cover.
     drawRunningChrome(doc, pages, options.meetingMetaLine)
 
     doc.end()
   })
 }
 
-function addContentPage(doc: PDFKit.PDFDocument, pages: PageInfo[]): void {
+/**
+ * Append a new portrait letter page configured with the standard content
+ * margins, reset the text cursor to the top of the content area, and record
+ * its kind so the chrome pass can skip the cover.
+ */
+function addContentPage(
+  doc: PDFKit.PDFDocument,
+  pages: PageInfo[],
+  kind: PageKind,
+): void {
   doc.addPage({
     size: 'LETTER',
     margins: {
@@ -117,10 +164,19 @@ function addContentPage(doc: PDFKit.PDFDocument, pages: PageInfo[]): void {
       right: PAGE_PADDING_X,
     },
   })
-  pages.push({ isCover: false })
+  pages.push({ kind })
   doc.x = PAGE_PADDING_X
   doc.y = PAGE_PADDING_TOP + 28
   doc.font(FONT.regular).fontSize(BODY_FONT_SIZE).fillColor(COLOR.body)
+}
+
+/** 0-based index of the most-recently-buffered page. */
+function currentPageIndex(doc: PDFKit.PDFDocument): number {
+  return doc.bufferedPageRange().count - 1
+}
+
+function toOneBased(zeroBased: number): number {
+  return zeroBased + 1
 }
 
 function drawCoverPage(
@@ -204,17 +260,15 @@ function drawCoverPage(
     })
   cursorY = doc.y + 18
 
-  if (options.preparedForLine) {
-    doc
-      .font(FONT.regular)
-      .fontSize(12)
-      .fillColor(COLOR.body)
-      .text(`Prepared for ${options.preparedForLine}`, contentLeft, cursorY, {
-        width: contentWidth,
-        align: 'center',
-      })
-    cursorY = doc.y + 4
-  }
+  // NOTE: We intentionally do *not* render a "Prepared for <name>" line on
+  // the cover. The endpoint that serves this PDF is unauthenticated, and the
+  // share URL acts as a bearer token — anyone with the link can fetch the
+  // PDF. Surfacing the elected official's full name in the document would
+  // turn every leaked share link into a PII disclosure, so the renderer
+  // ignores `options.preparedForLine` even when the service sets it.
+  // (The option is kept in the type so the cover can re-add it later behind
+  // a `forAuthenticatedOwner: true` toggle without a breaking change.)
+  void options.preparedForLine
 
   const metaLine = options.meetingMetaLine ?? briefing.meeting_date ?? ''
   if (metaLine) {
@@ -290,26 +344,42 @@ function drawCoverPage(
     )
 }
 
-function drawTocPage(doc: PDFKit.PDFDocument, featured: BriefingItem[]): void {
+interface TocPageNumbers {
+  execSummary: number
+  featured: number[]
+  fullAgenda: number
+}
+
+function drawTocPage(
+  doc: PDFKit.PDFDocument,
+  featured: BriefingItem[],
+  pageNumbers: TocPageNumbers,
+): void {
   drawH1(doc, 'Table of Contents')
   doc.moveDown(0.4)
 
-  const startY = doc.y
-  let rowY = startY
-  const rowGap = 28
+  let rowY = doc.y
 
-  rowY = drawTocRow(doc, rowY, 'Executive Summary', '3')
-  featured.forEach((item, i) => {
-    rowY = drawTocRow(doc, rowY, `${i + 1}. ${item.title}`, String(4 + i))
-  })
   rowY = drawTocRow(
     doc,
     rowY,
-    `${featured.length + 1}. Full Agenda`,
-    String(4 + featured.length),
+    'Executive Summary',
+    String(pageNumbers.execSummary),
   )
-  // suppress unused var lint
-  void rowGap
+  featured.forEach((item, i) => {
+    rowY = drawTocRow(
+      doc,
+      rowY,
+      `${i + 1}. ${item.title}`,
+      String(pageNumbers.featured[i] ?? ''),
+    )
+  })
+  drawTocRow(
+    doc,
+    rowY,
+    `${featured.length + 1}. Full Agenda`,
+    String(pageNumbers.fullAgenda),
+  )
 }
 
 function drawTocRow(
@@ -352,6 +422,7 @@ function drawExecutiveSummaryPage(
   doc: PDFKit.PDFDocument,
   briefing: BriefingArtifact,
   featured: BriefingItem[],
+  pages: PageInfo[],
 ): void {
   drawH1(doc, 'Executive Summary')
   doc
@@ -365,19 +436,45 @@ function drawExecutiveSummaryPage(
   doc.moveDown(0.6)
 
   if (featured.length > 0) {
+    // Page numbers aren't known yet — the exec summary draws *before* the
+    // item pages exist. We render the rows without an explicit "See p. N"
+    // detail; the Full Agenda (drawn later) provides the canonical page
+    // refs once they're captured.
     drawSummaryTable(
       doc,
       featured.map((item, i) => ({
         num: String(i + 1),
         item: item.title,
-        detail: `See p. ${4 + i}`,
+        detail: '',
         bold: true,
       })),
+      pages,
     )
   }
 }
 
 function drawItemPage(
+  doc: PDFKit.PDFDocument,
+  item: BriefingItem,
+  position: number,
+  totalCount: number,
+  pages: PageInfo[],
+): void {
+  // Any auto-paginated overflow page added by pdfkit while we draw this
+  // item's body needs to be tracked so the chrome pass renders header +
+  // footer on it. pdfkit emits `pageAdded` for both manual `addPage` and
+  // auto-pagination; we listen scoped to this draw and remove the listener
+  // afterwards so we don't double-count the manual cover/TOC additions.
+  const onPageAdded = () => pages.push({ kind: 'content' })
+  doc.on('pageAdded', onPageAdded)
+  try {
+    drawItemBody(doc, item, position, totalCount)
+  } finally {
+    doc.off('pageAdded', onPageAdded)
+  }
+}
+
+function drawItemBody(
   doc: PDFKit.PDFDocument,
   item: BriefingItem,
   position: number,
@@ -436,6 +533,8 @@ function drawFullAgendaPage(
   doc: PDFKit.PDFDocument,
   briefing: BriefingArtifact,
   featured: BriefingItem[],
+  featuredPageNumbers: number[],
+  pages: PageInfo[],
 ): void {
   drawH1(doc, 'Full Agenda')
   doc
@@ -450,9 +549,16 @@ function drawFullAgendaPage(
     )
   doc.moveDown(0.6)
 
+  // Map each featured item's id to the real (1-based) page number captured
+  // when the item section started rendering. This replaces the old
+  // `4 + i` formula which broke whenever any item overflowed onto a second
+  // page.
   const featuredPageMap = new Map<string, number>()
   featured.forEach((item, i) => {
-    featuredPageMap.set(item.id, 4 + i)
+    const pageNumber = featuredPageNumbers[i]
+    if (pageNumber !== undefined) {
+      featuredPageMap.set(item.id, pageNumber)
+    }
   })
 
   drawSummaryTable(
@@ -466,6 +572,7 @@ function drawFullAgendaPage(
         bold: !!featuredPage,
       }
     }),
+    pages,
   )
 }
 
@@ -476,41 +583,68 @@ interface SummaryRow {
   bold: boolean
 }
 
-function drawSummaryTable(doc: PDFKit.PDFDocument, rows: SummaryRow[]): void {
+/**
+ * Draw a summary table starting at `doc.y`. The table is row-paginated:
+ * when the next row wouldn't fit above the footer area, we add a new
+ * content page, redraw the dark header bar, and continue. This prevents
+ * the bug where the row-striping rectangles end up on a different page
+ * than the row text after pdfkit auto-paginates the per-row `.text()` call.
+ */
+function drawSummaryTable(
+  doc: PDFKit.PDFDocument,
+  rows: SummaryRow[],
+  pages: PageInfo[],
+): void {
   const left = PAGE_PADDING_X
   const headerH = 28
+  const padV = 10
+  const padH = 12
+  // Reserve room for the running footer (28pt rule + text below).
+  const bottomLimit = LETTER_H - PAGE_PADDING_BOTTOM - 32
 
-  doc.rect(left, doc.y, CONTENT_W, headerH).fill(COLOR.navy)
-  doc
-    .font(FONT.bold)
-    .fontSize(10)
-    .fillColor(COLOR.white)
-    .text('#', left + 12, doc.y - headerH + 10, { width: COL_NUM_W - 24 })
-  doc.text('Item', left + COL_NUM_W + 12, doc.y - 12, {
-    width: COL_ITEM_W - 24,
-  })
-  doc.text('Detail', left + COL_NUM_W + COL_ITEM_W + 12, doc.y - 12, {
-    width: COL_DETAIL_W - 24,
-    align: 'right',
-  })
+  // Draw the dark header bar at the current `doc.y` and return the `rowY`
+  // immediately below it (where the first body row should start).
+  const drawHeader = (): number => {
+    const headerTop = doc.y
+    doc.rect(left, headerTop, CONTENT_W, headerH).fill(COLOR.navy)
+    doc
+      .font(FONT.bold)
+      .fontSize(10)
+      .fillColor(COLOR.white)
+      .text('#', left + padH, headerTop + 10, { width: COL_NUM_W - 2 * padH })
+    doc.text('Item', left + COL_NUM_W + padH, headerTop + 10, {
+      width: COL_ITEM_W - 2 * padH,
+    })
+    doc.text('Detail', left + COL_NUM_W + COL_ITEM_W + padH, headerTop + 10, {
+      width: COL_DETAIL_W - 2 * padH,
+      align: 'right',
+    })
+    return headerTop + headerH
+  }
 
-  let rowY = doc.y + headerH - 12 + 14
+  let rowY = drawHeader()
+  // Striping continues across page breaks — using the row index modulo 2
+  // alone would restart on each new page, which looked off in QA. Track an
+  // explicit alternating counter instead.
+  let stripeIndex = 0
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    const padV = 10
-    const padH = 12
+  for (const row of rows) {
     const itemFont = row.bold ? FONT.bold : FONT.regular
-
     doc.font(itemFont).fontSize(BODY_FONT_SIZE)
     const itemHeight = doc.heightOfString(row.item, {
       width: COL_ITEM_W - 2 * padH,
     })
     const rowH = Math.max(itemHeight + 2 * padV, 24)
 
-    if (i % 2 === 0) {
+    if (rowY + rowH > bottomLimit) {
+      addContentPage(doc, pages, 'content')
+      rowY = drawHeader()
+    }
+
+    if (stripeIndex % 2 === 0) {
       doc.rect(left, rowY, CONTENT_W, rowH).fill(COLOR.rowAlt)
     }
+    stripeIndex++
 
     doc
       .font(itemFont)
@@ -612,10 +746,16 @@ function drawRunningChrome(
   pages: PageInfo[],
   meetingMetaLine?: string,
 ): void {
+  // Walk the entire buffered page range — not just the entries we explicitly
+  // recorded in `pages`. pdfkit auto-paginates `.text()` calls and the
+  // overflow page won't always appear in `pages` even with our `pageAdded`
+  // listener (the listener fires before the page is fully wired up in some
+  // pdfkit code paths). Skipping by index, treating any page we *know* is a
+  // cover as the only exclusion, guarantees every other page gets chrome.
   const { start, count } = doc.bufferedPageRange()
   for (let i = 0; i < count; i++) {
     const info = pages[i]
-    if (!info || info.isCover) continue
+    if (info?.kind === 'cover') continue
 
     doc.switchToPage(start + i)
     drawRunningHeader(doc, meetingMetaLine)

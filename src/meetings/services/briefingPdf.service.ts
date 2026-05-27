@@ -1,12 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { formatInTimeZone } from 'date-fns-tz'
 import { format, parseISO } from 'date-fns'
+import { z } from 'zod'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { buildSlug } from 'src/shared/util/slug.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { renderBriefingPdf } from './briefingPdf.renderer'
 import {
   BriefingArtifact,
-  BriefingItem,
   BriefingType,
   RenderBriefingPdfOptions,
 } from './briefingPdf.types'
@@ -17,18 +18,75 @@ const BRIEFING_TYPE_LABEL: Record<BriefingType, string> = {
   school_board_meeting: 'School Board meeting',
 }
 
+/**
+ * Zod schema for the subset of `MeetingBriefingArtifact` the renderer
+ * actually consumes. The artifact lives in S3 and is written by the agent
+ * pipeline outside this service, so we validate the shape before handing it
+ * to the renderer — a corrupted artifact would otherwise crash the renderer
+ * mid-stream and surface as a 5xx on a public, unauthenticated endpoint.
+ *
+ * Fields the renderer doesn't touch (sources, claims, etc.) are intentionally
+ * left out so the schema doesn't break every time the agent contract grows
+ * a new optional field.
+ */
+const briefingItemNewsSchema = z.object({
+  headline: z.string(),
+  publication: z.string(),
+})
+
+const briefingItemDisplaySchema = z.object({
+  summary: z.string(),
+  budget_impact: z.object({ summary: z.string() }).nullable().optional(),
+  constituent_sentiment: z
+    .object({
+      summary: z.string(),
+      detail: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  recent_news: z.array(briefingItemNewsSchema).nullable().optional(),
+  talking_points: z.array(z.string()).nullable().optional(),
+})
+
+const briefingItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  item_number: z.string().nullable(),
+  tier: z.enum(['featured', 'queued', 'standard']),
+  display: briefingItemDisplaySchema,
+})
+
+const briefingArtifactSchema = z.object({
+  briefing_type: z.string().optional(),
+  meeting_date: z.string().optional(),
+  meeting_time: z.string().optional(),
+  meeting_timezone: z.string().optional(),
+  meeting_name: z.string().optional(),
+  location: z.string().optional(),
+  executive_summary: z.object({ lead_in: z.string() }),
+  items: z.array(briefingItemSchema),
+})
+
 @Injectable()
 export class BriefingPdfService extends createPrismaBase(
   MODELS.MeetingBriefing,
 ) {
+  // The base class already provides a PinoLogger via `logger`; we wrap a
+  // Nest `Logger` here so renderer-specific warnings show up under a clear
+  // context tag without colliding with the inherited Prisma logger.
+  private readonly renderLogger = new Logger(BriefingPdfService.name)
+
   constructor(private readonly s3: S3Service) {
     super()
   }
 
   /**
    * Look up a briefing by its UUID, load its artifact from S3, and render a
-   * PDF buffer. Throws `NotFoundException` if no row matches or the artifact
-   * has been deleted from S3.
+   * PDF buffer. All failure modes collapse to `NotFoundException()` (no
+   * differentiated message) so the public endpoint doesn't leak whether a
+   * UUID exists / its artifact is missing / its artifact is malformed.
+   * Specific reasons are logged server-side via the Nest logger so operators
+   * can still triage from the request id.
    */
   async renderById(
     briefingId: string,
@@ -42,31 +100,22 @@ export class BriefingPdfService extends createPrismaBase(
         meetingTimezone: true,
         artifactBucket: true,
         artifactKey: true,
-        electedOffice: {
-          select: {
-            organizationSlug: true,
-            user: {
-              select: { firstName: true, lastName: true, name: true },
-            },
-          },
-        },
       },
     })
     if (!row) {
-      throw new NotFoundException('briefing_not_found')
+      this.renderLogger.warn(`renderById: row not found for ${briefingId}`)
+      throw new NotFoundException()
     }
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) {
-      throw new NotFoundException('briefing_artifact_missing')
+      this.renderLogger.warn(
+        `renderById: S3 artifact missing for ${briefingId} (s3://${row.artifactBucket}/${row.artifactKey})`,
+      )
+      throw new NotFoundException()
     }
 
-    let artifact: BriefingArtifact
-    try {
-      artifact = parseArtifact(raw)
-    } catch {
-      throw new NotFoundException('briefing_artifact_invalid')
-    }
+    const artifact = parseArtifact(raw, this.renderLogger, briefingId)
 
     const meetingDateIso = formatInTimeZone(
       row.meetingDate,
@@ -87,7 +136,6 @@ export class BriefingPdfService extends createPrismaBase(
       meetingTime,
       meetingTimezone,
     })
-    const preparedForLine = buildPreparedFor(row.electedOffice?.user)
 
     const liveBriefingUrl = liveBriefingBaseUrl
       ? `${liveBriefingBaseUrl.replace(/\/$/, '')}/dashboard/briefings/${meetingDateIso}`
@@ -95,7 +143,6 @@ export class BriefingPdfService extends createPrismaBase(
 
     const options: RenderBriefingPdfOptions = {
       title,
-      preparedForLine,
       meetingMetaLine,
       liveBriefingUrl,
     }
@@ -154,26 +201,12 @@ function formatMeetingTime(meetingTime: string | undefined): string {
   return `${h12}:${mm} ${ampm}`
 }
 
-function buildPreparedFor(
-  user:
-    | { firstName: string | null; lastName: string | null; name: string | null }
-    | null
-    | undefined,
-): string | undefined {
-  if (!user) return undefined
-  const first = user.firstName?.trim() ?? ''
-  const last = user.lastName?.trim() ?? ''
-  const full = [first, last].filter(Boolean).join(' ').trim()
-  if (full) return full
-  return user.name?.trim() || undefined
-}
-
 function buildFilename(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-  return `${slug || 'briefing'}.pdf`
+  // Use the shared slug util (which wraps `slugify`) so the rules for
+  // Unicode handling, separator collapse, etc. match every other slug we
+  // emit. Falls back to "briefing" if the title is empty after slugging.
+  const slug = buildSlug(title) || 'briefing'
+  return `${slug}.pdf`
 }
 
 function isBriefingType(value: unknown): value is BriefingType {
@@ -184,22 +217,25 @@ function isBriefingType(value: unknown): value is BriefingType {
   )
 }
 
-function parseArtifact(raw: string): BriefingArtifact {
-  // JSON.parse returns unknown — coerce to the renderer's structural view.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const parsed = JSON.parse(raw) as BriefingArtifact
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('artifact is not an object')
+function parseArtifact(
+  raw: string,
+  logger: Logger,
+  briefingId: string,
+): BriefingArtifact {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw) as unknown
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    logger.warn(`parseArtifact: invalid JSON for ${briefingId}: ${message}`)
+    throw new NotFoundException()
   }
-  if (!Array.isArray(parsed.items)) {
-    throw new Error('artifact.items is missing')
+  const result = briefingArtifactSchema.safeParse(parsed)
+  if (!result.success) {
+    logger.warn(
+      `parseArtifact: schema mismatch for ${briefingId}: ${result.error.message}`,
+    )
+    throw new NotFoundException()
   }
-  if (!parsed.executive_summary) {
-    throw new Error('artifact.executive_summary is missing')
-  }
-  return parsed
+  return result.data
 }
-
-// Surface a small helper so the controller can validate the prisma row id
-// belongs to a known briefing without re-querying.
-export type FeaturedBriefingItem = BriefingItem

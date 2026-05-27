@@ -7,6 +7,7 @@ import { AwsModule } from '@/vendors/aws/aws.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
 import { LlmModule } from '@/llm/llm.module'
 import { BriefingsPdfController } from './controllers/briefingsPdf.controller'
+import { BriefingsPdfRateLimitGuard } from './controllers/briefingsPdfRateLimit.guard'
 import { MeetingsBriefingsController } from './controllers/meetingsBriefings.controller'
 import { BriefingPdfService } from './services/briefingPdf.service'
 import { MeetingBriefingsService } from './services/meetingBriefings.service'
@@ -22,7 +23,11 @@ import { MeetingBriefingsService } from './services/meetingBriefings.service'
     LlmModule,
   ],
   controllers: [MeetingsBriefingsController, BriefingsPdfController],
-  providers: [MeetingBriefingsService, BriefingPdfService],
+  providers: [
+    MeetingBriefingsService,
+    BriefingPdfService,
+    BriefingsPdfRateLimitGuard,
+  ],
   exports: [MeetingBriefingsService],
 })
 export class MeetingsModule {}
