@@ -1,5 +1,17 @@
 # @goodparty_org/contracts
 
+## 0.7.0
+
+### Minor Changes
+
+- `AnnotationAnchorSchema` now accepts a third valid shape — **card-level**:
+  `json_path` set, `start` and `end` both `null`. The annotation is scoped
+  to a whole node (e.g. an agenda item card) without a passage selection.
+  The previously-valid shapes — fully passage-anchored (all three set) and
+  briefing-wide (all three `null`) — are unchanged. The inverse combination
+  (offsets without a `json_path`) is still rejected. Updated refine message
+  reflects the three valid shapes.
+
 ## 0.6.0
 
 ### Minor Changes
