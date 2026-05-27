@@ -146,7 +146,13 @@ test.describe('Websites - Vanity Path', () => {
     )
   })
 
+  // ENG-10258: publishing now requires an attached domain in
+  // submitted/registered/active. Fresh candidates in this test have no
+  // domain, so publish 4xx's and the subsequent GET returns 403 (or 404).
+  // Rewrite under the new compliance_setup flow (domain purchase first)
+  // before re-enabling.
   test('should view published website by vanity path', async ({ request }) => {
+    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
