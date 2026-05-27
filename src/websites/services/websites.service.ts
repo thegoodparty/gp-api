@@ -178,7 +178,7 @@ const fetchLiveHtml = async (url: string): Promise<LiveFetchResult> => {
       timeout: 10_000,
       responseType: 'text',
       validateStatus: () => true,
-      maxRedirects: 0,
+      maxRedirects: 5,
       transformResponse: [(data: string) => data],
       httpsAgent: new https.Agent({ lookup: ssrfSafeLookup }),
     })
