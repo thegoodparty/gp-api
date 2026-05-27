@@ -3,7 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { Campaign, User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { CampaignPlanService } from './campaignPlan.service'
+import { CampaignStrategyService } from './campaignStrategy.service'
 import { ElectionApiMockService } from './electionApiMock.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -85,10 +85,10 @@ const buildCampaign = (
     ...overrides,
   }) as Campaign & { user: User }
 
-describe('CampaignPlanService', () => {
-  let service: CampaignPlanService
+describe('CampaignStrategyService', () => {
+  let service: CampaignStrategyService
   let mockPrisma: {
-    campaignPlan: Record<
+    campaignStrategy: Record<
       | 'upsert'
       | 'findUnique'
       | 'findMany'
@@ -104,7 +104,7 @@ describe('CampaignPlanService', () => {
 
   beforeEach(async () => {
     mockPrisma = {
-      campaignPlan: {
+      campaignStrategy: {
         upsert: vi.fn().mockResolvedValue({ id: 42, campaignId: 99 }),
         findUnique: vi.fn(),
         findMany: vi.fn(),
@@ -123,17 +123,17 @@ describe('CampaignPlanService', () => {
         { provide: StrategicLandscapeService, useValue: mockStrategic },
         { provide: ElectionApiMockService, useValue: mockElectionApi },
         { provide: PinoLogger, useValue: createMockLogger() },
-        CampaignPlanService,
+        CampaignStrategyService,
       ],
     }).compile()
     await module.init()
 
-    service = module.get<CampaignPlanService>(CampaignPlanService)
+    service = module.get<CampaignStrategyService>(CampaignStrategyService)
   })
 
   describe('getOrGenerateStrategicLandscape', () => {
     it('returns cached data when opportunities already exist', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(
         buildPlanRow({
           opportunities: [
             { order: 1, content: 'o1' },
@@ -177,7 +177,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('generates and returns fresh data when no opportunities exist', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['x', 'y', 'z'],
@@ -215,7 +215,7 @@ describe('CampaignPlanService', () => {
         ],
         opponents: [],
       })
-      mockPrisma.campaignPlan.findUnique
+      mockPrisma.campaignStrategy.findUnique
         .mockResolvedValueOnce(buildPlanRow())
         .mockResolvedValueOnce(winnerRow)
 
@@ -233,7 +233,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('falls back to details.otherParty when party is "Other"', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -254,7 +254,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('uses details.party verbatim when not "Other"', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -273,7 +273,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('derives userFullName via firstName + lastName, falling back to name', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -300,7 +300,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('treats the plan as cached when opportunities are empty but challenges or opponents exist', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(
         buildPlanRow({
           opportunities: [],
           challenges: [
@@ -321,7 +321,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('regenerates only when no section has any content', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['fresh'],
         challenges: ['fresh'],
@@ -334,7 +334,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('flags the candidate matching the user email as isUser=true', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -353,7 +353,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('matches by email case-insensitively', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -382,7 +382,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('falls back to full_name match when the candidate email is null', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -416,7 +416,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('collapses internal whitespace before matching by name', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -461,7 +461,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('flags no candidate when no email or name match', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockResolvedValue({
         opportunities: ['a', 'b', 'c'],
         challenges: ['a', 'b', 'c'],
@@ -488,7 +488,7 @@ describe('CampaignPlanService', () => {
     })
 
     it('re-throws non-P2002 errors from generate', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
       mockStrategic.generate.mockRejectedValue(new Error('llm down'))
 
       await expect(

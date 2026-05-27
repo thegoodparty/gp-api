@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Campaign, User } from '@prisma/client'
-import { CampaignPlanController } from './campaignPlan.controller'
-import { CampaignPlanService } from './services/campaignPlan.service'
+import { CampaignStrategyController } from './campaignStrategy.controller'
+import { CampaignStrategyService } from './services/campaignStrategy.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const sampleUser = {
@@ -40,8 +40,8 @@ const sampleCampaign = {
   user: sampleUser,
 } as Campaign & { user: User }
 
-describe('CampaignPlanController', () => {
-  let controller: CampaignPlanController
+describe('CampaignStrategyController', () => {
+  let controller: CampaignStrategyController
   let service: { getOrGenerateStrategicLandscape: ReturnType<typeof vi.fn> }
 
   beforeEach(() => {
@@ -52,13 +52,13 @@ describe('CampaignPlanController', () => {
         opponents: [],
       }),
     }
-    controller = new CampaignPlanController(
-      service as unknown as CampaignPlanService,
+    controller = new CampaignStrategyController(
+      service as unknown as CampaignStrategyService,
       createMockLogger(),
     )
   })
 
-  it('delegates to CampaignPlanService with the loaded campaign', async () => {
+  it('delegates to CampaignStrategyService with the loaded campaign', async () => {
     const result = await controller.generateStrategicLandscape(sampleCampaign)
 
     expect(service.getOrGenerateStrategicLandscape).toHaveBeenCalledWith(

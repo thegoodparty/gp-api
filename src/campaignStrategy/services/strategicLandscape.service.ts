@@ -54,7 +54,7 @@ export class StrategicLandscapeService {
   }
 
   async generate(
-    campaignPlanId: number,
+    campaignStrategyId: number,
     campaignId: number,
     ctx: RaceContext,
   ): Promise<StrategicLandscapeResult> {
@@ -94,13 +94,13 @@ export class StrategicLandscapeService {
         }
       },
       {
-        input: { campaignId, campaignPlanId },
-        metadata: { campaignPlanId, candidateOffice: ctx.candidateOffice },
+        input: { campaignId, campaignStrategyId },
+        metadata: { campaignStrategyId, candidateOffice: ctx.candidateOffice },
         type: 'task',
       },
     )
 
-    await this.persister.persist(campaignPlanId, result)
+    await this.persister.persist(campaignStrategyId, result)
     return result
   }
 

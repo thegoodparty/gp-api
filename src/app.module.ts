@@ -39,7 +39,7 @@ import { UsersModule } from '@/users/users.module'
 import { BraintrustModule } from '@/vendors/braintrust/braintrust.module'
 import { ContentfulModule } from '@/vendors/contentful/contentful.module'
 import { GeminiModule } from '@/vendors/google/gemini.module'
-import { CampaignPlanModule } from '@/campaignPlan/campaignPlan.module'
+import { CampaignStrategyModule } from '@/campaignStrategy/campaignStrategy.module'
 import { EcanvasserIntegrationModule } from '@/vendors/ecanvasserIntegration/ecanvasserIntegration.module'
 import { PeerlyModule } from '@/vendors/peerly/peerly.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
@@ -56,7 +56,7 @@ import { loggerModule } from './observability/logging/logger-module'
     ScheduleModule.forRoot(),
     BraintrustModule,
     GeminiModule,
-    CampaignPlanModule,
+    CampaignStrategyModule,
     AnalyticsModule,
     UsersModule,
     FeaturesModule,

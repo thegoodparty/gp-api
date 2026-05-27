@@ -6,18 +6,18 @@ import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
-import { CampaignPlanService } from './services/campaignPlan.service'
+import { CampaignStrategyService } from './services/campaignStrategy.service'
 import { StrategicLandscapeResultSchema } from './schemas/strategicLandscape.schema'
 
-@Controller('campaignPlan')
+@Controller('campaignStrategy')
 @UsePipes(ZodValidationPipe)
 @UseInterceptors(ZodResponseInterceptor)
-export class CampaignPlanController {
+export class CampaignStrategyController {
   constructor(
-    private readonly campaignPlan: CampaignPlanService,
+    private readonly campaignStrategy: CampaignStrategyService,
     private readonly logger: PinoLogger,
   ) {
-    this.logger.setContext(CampaignPlanController.name)
+    this.logger.setContext(CampaignStrategyController.name)
   }
 
   @Post('mine/strategic-landscape')
@@ -26,6 +26,6 @@ export class CampaignPlanController {
   async generateStrategicLandscape(
     @ReqCampaign() campaign: CampaignWith<'user'>,
   ) {
-    return this.campaignPlan.getOrGenerateStrategicLandscape(campaign)
+    return this.campaignStrategy.getOrGenerateStrategicLandscape(campaign)
   }
 }

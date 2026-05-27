@@ -4,39 +4,39 @@ import { StrategicLandscapeResult } from '../schemas/strategicLandscape.schema'
 
 @Injectable()
 export class StrategicLandscapePersister extends createPrismaBase(
-  MODELS.CampaignPlan,
+  MODELS.CampaignStrategy,
 ) {
   async persist(
-    campaignPlanId: number,
+    campaignStrategyId: number,
     result: StrategicLandscapeResult,
   ): Promise<void> {
-    // v1: first-write-wins. The @@unique([campaignPlanId, order]) on
-    // campaignPlanOpportunity serializes concurrent generation attempts —
+    // v1: first-write-wins. The @@unique([campaignStrategyId, order]) on
+    // campaignStrategyOpportunity serializes concurrent generation attempts —
     // the second request hits P2002 and the service falls back to the
     // cached read. When we add regeneration, replace this with
     // deleteMany + create inside an advisory lock so two regen requests
     // can't interleave their writes.
     await this.client.$transaction(async (tx) => {
-      await tx.campaignPlanOpportunity.createMany({
+      await tx.campaignStrategyOpportunity.createMany({
         data: result.opportunities.map((content, i) => ({
-          campaignPlanId,
+          campaignStrategyId,
           order: i + 1,
           content,
         })),
       })
 
-      await tx.campaignPlanChallenge.createMany({
+      await tx.campaignStrategyChallenge.createMany({
         data: result.challenges.map((content, i) => ({
-          campaignPlanId,
+          campaignStrategyId,
           order: i + 1,
           content,
         })),
       })
 
       for (const opponent of result.opponents) {
-        await tx.campaignPlanOpponent.create({
+        await tx.campaignStrategyOpponent.create({
           data: {
-            campaignPlanId,
+            campaignStrategyId,
             fullName: opponent.fullName,
             partyAffiliation: opponent.partyAffiliation,
             incumbent: opponent.incumbent,

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Campaign, CampaignPlan, User } from '@prisma/client'
+import { Campaign, CampaignStrategy, User } from '@prisma/client'
 import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { InternalServerErrorException } from '@nestjs/common'
@@ -65,7 +65,9 @@ const stitchIsUser = (
 }
 
 @Injectable()
-export class CampaignPlanService extends createPrismaBase(MODELS.CampaignPlan) {
+export class CampaignStrategyService extends createPrismaBase(
+  MODELS.CampaignStrategy,
+) {
   constructor(
     private readonly strategicLandscape: StrategicLandscapeService,
     private readonly electionApi: ElectionApiMockService,
@@ -91,7 +93,7 @@ export class CampaignPlanService extends createPrismaBase(MODELS.CampaignPlan) {
       return await this.strategicLandscape.generate(plan.id, campaign.id, ctx)
     } catch (error) {
       // If two concurrent requests both miss the cache, the second one trips
-      // the @@unique([campaignPlanId, order]) on CampaignPlanOpportunity at
+      // the @@unique([campaignStrategyId, order]) on CampaignStrategyOpportunity at
       // persist time. Treat that as "someone else just wrote it" and return
       // their result instead of surfacing the error.
       if (isUniqueConstraintError(error)) {
@@ -114,8 +116,8 @@ export class CampaignPlanService extends createPrismaBase(MODELS.CampaignPlan) {
     }
   }
 
-  private upsertForCampaign(campaignId: number): Promise<CampaignPlan> {
-    return this.client.campaignPlan.upsert({
+  private upsertForCampaign(campaignId: number): Promise<CampaignStrategy> {
+    return this.client.campaignStrategy.upsert({
       where: { campaignId },
       create: { campaignId },
       update: {},
@@ -123,10 +125,10 @@ export class CampaignPlanService extends createPrismaBase(MODELS.CampaignPlan) {
   }
 
   private async readStrategicLandscape(
-    campaignPlanId: number,
+    campaignStrategyId: number,
   ): Promise<StrategicLandscapeResult | null> {
-    const plan = await this.client.campaignPlan.findUnique({
-      where: { id: campaignPlanId },
+    const plan = await this.client.campaignStrategy.findUnique({
+      where: { id: campaignStrategyId },
       include: {
         opportunities: { orderBy: { order: 'asc' } },
         challenges: { orderBy: { order: 'asc' } },
