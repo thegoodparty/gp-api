@@ -129,6 +129,7 @@ describe('SessionGuard — impersonating flag', () => {
         clerkId: adminUser.clerkId,
       }),
     )
+    expect(req.actorSub).toBe(adminUser.clerkId)
   })
 
   it('actor.sub is not a user_ ID: impersonating=false, actorUser absent', async () => {
