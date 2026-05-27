@@ -93,10 +93,26 @@ export async function renderBriefingPdf(
     drawCoverPage(doc, briefing, options, liveQrPngBuffer)
     pages.push({ kind: 'cover' })
 
-    // 2. Reserve TOC. We draw onto it at the end of the run with real
-    //    page numbers captured from the content rendered below.
-    addContentPage(doc, pages, 'toc')
-    const tocPageIndex = currentPageIndex(doc)
+    // 2. Reserve TOC pages. The TOC has 1 Executive Summary row + 1 row per
+    //    featured item + 1 Full Agenda row. Each row is ~28pt tall in the
+    //    content area (~700pt), so ~25 rows fit per page. We round up
+    //    conservatively to 20 rows/page to leave headroom for long titles
+    //    that wrap onto a second line. With the typical ~6 featured items
+    //    this still reserves one page; meetings with 20+ featured items
+    //    quietly get a second TOC page rather than overflowing into a
+    //    disjointed trailing page at the end of the buffer (which is what
+    //    pdfkit's auto-pagination does when you `switchToPage` and overflow).
+    const TOC_ROWS_PER_PAGE = 20
+    const tocRowCount = featured.length + 2
+    const tocPagesNeeded = Math.max(
+      1,
+      Math.ceil(tocRowCount / TOC_ROWS_PER_PAGE),
+    )
+    const tocPageIndices: number[] = []
+    for (let p = 0; p < tocPagesNeeded; p++) {
+      addContentPage(doc, pages, 'toc')
+      tocPageIndices.push(currentPageIndex(doc))
+    }
 
     // 3. Executive summary. The table inside paginates on its own if there
     //    are enough featured items to need more than one page.
@@ -127,14 +143,17 @@ export async function renderBriefingPdf(
     )
 
     // 6. Fill in the TOC with the real page numbers we just captured.
-    doc.switchToPage(tocPageIndex)
-    doc.x = PAGE_PADDING_X
-    doc.y = PAGE_PADDING_TOP + 28
-    drawTocPage(doc, featured, {
-      execSummary: toOneBased(execSummaryPageIndex),
-      featured: itemPageIndices.map(toOneBased),
-      fullAgenda: toOneBased(fullAgendaPageIndex),
-    })
+    //    `drawTocPage` paginates internally across the pre-reserved pages.
+    drawTocPage(
+      doc,
+      featured,
+      {
+        execSummary: toOneBased(execSummaryPageIndex),
+        featured: itemPageIndices.map(toOneBased),
+        fullAgenda: toOneBased(fullAgendaPageIndex),
+      },
+      tocPageIndices,
+    )
 
     // 7. Draw running header/footer on every non-cover page. We iterate the
     //    full buffer (so any overflow page auto-added by pdfkit gets chrome
@@ -346,36 +365,120 @@ interface TocPageNumbers {
   fullAgenda: number
 }
 
+/**
+ * Render the TOC across `tocPageIndices`. We pre-reserved these pages in
+ * `renderBriefingPdf` so that:
+ *   (a) the TOC always sits immediately after the cover (page numbers
+ *       remain meaningful), and
+ *   (b) overflow stays inside the reserved range — pdfkit's auto-pagination
+ *       when you `switchToPage` then overflow would otherwise append the
+ *       extra page to the *end* of the buffer rather than after the TOC.
+ *
+ * We switch to the first reserved page, render the title + rows there,
+ * and move on to the next reserved page when `rowY` would dip below the
+ * bottom of the content area. If the TOC has more rows than we reserved
+ * space for (shouldn't happen given the conservative estimate, but
+ * defending against future contract changes), we truncate with a final
+ * "… and N more in the Full Agenda" row rather than silently dropping
+ * entries.
+ */
 function drawTocPage(
   doc: PDFKit.PDFDocument,
   featured: BriefingItem[],
   pageNumbers: TocPageNumbers,
+  tocPageIndices: number[],
 ): void {
-  drawH1(doc, 'Table of Contents')
-  doc.moveDown(0.4)
+  if (tocPageIndices.length === 0) return
 
-  let rowY = doc.y
+  let pageCursor = 0
+  let rowY = 0
+  // Leave ~24pt below the bottom rule so the running footer doesn't collide.
+  const bottomLimit = LETTER_H - PAGE_PADDING_BOTTOM - 32
 
-  rowY = drawTocRow(
-    doc,
-    rowY,
-    'Executive Summary',
-    String(pageNumbers.execSummary),
-  )
-  featured.forEach((item, i) => {
-    rowY = drawTocRow(
-      doc,
-      rowY,
+  /** Switch to the next reserved page (or no-op if we're already there). */
+  const switchToTocPage = (cursor: number): void => {
+    doc.switchToPage(tocPageIndices[cursor])
+    doc.x = PAGE_PADDING_X
+    doc.y = PAGE_PADDING_TOP + 28
+    if (cursor === 0) {
+      drawH1(doc, 'Table of Contents')
+      doc.moveDown(0.4)
+    } else {
+      // Continuation pages get a smaller "(continued)" header so the reader
+      // knows the list is still the same TOC, just on a new sheet.
+      doc
+        .font(FONT.bold)
+        .fontSize(18)
+        .fillColor(COLOR.navy)
+        .text('Table of Contents (continued)', PAGE_PADDING_X, doc.y, {
+          width: CONTENT_W,
+        })
+      doc.moveDown(0.4)
+    }
+    rowY = doc.y
+  }
+
+  switchToTocPage(pageCursor)
+
+  /**
+   * Draw `label / pageNumber` as one TOC row at the current `rowY`, paging
+   * forward if the row would clip the footer area.
+   */
+  const drawRow = (label: string, pageNumber: string): boolean => {
+    // Pre-measure: rows are ~28pt tall after a wrap; budget 36pt to be safe.
+    if (rowY + 36 > bottomLimit) {
+      pageCursor += 1
+      if (pageCursor >= tocPageIndices.length) {
+        // Out of reserved pages. Append a single hint row to the *last*
+        // page we did render so users know more items exist. Switch back
+        // to that page before appending.
+        doc.switchToPage(tocPageIndices[tocPageIndices.length - 1])
+        return false
+      }
+      switchToTocPage(pageCursor)
+    }
+    rowY = drawTocRow(doc, rowY, label, pageNumber)
+    return true
+  }
+
+  if (!drawRow('Executive Summary', String(pageNumbers.execSummary))) {
+    return
+  }
+
+  let truncatedAt: number | null = null
+  for (let i = 0; i < featured.length; i++) {
+    const item = featured[i]
+    const ok = drawRow(
       `${i + 1}. ${item.title}`,
       String(pageNumbers.featured[i] ?? ''),
     )
-  })
-  drawTocRow(
-    doc,
-    rowY,
-    `${featured.length + 1}. Full Agenda`,
-    String(pageNumbers.fullAgenda),
-  )
+    if (!ok) {
+      truncatedAt = i
+      break
+    }
+  }
+
+  if (truncatedAt !== null) {
+    // We ran out of reserved TOC space. Surface a hint instead of failing
+    // silently. The current `rowY` was reset to the last reserved page by
+    // `drawRow`; render the hint at whatever Y the page left us at, but
+    // guard against clipping by appending near the bottom limit.
+    const remaining = featured.length - truncatedAt
+    const hintY = Math.min(rowY, bottomLimit - 24)
+    doc
+      .font(FONT.italic)
+      .fontSize(10)
+      .fillColor(COLOR.muted)
+      .text(
+        `… and ${remaining} more item${remaining === 1 ? '' : 's'} (see Full Agenda).`,
+        PAGE_PADDING_X,
+        hintY + 6,
+        { width: CONTENT_W },
+      )
+    return
+  }
+
+  drawRow(`${featured.length + 1}. Full Agenda`, String(pageNumbers.fullAgenda))
 }
 
 function drawTocRow(

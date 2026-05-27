@@ -180,6 +180,31 @@ describe('renderBriefingPdf', () => {
     }
   })
 
+  it('paginates the TOC across multiple pages when there are many featured items', async () => {
+    // 25 featured items exceeds the 20 rows/page TOC reservation, so the
+    // TOC needs two pages. Regression test for the case where pdfkit's
+    // auto-pagination would otherwise append the overflow at the end of
+    // the buffer rather than after the TOC.
+    const items: BriefingItem[] = Array.from({ length: 25 }, (_, i) =>
+      makeItem(i + 1, 'featured'),
+    )
+    const buf = await renderBriefingPdf(makeArtifact({ items }))
+    const { text } = await extractText(buf)
+
+    // First TOC page renders the heading; second TOC page must render the
+    // continuation heading so the reader knows the list spans two sheets.
+    expect(text).toContain('Table of Contents')
+    expect(text).toContain('Table of Contents (continued)')
+
+    // First and last featured-item rows both appear, proving the second
+    // TOC page is reachable (not dumped on a trailing page disconnected
+    // from the rest of the TOC).
+    expect(text).toContain('1. Agenda item 1')
+    expect(text).toContain('25. Agenda item 25')
+    // Full Agenda row still rendered at the tail of the TOC.
+    expect(text).toContain('26. Full Agenda')
+  })
+
   it('paginates the Full Agenda table when there are many items', async () => {
     // 60 items is well past what fits on one page; the table must split
     // without throwing and the final doc must still parse.
