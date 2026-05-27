@@ -4,10 +4,27 @@ import { Campaign, CampaignUpdateHistoryType } from '@prisma/client'
 import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CampaignsService } from '../services/campaigns.service'
 
-const mockModel = {
-  findFirstOrThrow: vi.fn(),
-  deleteMany: vi.fn(),
+const mockDeleteMany = vi.fn()
+const mockCampaignFindUniqueOrThrow = vi.fn()
+const mockCampaignUpdate = vi.fn()
+const mockExecuteRaw = vi.fn()
+
+const mockTx = {
+  campaignUpdateHistory: { deleteMany: mockDeleteMany },
+  campaign: {
+    findUniqueOrThrow: mockCampaignFindUniqueOrThrow,
+    update: mockCampaignUpdate,
+  },
+  $executeRaw: mockExecuteRaw,
 }
+
+const mockTransaction = vi.fn(
+  async (cb: (tx: typeof mockTx) => Promise<void>) => {
+    await cb(mockTx)
+  },
+)
+
+const mockFindFirstOrThrow = vi.fn()
 
 const mockCampaignsService: Partial<CampaignsService> = {
   update: vi.fn().mockResolvedValue({}),
@@ -37,24 +54,26 @@ describe('CampaignUpdateHistoryService', () => {
       mockCampaignsService as CampaignsService,
     )
     Object.defineProperty(service, '_prisma', {
-      get: () => ({ campaignUpdateHistory: mockModel }),
+      get: () => ({
+        campaignUpdateHistory: {},
+        $transaction: mockTransaction,
+      }),
       configurable: true,
     })
-    service.findFirstOrThrow = mockModel.findFirstOrThrow.bind(mockModel)
+    service.findFirstOrThrow = mockFindFirstOrThrow
   })
 
   describe('delete', () => {
     it('throws when record does not belong to campaign', async () => {
-      mockModel.findFirstOrThrow.mockRejectedValue(new NotFoundException())
+      mockFindFirstOrThrow.mockRejectedValue(new NotFoundException())
 
       await expect(service.delete(99, 2)).rejects.toThrow(NotFoundException)
 
-      expect(mockModel.findFirstOrThrow).toHaveBeenCalledWith({
+      expect(mockFindFirstOrThrow).toHaveBeenCalledWith({
         where: { id: 99, campaignId: 2 },
-        include: { campaign: true },
       })
 
-      expect(mockModel.deleteMany).not.toHaveBeenCalled()
+      expect(mockTransaction).not.toHaveBeenCalled()
     })
 
     it('deletes record and decrements voter goals', async () => {
@@ -64,22 +83,23 @@ describe('CampaignUpdateHistoryService', () => {
         },
       })
 
-      mockModel.findFirstOrThrow.mockResolvedValue({
+      mockFindFirstOrThrow.mockResolvedValue({
         id: 5,
         campaignId: 1,
         type: CampaignUpdateHistoryType.doorKnocking,
         quantity: 30,
-        campaign,
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockDeleteMany.mockResolvedValue({ count: 1 })
+      mockCampaignFindUniqueOrThrow.mockResolvedValue(campaign)
+      mockCampaignUpdate.mockResolvedValue({})
 
       await service.delete(5, 1)
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
+      expect(mockDeleteMany).toHaveBeenCalledWith({
         where: { id: 5, campaignId: 1 },
       })
 
-      expect(mockCampaignsService.update).toHaveBeenCalledWith({
+      expect(mockCampaignUpdate).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {
           data: expect.objectContaining({
@@ -90,35 +110,35 @@ describe('CampaignUpdateHistoryService', () => {
     })
 
     it('skips goal update when deleteMany returns zero rows', async () => {
-      mockModel.findFirstOrThrow.mockResolvedValue({
+      mockFindFirstOrThrow.mockResolvedValue({
         id: 7,
         campaignId: 1,
         type: CampaignUpdateHistoryType.calls,
         quantity: 10,
-        campaign: makeCampaign({
-          data: { reportedVoterGoals: { calls: 10 } },
-        }),
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockDeleteMany.mockResolvedValue({ count: 0 })
 
       await service.delete(7, 1)
 
-      expect(mockCampaignsService.update).not.toHaveBeenCalled()
+      expect(mockCampaignFindUniqueOrThrow).not.toHaveBeenCalled()
+      expect(mockCampaignUpdate).not.toHaveBeenCalled()
     })
 
     it('skips goal update when no matching voter goals', async () => {
-      mockModel.findFirstOrThrow.mockResolvedValue({
+      mockFindFirstOrThrow.mockResolvedValue({
         id: 7,
         campaignId: 1,
         type: CampaignUpdateHistoryType.calls,
         quantity: 10,
-        campaign: makeCampaign({ data: {} }),
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockDeleteMany.mockResolvedValue({ count: 1 })
+      mockCampaignFindUniqueOrThrow.mockResolvedValue(
+        makeCampaign({ data: {} }),
+      )
 
       await service.delete(7, 1)
 
-      expect(mockCampaignsService.update).not.toHaveBeenCalled()
+      expect(mockCampaignUpdate).not.toHaveBeenCalled()
     })
 
     it('clamps voter goal at zero', async () => {
@@ -128,18 +148,19 @@ describe('CampaignUpdateHistoryService', () => {
         },
       })
 
-      mockModel.findFirstOrThrow.mockResolvedValue({
+      mockFindFirstOrThrow.mockResolvedValue({
         id: 8,
         campaignId: 1,
         type: CampaignUpdateHistoryType.doorKnocking,
         quantity: 20,
-        campaign,
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockDeleteMany.mockResolvedValue({ count: 1 })
+      mockCampaignFindUniqueOrThrow.mockResolvedValue(campaign)
+      mockCampaignUpdate.mockResolvedValue({})
 
       await service.delete(8, 1)
 
-      expect(mockCampaignsService.update).toHaveBeenCalledWith({
+      expect(mockCampaignUpdate).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {
           data: expect.objectContaining({
