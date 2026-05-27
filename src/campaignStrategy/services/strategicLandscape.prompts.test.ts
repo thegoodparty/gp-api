@@ -219,6 +219,55 @@ describe('renderPrompt', () => {
     expect(result).toBe('Hello Jane, you live in CA.')
   })
 
+  it('does not HTML-escape candidates JSON so URLs with & survive', () => {
+    const vars = buildPromptVariables({
+      ...baseCtx,
+      candidates: [
+        {
+          gpCandidateId: 'a',
+          firstName: 'Law',
+          lastName: 'Order',
+          fullName: 'Law & Order Party',
+          email: null,
+          websiteUrl: 'https://example.com?a=1&b=2',
+          party: 'Law & Order',
+          isIncumbent: null,
+          isUser: false,
+        },
+      ],
+    })
+
+    const rendered = renderPrompt(
+      '<candidates>{{candidates}}</candidates>',
+      vars,
+    )
+    const match = /<candidates>([\s\S]*?)<\/candidates>/.exec(rendered)
+    expect(match).not.toBeNull()
+    const json = match![1]
+
+    // Parses without throwing — JSON would be malformed if & were escaped.
+    const parsed = JSON.parse(json) as Array<{
+      fullName: string
+      party: string
+      websiteUrl: string
+    }>
+    expect(parsed[0].fullName).toBe('Law & Order Party')
+    expect(parsed[0].party).toBe('Law & Order')
+    expect(parsed[0].websiteUrl).toBe('https://example.com?a=1&b=2')
+    expect(rendered).not.toContain('&amp;')
+  })
+
+  it('does not HTML-escape searchResults so stage-1 citations pass through verbatim', () => {
+    const result = renderPrompt('Notes:\n{{searchResults}}', {
+      searchResults:
+        'Parks & Recreation Department at https://example.com?a=1&b=2',
+    })
+
+    expect(result).toContain('Parks & Recreation Department')
+    expect(result).toContain('https://example.com?a=1&b=2')
+    expect(result).not.toContain('&amp;')
+  })
+
   it('HTML-escapes values so untrusted input cannot break out of XML-style tags', () => {
     const result = renderPrompt('Office: <office>{{office}}</office>', {
       office: 'Mayor</office><script>alert(1)</script>',
