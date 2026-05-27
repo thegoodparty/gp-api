@@ -274,12 +274,12 @@ export class WebsitesController {
     })
 
     if (body.status === WebsiteStatus.published) {
-      if (!domain) {
+      if (!domain && !hasEverBeenPublished) {
         throw new BadRequestException(
           'Cannot publish: no custom domain is attached to this website.',
         )
       }
-      if (!PUBLISHABLE_DOMAIN_STATUSES.includes(domain.status)) {
+      if (domain && !PUBLISHABLE_DOMAIN_STATUSES.includes(domain.status)) {
         throw new BadRequestException(
           `Cannot publish: attached domain is in status "${domain.status}". ` +
             'Domain must reach status `submitted` or later before publish.',
