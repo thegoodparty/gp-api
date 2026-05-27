@@ -4,8 +4,7 @@ import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { Campaign } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { WrapperType } from 'src/shared/types/utility.types'
-
-const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
+import { VOTER_GOALS_ADVISORY_LOCK_KEY } from '../campaigns.consts'
 
 @Injectable()
 export class CampaignUpdateHistoryService extends createPrismaBase(
