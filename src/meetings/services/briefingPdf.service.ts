@@ -139,9 +139,12 @@ export class BriefingPdfService extends createPrismaBase(
 
     const raw = await this.s3.getFile(row.artifactBucket, row.artifactKey)
     if (!raw) {
-      this.renderLogger.warn(
-        `renderById: S3 artifact missing for ${idPrefix} (s3://${row.artifactBucket}/${row.artifactKey})`,
-      )
+      // Intentionally leave bucket/key out of the warn line: artifact paths
+      // typically encode campaign or user identifiers and any engineer with
+      // access to log sinks could harvest them. The S3 layer logs the
+      // bucket+key separately at DEBUG when fetches fail, which is enough
+      // for triage without leaking PII to the broader log audience.
+      this.renderLogger.warn(`renderById: S3 artifact missing for ${idPrefix}`)
       throw new NotFoundException()
     }
 
