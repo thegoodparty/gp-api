@@ -18,6 +18,7 @@ describe('ElectionApiMockService', () => {
   it('includes the incumbent in the candidates list', () => {
     const ctx = service.getRaceContext(1)
     const incumbent = ctx.candidates.find((c) => c.isIncumbent === true)
+    expect(incumbent).toBeDefined()
     expect(incumbent?.fullName).toBe('Jeffrey Prang')
   })
 
@@ -29,6 +30,7 @@ describe('ElectionApiMockService', () => {
   it('exposes Sandy Sun with a null email to exercise the null path', () => {
     const ctx = service.getRaceContext(1)
     const sandy = ctx.candidates.find((c) => c.fullName === 'Sandy Sun')
+    expect(sandy).toBeDefined()
     expect(sandy?.email).toBeNull()
   })
 })

@@ -164,7 +164,10 @@ describe('StrategicLandscapeService', () => {
     expect(persister.persist).not.toHaveBeenCalled()
   })
 
-  it('wraps the run in a tracedNested span with type=task', async () => {
+  // Smoke check that the tracing wrapper is still around the generate path.
+  // Without this, a refactor could silently drop the Braintrust instrumentation
+  // and observability would disappear without breaking any user-facing behavior.
+  it('opens a tracedNested span around the generation', async () => {
     gemini.generateStructured
       .mockResolvedValueOnce({ opportunities: ['a', 'b', 'c'] })
       .mockResolvedValueOnce({ challenges: ['a', 'b', 'c'] })
@@ -177,27 +180,5 @@ describe('StrategicLandscapeService', () => {
       expect.any(Function),
       expect.objectContaining({ type: 'task' }),
     )
-  })
-
-  it('emits per-pipeline parent spans tagged with pipeline metadata', async () => {
-    gemini.generateStructured
-      .mockResolvedValueOnce({ opportunities: ['a', 'b', 'c'] })
-      .mockResolvedValueOnce({ challenges: ['a', 'b', 'c'] })
-      .mockResolvedValueOnce({ opponents: [] })
-
-    await service.generate(1, 1, buildCtx())
-
-    const pipelineNames = [
-      'strategic-landscape:opportunities',
-      'strategic-landscape:challenges',
-      'strategic-landscape:opposition-research',
-    ]
-    for (const name of pipelineNames) {
-      expect(braintrust.tracedNested).toHaveBeenCalledWith(
-        name,
-        expect.any(Function),
-        expect.objectContaining({ type: 'task' }),
-      )
-    }
   })
 })

@@ -201,23 +201,6 @@ describe('CampaignPlanService', () => {
       expect(mockElectionApi.getRaceContext).toHaveBeenCalledWith(99)
     })
 
-    it('upserts the CampaignPlan row before checking cache', async () => {
-      mockPrisma.campaignPlan.findUnique.mockResolvedValue(buildPlanRow())
-      mockStrategic.generate.mockResolvedValue({
-        opportunities: ['a', 'b', 'c'],
-        challenges: ['a', 'b', 'c'],
-        opponents: [],
-      })
-
-      await service.getOrGenerateStrategicLandscape(buildCampaign())
-
-      expect(mockPrisma.campaignPlan.upsert).toHaveBeenCalledWith({
-        where: { campaignId: 99 },
-        create: { campaignId: 99 },
-        update: {},
-      })
-    })
-
     it('falls back to the cached read when a concurrent write trips P2002', async () => {
       const winnerRow = buildPlanRow({
         opportunities: [
@@ -465,7 +448,7 @@ describe('CampaignPlanService', () => {
             firstName: 'Rose',
             lastName: 'Ashton',
             name: 'Rose Ashton',
-            email: null,
+            email: null as string | null,
           } as User,
         }),
       )

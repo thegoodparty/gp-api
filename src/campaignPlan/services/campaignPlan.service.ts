@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign, CampaignPlan, User } from '@prisma/client'
+import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { InternalServerErrorException } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import { getUserFullName } from '@/users/util/users.util'
+import { toLowerAndTrim } from '@/shared/util/strings.util'
 import { StrategicLandscapeResult } from '../schemas/strategicLandscape.schema'
 import {
   ApiCandidate,
@@ -14,18 +16,27 @@ import {
 import { ElectionApiMockService } from './electionApiMock.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
 
+// Defensive Zod parse over Campaign.details — the column is Prisma JSON,
+// so we can't trust the shadow type at runtime. Only the two keys we read
+// here are declared; everything else passes through silently.
+const PartyDetailsSchema = z
+  .object({
+    party: z.string().optional(),
+    otherParty: z.string().optional(),
+  })
+  .partial()
+
 const resolvePartyAffiliation = (details: Campaign['details']): string => {
-  const party = typeof details?.party === 'string' ? details.party : ''
-  if (party === 'Other') {
-    return typeof details?.otherParty === 'string' && details.otherParty
-      ? details.otherParty
-      : party
-  }
+  const parsed = PartyDetailsSchema.safeParse(details)
+  if (!parsed.success) return ''
+  const party = parsed.data.party ?? ''
+  const otherParty = parsed.data.otherParty ?? ''
+  if (party === 'Other' && otherParty) return otherParty
   return party
 }
 
 const normalize = (value: string | null | undefined): string =>
-  (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+  toLowerAndTrim(value ?? '').replace(/\s+/g, ' ')
 
 // election-api doesn't return an is_user flag — we stitch it here by
 // matching the requesting user against the candidate list. Email is the

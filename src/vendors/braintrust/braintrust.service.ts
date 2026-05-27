@@ -113,6 +113,10 @@ export class BraintrustService {
   async tracedNested<T>(
     name: string,
     fn: () => T | Promise<T>,
+    // input/metadata are open Braintrust span telemetry — they accept any
+    // serialisable record. The SDK's span.log() takes the same shape and
+    // the existing traced() method on this class uses the identical type.
+    // No concrete contract exists to narrow against.
     options?: {
       input?: Record<string, unknown>
       metadata?: Record<string, unknown>

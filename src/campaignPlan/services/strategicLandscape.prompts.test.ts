@@ -83,13 +83,15 @@ describe('buildPromptVariables', () => {
     }>
 
     expect(parsed).toHaveLength(3)
-    expect(parsed.find((c) => c.fullName === 'Jane Doe')?.isUser).toBe(true)
-    expect(parsed.find((c) => c.fullName === 'Bob Smith')?.isIncumbent).toBe(
-      true,
-    )
-    expect(parsed.find((c) => c.fullName === 'Bob Smith')?.websiteUrl).toBe(
-      'https://bobsmith.example',
-    )
+
+    const jane = parsed.find((c) => c.fullName === 'Jane Doe')
+    expect(jane).toBeDefined()
+    expect(jane?.isUser).toBe(true)
+
+    const bob = parsed.find((c) => c.fullName === 'Bob Smith')
+    expect(bob).toBeDefined()
+    expect(bob?.isIncumbent).toBe(true)
+    expect(bob?.websiteUrl).toBe('https://bobsmith.example')
   })
 
   it('uses "not available" sentinel for missing string fields', () => {
@@ -147,6 +149,36 @@ describe('buildPromptVariables', () => {
     expect(rendered).not.toMatch(/\bnull\b/)
     expect(rendered).toContain('not available')
     expect(rendered).not.toMatch(/\{\{[a-zA-Z]/)
+  })
+
+  it('caps candidate fullName, party, and websiteUrl to bound prompt-injection payload size', () => {
+    const longString = 'A'.repeat(2000)
+    const vars = buildPromptVariables({
+      ...baseCtx,
+      candidates: [
+        {
+          gpCandidateId: 'x',
+          firstName: 'X',
+          lastName: 'Y',
+          fullName: longString,
+          email: null,
+          websiteUrl: longString,
+          party: longString,
+          isIncumbent: null,
+          isUser: false,
+        },
+      ],
+    })
+
+    const parsed = JSON.parse(vars.candidates) as Array<{
+      fullName: string
+      party?: string
+      websiteUrl?: string
+    }>
+
+    expect(parsed[0].fullName.length).toBeLessThanOrEqual(200)
+    expect(parsed[0].party?.length ?? 0).toBeLessThanOrEqual(100)
+    expect(parsed[0].websiteUrl?.length ?? 0).toBeLessThanOrEqual(500)
   })
 
   it('omits null party and websiteUrl from candidate JSON; keeps isIncumbent tri-state', () => {
