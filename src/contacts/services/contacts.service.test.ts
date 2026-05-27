@@ -297,6 +297,71 @@ describe('ContactsService', () => {
         expect(mockStream.pipe).toHaveBeenCalledTimes(1)
       })
 
+      it('absorbs upstream stream errors after headers are flushed (logs, destroys, does not reject)', async () => {
+        const org = makeOrganization({
+          slug: 'eo-office-1',
+          overrideDistrictId: OVERRIDE_DISTRICT_ID,
+        })
+        // Capture event handlers as they are registered so we can fire
+        // 'error' AFTER pipe + flushHeaders have run.
+        const handlers: Record<string, ((err?: Error) => void) | undefined> = {}
+        const mockStream = {
+          destroyed: false,
+          pipe: vi.fn(),
+          destroy: vi.fn(),
+          on: vi.fn((event: string, cb: (err?: Error) => void) => {
+            handlers[event] = cb
+          }),
+        }
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+
+        // res.raw needs `destroy` + `destroyed` for the post-headers cleanup
+        // path. The service must call `res.raw.destroy(err)` instead of
+        // letting the rejection bubble to the Nest exception filter (which
+        // would call `httpAdapter.reply` on an already-committed response).
+        const flushHeaders = vi.fn()
+        const setHeader = vi.fn()
+        const on = vi.fn()
+        const destroy = vi.fn()
+        const res = {
+          raw: {
+            headersSent: false,
+            destroyed: false,
+            flushHeaders,
+            setHeader,
+            on,
+            destroy,
+          },
+        } as never
+
+        const completion = service.downloadContacts(
+          { segment: 'all' },
+          res,
+          org,
+        )
+
+        // Wait for the service to register the upstream 'error' listener
+        // (segment + district resolution are async).
+        await vi.waitFor(() => {
+          expect(handlers.error).toBeDefined()
+        })
+
+        // Sanity: by the time we're firing 'error', headers MUST already be
+        // committed to the wire — otherwise the bug we are guarding against
+        // (filter writing JSON over committed headers) doesn't apply.
+        expect(flushHeaders).toHaveBeenCalledTimes(1)
+        expect(setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv')
+
+        const upstreamError = new Error('people-api connection reset')
+        handlers.error!(upstreamError)
+
+        await expect(completion).resolves.toBeUndefined()
+        // Both ends torn down, no rejection escapes to Nest's exception filter.
+        expect(mockStream.destroy).toHaveBeenCalledTimes(1)
+        expect(destroy).toHaveBeenCalledTimes(1)
+        expect(destroy).toHaveBeenCalledWith(upstreamError)
+      })
+
       it('destroys the upstream stream when the client closes the connection mid-download', async () => {
         const org = makeOrganization({
           slug: 'eo-office-1',

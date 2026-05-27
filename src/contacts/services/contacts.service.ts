@@ -282,7 +282,7 @@ export class ContactsService {
         res.raw.flushHeaders()
       }
 
-      return new Promise<void>((resolve, reject) => {
+      return new Promise<void>((resolve) => {
         let settled = false
         const settle = (fn: () => void) => {
           if (settled) return
@@ -297,10 +297,26 @@ export class ContactsService {
 
         response.data.pipe(res.raw)
         response.data.on('end', () => settle(resolve))
+        // Once `flushHeaders()` above committed our HTTP headers to the wire,
+        // a mid-transfer upstream error must NOT propagate as a rejection.
+        // Nest's global exception filter would call
+        // `httpAdapter.reply(res.raw, jsonBody, 500)` on a response whose
+        // headers are already sent, producing either an
+        // `ERR_HTTP_HEADERS_SENT` warning or a corrupt CSV+JSON blob saved as
+        // `contacts.csv`. Instead: log, tear down both ends, and resolve so
+        // the controller's await falls through cleanly. The browser sees a
+        // truncated download and the operator sees the cause in the logs.
         response.data.on('error', (err: Error) =>
           settle(() => {
+            this.logger.error(
+              { err },
+              'Upstream stream error after download headers committed',
+            )
             destroyUpstream()
-            reject(err)
+            if (!res.raw.destroyed) {
+              res.raw.destroy(err)
+            }
+            resolve()
           }),
         )
         // Browser canceled / network closed mid-download: tear down the
