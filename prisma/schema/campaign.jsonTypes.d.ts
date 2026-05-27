@@ -135,6 +135,27 @@ declare global {
       electionDate: string
     }
 
+    export type LocalMediaOutlet = {
+      name: string
+      type: 'TV' | 'print' | 'radio'
+      description: string
+      email?: string | null
+      phone?: string | null
+      address?: string | null
+    }
+
+    export type LocalMediaOutletsCache =
+      | {
+          office: string
+          status: 'pending'
+          startedAt: number
+        }
+      | {
+          office: string
+          status: 'ready'
+          outlets: LocalMediaOutlet[]
+        }
+
     export type OnboardingAnswers = {
       officePath?: OnboardingOfficePath
       manualOffice?: boolean
@@ -144,6 +165,7 @@ declare global {
       officeZip?: string
       structuredOffice?: OnboardingSelectedOffice
       manualOfficeForm?: OnboardingManualOfficeForm
+      localMediaOutlets?: LocalMediaOutletsCache
     }
 
     export type CampaignAiContent = {

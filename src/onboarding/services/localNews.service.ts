@@ -1,12 +1,15 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import type { ChatCompletionTool } from 'openai/resources/chat/completions'
 import { PinoLogger } from 'nestjs-pino'
 import crypto from 'node:crypto'
+import { Campaign } from '@prisma/client'
 import { AiService } from '@/ai/ai.service'
 import type { AiChatMessage } from '@/campaigns/ai/chat/aiChat.types'
+import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import {
+  aiOutletsToolResultSchema,
+  LocalNewsOutlet,
   LocalNewsResponse,
-  localNewsResponseSchema,
 } from '../schemas/getLocalNews.schema'
 
 const SYSTEM_PROMPT = `You are a local media research assistant helping political candidates identify news outlets to monitor during their campaign.
@@ -20,6 +23,12 @@ REQUIREMENTS:
 4. Prefer outlets that actively cover local government, elections, and civic affairs.
 5. Order the outlets within each format from most to least relevant for the candidate to monitor.
 
+CONTACT INFO:
+For each outlet, return its newsroom email, newsroom/main phone number, and street address WHEN you are highly confident the value is correct.
+- If you are not certain a contact value is correct, return null for that field. Never guess.
+- Never fabricate contact information. Plausible-sounding but unverified contact info is worse than no contact info.
+- Prefer general newsroom or tip-line contacts over individual reporters.
+
 Return at most 10 outlets total. Return at least 1 outlet. Do not fabricate outlets.
 
 Return the result by calling the \`returnLocalNewsOutlets\` tool with arguments matching this exact shape:
@@ -30,7 +39,10 @@ Return the result by calling the \`returnLocalNewsOutlets\` tool with arguments 
     {
       "name": "string, the outlet's commonly known name",
       "type": "TV" | "print" | "radio",
-      "description": "string, ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists."
+      "description": "string, ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists.",
+      "email": "string or null — newsroom email if highly confident, else null",
+      "phone": "string or null — newsroom/main phone if highly confident, else null",
+      "address": "string or null — street address if highly confident, else null"
     }
   ]
 }
@@ -51,7 +63,14 @@ const tool: ChatCompletionTool = {
           maxItems: 10,
           items: {
             type: 'object',
-            required: ['name', 'type', 'description'],
+            required: [
+              'name',
+              'type',
+              'description',
+              'email',
+              'phone',
+              'address',
+            ],
             properties: {
               name: {
                 type: 'string',
@@ -66,6 +85,21 @@ const tool: ChatCompletionTool = {
                 description:
                   "ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists.",
               },
+              email: {
+                type: ['string', 'null'],
+                description:
+                  'Newsroom email when highly confident. Use null when unknown or unsure. Never guess.',
+              },
+              phone: {
+                type: ['string', 'null'],
+                description:
+                  'Newsroom or main phone number when highly confident. Use null when unknown or unsure. Never guess.',
+              },
+              address: {
+                type: ['string', 'null'],
+                description:
+                  'Street address when highly confident. Use null when unknown or unsure. Never guess.',
+              },
             },
           },
         },
@@ -75,10 +109,16 @@ const tool: ChatCompletionTool = {
   },
 }
 
+// If a pending job hasn't resolved within this window, treat it as dead and
+// allow the next caller to kick off a fresh fetch. Covers process restarts
+// and AI hangs.
+const PENDING_TTL_MS = 5 * 60 * 1000
+
 @Injectable()
 export class OnboardingLocalNewsService {
   constructor(
     private readonly ai: AiService,
+    private readonly campaigns: CampaignsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(OnboardingLocalNewsService.name)
@@ -88,66 +128,199 @@ export class OnboardingLocalNewsService {
     city,
     state,
     office,
+    campaign,
   }: {
     city?: string
     state: string
     office: string
+    campaign: Campaign
   }): Promise<LocalNewsResponse> {
-    const jurisdiction = city ? `${city}, ${state}` : state
-    const messages: AiChatMessage[] = [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-      },
-      {
-        role: 'user',
-        content: `Jurisdiction: ${jurisdiction}\nOffice: ${office}`,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-      },
-    ]
+    const existing = campaign.data?.onboarding?.localMediaOutlets
 
-    const completion = await this.ai.getChatToolCompletion({
-      messages,
-      tool,
-      toolChoice: {
-        type: 'function',
-        function: { name: 'returnLocalNewsOutlets' },
-      },
-      temperature: 0.2,
-      topP: 0.1,
-      models: ['deepseek-ai/DeepSeek-V4-Pro'],
-    })
-
-    const raw = completion.content?.trim()
-    if (!raw) {
-      throw new BadGatewayException(
-        'AI service returned no content for local news outlets',
-      )
+    if (existing && existing.office === office) {
+      if (existing.status === 'ready') {
+        this.logger.info(
+          {
+            office,
+            outletCount: existing.outlets.length,
+            campaignId: campaign.id,
+          },
+          'getLocalNews cache hit',
+        )
+        return { status: 'ready', outlets: existing.outlets }
+      }
+      if (
+        existing.status === 'pending' &&
+        Date.now() - existing.startedAt < PENDING_TTL_MS
+      ) {
+        return { status: 'pending' }
+      }
     }
 
-    let parsed: unknown
+    await this.markPending(campaign, office)
+    void this.runFetch({ campaignId: campaign.id, city, state, office })
+    return { status: 'pending' }
+  }
+
+  private async runFetch({
+    campaignId,
+    city,
+    state,
+    office,
+  }: {
+    campaignId: number
+    city?: string
+    state: string
+    office: string
+  }): Promise<void> {
+    const jurisdiction = city ? `${city}, ${state}` : state
+    const startedAt = Date.now()
+    this.logger.info(
+      { jurisdiction, office, campaignId },
+      'getLocalNews background fetch started',
+    )
+
     try {
-      parsed = JSON.parse(raw)
+      const messages: AiChatMessage[] = [
+        {
+          role: 'system',
+          content: SYSTEM_PROMPT,
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+        },
+        {
+          role: 'user',
+          content: `Jurisdiction: ${jurisdiction}\nOffice: ${office}`,
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+        },
+      ]
+
+      const completion = await this.ai.getChatToolCompletion({
+        messages,
+        tool,
+        toolChoice: {
+          type: 'function',
+          function: { name: 'returnLocalNewsOutlets' },
+        },
+        temperature: 0.2,
+        topP: 0.1,
+        models: ['deepseek-ai/DeepSeek-V4-Pro'],
+        enableReasoning: true,
+        maxTokens: 8000,
+      })
+
+      const raw = completion.content?.trim()
+      if (!raw) {
+        throw new Error('AI returned no content for local news outlets')
+      }
+
+      let parsedJson: unknown
+      try {
+        parsedJson = JSON.parse(raw)
+      } catch (error) {
+        throw new Error(`Failed to JSON.parse local news AI response: ${error}`)
+      }
+
+      const validated = aiOutletsToolResultSchema.safeParse(parsedJson)
+      if (!validated.success) {
+        this.logger.error(
+          { issues: validated.error.issues, parsed: parsedJson, campaignId, office },
+          'AI local news response failed schema validation',
+        )
+        throw new Error('AI returned unexpected outlet shape')
+      }
+
+      await this.writeReady(campaignId, office, validated.data.outlets)
+      this.logger.info(
+        {
+          jurisdiction,
+          office,
+          campaignId,
+          outletCount: validated.data.outlets.length,
+          elapsedMs: Date.now() - startedAt,
+        },
+        'getLocalNews background fetch completed',
+      )
     } catch (error) {
       this.logger.error(
-        { error, raw },
-        'Failed to JSON.parse local news AI response',
+        { error, campaignId, office, elapsedMs: Date.now() - startedAt },
+        'getLocalNews background fetch failed',
       )
-      throw new BadGatewayException('AI service returned invalid JSON')
+      await this.expirePending(campaignId, office)
     }
+  }
 
-    const validated = localNewsResponseSchema.safeParse(parsed)
-    if (!validated.success) {
+  private async markPending(campaign: Campaign, office: string): Promise<void> {
+    await this.campaigns.updateJsonFields(campaign.id, {
+      data: {
+        onboarding: {
+          localMediaOutlets: {
+            office,
+            status: 'pending',
+            startedAt: Date.now(),
+          },
+        },
+      },
+    })
+  }
+
+  private async writeReady(
+    campaignId: number,
+    office: string,
+    outlets: LocalNewsOutlet[],
+  ): Promise<void> {
+    await this.campaigns.updateJsonFields(campaignId, {
+      data: {
+        onboarding: {
+          localMediaOutlets: {
+            office,
+            status: 'ready',
+            outlets,
+          },
+        },
+      },
+    })
+  }
+
+  private async expirePending(
+    campaignId: number,
+    office: string,
+  ): Promise<void> {
+    try {
+      const fresh = await this.campaigns.findFirst({
+        where: { id: campaignId },
+      })
+      const current = fresh?.data?.onboarding?.localMediaOutlets
+      // Only invalidate if the pending marker still belongs to this office.
+      // A newer caller may have overwritten it with a different office (or a
+      // successful ready result) and we don't want to clobber that.
+      if (
+        !current ||
+        current.office !== office ||
+        current.status !== 'pending'
+      ) {
+        return
+      }
+      // Set startedAt to 0 so the TTL check immediately treats this as
+      // expired. The next poll will trigger a fresh fetch instead of waiting
+      // out the full TTL window.
+      await this.campaigns.updateJsonFields(campaignId, {
+        data: {
+          onboarding: {
+            localMediaOutlets: {
+              office,
+              status: 'pending',
+              startedAt: 0,
+            },
+          },
+        },
+      })
+    } catch (error) {
       this.logger.error(
-        { issues: validated.error.issues, parsed },
-        'AI local news response failed schema validation',
+        { error, campaignId, office },
+        'Failed to expire pending localMediaOutlets marker',
       )
-      throw new BadGatewayException('AI service returned an unexpected shape')
     }
-
-    return validated.data
   }
 }

@@ -46,6 +46,9 @@ type GetChatToolCompletionArgs = {
   toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
   models?: string[]
+  enableReasoning?: boolean // Together AI: leave reasoning on for reasoning-native models (e.g. DeepSeek) that need it to emit tool args.
+  reasoningEffort?: 'low' | 'medium' | 'high' // Together AI: cap how much budget the model spends thinking before emitting output.
+  maxTokens?: number // Together AI defaults to ~2048; reasoning models need more headroom to finish thinking AND emit the tool call.
 }
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
@@ -226,6 +229,9 @@ export class AiService {
     toolChoice,
     timeout = 300000,
     models,
+    enableReasoning = false,
+    reasoningEffort,
+    maxTokens,
   }: GetChatToolCompletionArgs) {
     const modelsToTry = models?.length ? models : PARSED_AI_MODELS
     for (const model of modelsToTry) {
@@ -242,7 +248,13 @@ export class AiService {
             temperature,
             ...(tool && { tools: [tool] }),
             ...(toolChoice && { tool_choice: toolChoice }),
-            ...(isTogetherAi && { reasoning: { enabled: false } }),
+            ...(isTogetherAi && {
+              reasoning: {
+                enabled: enableReasoning,
+                ...(enableReasoning && reasoningEffort && { effort: reasoningEffort }),
+              },
+            }),
+            ...(maxTokens !== undefined && { max_tokens: maxTokens }),
           },
           { timeout },
         )
