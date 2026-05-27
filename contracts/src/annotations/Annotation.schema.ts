@@ -26,8 +26,16 @@ export type AnnotationResourceType = z.infer<
 >
 
 /**
- * Anchor: either all three fields are set (text-anchored) or all three
- * are null (page-level / top-level annotation). Mixed states are rejected.
+ * Anchor: one of three valid shapes
+ *   - Passage-anchored: all three of `json_path`, `start`, `end` are set.
+ *     The annotation maps to a character range inside that node.
+ *   - Card-level:       `json_path` is set, both `start` and `end` are null.
+ *     The annotation is scoped to a whole card / artifact node without a
+ *     passage selection — e.g. a note attached to an entire agenda item.
+ *   - Briefing-wide:    all three are null. Legacy / page-scoped annotation.
+ *
+ * The (json_path null AND start/end set) combination is rejected — you
+ * can't reference an offset without a node to apply it to.
  */
 export const AnnotationAnchorSchema = z
   .object({
@@ -37,11 +45,18 @@ export const AnnotationAnchorSchema = z
   })
   .refine(
     (a) => {
-      const all = a.json_path !== null && a.start !== null && a.end !== null
-      const none = a.json_path === null && a.start === null && a.end === null
-      return all || none
+      const passage =
+        a.json_path !== null && a.start !== null && a.end !== null
+      const cardLevel =
+        a.json_path !== null && a.start === null && a.end === null
+      const briefingWide =
+        a.json_path === null && a.start === null && a.end === null
+      return passage || cardLevel || briefingWide
     },
-    { message: 'anchor must have all of json_path/start/end set or all null' },
+    {
+      message:
+        'anchor must be passage-anchored (all set), card-level (json_path only), or briefing-wide (all null)',
+    },
   )
   .refine((a) => a.start === null || a.end === null || a.start < a.end, {
     message: 'start must be less than end',
