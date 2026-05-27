@@ -1,6 +1,7 @@
 import { User, UserRole } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersController } from './users.controller'
+import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
 import { UsersService } from './services/users.service'
 import { FilesService } from 'src/files/files.service'
 import { FileUpload } from 'src/files/files.types'
@@ -369,6 +370,14 @@ describe('UsersController', () => {
       controller.updateMetadata(mockUser, { meta })
 
       expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, meta)
+    })
+
+    it('strips server-managed fields from input', () => {
+      const result = UpdateMetadataSchema.schema.parse({
+        meta: { customerId: 'cus_456', textNotifications: true },
+      })
+      expect(result.meta).not.toHaveProperty('customerId')
+      expect(result.meta.textNotifications).toBe(true)
     })
   })
 
