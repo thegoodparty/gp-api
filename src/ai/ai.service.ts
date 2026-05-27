@@ -212,13 +212,13 @@ export class AiService {
 
   private extractToolContent(
     message: ChatCompletion.Choice['message'],
-  ): string {
+  ): { content: string; fromToolCall: boolean } {
     const toolCalls = message.tool_calls
     if (toolCalls?.length) {
       const args = toolCalls[0]?.function?.arguments
-      if (args) return args
+      if (args) return { content: args, fromToolCall: true }
     }
-    return message.content || ''
+    return { content: message.content || '', fromToolCall: false }
   }
 
   async getChatToolCompletion({
@@ -260,12 +260,20 @@ export class AiService {
         )
 
         const message = completion.choices[0]?.message
-        let content = message ? this.extractToolContent(message) : ''
-        content = content.trim()
+        const extracted = message
+          ? this.extractToolContent(message)
+          : { content: '', fromToolCall: false }
+        let content = extracted.content.trim()
         content = this.applyToolResponseFallback(content)
 
         content = AiService.stripHtmlFences(content)
-        content = content.replace(/\n/g, '<br/><br/>')
+        // Only apply the prose `\n -> <br/><br/>` transform to plain message
+        // content. Tool-call arguments are JSON; that substitution would
+        // corrupt pretty-printed payloads and silently mangle newlines inside
+        // string fields.
+        if (!extracted.fromToolCall) {
+          content = content.replace(/\n/g, '<br/><br/>')
+        }
 
         this.logger.debug({ content }, 'completion success')
         return {

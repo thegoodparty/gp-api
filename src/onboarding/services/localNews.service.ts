@@ -157,8 +157,10 @@ export class OnboardingLocalNewsService {
       }
     }
 
-    await this.markPending(campaign, office)
-    void this.runFetch({ campaignId: campaign.id, city, state, office })
+    const claimed = await this.markPending(campaign.id, office)
+    if (claimed) {
+      void this.runFetch({ campaignId: campaign.id, city, state, office })
+    }
     return { status: 'pending' }
   }
 
@@ -251,8 +253,30 @@ export class OnboardingLocalNewsService {
     }
   }
 
-  private async markPending(campaign: Campaign, office: string): Promise<void> {
-    await this.campaigns.updateJsonFields(campaign.id, {
+  // Atomically attempt to claim the slot for (campaign, office). Re-reads the
+  // campaign inside the same call so a concurrent request can't both see "no
+  // pending marker" and both kick off an AI run. Returns true if this caller
+  // claimed the slot and should run the AI fetch; false if another caller
+  // already owns a fresh pending marker for the same office.
+  //
+  // Note: this is "good enough" for the single-user onboarding case (the only
+  // realistic concurrency is React Strict Mode double-mounts or multi-tab).
+  // True transactional safety would need a serializable tx + conditional
+  // update; the cost-benefit doesn't justify it here.
+  private async markPending(
+    campaignId: number,
+    office: string,
+  ): Promise<boolean> {
+    const fresh = await this.campaigns.findFirst({ where: { id: campaignId } })
+    const current = fresh?.data?.onboarding?.localMediaOutlets
+    if (
+      current?.office === office &&
+      current.status === 'pending' &&
+      Date.now() - current.startedAt < PENDING_TTL_MS
+    ) {
+      return false
+    }
+    await this.campaigns.updateJsonFields(campaignId, {
       data: {
         onboarding: {
           localMediaOutlets: {
@@ -263,6 +287,7 @@ export class OnboardingLocalNewsService {
         },
       },
     })
+    return true
   }
 
   private async writeReady(

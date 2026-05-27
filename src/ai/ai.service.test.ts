@@ -350,6 +350,30 @@ describe('AiService', () => {
       expect(result.content).toBe('a<br/><br/>b')
     })
 
+    it('does NOT replace newlines in tool_call arguments (would corrupt JSON)', async () => {
+      const prettyJson = '{\n  "city": "NYC"\n}'
+      mockOpenAiCreate.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                { function: { name: 'extractLocation', arguments: prettyJson } },
+              ],
+            },
+          },
+        ],
+        usage: { total_tokens: 5 },
+      })
+
+      const result = await service.getChatToolCompletion({
+        messages: [userMessage('test')],
+      })
+
+      expect(result.content).toBe(prettyJson)
+      expect(() => JSON.parse(result.content)).not.toThrow()
+    })
+
     it('parses <function=...> fallback format from content', async () => {
       mockOpenAiCreate.mockResolvedValueOnce({
         choices: [
