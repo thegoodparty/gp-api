@@ -50,24 +50,40 @@ const toCandidate = (c: ApiCandidateRaw): ApiCandidate => ({
   isIncumbent: c.is_incumbent,
 })
 
-const toRaceContext = (data: ApiResponse): RaceContextFromApi => ({
-  state: data.state,
-  candidateOffice: data.candidate_office,
-  officialOfficeName: data.official_office_name,
-  officeLevel: data.office_level,
-  officeType: data.office_type,
-  primaryElectionDate: data.primary_election_date,
-  generalElectionDate: data.general_election_date,
-  relevantElectionDate: data.relevant_election_date,
-  numberOfSeats: data.number_of_seats,
-  projectedTurnout: data.projected_turnout,
-  civicsWinNumber: data.civics_win_number,
-  winNumberEstimate: data.win_number_estimate,
-  winNumberEffective: data.win_number_effective,
-  contactsNeededEstimate: data.contacts_needed_estimate,
-  candidateCount: data.candidate_count,
-  candidates: data.candidates.map(toCandidate),
-})
+// Substring match (case-insensitive) on the email. Filters out internal
+// test candidates (e.g. someone@goodparty.org) seeded against real races
+// so they don't leak into the LLM prompt as if they were genuine
+// opponents. candidateCount is recomputed from the filtered array to
+// keep the two fields consistent.
+const TEST_CANDIDATE_EMAIL_MARKER = '@goodparty'
+
+const isTestCandidate = (c: ApiCandidate): boolean =>
+  c.email !== null &&
+  c.email.toLowerCase().includes(TEST_CANDIDATE_EMAIL_MARKER)
+
+const toRaceContext = (data: ApiResponse): RaceContextFromApi => {
+  const candidates = data.candidates
+    .map(toCandidate)
+    .filter((c) => !isTestCandidate(c))
+  return {
+    state: data.state,
+    candidateOffice: data.candidate_office,
+    officialOfficeName: data.official_office_name,
+    officeLevel: data.office_level,
+    officeType: data.office_type,
+    primaryElectionDate: data.primary_election_date,
+    generalElectionDate: data.general_election_date,
+    relevantElectionDate: data.relevant_election_date,
+    numberOfSeats: data.number_of_seats,
+    projectedTurnout: data.projected_turnout,
+    civicsWinNumber: data.civics_win_number,
+    winNumberEstimate: data.win_number_estimate,
+    winNumberEffective: data.win_number_effective,
+    contactsNeededEstimate: data.contacts_needed_estimate,
+    candidateCount: candidates.length,
+    candidates,
+  }
+}
 
 @Injectable()
 export class ElectionApiService {

@@ -136,6 +136,77 @@ describe('ElectionApiService', () => {
     await expect(service.getRaceContext(BR_HASH)).rejects.not.toThrow(/secret/)
   })
 
+  it('strips candidates whose email contains @goodparty and recomputes candidateCount', async () => {
+    const responseWithTestData = {
+      ...validResponse,
+      candidate_count: 4,
+      candidates: [
+        validResponse.candidates[0],
+        {
+          gp_candidate_id: 'test-1',
+          first_name: 'Internal',
+          last_name: 'Tester',
+          full_name: 'Internal Tester',
+          email: 'felix@goodparty.org',
+          website_url: null,
+          party: null,
+          is_incumbent: null,
+        },
+        {
+          gp_candidate_id: 'test-2',
+          first_name: 'Mixed',
+          last_name: 'Case',
+          full_name: 'Mixed Case',
+          email: 'Admin@GoodParty.com',
+          website_url: null,
+          party: null,
+          is_incumbent: null,
+        },
+        validResponse.candidates[1],
+      ],
+    }
+    mockHttpPost.mockReturnValue(
+      of({ data: responseWithTestData, status: 200 }),
+    )
+
+    const result = await service.getRaceContext(BR_HASH)
+
+    expect(result.candidates.map((c) => c.fullName)).toEqual([
+      'Jane Doe',
+      'Bob Smith',
+    ])
+    expect(result.candidateCount).toBe(2)
+  })
+
+  it('keeps candidates with null email even though @goodparty filter is on email', async () => {
+    mockHttpPost.mockReturnValue(
+      of({
+        data: {
+          ...validResponse,
+          candidate_count: 1,
+          candidates: [
+            {
+              gp_candidate_id: null,
+              first_name: 'No',
+              last_name: 'Email',
+              full_name: 'No Email',
+              email: null,
+              website_url: null,
+              party: null,
+              is_incumbent: null,
+            },
+          ],
+        },
+        status: 200,
+      }),
+    )
+
+    const result = await service.getRaceContext(BR_HASH)
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.candidates[0].fullName).toBe('No Email')
+  })
+
   it('throws BadGateway when election-api returns a response that fails schema validation', async () => {
     mockHttpPost.mockReturnValue(
       of({ data: { ...validResponse, candidate_count: 'two' }, status: 200 }),
