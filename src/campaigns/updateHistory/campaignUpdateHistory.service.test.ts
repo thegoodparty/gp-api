@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotFoundException } from '@nestjs/common'
-import {
-  Campaign,
-  CampaignUpdateHistoryType,
-} from '@prisma/client'
+import { Campaign, CampaignUpdateHistoryType } from '@prisma/client'
 import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CampaignsService } from '../services/campaigns.service'
 
@@ -43,23 +40,16 @@ describe('CampaignUpdateHistoryService', () => {
       get: () => ({ campaignUpdateHistory: mockModel }),
       configurable: true,
     })
-    service.findFirstOrThrow =
-      mockModel.findFirstOrThrow.bind(mockModel)
+    service.findFirstOrThrow = mockModel.findFirstOrThrow.bind(mockModel)
   })
 
   describe('delete', () => {
     it('throws when record does not belong to campaign', async () => {
-      mockModel.findFirstOrThrow.mockRejectedValue(
-        new NotFoundException(),
-      )
+      mockModel.findFirstOrThrow.mockRejectedValue(new NotFoundException())
 
-      await expect(service.delete(99, 2)).rejects.toThrow(
-        NotFoundException,
-      )
+      await expect(service.delete(99, 2)).rejects.toThrow(NotFoundException)
 
-      expect(
-        mockModel.findFirstOrThrow,
-      ).toHaveBeenCalledWith({
+      expect(mockModel.findFirstOrThrow).toHaveBeenCalledWith({
         where: { id: 99, campaignId: 2 },
         include: { campaign: true },
       })
@@ -83,20 +73,20 @@ describe('CampaignUpdateHistoryService', () => {
         quantity: 30,
         campaign,
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockModel.deleteMany.mockResolvedValue({
+        count: 1,
+      })
 
       await service.delete(5, 1)
 
-      expect(mockCampaignsService.update).toHaveBeenCalledWith(
-        {
-          where: { id: 1 },
-          data: {
-            data: expect.objectContaining({
-              reportedVoterGoals: { doorKnocking: 70 },
-            }),
-          },
+      expect(mockCampaignsService.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: expect.objectContaining({
+            reportedVoterGoals: { doorKnocking: 70 },
+          }),
         },
-      )
+      })
 
       expect(mockModel.deleteMany).toHaveBeenCalledWith({
         where: { id: 5, campaignId: 1 },
@@ -113,13 +103,13 @@ describe('CampaignUpdateHistoryService', () => {
         quantity: 10,
         campaign,
       })
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockModel.deleteMany.mockResolvedValue({
+        count: 1,
+      })
 
       await service.delete(7, 1)
 
-      expect(
-        mockCampaignsService.update,
-      ).not.toHaveBeenCalled()
+      expect(mockCampaignsService.update).not.toHaveBeenCalled()
       expect(mockModel.deleteMany).toHaveBeenCalledWith({
         where: { id: 7, campaignId: 1 },
       })
