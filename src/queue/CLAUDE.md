@@ -32,3 +32,14 @@ A short overview also lives in `README.md`.
 - The consumer file is intentionally large and switch-based; future refactor will split per-handler. Don't restructure it as part of an unrelated change (Rule 5).
 - AWS credentials are required even in dev (the producer constructor throws otherwise). Set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in `.env` for local work.
 - Preview environments do **not** set `AGENT_DISPATCH_QUEUE_NAME` — agent dispatch fails fast on PR branches by design.
+
+## Failure modes — what breaks if you get this wrong
+
+These are the SQS-specific failure modes that PR review has caught repeatedly. Each one has caused or nearly caused a real production bug.
+
+- **Stub handler that returns `true` for an unhandled `QueueType` silently drops the message.** SQS acks, nothing reaches the DLQ, no alert fires. A new `QueueType` enum value must land with a real handler case in the same PR — not a placeholder that returns success. If a placeholder is genuinely needed, return `false` (or throw a typed sentinel) so the message ages out to DLQ instead of disappearing.
+- **`throw` from inside a handler triggers infinite redelivery, not DLQ.** An unhandled exception bubbles up to SQS, which treats it as transient and requeues the message. The message will redeliver until the queue's redrive policy gives up — potentially hours of retry traffic. Use the framework's failure-return path so the message reaches DLQ on max retries.
+- **`enqueue` / `sendMessage` defaults to `throwOnError: false`.** Producer-side failures swallow silently. The DB row commits, the async work never runs, nothing alerts. Either pass `throwOnError: true` for callers that need fail-fast, or check the return value and decide what to do — don't assume success.
+- **Credentials in payloads persist at rest.** Don't include `*_token`, `*_url` fields that carry credentials, or Clerk actor-token URLs in `data`. SQS retains messages for the queue's retention window, and the ReceiveMessage IAM scope is coarse. Pass a stable identifier (user ID, campaign ID, request ID); mint the credential in the handler from that identifier.
+- **Over-broad `MessageGroupId` serializes unrelated work.** A constant or too-coarse group key (e.g. the literal string `"global"`) makes the queue effectively single-threaded for that type. A too-narrow group breaks the ordering you actually need. Pick the smallest key that preserves required ordering — typically per-campaign or per-organization, not per-app.
+- **Transactional state and enqueue must agree on success.** If you commit a DB row that says "queued" and then `enqueue` fails, the row is wrong. If you `enqueue` first and then the DB commit fails, the handler runs against missing state. Enqueue inside the transaction's success path (after `await tx.commit()`-equivalent), or use an outbox pattern. Don't pretend the two-phase problem isn't there.

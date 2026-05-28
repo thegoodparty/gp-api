@@ -8,6 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import websocket from '@fastify/websocket'
 import { AppModule } from './app.module'
 import { Logger, PinoLogger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
@@ -27,6 +28,16 @@ export const bootstrap = async (
   const adapter = new FastifyAdapter({
     logger: false,
     genReqId: () => randomUUID(),
+    // We run behind ALB / Vercel which terminate TLS and forward the real
+    // client IP via `X-Forwarded-For`. Without `trustProxy`, `request.ip`
+    // resolves to the upstream proxy's address, so any per-IP gate
+    // (notably `BriefingsPdfRateLimitGuard` on the public PDF endpoint)
+    // would key every user onto the same bucket. Fastify's `trustProxy`
+    // tells it to honour the forwarded chain and surface the real client
+    // IP on `request.ip`. Defaulting to `true` here is correct because we
+    // only run this app behind known infrastructure that sets the header
+    // honestly — never directly exposed to the internet.
+    trustProxy: true,
   })
 
   /**
@@ -39,6 +50,12 @@ export const bootstrap = async (
   adapter.getInstance().addHook('onRequest', (req, _, done) => {
     req.raw.route = req.routeOptions?.url
     done()
+  })
+
+  await adapter.getInstance().register(websocket, {
+    options: {
+      maxPayload: 64 * 1024,
+    },
   })
 
   const app = await NestFactory.create<NestFastifyApplication>(

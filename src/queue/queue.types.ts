@@ -11,6 +11,8 @@ export enum QueueType {
   CAMPAIGN_PLAN_COMPLETE = 'campaignPlanComplete',
   WEEKLY_TASKS_DIGEST = 'weeklyTasksDigest',
   AGENT_EXPERIMENT_RESULT = 'agentExperimentResult',
+  AGENTIC_COMPLIANCE_KICKOFF = 'agenticComplianceKickoff',
+  OCR_ATTACHMENT = 'ocrAttachment',
 }
 
 export type QueueMessage =
@@ -41,6 +43,14 @@ export type QueueMessage =
       type: QueueType.AGENT_EXPERIMENT_RESULT
       data: AgentExperimentResultData
     }
+  | {
+      type: QueueType.AGENTIC_COMPLIANCE_KICKOFF
+      data: AgenticComplianceKickoffMessage
+    }
+  | {
+      type: QueueType.OCR_ATTACHMENT
+      data: OcrAttachmentMessage
+    }
 
 export type GenerateAiContentMessageData = {
   slug: string
@@ -55,6 +65,16 @@ export type TcrComplianceStatusCheckMessage = {
 export type DomainEmailForwardingMessage = {
   domainId: number
 }
+
+export const AgenticComplianceKickoffMessageSchema = z.object({
+  campaignId: z.number().int(),
+  tcrComplianceId: z.string().cuid(),
+  clerkUserId: z.string().min(1),
+})
+
+export type AgenticComplianceKickoffMessage = z.infer<
+  typeof AgenticComplianceKickoffMessageSchema
+>
 
 export const CampaignPlanCompleteMessageSchema = z.discriminatedUnion(
   'status',
@@ -137,6 +157,7 @@ export enum MessageGroup {
   domainEmailRedirect = 'domainEmailRedirect',
   polls = 'polls',
   weeklyTasksDigest = 'weeklyTasksDigest',
+  agenticComplianceKickoff = 'agenticComplianceKickoff',
 }
 
 const PollResponseJsonRowSchema = z.object({
@@ -174,3 +195,8 @@ export const AgentExperimentResultSchema = z.object({
 export type AgentExperimentResultData = z.infer<
   typeof AgentExperimentResultSchema
 >
+
+export const OcrAttachmentMessageSchema = z.object({
+  attachmentId: z.string(),
+})
+export type OcrAttachmentMessage = z.infer<typeof OcrAttachmentMessageSchema>

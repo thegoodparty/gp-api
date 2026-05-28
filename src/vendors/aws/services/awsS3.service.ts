@@ -99,7 +99,7 @@ export class AwsS3Service extends AwsService {
   }
 
   async getSignedS3Url(bucket: string, fileName: string, fileType: string) {
-    const filePath = `${bucket}/${fileName}`
+    const filePath = this.getKey({ bucket, fileName })
 
     this.logger.debug(
       {

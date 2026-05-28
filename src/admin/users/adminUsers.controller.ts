@@ -119,8 +119,8 @@ export class AdminUsersController {
     // Happy path: actor resolved from the JWT (admin has a gp-api Clerk account)
     if (req.actorUser?.clerkId) return req.actorUser.clerkId
 
-    // Direct admin session (not currently impersonating someone)
-    if (req.user && !req.user.impersonating && req.user.clerkId) {
+    // Direct admin session (no actor claim in the JWT)
+    if (req.user && !req.actorSub && req.user.clerkId) {
       return req.user.clerkId
     }
 

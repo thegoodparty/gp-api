@@ -2,7 +2,15 @@
 // Test fixtures define decorated controller stubs whose method bodies don't matter.
 import { describe, expect, it, vi } from 'vitest'
 import { Test } from '@nestjs/testing'
-import { Body, Controller, Get, Param, Patch, Module } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Module,
+} from '@nestjs/common'
 import { DiscoveryModule, HttpAdapterHost } from '@nestjs/core'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
@@ -247,6 +255,14 @@ class FooController {
   write(@Body() _b: InDto) {}
 }
 
+@Controller('v1')
+class NoBodyPostController {
+  @Post('foo/verify')
+  @ResponseSchema(z.object({ ok: z.boolean() }))
+  @McpTool({ description: 'no-body action' })
+  verify() {}
+}
+
 describe('McpServerService MCP request handlers', () => {
   it('exposes list_tools that returns tool entries with JSON Schema input shapes', async () => {
     const moduleRef = await buildAppModule(
@@ -404,6 +420,78 @@ describe('McpServerService MCP request handlers', () => {
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toMatch(/Invalid arguments/)
     expect(inject).not.toHaveBeenCalled()
+  })
+
+  it('drops content-type from forwarded headers when the tool has no body', async () => {
+    const calls: InjectOpts[] = []
+    const inject = vi.fn(async (opts: InjectOpts) => {
+      calls.push(opts)
+      return { statusCode: 200, body: '{}', headers: {} }
+    })
+    const moduleRef = await buildAppModule(
+      [NoBodyPostController],
+      inject,
+    ).compile()
+    await moduleRef.init()
+
+    const svc = moduleRef.get(McpServerService)
+    const server = svc.createServer() as unknown as {
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
+    }
+    const callHandler = server._requestHandlers.get('tools/call')!
+    await callHandler(
+      {
+        method: 'tools/call',
+        params: { name: 'POST_v1_foo_verify', arguments: {} },
+      },
+      {
+        requestInfo: {
+          headers: {
+            authorization: 'Bearer t',
+            'content-type': 'application/json',
+          },
+        },
+      },
+    )
+    expect(calls).toHaveLength(1)
+    expect(calls[0].method).toBe('POST')
+    expect(calls[0].payload).toBeUndefined()
+    expect(calls[0].headers?.authorization).toBe('Bearer t')
+    expect(calls[0].headers?.['content-type']).toBeUndefined()
+  })
+
+  it('preserves content-type when the tool call has a body', async () => {
+    const calls: InjectOpts[] = []
+    const inject = vi.fn(async (opts: InjectOpts) => {
+      calls.push(opts)
+      return { statusCode: 200, body: '{}', headers: {} }
+    })
+    const moduleRef = await buildAppModule([FooController], inject).compile()
+    await moduleRef.init()
+
+    const svc = moduleRef.get(McpServerService)
+    const server = svc.createServer() as unknown as {
+      _requestHandlers: Map<
+        string,
+        (req: unknown, extra?: unknown) => Promise<unknown>
+      >
+    }
+    const callHandler = server._requestHandlers.get('tools/call')!
+    await callHandler(
+      {
+        method: 'tools/call',
+        params: { name: 'PATCH_v1_foo', arguments: { body: { slogan: 'x' } } },
+      },
+      {
+        requestInfo: {
+          headers: { 'content-type': 'application/json' },
+        },
+      },
+    )
+    expect(calls[0].headers?.['content-type']).toBe('application/json')
   })
 
   it('returns isError for unknown tool', async () => {
