@@ -11,6 +11,7 @@ import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { PinoLogger } from 'nestjs-pino'
+import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { lastValueFrom } from 'rxjs'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -179,6 +180,22 @@ export class ContactsService {
     return this.withOrgDistrictResolution(organization, fetchSample)
   }
 
+  // Lookup a single person in the org's district by phone number.
+  // The People API's list endpoint already accepts phone-shaped strings in
+  // its `search` field and matches against the indexed
+  // `VoterTelephones_CellPhoneFormatted` column. Returns the first match
+  // (a phone may be shared by multiple voters in a household) or null.
+  async findPersonByPhone(
+    phone: string,
+    organization: Organization,
+  ): Promise<PersonOutput | null> {
+    const result = await this.findContacts(
+      { search: phone, segment: 'all', resultsPerPage: 1, page: 1 },
+      organization,
+    )
+    return result.people[0] ?? null
+  }
+
   async findPerson(
     id: string,
     organization: Organization,
@@ -231,8 +248,9 @@ export class ContactsService {
       districtParams: { districtId: string },
       filters: FilterObject,
     ) => {
+      let response: { data: Readable }
       try {
-        const response = await lastValueFrom(
+        response = await lastValueFrom(
           this.httpService.post<Readable>(
             `${PEOPLE_API_URL}/v1/people/download`,
             { ...districtParams, filters },
@@ -244,12 +262,6 @@ export class ContactsService {
             },
           ),
         )
-
-        return new Promise<void>((resolve, reject) => {
-          response.data.pipe(res.raw)
-          response.data.on('end', resolve)
-          response.data.on('error', reject)
-        })
       } catch (error) {
         this.logger.error(
           { error },
@@ -260,6 +272,80 @@ export class ContactsService {
           'Failed to download contacts from people API',
         )
       }
+
+      // Upstream is live. Only now do we commit our own response headers,
+      // because once these are flushed the connection becomes a binary
+      // download that any error response would corrupt (browser would save
+      // the JSON error blob as `contacts.csv`). All earlier failures
+      // (`isProAccess`, district resolution, axios POST) still produce a
+      // structured 4xx/5xx because nothing has been written to the wire yet.
+      res.raw.setHeader('Content-Type', 'text/csv')
+      res.raw.setHeader(
+        'Content-Disposition',
+        'attachment; filename="contacts.csv"',
+      )
+      // Cookie handshake the Download.tsx client polls for. The browser
+      // commits cookies from a download response, so its appearance is the
+      // signal that "the server has actually started streaming" and lets the
+      // client clear its preparing-state spinner ahead of the 15s fallback.
+      // `Secure` is fine for localhost too: Chrome/Firefox/Safari all treat
+      // localhost as a secure context for cookie purposes.
+      res.raw.setHeader(
+        'Set-Cookie',
+        `gp_download=${randomUUID()}; Path=/; Max-Age=30; SameSite=Lax; Secure`,
+      )
+      if (!res.raw.headersSent) {
+        res.raw.flushHeaders()
+      }
+
+      return new Promise<void>((resolve) => {
+        let settled = false
+        const settle = (fn: () => void) => {
+          if (settled) return
+          settled = true
+          fn()
+        }
+        const destroyUpstream = () => {
+          if (!response.data.destroyed) {
+            response.data.destroy()
+          }
+        }
+
+        response.data.pipe(res.raw)
+        response.data.on('end', () => settle(resolve))
+        // Once `flushHeaders()` above committed our HTTP headers to the wire,
+        // a mid-transfer upstream error must NOT propagate as a rejection.
+        // Nest's global exception filter would call
+        // `httpAdapter.reply(res.raw, jsonBody, 500)` on a response whose
+        // headers are already sent, producing either an
+        // `ERR_HTTP_HEADERS_SENT` warning or a corrupt CSV+JSON blob saved as
+        // `contacts.csv`. Instead: log, tear down both ends, and resolve so
+        // the controller's await falls through cleanly. The browser sees a
+        // truncated download and the operator sees the cause in the logs.
+        response.data.on('error', (err: Error) =>
+          settle(() => {
+            this.logger.error(
+              { err },
+              'Upstream stream error after download headers committed',
+            )
+            destroyUpstream()
+            if (!res.raw.destroyed) {
+              res.raw.destroy(err)
+            }
+            resolve()
+          }),
+        )
+        // Browser canceled / network closed mid-download: tear down the
+        // upstream people-api stream so the gp-api → people-api socket and
+        // the underlying pg COPY connection are released promptly instead of
+        // waiting for an idle-timeout.
+        res.raw.on('close', () =>
+          settle(() => {
+            destroyUpstream()
+            resolve()
+          }),
+        )
+      })
     }
 
     const filters = await this.segmentToFilters(segment, organization)

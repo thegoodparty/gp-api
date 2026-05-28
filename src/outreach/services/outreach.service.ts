@@ -181,6 +181,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         campaign,
         outreach,
         audienceRequest: createOutreachDto.audienceRequest,
+        campaignPlanDueDate: createOutreachDto.campaignPlanDueDate,
       })
     } catch (err) {
       this.logger.error(

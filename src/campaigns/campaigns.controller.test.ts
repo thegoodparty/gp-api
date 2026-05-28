@@ -248,6 +248,8 @@ describe('CampaignsController', () => {
         projectedTurnout: 8000,
         winNumber: 4001,
         voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
       }
       vi.spyOn(
         campaignsService,
@@ -398,6 +400,8 @@ describe('CampaignsController', () => {
         projectedTurnout: 5000,
         winNumber: 2501,
         voterContactGoal: 12505,
+        filingFee: null,
+        filingRequirementsText: null,
       }
       vi.spyOn(
         campaignsService,

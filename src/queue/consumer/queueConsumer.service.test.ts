@@ -2,6 +2,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { MeetingBriefingsService } from '@/meetings/services/meetingBriefings.service'
+import { AnnotationAttachmentService } from '@/annotations/services/annotationAttachment.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { AiGenerationService } from '@/campaigns/tasks/services/aiGeneration.service'
@@ -108,7 +110,10 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     }
   }
   let campaignsService: { findUnique: ReturnType<typeof vi.fn> }
-  let contactsService: { findContacts: ReturnType<typeof vi.fn> }
+  let contactsService: {
+    findContacts: ReturnType<typeof vi.fn>
+    findPersonByPhone: ReturnType<typeof vi.fn>
+  }
   let pollIssuesService: {
     model: { deleteMany: ReturnType<typeof vi.fn> }
     client: { pollIssue: { createMany: ReturnType<typeof vi.fn> } }
@@ -170,6 +175,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       findContacts: vi
         .fn()
         .mockResolvedValue({ pagination: { totalResults: 100 } }),
+      findPersonByPhone: vi.fn().mockResolvedValue(null),
     }
     pollIssuesService = {
       model: { deleteMany: vi.fn().mockResolvedValue(undefined) },
@@ -221,6 +227,8 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -263,8 +271,9 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     )
   })
 
-  it('throws when person with cell phone is not found in poll', async () => {
+  it('skips response and completes poll when phone is in neither outreach nor People DB (no poison pill)', async () => {
     pollIndividualMessage.findMany.mockResolvedValue([])
+    contactsService.findPersonByPhone.mockResolvedValue(null)
     const json = createPollAnalysisJson([
       {
         phoneNumber: '+15559999999',
@@ -276,12 +285,112 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     s3Service.getFile.mockResolvedValue(json)
     const message = createPollAnalysisCompleteMessage({ pollId })
 
-    await expect(service.processMessage(message)).rejects.toThrow(
-      InternalServerErrorException,
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(contactsService.findPersonByPhone).toHaveBeenCalledWith(
+      '5559999999',
+      expect.anything(),
     )
-    await expect(service.processMessage(message)).rejects.toThrow(
-      /not found in poll/,
+    expect(pollIndividualMessage.client.$transaction).toHaveBeenCalled()
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: [],
+    })
+    expect(pollsService.markPollComplete).toHaveBeenCalled()
+  })
+
+  it('falls back to People DB when phone is missing from outreach and persists with the matched personId', async () => {
+    pollIndividualMessage.findMany.mockResolvedValue([])
+    contactsService.findPersonByPhone.mockResolvedValue({
+      id: 'people-db-person-1',
+    })
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber: '+15559999999',
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'Forwarded reply',
+        clusterId: 1,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(contactsService.findPersonByPhone).toHaveBeenCalledWith(
+      '5559999999',
+      expect.anything(),
     )
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          personId: 'people-db-person-1',
+          content: 'Forwarded reply',
+        }),
+      ]),
+    })
+  })
+
+  it('does not call People DB fallback when every response phone maps to outreach', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'Hi',
+        clusterId: 1,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    await service.processMessage(message)
+
+    expect(contactsService.findPersonByPhone).not.toHaveBeenCalled()
+  })
+
+  it('skips response when People DB lookup throws (e.g. district unresolved) — still no poison pill', async () => {
+    pollIndividualMessage.findMany.mockResolvedValue([])
+    contactsService.findPersonByPhone.mockRejectedValue(
+      new Error(
+        'Organization does not have sufficient data to resolve district',
+      ),
+    )
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber: '+15559999999',
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'Hello',
+        clusterId: 1,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: [],
+    })
   })
 
   it('creates poll issues, coalesces JSON rows by phone+receivedAt, creates messages and links by clusterId', async () => {
@@ -778,6 +887,8 @@ describe('QueueConsumerService - handleDomainEmailForwardingMessage', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -961,6 +1072,8 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
       createMockLogger(),
     )
   })
@@ -1068,7 +1181,12 @@ describe('QueueConsumerService - message type routing', () => {
             addEventTasks: vi.fn().mockResolvedValue(undefined),
           },
         },
-        { provide: CampaignTcrComplianceService, useValue: {} },
+        {
+          provide: CampaignTcrComplianceService,
+          useValue: {
+            handleAgenticKickoff: vi.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: ContactsService, useValue: {} },
         { provide: DomainsService, useValue: {} },
         { provide: ElectedOfficeService, useValue: {} },
@@ -1085,6 +1203,14 @@ describe('QueueConsumerService - message type routing', () => {
           useValue: { handleWeeklyTasksDigest: vi.fn() },
         },
         { provide: ExperimentRunsService, useValue: {} },
+        {
+          provide: MeetingBriefingsService,
+          useValue: { onExperimentRunCompleted: vi.fn() },
+        },
+        {
+          provide: AnnotationAttachmentService,
+          useValue: { runOcr: vi.fn() },
+        },
         { provide: PinoLogger, useValue: createMockLogger() },
       ],
     }).compile()
@@ -1190,6 +1316,60 @@ describe('QueueConsumerService - message type routing', () => {
     }
 
     // withLegacyErrorSwallowing catches the Zod parse failure and returns true
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).not.toHaveBeenCalled()
+  })
+
+  it('routes agenticComplianceKickoff messages to the TCR compliance handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const validTcrCuid = 'ckpqr7s3z00010o9k1234abcd'
+    const message: Message = {
+      MessageId: 'msg-kickoff-ok',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: validTcrCuid,
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(handleSpy).toHaveBeenCalledOnce()
+    expect(handleSpy).toHaveBeenCalledWith({
+      campaignId: 42,
+      tcrComplianceId: validTcrCuid,
+      clerkUserId: 'user_clerk_xyz',
+    })
+  })
+
+  it('discards agenticComplianceKickoff with invalid payload and does not call handler', async () => {
+    const tcr = module.get(CampaignTcrComplianceService)
+    const handleSpy = vi
+      .spyOn(tcr, 'handleAgenticKickoff')
+      .mockResolvedValue(undefined)
+
+    const message: Message = {
+      MessageId: 'msg-kickoff-invalid',
+      Body: JSON.stringify({
+        type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+        data: {
+          campaignId: 42,
+          tcrComplianceId: 'not-a-cuid',
+          clerkUserId: 'user_clerk_xyz',
+        },
+      }),
+    }
+
     const result = await service.processMessage(message)
 
     expect(result).toBe(true)

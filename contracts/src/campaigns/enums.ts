@@ -71,3 +71,17 @@ export const GENERATION_STATUS_VALUES = ['processing', 'completed'] as const
 export type GenerationStatus = (typeof GENERATION_STATUS_VALUES)[number]
 export const GenerationStatusSchema = z.enum(GENERATION_STATUS_VALUES)
 export const GenerationStatus = toEnumObject(GENERATION_STATUS_VALUES)
+
+export const COMPLIANCE_STAGE_VALUES = [
+  'needs_profile',
+  'needs_filing',
+  'pending_domain_purchase',
+  'pending_website_live',
+  'awaiting_pin',
+  'tcr_in_review',
+  'tcr_approved',
+  'tcr_rejected',
+] as const
+export type ComplianceStage = (typeof COMPLIANCE_STAGE_VALUES)[number]
+export const ComplianceStageSchema = z.enum(COMPLIANCE_STAGE_VALUES)
+export const ComplianceStage = toEnumObject(COMPLIANCE_STAGE_VALUES)

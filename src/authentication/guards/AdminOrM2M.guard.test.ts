@@ -47,19 +47,49 @@ describe('AdminOrM2MGuard', () => {
     expect(result).toBe(false)
   })
 
-  it('allows impersonating sessions (actor claim present)', () => {
+  it('allows impersonation when actorUser is admin', () => {
     const result = guard.canActivate(
       mockContext({
         user: { roles: [UserRole.candidate], impersonating: true },
+        actorUser: { roles: [UserRole.admin] },
       }),
     )
     expect(result).toBe(true)
   })
 
-  it('rejects non-impersonating candidate sessions', () => {
+  it('allows email-fallback actor via actorSub', () => {
     const result = guard.canActivate(
       mockContext({
-        user: { roles: [UserRole.candidate], impersonating: false },
+        user: {
+          roles: [UserRole.candidate],
+          impersonating: false,
+        },
+        actorSub: 'admin@goodparty.org',
+      }),
+    )
+    expect(result).toBe(true)
+  })
+
+  it('rejects when no actorSub, no actorUser, non-admin user', () => {
+    const result = guard.canActivate(
+      mockContext({
+        user: {
+          roles: [UserRole.candidate],
+          impersonating: false,
+        },
+      }),
+    )
+    expect(result).toBe(false)
+  })
+
+  it('rejects impersonation when actorUser is not admin and no actorSub', () => {
+    const result = guard.canActivate(
+      mockContext({
+        user: {
+          roles: [UserRole.candidate],
+          impersonating: true,
+        },
+        actorUser: { roles: [UserRole.candidate] },
       }),
     )
     expect(result).toBe(false)

@@ -521,4 +521,63 @@ describe('ElectionsService', () => {
       expect(result).toBeNull()
     })
   })
+
+  describe('fetchFilingFeeByRaceHash', () => {
+    it('returns null without calling the API when brHashId is empty', async () => {
+      const result = await service.fetchFilingFeeByRaceHash('')
+
+      expect(result).toBeNull()
+      expect(mockHttpGet).not.toHaveBeenCalled()
+    })
+
+    it('forwards the brHashId on the URL and returns the API response', async () => {
+      const response = {
+        filingFee: 100,
+        filingRequirementsText: '$100 filing fee',
+        extractionSource: 'direct_dollar' as const,
+      }
+      mockHttpGet.mockReturnValue(of({ data: response, status: 200 }))
+
+      const result = await service.fetchFilingFeeByRaceHash('br-hash-123')
+
+      expect(result).toEqual(response)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('races/by-br-hash-id/br-hash-123/filing-fee'),
+        expect.anything(),
+      )
+    })
+
+    it('URI-encodes brHashes that contain special characters', async () => {
+      mockHttpGet.mockReturnValue(
+        of({
+          data: {
+            filingFee: null,
+            filingRequirementsText: null,
+            extractionSource: null,
+          },
+          status: 200,
+        }),
+      )
+
+      // BallotReady GraphQL Node IDs are base64 and can contain `/` and `=`.
+      await service.fetchFilingFeeByRaceHash('Z2lkOi8v/ballot=')
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `races/by-br-hash-id/${encodeURIComponent('Z2lkOi8v/ballot=')}/filing-fee`,
+        ),
+        expect.anything(),
+      )
+    })
+
+    it('returns null and swallows errors when the API call fails', async () => {
+      mockHttpGet.mockImplementation(() => {
+        throw new Error('boom')
+      })
+
+      const result = await service.fetchFilingFeeByRaceHash('br-hash-1')
+
+      expect(result).toBeNull()
+    })
+  })
 })

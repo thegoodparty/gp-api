@@ -14,6 +14,7 @@ import {
 } from '@/authentication/interfaces/auth-provider.interface'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
+import { TRANSCRIBE_STREAM_PATH } from '@/speech/ws/speechToText.gateway'
 import { UsersService } from '@/users/services/users.service'
 import { SessionsService } from '@/users/services/sessions.service'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
@@ -34,6 +35,16 @@ export class SessionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<IncomingRequest>()
+
+    // The speech-to-text WebSocket upgrade authenticates with a short-lived
+    // ticket verified in SpeechToTextGateway, not the session cookie/JWT.
+    // Browsers can't set an Authorization header on a WS handshake, so this
+    // guard would otherwise reject the upgrade and the ALB returns a 502. It's
+    // a raw Fastify route and can't carry @PublicAccess(), hence the path check.
+    if (request.url.split('?')[0] === TRANSCRIBE_STREAM_PATH) {
+      return true
+    }
+
     const token = request.headers.authorization?.replace('Bearer ', '')
 
     if (!token) {
@@ -79,7 +90,7 @@ export class SessionGuard implements CanActivate {
 
       request.user = {
         ...user,
-        impersonating: actor != null,
+        impersonating: actorUser != null,
       }
       if (actorUser) {
         request.actorUser = actorUser

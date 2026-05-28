@@ -1,0 +1,13 @@
+model AnnotationNote {
+  id String @id @default(cuid())
+
+  body String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  annotation  Annotation?
+  attachments AnnotationNoteAttachment[]
+
+  @@map("annotation_note")
+}

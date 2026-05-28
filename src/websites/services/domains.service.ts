@@ -3,6 +3,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -52,6 +53,8 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
 
+const SUPPORTED_TLDS = ['com', 'org', 'vote'] as const
+
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
 const DOMAIN_RESERVATION_KIND = {
@@ -64,7 +67,7 @@ const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
 
 const GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS = 'candidate-domains@goodparty.org'
 
-const { ENABLE_DOMAIN_SETUP } = process.env
+const { ENABLE_DOMAIN_PURCHASE } = process.env
 
 @Injectable()
 export class DomainsService
@@ -116,7 +119,7 @@ export class DomainsService
   }
 
   shouldEnableDomainPurchase(): boolean {
-    return ENABLE_DOMAIN_SETUP === 'true'
+    return ENABLE_DOMAIN_PURCHASE === 'true'
   }
 
   private validateDomainSearchResult(searchResult: DomainSearchResult) {
@@ -422,9 +425,9 @@ export class DomainsService
       electionDate = new Date()
     }
 
-    let candidates: string[]
+    let expanded: string[]
     try {
-      candidates = expandDomainPatterns(
+      expanded = expandDomainPatterns(
         patterns,
         {
           firstName: campaign.user.firstName ?? '',
@@ -441,6 +444,19 @@ export class DomainsService
       }
       throw error
     }
+
+    // Per the @McpTool description on POST /domains/search, callers may pass
+    // bare SLD patterns (no TLD) and the server fans them out across the
+    // supported TLDs. Patterns that already include a TLD are passed through
+    // unchanged so existing alternation syntax (e.g. `vote-x.(run|bio)`)
+    // keeps working.
+    const candidates = Array.from(
+      new Set(
+        expanded.flatMap((c) =>
+          c.includes('.') ? [c] : SUPPORTED_TLDS.map((tld) => `${c}.${tld}`),
+        ),
+      ),
+    )
 
     const checked = await Promise.allSettled(
       candidates.map((domain) =>
@@ -644,12 +660,24 @@ export class DomainsService
   async purchaseDomainForCampaign(
     campaign: Campaign & { user: User },
     domainName: string,
+    maxPrice: number,
   ): Promise<{
     website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
     domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
     alreadyExisted: boolean
     message: string
   }> {
+    // The skip-payment branch below bills GP's Vercel team account; gate to
+    // Pro campaigns so non-Pro browser callers can't bypass Stripe Checkout.
+    // (Pro covers the bundled domain per the product design.) Strict
+    // agent-only discrimination would require an actor-token claim from the
+    // broker — tracked separately.
+    if (!campaign.isPro) {
+      throw new ForbiddenException(
+        'Domain purchase requires an active Pro subscription',
+      )
+    }
+
     const preflightHit = await this.preflightDomainPurchase(
       campaign.id,
       domainName,
@@ -680,6 +708,12 @@ export class DomainsService
 
     const price = await this.lookupDomainPrice(domainName)
 
+    if (price > maxPrice) {
+      throw new ConflictException(
+        `Domain ${domainName} price ${price} exceeds maxPrice ${maxPrice}`,
+      )
+    }
+
     const locked = await this.reserveDomainForCampaign(
       campaign.id,
       domainName,
@@ -697,24 +731,45 @@ export class DomainsService
 
     const { websiteSummary, domain: createdDomain } = locked
 
-    // NOTE: this method only reserves the Domain row (status=pending) and
-    // does NOT call completeDomainRegistration — that requires a non-null
-    // paymentId and must be invoked after payment is confirmed (e.g. via a
-    // Stripe webhook). No HTTP route should call this method directly until
-    // that payment-confirmation leg is wired up, or domains will stall in
-    // DomainStatus.pending with no recovery path.
+    // Agent purchases handle registration inline (no Stripe charge — domain
+    // billed to GP's Vercel team account; the maxPrice check above is the
+    // safety bound). Browser purchases flow through handleDomainPostPurchase,
+    // which sets paymentId so completeDomainRegistration's default guard fires.
+    try {
+      const website = await this.client.website.findUniqueOrThrow({
+        where: { id: websiteSummary.id },
+        select: { content: true },
+      })
+      const contactInfo = this.buildContactInfo(campaign.user, website.content)
+      await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
+        skipPaymentVerification: true,
+      })
+    } catch (error) {
+      // Mark inactive so preflight on retry falls through to a fresh reservation
+      // instead of returning alreadyExisted: true for a stuck pending row.
+      // completeDomainRegistration's Vercel-failure path sets this itself, but
+      // other failure modes (the website lookup above, top-level
+      // findUniqueOrThrow, !domain.price, getDomainDetails rethrow, final
+      // status update) do not — this is the safety net for those.
+      await this.model.update({
+        where: { id: createdDomain.id },
+        data: { status: DomainStatus.inactive },
+      })
+      throw error
+    }
 
+    // completeDomainRegistration unconditionally sets status=submitted; reuse
+    // the reservation row's fields rather than re-reading from the DB.
     return {
       website: websiteSummary,
       domain: {
         id: createdDomain.id,
         name: createdDomain.name,
-        status: createdDomain.status,
+        status: DomainStatus.submitted,
         price: createdDomain.price?.toNumber() ?? null,
       },
       alreadyExisted: false,
-      message:
-        'Domain reserved; registration will complete after payment confirmation',
+      message: 'Domain registration submitted',
     }
   }
 
@@ -957,26 +1012,31 @@ export class DomainsService
   async completeDomainRegistration(
     websiteId: number,
     contact: RegisterDomainSchema,
+    options: { skipPaymentVerification?: boolean } = {},
   ) {
     const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
 
-    if (!domain.paymentId) {
-      throw new BadRequestException({
-        message: 'No payment ID found for domain',
-        errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
-      })
-    }
+    if (!options.skipPaymentVerification) {
+      if (!domain.paymentId) {
+        throw new BadRequestException({
+          message: 'No payment ID found for domain',
+          errorCode: 'BILLING_DOMAIN_PAYMENT_ID_MISSING',
+        })
+      }
 
-    const paymentIntent = await this.payments.retrievePayment(domain.paymentId)
-
-    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
-      throw new BadRequestException(
-        `Payment not completed. Current status: ${paymentIntent.status}`,
+      const paymentIntent = await this.payments.retrievePayment(
+        domain.paymentId,
       )
+
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if ((paymentIntent.status as PaymentStatus) !== PaymentStatus.SUCCEEDED) {
+        throw new BadRequestException(
+          `Payment not completed. Current status: ${paymentIntent.status}`,
+        )
+      }
     }
 
     if (!domain.price) {

@@ -1,0 +1,30 @@
+enum ChatMessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  conversationId String           @map("conversation_id")
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    ChatMessageRole
+  content String          @db.Text
+
+  /// Optional idempotency key supplied by the client (UUID per send attempt).
+  /// Reusing the same id on retry returns the existing message instead of
+  /// inserting a duplicate. Enforced by a partial unique index in migration
+  /// 20260514170000 (WHERE client_message_id IS NOT NULL) so that null values
+  /// — used by server-internal callers that don't care about dedupe — don't
+  /// collide. See src/chats/CLIENT_HOOKUP.md for the client contract.
+  clientMessageId String? @map("client_message_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId, clientMessageId])
+  @@map("chat_message")
+}

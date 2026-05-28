@@ -81,9 +81,9 @@ test.describe('Users - User Metadata', () => {
     }
 
     const metaData = {
-      lastVisited: faker.number.int({ min: 1, max: 1000000 }),
-      sessionCount: faker.number.int({ min: 1, max: 100 }),
       textNotifications: faker.datatype.boolean(),
+      whyBrowsing: 'considering' as const,
+      accountType: 'candidate',
     }
 
     const response = await request.put('/v1/users/me/metadata', {
@@ -100,9 +100,9 @@ test.describe('Users - User Metadata', () => {
     const body = (await response.json()) as ReadUserOutput
     expect(body.metaData).toBeTruthy()
     const metadata = body.metaData as MetadataResponse
-    expect(metadata?.lastVisited).toBe(metaData.lastVisited)
-    expect(metadata?.sessionCount).toBe(metaData.sessionCount)
     expect(metadata?.textNotifications).toBe(metaData.textNotifications)
+    expect(metadata?.whyBrowsing).toBe(metaData.whyBrowsing)
+    expect(metadata?.accountType).toBe(metaData.accountType)
   })
 
   test('should return 401 when getting metadata without authentication', async ({

@@ -125,6 +125,9 @@ export {
   GENERATION_STATUS_VALUES,
   GenerationStatus,
   GenerationStatusSchema,
+  COMPLIANCE_STAGE_VALUES,
+  ComplianceStage,
+  ComplianceStageSchema,
 } from './campaigns/enums'
 
 export type {
@@ -190,6 +193,20 @@ export {
   type UpdateCampaignM2MInput,
 } from './campaigns/UpdateCampaignM2M.schema'
 
+export {
+  ComplianceStateDomainSchema,
+  type ComplianceStateDomain,
+  ComplianceStateOutputSchema,
+  type ComplianceStateOutput,
+} from './campaigns/ComplianceStateOutput.schema'
+
+export {
+  SubmitToPeerlyPinDeliveryChannelsSchema,
+  type SubmitToPeerlyPinDeliveryChannels,
+  SubmitToPeerlyOutputSchema,
+  type SubmitToPeerlyOutput,
+} from './campaigns/SubmitToPeerlyOutput.schema'
+
 export type { Ecanvasser, EcanvasserSummary } from './ecanvasser/types'
 
 export {
@@ -235,3 +252,81 @@ export {
 } from './elections/raceListItem'
 
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
+
+export {
+  SPEECH_SYNTHESIS_ENGINE_VALUES,
+  type SpeechSynthesisEngine,
+  SpeechSynthesisEngineSchema,
+  SPEECH_SYNTHESIS_VOICE_VALUES,
+  type SpeechSynthesisVoice,
+  SpeechSynthesisVoiceSchema,
+  SYNTHESIZE_SPEECH_MAX_TEXT_LENGTH,
+  SynthesizeSpeechRequestSchema,
+  type SynthesizeSpeechRequest,
+  SynthesizeSpeechSegmentSchema,
+  type SynthesizeSpeechSegment,
+  SynthesizeSpeechResponseSchema,
+  type SynthesizeSpeechResponse,
+} from './speech/synthesizeSpeech.schema'
+
+export {
+  TranscribeSessionRequestSchema,
+  type TranscribeSessionRequest,
+  TranscribeSessionResponseSchema,
+  type TranscribeSessionResponse,
+} from './speech/transcribeSession.schema'
+
+export {
+  ANNOTATION_KIND_VALUES,
+  AnnotationKindSchema,
+  type AnnotationKind,
+  ANNOTATION_RESOURCE_TYPE_VALUES,
+  AnnotationResourceTypeSchema,
+  type AnnotationResourceType,
+  AnnotationAnchorSchema,
+  type AnnotationAnchor,
+  OCR_STATUS_VALUES,
+  OcrStatusSchema,
+  type OcrStatus,
+  AnnotationNoteAttachmentSchema,
+  type AnnotationNoteAttachment,
+  AnnotationNoteSchema,
+  type AnnotationNote,
+  AnnotationBugReportSchema,
+  type AnnotationBugReport,
+  AnnotationChatSchema,
+  type AnnotationChat,
+  AnnotationSchema,
+  type Annotation,
+  CreateAnnotationRequestSchema,
+  type CreateAnnotationRequest,
+  UpdateNoteRequestSchema,
+  type UpdateNoteRequest,
+  AttachmentPresignRequestSchema,
+  type AttachmentPresignRequest,
+  AttachmentPresignResponseSchema,
+  type AttachmentPresignResponse,
+  AttachmentDownloadUrlResponseSchema,
+  type AttachmentDownloadUrlResponse,
+  AnnotationResponseSchema,
+  type AnnotationResponse,
+  AnnotationsListResponseSchema,
+  type AnnotationsListResponse,
+} from './annotations/Annotation.schema'
+
+export {
+  ARTIFACT_RESOURCE_TYPE_VALUES,
+  ArtifactResourceTypeSchema,
+  type ArtifactResourceType,
+  ARTIFACT_FEEDBACK_KIND_VALUES,
+  ArtifactFeedbackKindSchema,
+  type ArtifactFeedbackKind,
+  ArtifactFeedbackSchema,
+  type ArtifactFeedback,
+  SetArtifactFeedbackRequestSchema,
+  type SetArtifactFeedbackRequest,
+  ArtifactFeedbackResponseSchema,
+  type ArtifactFeedbackResponse,
+  BriefingFeedbackListResponseSchema,
+  type BriefingFeedbackListResponse,
+} from './artifactFeedback/ArtifactFeedback.schema'

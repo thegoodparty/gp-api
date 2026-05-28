@@ -241,10 +241,14 @@ export class WeeklyTasksDigestHandlerService extends createPrismaBase(
 
     for (const [campaignId, group] of campaigns) {
       try {
+        const sortedTasks = [...group.tasks].sort(
+          (a, b) => a.date.getTime() - b.date.getTime(),
+        )
+
         const properties: WeeklyDigestProperties = {
           plan_tasks_completed: group.completedCount,
           plan_total_tasks: group.completedCount + group.incompleteCount,
-          ...buildTaskProperties(group.tasks),
+          ...buildTaskProperties(sortedTasks),
         }
 
         await this.analytics.track(

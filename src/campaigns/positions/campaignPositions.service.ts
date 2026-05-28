@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -26,17 +26,29 @@ export class CampaignPositionsService extends createPrismaBase(
     return this.model.create({ data })
   }
 
-  update(id: number, { description, order }: UpdateCampaignPositionSchema) {
-    return this.model.update({
-      where: { id },
+  async update(
+    id: number,
+    campaignId: number,
+    { description, order }: UpdateCampaignPositionSchema,
+  ) {
+    const { count } = await this.model.updateMany({
+      where: { id, campaignId },
       data: {
         description,
         order,
       },
     })
+    if (count === 0) {
+      throw new NotFoundException()
+    }
   }
 
-  delete(id: number) {
-    return this.model.delete({ where: { id } })
+  async delete(id: number, campaignId: number) {
+    const { count } = await this.model.deleteMany({
+      where: { id, campaignId },
+    })
+    if (count === 0) {
+      throw new NotFoundException()
+    }
   }
 }

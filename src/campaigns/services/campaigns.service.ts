@@ -249,6 +249,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
     scalarFields?: Prisma.CampaignUpdateInput,
+    outerTx?: Prisma.TransactionClient,
   ) {
     const {
       data,
@@ -260,89 +261,79 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       overrideDistrictId,
     } = body
 
-    const updatedCampaign = await this.client.$transaction(
-      async (tx) => {
-        this.logger.debug({ id, body }, 'Updating campaign json fields')
-        // TODO: This should be .findUniqueOrThrow which would remove the need
-        //  for the null check below and subsequently simplify the return
-        //  signature of this method
-        //  https://goodparty.atlassian.net/browse/WEB-4384
-        const campaign = await tx.campaign.findFirst({
-          where: { id },
-        })
+    const runUpdate = async (tx: Prisma.TransactionClient) => {
+      this.logger.debug({ id, body }, 'Updating campaign json fields')
+      const campaign = await tx.campaign.findFirst({
+        where: { id },
+      })
 
-        if (!campaign) return false
+      if (!campaign) return false
 
-        const campaignUpdateData: Prisma.CampaignUpdateInput = {
-          ...scalarFields,
-        }
-        if (data) {
-          campaignUpdateData.data = deepMerge(campaign.data as object, data)
-        }
-        if (formattedAddress !== undefined) {
-          campaignUpdateData.formattedAddress = formattedAddress
-        }
-        if (placeId !== undefined) {
-          campaignUpdateData.placeId = placeId
-        }
-        if (canDownloadFederal !== undefined) {
-          campaignUpdateData.canDownloadFederal = canDownloadFederal
-        }
-        if (details) {
-          const mergedDetails = deepMerge(
-            campaign.details as object,
-            details,
-          ) as PrismaJson.CampaignDetails
-          if (details?.customIssues) {
-            // If this isn't done, customIssues' entries duplicate
-            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            mergedDetails.customIssues = details.customIssues as Array<{
-              position: string
-              title: string
-            }>
-          }
-          if (details.runningAgainst) {
-            // If this isn't done, runningAgainst's entries duplicate
-            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            mergedDetails.runningAgainst = details.runningAgainst as Array<{
-              name: string
-              party: string
-              description: string
-            }>
-          }
-          campaignUpdateData.details = mergedDetails
-        }
-        if (objectNotEmpty(aiContent)) {
-          // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+      const campaignUpdateData: Prisma.CampaignUpdateInput = {
+        ...scalarFields,
+      }
+      if (data) {
+        campaignUpdateData.data = deepMerge(campaign.data as object, data)
+      }
+      if (formattedAddress !== undefined) {
+        campaignUpdateData.formattedAddress = formattedAddress
+      }
+      if (placeId !== undefined) {
+        campaignUpdateData.placeId = placeId
+      }
+      if (canDownloadFederal !== undefined) {
+        campaignUpdateData.canDownloadFederal = canDownloadFederal
+      }
+      if (details) {
+        const mergedDetails = deepMerge(
+          campaign.details as object,
+          details,
+        ) as PrismaJson.CampaignDetails
+        if (details?.customIssues) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          campaignUpdateData.aiContent = deepMerge(
-            (campaign.aiContent as object) || {},
-            aiContent,
-          ) as PrismaJson.CampaignAiContent
+          mergedDetails.customIssues = details.customIssues as Array<{
+            position: string
+            title: string
+          }>
         }
-
-        if (overrideDistrictId !== undefined) {
-          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-          const districtId = overrideDistrictId ?? null
-          await tx.organization.update({
-            where: { slug: orgSlug },
-            data: { overrideDistrictId: districtId },
-          })
+        if (details.runningAgainst) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          mergedDetails.runningAgainst = details.runningAgainst as Array<{
+            name: string
+            party: string
+            description: string
+          }>
         }
+        campaignUpdateData.details = mergedDetails
+      }
+      if (objectNotEmpty(aiContent)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        campaignUpdateData.aiContent = deepMerge(
+          (campaign.aiContent as object) || {},
+          aiContent,
+        ) as PrismaJson.CampaignAiContent
+      }
 
-        // TODO: Also should be .findUniqueOrThrow
-        //  https://goodparty.atlassian.net/browse/WEB-4384
-        return tx.campaign.update({
-          where: { id: campaign.id },
-          data: campaignUpdateData,
+      if (overrideDistrictId !== undefined) {
+        const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const districtId = overrideDistrictId ?? null
+        await tx.organization.update({
+          where: { slug: orgSlug },
+          data: { overrideDistrictId: districtId },
         })
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      },
-    )
+      }
+
+      return tx.campaign.update({
+        where: { id: campaign.id },
+        data: campaignUpdateData,
+      })
+    }
+
+    const updatedCampaign = outerTx
+      ? await runUpdate(outerTx)
+      : await this.client.$transaction(runUpdate, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        })
 
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384
@@ -761,6 +752,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const { electionDate } = details ?? {}
     if (!electionDate) return null
 
+    // details is `Prisma.JsonValue` so raceId isn't on its TS shape; the
+    // office picker (gp-webapp) writes the BallotReady race hash here.
+    let raceId: string | undefined
+    if (details && typeof details === 'object' && !Array.isArray(details)) {
+      const candidate = (details as Record<string, unknown>).raceId
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        raceId = candidate
+      }
+    }
+
     const org = organizationSlug
       ? await this.organizations.findUnique({
           where: { slug: organizationSlug },
@@ -768,6 +769,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       : null
 
     if (!org?.overrideDistrictId && !org?.positionId) return null
+
+    // Prefer the race-hash-based filing fee when the campaign has a BR race
+    // hash on details.raceId — it resolves with a single Race lookup and
+    // doesn't depend on Position.placeId being populated (which it isn't
+    // in the election-api mart today). Falls back to the Position-side
+    // filing fee on the positionId branch when raceId is missing or the
+    // race-hash lookup fails.
+    const filingFeeFromRaceHash = raceId
+      ? await this.elections.fetchFilingFeeByRaceHash(raceId)
+      : null
 
     if (org.overrideDistrictId) {
       const result = await this.elections
@@ -784,6 +795,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         projectedTurnout,
         winNumber: winNumber ?? 0,
         voterContactGoal: voterContactGoal ?? 0,
+        filingFee: filingFeeFromRaceHash?.filingFee ?? null,
+        filingRequirementsText:
+          filingFeeFromRaceHash?.filingRequirementsText ?? null,
       }
     }
 
@@ -799,7 +813,30 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (!result || result.projectedTurnout <= 0) return null
 
-    const { projectedTurnout, winNumber, voterContactGoal } = result
-    return { projectedTurnout, winNumber, voterContactGoal }
+    const {
+      projectedTurnout,
+      winNumber,
+      voterContactGoal,
+      filingFee,
+      filingRequirementsText,
+    } = result
+    return {
+      projectedTurnout,
+      winNumber,
+      voterContactGoal,
+      // Race-hash result wins when we successfully fetched it (even when its
+      // filingFee is null — that's a legitimate "BR has no fee data for
+      // this race" signal, not an absence of an answer). Falls back to the
+      // Position-side result only when no raceId was set or the race-hash
+      // call errored out.
+      filingFee:
+        filingFeeFromRaceHash !== null
+          ? filingFeeFromRaceHash.filingFee
+          : (filingFee ?? null),
+      filingRequirementsText:
+        filingFeeFromRaceHash !== null
+          ? filingFeeFromRaceHash.filingRequirementsText
+          : (filingRequirementsText ?? null),
+    }
   }
 }
