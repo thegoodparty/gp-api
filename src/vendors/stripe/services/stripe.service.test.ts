@@ -162,14 +162,40 @@ describe('StripeService', () => {
         redirectUrl: 'https://stripe.test/cs_1',
         checkoutSessionId: 'cs_1',
       })
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          metadata: { userId: 7 },
-          customer_email: 'a@b.com',
-          mode: 'subscription',
-          line_items: [{ price: 'price_pro', quantity: 1 }],
-        }),
-      )
+      expect(stripe.checkout.sessions.create).toHaveBeenCalledExactlyOnceWith({
+        metadata: { userId: 7 },
+        customer_email: 'a@b.com',
+        billing_address_collection: 'auto',
+        line_items: [{ price: 'price_pro', quantity: 1 }],
+        mode: 'subscription',
+        allow_promotion_codes: true,
+        expand: [
+          'subscription',
+          'subscription.items.data.price',
+          'payment_intent.payment_method',
+        ],
+        success_url:
+          'http://localhost:4000/dashboard/pro-sign-up/success?' +
+          'session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: 'http://localhost:4000/dashboard',
+      })
+    })
+
+    it('omits customer_email when email is null', async () => {
+      stripe.products.retrieve.mockResolvedValue({
+        default_price: 'price_pro',
+      } as unknown as Stripe.Product)
+      stripe.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_2',
+        url: 'https://stripe.test/cs_2',
+      } as Stripe.Checkout.Session)
+
+      await service.createCheckoutSession(7)
+
+      const [arg] = stripe.checkout.sessions.create.mock.calls[0] as [
+        Stripe.Checkout.SessionCreateParams,
+      ]
+      expect(arg).not.toHaveProperty('customer_email')
     })
   })
 
@@ -259,6 +285,45 @@ describe('StripeService', () => {
         ),
       ).rejects.toThrow(BadGatewayException)
     })
+
+    it('uses customer_email when customerId is absent', async () => {
+      stripe.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_email',
+        client_secret: 'cs_secret_email',
+        amount_total: 4999,
+      } as Stripe.Checkout.Session)
+
+      await service.createCustomCheckoutSession(
+        { id: 5, email: 'u@e.com', customerId: undefined },
+        payload,
+      )
+
+      const [arg] = stripe.checkout.sessions.create.mock.calls[0] as [
+        Stripe.Checkout.SessionCreateParams,
+      ]
+      expect(arg.customer_email).toBe('u@e.com')
+      expect(arg).not.toHaveProperty('customer')
+    })
+
+    it('omits both customer fields when customerId and email absent', async () => {
+      stripe.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_anon',
+        client_secret: 'cs_secret_anon',
+        amount_total: 4999,
+      } as Stripe.Checkout.Session)
+
+      await service.createCustomCheckoutSession(
+        { id: 5, email: null, customerId: undefined },
+        payload,
+      )
+
+      const [arg] = stripe.checkout.sessions.create.mock.calls[0] as [
+        Stripe.Checkout.SessionCreateParams,
+      ]
+      expect(arg).not.toHaveProperty('customer')
+      expect(arg).not.toHaveProperty('customer_email')
+      expect(arg).not.toHaveProperty('payment_intent_data')
+    })
   })
 
   describe('createPortalSession', () => {
@@ -287,10 +352,10 @@ describe('StripeService', () => {
       const result = await service.parseWebhookEvent(body, 'sig_1')
 
       expect(result).toBe(event)
-      expect(stripe.webhooks.constructEvent).toHaveBeenCalledWith(
+      expect(stripe.webhooks.constructEvent).toHaveBeenCalledExactlyOnceWith(
         body,
         'sig_1',
-        expect.any(String),
+        process.env.STRIPE_WEBSOCKET_SECRET,
       )
     })
   })
