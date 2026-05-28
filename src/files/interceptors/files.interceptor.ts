@@ -11,6 +11,7 @@ import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { Prisma } from '@prisma/client'
+import { FORBIDDEN_KEYS } from '@/shared/constants/forbiddenKeys'
 
 type FilesInterceptorOpts = {
   /**
@@ -138,8 +139,6 @@ export function FilesInterceptor(
     }
   }
 }
-
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 /**
  * Helper function to set nested object properties
