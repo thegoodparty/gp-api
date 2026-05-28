@@ -87,6 +87,7 @@ jobs:
           path: |
             node_modules/.prisma
             contracts/dist
+            src/generated/route-types.ts
 
   lint:
     name: Lint
@@ -281,16 +282,15 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Restore node_modules
         id: node-modules-cache
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (cache miss)
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
@@ -301,6 +301,12 @@ jobs:
         with:
           name: build-deps
           path: .
+
+      - name: Setup Node 24 for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: RC version contracts
         id: rc-version
@@ -348,16 +354,15 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Restore node_modules
         id: node-modules-cache
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (cache miss)
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
@@ -379,6 +384,12 @@ jobs:
       - name: Symlink changeset config for changesets/action
         run: ln -s contracts/.changeset .changeset
 
+      - name: Setup Node 24 for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
       - name: Create Release PR or Publish contracts
         id: changesets
         uses: changesets/action@v1
@@ -392,10 +403,8 @@ jobs:
 
   docker-build:
     name: Docker build & push
-    needs: setup
+    needs: [setup, lint, typecheck, test, prisma-check]
     runs-on: ubuntu-latest
-    outputs:
-      ecr-exists: ${{ steps.ecr-check.outputs.exists }}
     steps:
       - uses: actions/checkout@v6
         with:
