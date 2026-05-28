@@ -201,32 +201,49 @@ describe('StripeService', () => {
         clientSecret: 'cs_secret',
         amount: 49.99,
       })
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          ui_mode: 'custom',
-          mode: 'payment',
-          customer: 'cus_5',
-          payment_intent_data: { receipt_email: 'u@e.com' },
-          allow_promotion_codes: true,
-          return_url: 'https://app.test/return',
-          line_items: [
-            {
-              price_data: {
-                currency: 'usd',
-                product_data: { name: 'Poll Pack' },
-                unit_amount: 4999,
-              },
-              quantity: 1,
+      expect(stripe.checkout.sessions.create).toHaveBeenCalledExactlyOnceWith({
+        ui_mode: 'custom',
+        mode: 'payment',
+        customer: 'cus_5',
+        payment_intent_data: { receipt_email: 'u@e.com' },
+        allow_promotion_codes: true,
+        return_url: 'https://app.test/return',
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: { name: 'Poll Pack' },
+              unit_amount: 4999,
             },
-          ],
-          metadata: {
-            campaignId: '9',
-            userId: '5',
-            paymentType: PaymentType.POLL,
-            purchaseType: PurchaseType.POLL,
+            quantity: 1,
           },
-        }),
+        ],
+        metadata: {
+          campaignId: '9',
+          userId: '5',
+          paymentType: PaymentType.POLL,
+          purchaseType: PurchaseType.POLL,
+        },
+      })
+    })
+
+    it('falls back to payload.amount / 100 when amount_total is null', async () => {
+      stripe.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_3',
+        client_secret: 'cs_secret_2',
+        amount_total: null,
+      } as unknown as Stripe.Checkout.Session)
+
+      const result = await service.createCustomCheckoutSession(
+        { id: 5, email: 'u@e.com', customerId: 'cus_5' },
+        payload,
       )
+
+      expect(result).toEqual({
+        id: 'cs_3',
+        clientSecret: 'cs_secret_2',
+        amount: payload.amount / 100,
+      })
     })
 
     it('throws BadGatewayException when Stripe returns no client_secret', async () => {
@@ -288,6 +305,30 @@ describe('StripeService', () => {
       const result = await service.fetchCustomerIdFromCheckoutSession('cs_paid')
 
       expect(result).toBe('cus_paid')
+    })
+
+    it('returns customer.id when paid and customer is an expanded object', async () => {
+      stripe.checkout.sessions.retrieve.mockResolvedValue({
+        payment_status: 'paid',
+        customer: { id: 'cus_expanded', object: 'customer' },
+      } as Stripe.Checkout.Session)
+
+      const result =
+        await service.fetchCustomerIdFromCheckoutSession('cs_expanded')
+
+      expect(result).toBe('cus_expanded')
+    })
+
+    it('returns null when paid but customer is absent', async () => {
+      stripe.checkout.sessions.retrieve.mockResolvedValue({
+        payment_status: 'paid',
+        customer: null,
+      } as Stripe.Checkout.Session)
+
+      const result =
+        await service.fetchCustomerIdFromCheckoutSession('cs_nocustomer')
+
+      expect(result).toBeNull()
     })
 
     it('returns null when the session is not paid', async () => {
