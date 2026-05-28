@@ -144,14 +144,22 @@ declare global {
       address?: string | null
     }
 
+    // Cache key is the full (state, city, office) jurisdiction that was fed
+    // to the AI prompt, not just office. Without all three fields, a cache
+    // entry for "City Council" in Denver would silently satisfy a fetch for
+    // "City Council" in Boulder.
     export type LocalMediaOutletsCache =
       | {
           office: string
+          city: string | null
+          state: string
           status: 'pending'
           startedAt: number
         }
       | {
           office: string
+          city: string | null
+          state: string
           status: 'ready'
           outlets: LocalMediaOutlet[]
         }

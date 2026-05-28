@@ -4,6 +4,23 @@ import { OnboardingLocalNewsService } from './localNews.service'
 
 const PENDING_TTL_MS = 5 * 60 * 1000
 const OFFICE = 'Denver City Council - District 9'
+const STATE = 'CO'
+// city is intentionally null on these tests — most onboarding callers pass
+// no city. The cache key still has to reflect that explicitly.
+const CITY: string | null = null
+
+const cacheKey = (
+  overrides: Partial<{
+    office: string
+    city: string | null
+    state: string
+  }> = {},
+) => ({
+  office: OFFICE,
+  city: CITY,
+  state: STATE,
+  ...overrides,
+})
 
 function makeService() {
   const ai = {
@@ -51,28 +68,17 @@ describe('OnboardingLocalNewsService', () => {
   })
 
   describe('getLocalNews', () => {
-    it('returns the cached outlets when status=ready and office matches', async () => {
-      const { service, campaigns, ai } = makeService()
+    it('returns the cached outlets when the (office, city, state) key matches', async () => {
+      const { service, ai } = makeService()
       const outlets = readyOutlets()
-      campaigns.findFirst.mockResolvedValue({
-        id: 1,
-        data: {
-          onboarding: {
-            localMediaOutlets: { office: OFFICE, status: 'ready', outlets },
-          },
-        },
-      })
+      const cached = { ...cacheKey(), status: 'ready', outlets }
 
       const result = await service.getLocalNews({
-        state: 'CO',
+        state: STATE,
         office: OFFICE,
         campaign: {
           id: 1,
-          data: {
-            onboarding: {
-              localMediaOutlets: { office: OFFICE, status: 'ready', outlets },
-            },
-          },
+          data: { onboarding: { localMediaOutlets: cached } },
         } as never,
       })
 
@@ -80,17 +86,57 @@ describe('OnboardingLocalNewsService', () => {
       expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
     })
 
-    it('returns pending without calling markPending when a fresh pending entry exists', async () => {
+    it('ignores a cached entry for a different city even when office matches', async () => {
+      // The bug this guards against: Denver City Council cache hit served to
+      // a Boulder City Council fetch because office matched.
+      const { service, campaigns, ai, model } = makeService()
+      const denverCached = {
+        office: OFFICE,
+        city: 'Denver',
+        state: STATE,
+        status: 'ready' as const,
+        outlets: readyOutlets(),
+      }
+      campaigns.findFirst.mockResolvedValue({
+        id: 1,
+        data: { onboarding: { localMediaOutlets: denverCached } },
+      })
+      ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
+
+      const result = await service.getLocalNews({
+        state: STATE,
+        city: 'Boulder',
+        office: OFFICE,
+        campaign: {
+          id: 1,
+          data: { onboarding: { localMediaOutlets: denverCached } },
+        } as never,
+      })
+
+      // Should NOT return the Denver outlets. Should fall through to
+      // markPending and report pending.
+      expect(result).toEqual({ status: 'pending' })
+      // markPending wrote a fresh marker keyed to Boulder.
+      const claimWrite = model.update.mock.calls[0]?.[0]
+      expect(claimWrite?.data.data.onboarding.localMediaOutlets).toMatchObject({
+        office: OFFICE,
+        city: 'Boulder',
+        state: STATE,
+        status: 'pending',
+      })
+    })
+
+    it('returns pending without calling markPending when a fresh pending entry exists for the same key', async () => {
       const { service, campaigns, ai, model } = makeService()
       const result = await service.getLocalNews({
-        state: 'CO',
+        state: STATE,
         office: OFFICE,
         campaign: {
           id: 1,
           data: {
             onboarding: {
               localMediaOutlets: {
-                office: OFFICE,
+                ...cacheKey(),
                 status: 'pending',
                 startedAt: Date.now() - 1000,
               },
@@ -100,8 +146,6 @@ describe('OnboardingLocalNewsService', () => {
       })
 
       expect(result).toEqual({ status: 'pending' })
-      // No DB re-read or write, no AI call kicked off — the in-memory snapshot
-      // was sufficient to short-circuit.
       expect(campaigns.findFirst).not.toHaveBeenCalled()
       expect(model.update).not.toHaveBeenCalled()
       expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
@@ -114,33 +158,29 @@ describe('OnboardingLocalNewsService', () => {
         data: {
           onboarding: {
             localMediaOutlets: {
-              office: OFFICE,
+              ...cacheKey(),
               status: 'pending',
               startedAt: Date.now() - PENDING_TTL_MS - 1000,
             },
           },
         },
       }
-      // Every internal findFirst re-read returns the same expired snapshot
-      // so this caller successfully claims the slot.
       campaigns.findFirst.mockResolvedValue(expiredCampaign)
-      // runFetch will pass content="" through to the failure path; we just
-      // care that markPending's claim write fired.
       ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
 
       const result = await service.getLocalNews({
-        state: 'CO',
+        state: STATE,
         office: OFFICE,
         campaign: expiredCampaign as never,
       })
 
       expect(result).toEqual({ status: 'pending' })
-      // markPending wrote a fresh pending marker via the direct prisma
-      // update. The first write is always the claim.
       const claimWrite = model.update.mock.calls[0]?.[0]
       expect(claimWrite?.where).toEqual({ id: 1 })
       expect(claimWrite?.data.data.onboarding.localMediaOutlets).toMatchObject({
         office: OFFICE,
+        city: CITY,
+        state: STATE,
         status: 'pending',
       })
       const claimStartedAt =
@@ -151,14 +191,12 @@ describe('OnboardingLocalNewsService', () => {
 
     it("doesn't claim the slot when re-read shows a fresh pending entry from another caller", async () => {
       const { service, campaigns, model } = makeService()
-      // Caller's in-memory snapshot is stale (no pending marker), but the
-      // current DB state shows another caller already claimed the slot.
       campaigns.findFirst.mockResolvedValue({
         id: 1,
         data: {
           onboarding: {
             localMediaOutlets: {
-              office: OFFICE,
+              ...cacheKey(),
               status: 'pending',
               startedAt: Date.now() - 1000,
             },
@@ -167,23 +205,18 @@ describe('OnboardingLocalNewsService', () => {
       })
 
       const result = await service.getLocalNews({
-        state: 'CO',
+        state: STATE,
         office: OFFICE,
         campaign: { id: 1, data: { onboarding: {} } } as never,
       })
 
       expect(result).toEqual({ status: 'pending' })
-      // findFirst happened (we re-read) but no write happened because the
-      // other caller already owns the pending slot.
       expect(campaigns.findFirst).toHaveBeenCalledTimes(1)
       expect(model.update).not.toHaveBeenCalled()
     })
 
     it('expires the pending marker (startedAt: 0) when the background fetch fails', async () => {
       const { service, campaigns, ai, model } = makeService()
-      // Dynamic responder: after the claim write fires, return the
-      // freshly-claimed pending marker on subsequent reads so expirePending's
-      // check passes.
       let claimWritten = false
       campaigns.findFirst.mockImplementation(async () => ({
         id: 1,
@@ -191,7 +224,7 @@ describe('OnboardingLocalNewsService', () => {
           ? {
               onboarding: {
                 localMediaOutlets: {
-                  office: OFFICE,
+                  ...cacheKey(),
                   status: 'pending',
                   startedAt: 12345,
                 },
@@ -206,18 +239,14 @@ describe('OnboardingLocalNewsService', () => {
       ai.getChatToolCompletion.mockRejectedValue(new Error('AI exploded'))
 
       await service.getLocalNews({
-        state: 'CO',
+        state: STATE,
         office: OFFICE,
         campaign: { id: 1, data: { onboarding: {} } } as never,
       })
 
-      // Background promise is fire-and-forget; flush microtasks so the
-      // expirePending write completes before we assert.
       await new Promise((resolve) => setImmediate(resolve))
       await new Promise((resolve) => setImmediate(resolve))
 
-      // Look for the expire write (startedAt: 0). Order: claim write fires
-      // first, then the failure path triggers expirePending's write.
       const expireWrite = model.update.mock.calls.find(
         (call) =>
           call[0]?.data.data.onboarding.localMediaOutlets.startedAt === 0,
@@ -225,6 +254,8 @@ describe('OnboardingLocalNewsService', () => {
       expect(expireWrite).toBeDefined()
       expect(expireWrite?.data.data.onboarding.localMediaOutlets).toEqual({
         office: OFFICE,
+        city: CITY,
+        state: STATE,
         status: 'pending',
         startedAt: 0,
       })
