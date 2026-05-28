@@ -459,20 +459,24 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
 
     try {
-      await this.segment.trackEvent(userId, 'Agenda Picked Up', {
-        agenda_id: dateString,
-        meeting_date: dateString,
-        meeting_time: meetingTime,
-        meeting_timezone: meetingTimezone,
-        meeting_place: artifact.location ?? '',
-        meeting_type: meetingType,
-        exec_summary: execSummary,
-        top_3_agenda_items: topItems.map((it) => it.title),
-      })
+      await this.segment.trackEvent(
+        userId,
+        'Briefing Assistant - Agenda Created',
+        {
+          agendaId: dateString,
+          meetingDate: dateString,
+          meetingTime,
+          meetingTimezone,
+          meetingPlace: artifact.location ?? '',
+          meetingType,
+          execSummary,
+          ...flattenTopAgendaItems(topItems),
+        },
+      )
     } catch (err) {
       this.logger.error(
         { err, userId },
-        '[SEGMENT] Failed to track Agenda Picked Up',
+        '[SEGMENT] Failed to track Briefing Assistant - Agenda Created',
       )
     }
   }
@@ -532,7 +536,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     } catch (err) {
       this.logger.error(
         { err, userId, meetingDate },
-        'Failed to generate Agenda Picked Up hook; falling back to lead_in',
+        'Failed to generate Briefing Assistant - Agenda Created hook; falling back to lead_in',
       )
       return leadInFallback
     }
@@ -549,6 +553,18 @@ const readLeadIn = (artifact: PrismaJson.MeetingBriefingArtifact): string => {
   if (!isRecord(es)) return ''
   const leadIn = es['lead_in']
   return typeof leadIn === 'string' ? leadIn : ''
+}
+
+const flattenTopAgendaItems = (
+  items: { title: string; overview: string }[],
+): Record<string, string> => {
+  const flat: Record<string, string> = {}
+  items.forEach((item, idx) => {
+    const n = idx + 1
+    flat[`agendaItem${n}Name`] = item.title
+    flat[`agendaItem${n}Description`] = item.overview
+  })
+  return flat
 }
 
 const readTopAgendaItems = (

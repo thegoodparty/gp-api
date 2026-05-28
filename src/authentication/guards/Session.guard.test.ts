@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/authentication/interfaces/auth-provider.interface'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { TRANSCRIBE_STREAM_PATH } from '@/speech/ws/speechToText.gateway'
 import { SessionGuard } from './Session.guard'
 
 const baseUser: User = {
@@ -48,8 +49,12 @@ describe('SessionGuard — impersonating flag', () => {
     fetchClerkFields: ReturnType<typeof vi.fn>
   }
 
-  const buildRequest = (token?: string): IncomingRequest =>
+  const buildRequest = (
+    token?: string,
+    url = '/v1/protected',
+  ): IncomingRequest =>
     ({
+      url,
       headers: {
         authorization: token ? `Bearer ${token}` : undefined,
       },
@@ -90,6 +95,17 @@ describe('SessionGuard — impersonating flag', () => {
       createMockLogger(),
       new Reflector(),
     )
+  })
+
+  it('allows the STT WebSocket upgrade without a token (ticket-authed)', async () => {
+    const req = buildRequest(undefined, `${TRANSCRIBE_STREAM_PATH}?ticket=abc`)
+    await expect(guard.canActivate(buildContext(req))).resolves.toBe(true)
+    expect(authProvider.verifySessionToken).not.toHaveBeenCalled()
+  })
+
+  it('still rejects a protected route with no token', async () => {
+    const req = buildRequest(undefined)
+    await expect(guard.canActivate(buildContext(req))).rejects.toThrow()
   })
 
   it('no actor claim: impersonating=false, no actorUser', async () => {

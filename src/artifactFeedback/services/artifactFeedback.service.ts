@@ -17,7 +17,15 @@ type BriefingScope = {
 
 type ItemScope = BriefingScope & { itemId: string }
 
-type SetFeedbackArgs = ItemScope & { feedback: ArtifactFeedbackKind }
+// `comment` is split into three states on the wire:
+//   undefined → caller is not touching the comment (preserve whatever's
+//               already stored on the row, if any).
+//   null      → caller is explicitly clearing the existing comment.
+//   string    → caller is setting / replacing the comment.
+type SetFeedbackArgs = ItemScope & {
+  feedback: ArtifactFeedbackKind
+  comment?: string | null
+}
 
 function toDTO(row: ArtifactFeedbackRow): ArtifactFeedbackDTO {
   return {
@@ -27,6 +35,7 @@ function toDTO(row: ArtifactFeedbackRow): ArtifactFeedbackDTO {
     artifact_type: row.artifactType,
     artifact_id: row.artifactId,
     feedback: row.feedback,
+    comment: row.comment,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
   }
@@ -57,12 +66,20 @@ export class ArtifactFeedbackService extends createPrismaBase(
   }
 
   async setForItem(args: SetFeedbackArgs): Promise<ArtifactFeedbackDTO> {
-    const { meetingDate, itemId, userId, electedOffice, feedback } = args
+    const { meetingDate, itemId, userId, electedOffice, feedback, comment } =
+      args
     const briefingId = await resolveBriefingId(
       this.client,
       meetingDate,
       electedOffice,
     )
+
+    // `undefined` means "don't touch the column"; null / string both mean
+    // "write this value". Build the partial update conditionally so we
+    // don't clobber a previously-saved comment when the user re-votes
+    // without re-typing.
+    const commentPatch: { comment?: string | null } =
+      comment === undefined ? {} : { comment }
 
     const row = await this.client.artifactFeedback.upsert({
       where: {
@@ -80,8 +97,10 @@ export class ArtifactFeedbackService extends createPrismaBase(
         artifactId: itemId,
         artifactType: ArtifactResourceType.agenda_item,
         feedback,
+        // On create, `undefined` falls through to the column default (null).
+        ...commentPatch,
       },
-      update: { feedback },
+      update: { feedback, ...commentPatch },
     })
 
     return toDTO(row)

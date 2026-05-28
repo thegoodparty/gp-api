@@ -180,6 +180,22 @@ export class ContactsService {
     return this.withOrgDistrictResolution(organization, fetchSample)
   }
 
+  // Lookup a single person in the org's district by phone number.
+  // The People API's list endpoint already accepts phone-shaped strings in
+  // its `search` field and matches against the indexed
+  // `VoterTelephones_CellPhoneFormatted` column. Returns the first match
+  // (a phone may be shared by multiple voters in a household) or null.
+  async findPersonByPhone(
+    phone: string,
+    organization: Organization,
+  ): Promise<PersonOutput | null> {
+    const result = await this.findContacts(
+      { search: phone, segment: 'all', resultsPerPage: 1, page: 1 },
+      organization,
+    )
+    return result.people[0] ?? null
+  }
+
   async findPerson(
     id: string,
     organization: Organization,
