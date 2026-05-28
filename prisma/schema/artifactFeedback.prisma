@@ -24,6 +24,11 @@ model ArtifactFeedback {
 
   feedback ArtifactFeedbackKind
 
+  /// Optional free-text the submitter attaches to their thumbs-up / thumbs-down
+  /// — e.g. why the briefing's agenda-item summary was bad. Capped at 2000
+  /// chars at the DB layer to keep pathological inputs out of the table.
+  comment String? @db.VarChar(2000)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
