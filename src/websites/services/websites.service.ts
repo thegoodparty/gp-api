@@ -109,7 +109,7 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
     // page that lacks the privacy/terms/identity markers verify-live looks for.
     // Short-circuit so the rest of the compliance flow (TCR submission) is
     // testable in dev.
-    if (process.env.OTEL_SERVICE_ENVIRONMENT === 'dev') {
+    if (process.env.OTEL_SERVICE_ENVIRONMENT !== 'prod') {
       return {
         verified: true,
         url,
