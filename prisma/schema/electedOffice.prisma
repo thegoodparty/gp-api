@@ -16,6 +16,7 @@ model ElectedOffice {
 
   polls                  Poll[]
   pollIndividualMessages PollIndividualMessage[]
+  meetingBriefings       MeetingBriefing[]
 
   @@index([userId])
   @@index([campaignId])

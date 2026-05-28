@@ -1,13 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import {
-  Campaign,
-  CommitteeType,
-  Domain,
-  DomainStatus,
-  OfficeLevel,
-  User,
-} from '@prisma/client'
+import { Campaign, CommitteeType, OfficeLevel, User } from '@prisma/client'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
@@ -74,23 +67,6 @@ const createMockCampaign = (
   })
 }
 
-const createMockDomain = (overrides: Partial<Domain> = {}): Domain => {
-  return {
-    id: 1,
-    name: 'candidate.com',
-    websiteId: 1,
-    status: DomainStatus.active,
-    operationId: null,
-    price: null,
-    paymentId: null,
-    emailForwardingDomainId: null,
-    registrantVerifiedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  }
-}
-
 describe('PeerlyIdentityService', () => {
   let service: PeerlyIdentityService
   let module: TestingModule
@@ -120,7 +96,7 @@ describe('PeerlyIdentityService', () => {
   }
 
   const baseUser = createMockUser()
-  const baseDomain = createMockDomain()
+  const baseDomainName = 'candidate.com'
 
   beforeEach(async () => {
     resetAllCounters()
@@ -306,7 +282,7 @@ describe('PeerlyIdentityService', () => {
           tcrComplianceInput,
           baseUser,
           campaign,
-          baseDomain,
+          baseDomainName,
         )
 
         expect(lastSubmittedData.verification_type).toBe(
@@ -382,7 +358,7 @@ describe('PeerlyIdentityService', () => {
         },
         baseUser,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       expect(lastSubmittedData.city_county).toBe('Anytown')
@@ -424,7 +400,7 @@ describe('PeerlyIdentityService', () => {
           },
           baseUser,
           campaign,
-          baseDomain,
+          baseDomainName,
         ),
       ).rejects.toThrow(BadRequestException)
     })
@@ -452,7 +428,7 @@ describe('PeerlyIdentityService', () => {
         tcrComplianceInput,
         baseUser,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       // Verify email is the preferred verification method
@@ -492,7 +468,7 @@ describe('PeerlyIdentityService', () => {
           tcrComplianceInput,
           baseUser,
           campaign,
-          baseDomain,
+          baseDomainName,
         ),
       ).rejects.toThrow(BadRequestException)
     })
@@ -520,7 +496,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       expect(lastSubmittedData.jobAreas).toEqual([
@@ -543,7 +519,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       // jobAreas is present with didState even when no area codes resolved
@@ -562,7 +538,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       expect(lastSubmittedData.jobAreas).toEqual([{ didState: 'IL' }])
@@ -580,7 +556,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       // state at top level from extractAddressComponents
@@ -608,7 +584,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       expect(lastSubmittedData).not.toHaveProperty('jobAreas')
@@ -624,7 +600,7 @@ describe('PeerlyIdentityService', () => {
           'peerly-123',
           baseTcrPayload as never,
           campaign,
-          baseDomain,
+          baseDomainName,
         ),
       ).rejects.toThrow(BadRequestException)
     })
@@ -641,7 +617,7 @@ describe('PeerlyIdentityService', () => {
         'peerly-123',
         baseTcrPayload as never,
         campaign,
-        baseDomain,
+        baseDomainName,
       )
 
       expect(lastSubmittedData.ein).toBe('12-3456789')

@@ -13,9 +13,10 @@ export class UserOwnerOrAdminGuard implements CanActivate {
       params: { id: string }
       m2mToken?: VerifiedM2MToken
     }>()
+    const isDecimalInt = /^\d+$/.test(params.id)
     return Boolean(
       m2mToken ||
-        user?.id === parseInt(params.id) ||
+        (isDecimalInt && user?.id === Number(params.id)) ||
         user?.roles.includes(UserRole.admin),
     )
   }

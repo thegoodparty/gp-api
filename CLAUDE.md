@@ -60,7 +60,7 @@ Every file in `.cursor/rules/` carries `alwaysApply: true`. They override the re
 
 - **No semicolons**, single quotes, trailing commas (`.prettierrc`)
 - **Max 80-char lines.** Break long arg lists onto separate lines (prettier-conformance.mdc)
-- **No comments. Ever.** (rules.mdc Rule 4). Not "unless the why is non-obvious" — none. If the code needs explaining, rename the identifier or extract a function.
+- **Default to writing no comments.** Only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader (rules.mdc Rule 4). Don't explain WHAT the code does — rename identifiers or extract functions instead.
 - `@typescript-eslint/no-explicit-any` is an **error** — never use `any`. **Also never use `unknown`** in new code (rules.mdc Rule 0) — use proper types, generics, unions, or type guards.
 - `unused-imports/no-unused-imports` is an **error**
 - Delete unused variables; **don't `_`-prefix them** (no-underscore-unused-vars.mdc)
@@ -179,12 +179,24 @@ The submodule is initialized automatically by `npm install` via the `postinstall
 - **Wrap only external service calls in try/catch.** Keep DB operations outside the catch block so they aren't swallowed.
 - `@HttpCode(HttpStatus.NO_CONTENT)` methods must **`await`** the service call — never `return` it (rules.mdc Rule 24).
 
+## Design rules — high-cost mistakes
+
+Categories that PR review keeps catching. Each one has caused a real bug. Read these before writing code that crosses a service boundary, persists state, or touches the queue.
+
+- **Cross-service contracts.** Cross-boundary payloads (SQS messages between services, S2S fetches, webhook bodies) live in `@goodparty_org/contracts`. Before changing one: read the consumer code path, confirm every field the producer sends is read and every field the consumer expects is sent. The contract update lands in the same PR — not the next one. Use the `update-contract` skill.
+- **Verify before stamping state.** Never write `verifiedAt` / `completedAt` / `registeredAt` / `status='succeeded'` on the strength of a 2xx response. A webhook hit or request body is evidence of *a request*, not *a state*. Fetch back against the source of truth and confirm the external state first.
+- **Transaction scoping.** Writes that must succeed or fail together go inside one `prisma.$transaction(...)`. Don't mutate JSON columns or call sibling services *before* the transaction that creates the matching row — failure mid-transaction leaves orphan state with nothing to roll back. Don't call a service that opens its own `$transaction` from inside an outer one — Prisma rejects nesting. If you need shared scope, accept a `tx` parameter and pass it through. Order writes so failure leaves the pre-change state intact — never `delete` the old row before the replacement `create` succeeds.
+- **Idempotency check breadth.** When guarding a retry path, match on `(key, status in (succeeded, in_progress))`. Guarding on `key` alone blocks legitimate retries of terminally-failed records.
+- **Secrets in payloads.** Never embed short-lived credentials, impersonation tokens, signing tokens, or `*_url` fields that carry credentials in SQS message bodies, forwarded webhook bodies, log lines, or error responses returned to callers. Pass a stable identifier (user ID, campaign ID, request ID); mint the credential at the consumer side from that identifier when the handler runs.
+- **SQS handler semantics.** A stub `case` that returns `true` for an unhandled `QueueType` silently acks and drops the message. New `QueueType` values need a real handler case in the same PR, not a stub. `throw` from a handler triggers infinite redelivery, not DLQ — use the framework's failure-return path. `enqueue` / `sendMessage` defaults to `throwOnError: false`; producers must check the result or opt in. Detail: `src/queue/CLAUDE.md`.
+- **Verify cross-repo claims from review tools.** When a `Findings`-style review cites a field, endpoint, or contract that *should* exist in another repo, verify it exists before changing code on that premise: `git log -S<symbol> origin/develop` in the named repo. Codex treats ticket bodies as ground truth and is sometimes confidently wrong about cross-repo state.
+
 ## Never
 
 - Never edit a file under `prisma/schema/migrations/<timestamp>/` — applied migrations are immutable.
 - Never use `.passthrough()` on input schemas.
 - Never use `any` or `unknown` in new code, and never disable `@typescript-eslint/no-explicit-any` without an inline comment justifying it.
-- Never add comments (rules.mdc Rule 4). Don't leave `// removed X` markers or "TODO" trails for completed work.
+- Don't leave `// removed X` markers, "TODO" trails for completed work, or commentary about the current task — those rot fast. Comments are reserved for non-obvious WHYs (rules.mdc Rule 4).
 - Never add a JSON column when the data has a known structure or needs to be queried (rules.mdc Rule 25). Use real columns / relations.
 - Never use raw `Date` arithmetic / setters / comparison — use `date-fns` (rules.mdc Rule 28).
 - Never use a string/number literal where the library exposes an enum or constant (rules.mdc Rule 26).

@@ -5,7 +5,11 @@
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      { "include": "meetings/assets/**/*", "outDir": "dist" }
+    ],
+    "watchAssets": true
   },
   "generateOptions": {
     "spec": false

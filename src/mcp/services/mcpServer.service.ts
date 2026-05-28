@@ -163,6 +163,15 @@ export class McpServerService {
         if (typeof v === 'string') forwardHeaders[name] = v
       }
 
+      // Drop content-type when there's no body to forward — fastify's default
+      // JSON parser 400s on an empty body when content-type is application/json,
+      // which is exactly the shape of every no-body POST MCP tool call.
+      if (args.body == null) {
+        for (const k of Object.keys(forwardHeaders)) {
+          if (k.toLowerCase() === 'content-type') delete forwardHeaders[k]
+        }
+      }
+
       const response = await fastify.inject({
         method: tool.method,
         url,

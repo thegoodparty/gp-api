@@ -54,6 +54,13 @@ test.describe('Websites - Views', () => {
       multipart: {
         vanityPath,
         status: 'published',
+        'main[title]': 'Test Campaign',
+        'about[bio]': 'A test biography',
+        'about[issues][0][title]': 'Test Issue',
+        'about[issues][0][description]': 'Description',
+        'contact[address]': '123 Main St',
+        'contact[email]': 'test@example.com',
+        'contact[phone]': '5555555555',
       },
     })
 
@@ -108,6 +115,13 @@ test.describe('Websites - Views', () => {
       multipart: {
         vanityPath,
         status: 'published',
+        'main[title]': 'Test Campaign',
+        'about[bio]': 'A test biography',
+        'about[issues][0][title]': 'Test Issue',
+        'about[issues][0][description]': 'Description',
+        'contact[address]': '123 Main St',
+        'contact[email]': 'test@example.com',
+        'contact[phone]': '5555555555',
       },
     })
 
@@ -170,6 +184,13 @@ test.describe('Websites - Views', () => {
       multipart: {
         vanityPath,
         status: 'published',
+        'main[title]': 'Test Campaign',
+        'about[bio]': 'A test biography',
+        'about[issues][0][title]': 'Test Issue',
+        'about[issues][0][description]': 'Description',
+        'contact[address]': '123 Main St',
+        'contact[email]': 'test@example.com',
+        'contact[phone]': '5555555555',
       },
     })
 
@@ -236,6 +257,13 @@ test.describe('Websites - Views', () => {
       multipart: {
         vanityPath,
         status: 'published',
+        'main[title]': 'Test Campaign',
+        'about[bio]': 'A test biography',
+        'about[issues][0][title]': 'Test Issue',
+        'about[issues][0][description]': 'Description',
+        'contact[address]': '123 Main St',
+        'contact[email]': 'test@example.com',
+        'contact[phone]': '5555555555',
       },
     })
 

@@ -1,0 +1,13 @@
+model CampaignStrategyOpponentKeyFact {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  opponent   CampaignStrategyOpponent @relation(fields: [opponentId], references: [id], onDelete: Cascade)
+  opponentId Int                      @map("opponent_id")
+
+  order   Int
+  content String
+
+  @@index([opponentId])
+  @@map("campaign_strategy_opponent_key_fact")
+}

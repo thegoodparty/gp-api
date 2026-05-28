@@ -233,6 +233,7 @@ test.describe('Contacts and Segments', () => {
     expect(response.status()).toBe(HttpStatus.OK)
     const contentType = response.headers()['content-type']
     const contentDisposition = response.headers()['content-disposition']
+    const setCookie = response.headers()['set-cookie']
     const body = await response.body()
     const csv = body.toString('utf-8')
     const lines = csv
@@ -246,6 +247,13 @@ test.describe('Contacts and Segments', () => {
     if (contentDisposition !== undefined) {
       expect(contentDisposition).toContain('contacts.csv')
     }
+    // The Download.tsx client polls for this cookie to know when the server
+    // has begun streaming. It must be emitted on every successful download
+    // response or the spinner falls back to the 15s timeout. The cookie is
+    // also marked Secure to satisfy production cookie hygiene.
+    expect(setCookie).toBeDefined()
+    expect(setCookie).toContain('gp_download=')
+    expect(setCookie).toContain('Secure')
     expect(body.length).toBeGreaterThan(0)
     expect(lines.length).toBeGreaterThan(1) // header + at least one record
     expect(lines[0]).toContain(',')

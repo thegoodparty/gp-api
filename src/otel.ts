@@ -20,7 +20,7 @@ import {
   type LogRecordProcessor,
 } from '@opentelemetry/sdk-logs'
 import type { SdkLogRecord } from '@opentelemetry/sdk-logs/build/src/export/SdkLogRecord'
-import type { Context } from '@opentelemetry/api'
+import type { Attributes, Context } from '@opentelemetry/api'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
@@ -114,12 +114,35 @@ if (!headers) {
     shutdown: () => Promise.resolve(),
   }
 
+  const HIGH_CARDINALITY_SPAN_ATTRS = [
+    'net.host.name',
+    'net.host.ip',
+    'net.peer.name',
+    'net.peer.ip',
+    'http.host',
+    'host.name',
+    'host.id',
+    'service.instance.id',
+  ]
+  const cardinalityScrubProcessor: SpanProcessor = {
+    onStart: () => undefined,
+    onEnd: (span: ReadableSpan) => {
+      const attrs = span.attributes as Attributes
+      for (const attr of HIGH_CARDINALITY_SPAN_ATTRS) {
+        delete attrs[attr]
+      }
+    },
+    forceFlush: () => Promise.resolve(),
+    shutdown: () => Promise.resolve(),
+  }
+
   const traceExporter = new OTLPTraceExporter({
     url: `${endpoint}/v1/traces`,
     headers: parsedHeaders,
   })
 
   const sdk = new NodeSDK({
+    autoDetectResources: false,
     resource,
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({
@@ -147,6 +170,7 @@ if (!headers) {
       ),
     ),
     spanProcessors: [
+      cardinalityScrubProcessor,
       new BatchSpanProcessor(traceExporter),
       prismaConnectionMetricProcessor,
     ],

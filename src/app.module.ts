@@ -1,4 +1,5 @@
 import { AgentExperimentsModule } from '@/agentExperiments/agentExperiments.module'
+import { BriefingChatsModule } from '@/chats/briefing-chats/briefing-chats.module'
 import { McpModule } from '@/mcp/mcp.module'
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
@@ -23,17 +24,22 @@ import { OutreachModule } from '@/outreach/outreach.module'
 import { OnboardingModule } from '@/onboarding/onboarding.module'
 import { PaymentsModule } from '@/payments/payments.module'
 import { MeetingsModule } from '@/meetings/meetings.module'
+import { AnnotationsModule } from '@/annotations/annotations.module'
+import { ArtifactFeedbackModule } from '@/artifactFeedback/artifactFeedback.module'
 import { PollsModule } from '@/polls/polls.module'
 import { PrismaModule } from '@/prisma/prisma.module'
 import { QueueConsumerModule } from '@/queue/consumer/queueConsumer.module'
 import { ScheduledMessagingModule } from '@/scheduled-messaging/scheduled-messaging.module'
 import { SharedModule } from '@/shared/shared.module'
+import { SpeechModule } from '@/speech/speech.module'
 import { SubscribeModule } from '@/subscribe/subscribe.module'
 import { TopIssuesModule } from '@/topIssues/topIssues.module'
 import { SessionsService } from '@/users/services/sessions.service'
 import { UsersModule } from '@/users/users.module'
 import { BraintrustModule } from '@/vendors/braintrust/braintrust.module'
 import { ContentfulModule } from '@/vendors/contentful/contentful.module'
+import { GeminiModule } from '@/vendors/google/gemini.module'
+import { CampaignStrategyModule } from '@/campaignStrategy/campaignStrategy.module'
 import { EcanvasserIntegrationModule } from '@/vendors/ecanvasserIntegration/ecanvasserIntegration.module'
 import { PeerlyModule } from '@/vendors/peerly/peerly.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
@@ -49,6 +55,8 @@ import { loggerModule } from './observability/logging/logger-module'
     loggerModule,
     ScheduleModule.forRoot(),
     BraintrustModule,
+    GeminiModule,
+    CampaignStrategyModule,
     AnalyticsModule,
     UsersModule,
     FeaturesModule,
@@ -80,9 +88,13 @@ import { loggerModule } from './observability/logging/logger-module'
     ContactEngagementModule,
     PollsModule,
     MeetingsModule,
+    AnnotationsModule,
+    ArtifactFeedbackModule,
     ElectedOfficeModule,
     OrganizationsModule,
     OnboardingModule,
+    SpeechModule,
+    BriefingChatsModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.

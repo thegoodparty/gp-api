@@ -365,7 +365,7 @@ describe('UsersController', () => {
 
   describe('updateMetadata', () => {
     it('patches user metadata with the provided meta', () => {
-      const meta = { customerId: 'cus_456' }
+      const meta = { textNotifications: true }
       controller.updateMetadata(mockUser, { meta })
 
       expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, meta)
@@ -462,14 +462,26 @@ describe('UsersController', () => {
       const args = {
         bucket: 'uploads',
         fileName: 'doc.pdf',
-        fileType: 'application/pdf',
+        fileType: 'application/pdf' as const,
       }
-      const result = await controller.generateSignedUploadUrl(args)
+      const result = await controller.generateSignedUploadUrl(mockUser, args)
 
       expect(filesService.generateSignedUploadUrl).toHaveBeenCalledWith(args)
       expect(result).toEqual({
         signedUploadUrl: 'https://s3.example.com/signed-url',
       })
+    })
+
+    it('throws UnauthorizedException when user is null (M2M bypass)', async () => {
+      const args = {
+        bucket: 'uploads',
+        fileName: 'doc.pdf',
+        fileType: 'application/pdf' as const,
+      }
+
+      await expect(
+        controller.generateSignedUploadUrl(null as never, args),
+      ).rejects.toThrow(UnauthorizedException)
     })
   })
 

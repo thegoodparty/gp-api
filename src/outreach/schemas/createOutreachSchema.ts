@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import { OutreachStatus, OutreachType } from '@prisma/client'
+import { isValid, parseISO } from 'date-fns'
 
 export class CreateOutreachSchema extends createZodDto(
   z
@@ -34,6 +35,14 @@ export class CreateOutreachSchema extends createZodDto(
         .max(50, 'didNpaSubset cannot exceed 50 area codes')
         .optional(),
       title: z.string().optional(),
+      campaignPlanDueDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'campaignPlanDueDate must be YYYY-MM-DD')
+        .refine(
+          (s) => isValid(parseISO(s)),
+          'campaignPlanDueDate must be a valid calendar date',
+        )
+        .optional(),
     })
     .strict()
     .superRefine((data, ctx) => {
