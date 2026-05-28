@@ -306,6 +306,8 @@ export {
   type AttachmentPresignRequest,
   AttachmentPresignResponseSchema,
   type AttachmentPresignResponse,
+  AttachmentDownloadUrlResponseSchema,
+  type AttachmentDownloadUrlResponse,
   AnnotationResponseSchema,
   type AnnotationResponse,
   AnnotationsListResponseSchema,

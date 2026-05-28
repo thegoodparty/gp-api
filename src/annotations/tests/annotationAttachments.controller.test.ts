@@ -72,6 +72,9 @@ const mockS3 = () => {
     upload: vi
       .spyOn(s3, 'getSignedUrlForUpload')
       .mockResolvedValue('https://s3.example/upload-url'),
+    view: vi
+      .spyOn(s3, 'getSignedUrlForViewing')
+      .mockResolvedValue('https://s3.example/download-url'),
     exists: vi.spyOn(s3, 'objectExists').mockResolvedValue(true),
     get: vi.spyOn(s3, 'getFileBytes').mockResolvedValue(Buffer.from('binary')),
     del: vi.spyOn(s3, 'deleteObject').mockResolvedValue(undefined),
@@ -231,6 +234,69 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
     )
 
     expect(result.status).toBe(400)
+  })
+})
+
+describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/download-url', () => {
+  it('returns a presigned S3 GET URL plus an ISO expiry', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-download')
+    const s3 = mockS3()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-download'),
+    )
+    expect(presign.status).toBe(201)
+    const attachmentId = presign.data.attachment_id
+
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/${attachmentId}/download-url`,
+      orgHeader('eo-download'),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data).toMatchObject({
+      download_url: 'https://s3.example/download-url',
+    })
+    expect(typeof result.data.expires_at).toBe('string')
+    expect(Number.isNaN(Date.parse(result.data.expires_at))).toBe(false)
+    expect(s3.view).toHaveBeenCalledOnce()
+  })
+
+  it('returns 404 for an unknown attachment id', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-download-missing')
+    mockS3()
+
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/does-not-exist/download-url`,
+      orgHeader('eo-download-missing'),
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('rejects callers who do not own the annotation', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-download-owner')
+    mockS3()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-download-owner'),
+    )
+    expect(presign.status).toBe(201)
+    const attachmentId = presign.data.attachment_id
+
+    // Seed a second elected office and use its header — that user does
+    // not own the annotation, so the briefing-access check should 403.
+    await seedElectedOffice('eo-download-other')
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/${attachmentId}/download-url`,
+      orgHeader('eo-download-other'),
+    )
+
+    expect(result.status).toBe(403)
   })
 })
 

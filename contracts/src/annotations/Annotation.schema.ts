@@ -209,6 +209,21 @@ export type AttachmentPresignResponse = z.infer<
   typeof AttachmentPresignResponseSchema
 >
 
+/**
+ * Response from the GET-style "download URL" endpoint. The URL is a
+ * pre-signed S3 GET that clients can hit directly (for `<img src>` or
+ * `window.open`) without proxying bytes through gp-api. Short-lived;
+ * `expires_at` is an ISO timestamp the client can use to refetch
+ * before it lapses.
+ */
+export const AttachmentDownloadUrlResponseSchema = z.object({
+  download_url: z.string(),
+  expires_at: z.string(),
+})
+export type AttachmentDownloadUrlResponse = z.infer<
+  typeof AttachmentDownloadUrlResponseSchema
+>
+
 // ---------------------------------------------------------------------------
 // Response schemas
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import {
   Prisma,
 } from '@prisma/client'
 import {
+  AttachmentDownloadUrlResponse,
   AttachmentPresignRequest,
   AttachmentPresignResponse,
 } from '@goodparty_org/contracts'
@@ -23,6 +24,7 @@ import { MessageGroup, QueueType } from '@/queue/queue.types'
 
 const MAX_ATTACHMENTS_PER_NOTE = 20
 const UPLOAD_URL_EXPIRES_IN = 60 * 15 // 15 minutes
+const DOWNLOAD_URL_EXPIRES_IN = 60 * 15 // 15 minutes
 const OCR_TEXT_MAX_BYTES = 200_000
 
 /**
@@ -210,6 +212,48 @@ export class AnnotationAttachmentService extends createPrismaBase(
       MessageGroup.default,
       { deduplicationId: `ocr-${attachmentId}` },
     )
+  }
+
+  /**
+   * Returns a short-lived presigned S3 GET URL for this attachment. The
+   * client uses it for `<img src>` thumbnails on image attachments and
+   * `window.open` for non-image attachments. Bytes never pass through
+   * gp-api — the URL points straight at S3.
+   */
+  async createDownloadUrl(
+    annotationId: string,
+    attachmentId: string,
+    userId: number,
+    electedOffice: ElectedOffice,
+  ): Promise<AttachmentDownloadUrlResponse> {
+    const { noteId } = await this.loadOwnedNoteAnnotation(
+      annotationId,
+      userId,
+      electedOffice,
+    )
+    const attachment = await this.client.annotationNoteAttachment.findUnique({
+      where: { id: attachmentId },
+      select: { id: true, noteId: true, storageKey: true },
+    })
+    if (!attachment || attachment.noteId !== noteId) {
+      throw new NotFoundException('attachment_not_found')
+    }
+
+    const downloadUrl = await this.s3.getSignedUrlForViewing(
+      this.bucket,
+      attachment.storageKey,
+      { expiresIn: DOWNLOAD_URL_EXPIRES_IN },
+    )
+    if (!downloadUrl) {
+      throw new NotFoundException('attachment_not_found')
+    }
+
+    return {
+      download_url: downloadUrl,
+      expires_at: new Date(
+        Date.now() + DOWNLOAD_URL_EXPIRES_IN * 1000,
+      ).toISOString(),
+    }
   }
 
   /**
