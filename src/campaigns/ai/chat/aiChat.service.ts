@@ -6,6 +6,10 @@ import {
 } from 'src/ai/services/promptReplace.service'
 import { LlmService } from '@/llm/services/llm.service'
 import { formatHtmlLlmResponse } from '@/ai/util/llmResponseFormat.util'
+import {
+  isChatCompletionMessage,
+  toChatCompletionMessage,
+} from '@/ai/util/chatMessage.util'
 import { ContentService } from 'src/content/services/content.service'
 import { RaceTargetMetrics } from 'src/elections/types/elections.types'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
@@ -23,25 +27,6 @@ const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 const AI_CHAT_MAX_TOKENS = 500
 const AI_CHAT_TEMPERATURE = 0.7
 const AI_CHAT_TOP_P = 0.1
-
-const toChatCompletionMessage = (
-  m: AiChatMessage,
-): ChatCompletionMessageParam | undefined => {
-  switch (m.role) {
-    case 'system':
-      return { role: 'system', content: m.content }
-    case 'user':
-      return { role: 'user', content: m.content }
-    case 'assistant':
-      return { role: 'assistant', content: m.content }
-    default:
-      return undefined
-  }
-}
-
-const isChatCompletionMessage = (
-  m: ChatCompletionMessageParam | undefined,
-): m is ChatCompletionMessageParam => m !== undefined
 
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {

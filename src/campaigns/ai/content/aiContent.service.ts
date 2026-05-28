@@ -9,6 +9,10 @@ import {
 } from 'src/ai/services/promptReplace.service'
 import { LlmService } from '@/llm/services/llm.service'
 import { formatHtmlLlmResponse } from '@/ai/util/llmResponseFormat.util'
+import {
+  isChatCompletionMessage,
+  toChatCompletionMessage,
+} from '@/ai/util/chatMessage.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
@@ -236,7 +240,7 @@ export class AiContentService {
     const chat = existingChat || []
     const messages: ChatCompletionMessageParam[] = [
       { role: 'user', content: prompt },
-      ...(chat as ChatCompletionMessageParam[]),
+      ...chat.map(toChatCompletionMessage).filter(isChatCompletionMessage),
     ]
     let chatResponse
     let generateError = false
