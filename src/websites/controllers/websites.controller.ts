@@ -26,9 +26,10 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { ReqFiles } from 'src/files/decorators/ReqFiles.decorator'
 import { FileUpload } from 'src/files/files.types'
-import { MimeTypes } from 'http-constants-ts'
+import { CacheControls, MimeTypes } from 'http-constants-ts'
 import { UpdateWebsiteSchema } from '../schemas/UpdateWebsite.schema'
-import { FilesService } from 'src/files/files.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { merge } from 'es-toolkit'
 import { WebsiteContactsService } from '../services/websiteContacts.service'
 import { GetWebsiteContactsSchema } from '../schemas/GetWebsiteContacts.schema'
@@ -139,7 +140,7 @@ export class WebsitesController {
   constructor(
     private readonly websites: WebsitesService,
     private readonly contacts: WebsiteContactsService,
-    private readonly files: FilesService,
+    private readonly s3: S3Service,
     private readonly siteViews: WebsiteViewsService,
     private readonly campaigns: CampaignsService,
     private readonly analytics: AnalyticsService,
@@ -147,6 +148,15 @@ export class WebsitesController {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(WebsitesController.name)
+  }
+
+  private uploadWebsiteImage(file: FileUpload) {
+    const key = this.s3.buildKey('uploads', file.filename)
+    return this.s3.uploadFile(ASSET_DOMAIN, file.data, key, {
+      contentType: file.mimetype,
+      cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
+      baseUrl: `https://${ASSET_DOMAIN}`,
+    })
   }
 
   @Post()
@@ -322,8 +332,8 @@ export class WebsitesController {
       body.status === WebsiteStatus.published && !hasEverBeenPublished
 
     const [logo, hero] = await Promise.all([
-      logoFile ? this.files.uploadFile(logoFile, 'uploads') : null,
-      heroFile ? this.files.uploadFile(heroFile, 'uploads') : null,
+      logoFile ? this.uploadWebsiteImage(logoFile) : null,
+      heroFile ? this.uploadWebsiteImage(heroFile) : null,
     ])
 
     if (logo) {
