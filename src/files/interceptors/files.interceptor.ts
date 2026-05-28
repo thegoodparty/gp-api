@@ -11,6 +11,7 @@ import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { Prisma } from '@prisma/client'
+import { FORBIDDEN_KEYS } from '@/shared/constants/forbiddenKeys'
 
 type FilesInterceptorOpts = {
   /**
@@ -126,7 +127,7 @@ export function FilesInterceptor(
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               part.value as Prisma.JsonValue,
             )
-          } else {
+          } else if (!FORBIDDEN_KEYS.has(part.fieldname)) {
             // Multipart form value to Prisma JSON — no shared type between fastify and Prisma
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             req.body[part.fieldname] = part.value as Prisma.JsonValue
@@ -145,17 +146,20 @@ export function FilesInterceptor(
  * @param path The field name with bracket notation (e.g., 'user[name]', 'items[0]')
  * @param value The value to set
  */
-function setNestedProperty(
+export function setNestedProperty(
   obj: Prisma.JsonObject,
   path: string,
   value: Prisma.JsonValue,
 ) {
   if (!path.includes('[') || !path.includes(']')) {
+    if (FORBIDDEN_KEYS.has(path)) return
     obj[path] = value
     return
   }
 
   const keys = path.split(/[\[\]]/).filter((key) => key !== '')
+
+  if (keys.some((k) => FORBIDDEN_KEYS.has(k))) return
 
   let current = obj
 
