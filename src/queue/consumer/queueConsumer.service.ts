@@ -657,6 +657,44 @@ export class QueueConsumerService {
       phoneNumbers,
     })
 
+    // Some response phones won't appear in this poll's outreach map — most
+    // often because the original recipient forwarded the SMS and somebody
+    // else replied. Try to resolve those phones in the org's district via
+    // the People DB so we can still attribute the response to a real
+    // constituent. Anything still unresolved after this is skipped (logged)
+    // rather than thrown, to avoid poison-pilling the entire poll's
+    // analysis on a single unattributable reply.
+    const unmappedPhones = phoneNumbers.filter(
+      (p) => !phoneToPersonIdMap.has(p),
+    )
+    if (unmappedPhones.length > 0) {
+      this.logger.info(
+        { pollId, unmappedPhoneCount: unmappedPhones.length },
+        "Some response phones weren't in this poll's outreach; trying People DB fallback",
+      )
+      const lookups = await Promise.all(
+        unmappedPhones.map(async (normalized) => {
+          const digitsOnly = normalized.replace(/^\+1/, '')
+          try {
+            const person = await this.contactsService.findPersonByPhone(
+              digitsOnly,
+              organization,
+            )
+            return { phone: normalized, personId: person?.id ?? null }
+          } catch (err) {
+            this.logger.warn(
+              { err: serializeError(err), phone: normalized, pollId },
+              'People DB lookup failed for unmapped poll phone',
+            )
+            return { phone: normalized, personId: null }
+          }
+        }),
+      )
+      for (const { phone, personId } of lookups) {
+        if (personId) phoneToPersonIdMap.set(phone, personId)
+      }
+    }
+
     const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
     const joinValues: Prisma.Sql[] = []
 
@@ -674,9 +712,16 @@ export class QueueConsumerService {
       const normalizedPhone = normalizePhoneNumber(phoneNumber)
       const personId = phoneToPersonIdMap.get(normalizedPhone)
       if (!personId) {
-        throw new InternalServerErrorException(
-          `Person with cell phone ${phoneNumber} not found in poll ${pollId}`,
+        // Throwing here would bubble back to SQS and cause infinite
+        // redelivery (see queue/CLAUDE.md), blocking *all* other valid
+        // responses for this poll from being persisted. A single
+        // unattributable reply is the lesser evil — drop the row, keep a
+        // record in the logs, and let the rest of the analysis through.
+        this.logger.warn(
+          { pollId, phoneNumber: normalizedPhone, isOptOut },
+          'Skipping poll response: phone not in outreach and not found in People DB',
         )
+        continue
       }
 
       const uuid = uuidv5(
