@@ -397,6 +397,29 @@ describe('AiService', () => {
       expect(result.tokens).toBe(7)
     })
 
+    it('preserves newlines and produces valid JSON in <function=...> fallback', async () => {
+      // Pretty-printed JSON inside the fallback envelope must survive — the
+      // `\n -> <br/><br/>` transform would corrupt it.
+      const prettyJson = '{\n  "city": "LA"\n}'
+      mockOpenAiCreate.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: `<function=extractLocation>${prettyJson}</function>`,
+            },
+          },
+        ],
+        usage: { total_tokens: 9 },
+      })
+
+      const result = await service.getChatToolCompletion({
+        messages: [userMessage('test')],
+      })
+
+      expect(result.content).toBe(prettyJson)
+      expect(() => JSON.parse(result.content)).not.toThrow()
+    })
+
     it('tries next model on error and sends Slack notification', async () => {
       mockOpenAiCreate
         .mockRejectedValueOnce(new Error('model1 down'))
