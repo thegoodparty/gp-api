@@ -12,12 +12,13 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
-import { MimeTypes } from 'http-constants-ts'
+import { CacheControls, MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { FilesService } from 'src/files/files.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { CreateOutreachSchema } from './schemas/createOutreachSchema'
@@ -35,7 +36,7 @@ export class OutreachController {
   constructor(
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly outreachService: OutreachService,
-    private readonly filesService: FilesService,
+    private readonly s3: S3Service,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
     private readonly logger: PinoLogger,
   ) {
@@ -84,12 +85,21 @@ export class OutreachController {
       }
     }
 
-    const imageUrl =
-      image &&
-      (await this.filesService.uploadFile(
-        image,
-        `scheduled-campaign/${campaign.slug}/${outreachType}/${date}`,
-      ))
+    const imageUrl = image
+      ? await this.s3.uploadFile(
+          ASSET_DOMAIN,
+          image.data,
+          this.s3.buildKey(
+            `scheduled-campaign/${campaign.slug}/${outreachType}/${date}`,
+            image.filename,
+          ),
+          {
+            contentType: image.mimetype,
+            cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
+            baseUrl: `https://${ASSET_DOMAIN}`,
+          },
+        )
+      : undefined
 
     if (outreachType === OutreachType.p2p && !imageUrl) {
       throw new BadRequestException('Failed to upload image for P2P outreach')

@@ -1,6 +1,6 @@
 import { HttpModule } from '@nestjs/axios'
 import { Global, Module } from '@nestjs/common'
-import { FilesModule } from '@/files/files.module'
+import { AwsModule } from '@/vendors/aws/aws.module'
 import { AuthenticationModule } from '@/authentication/authentication.module'
 import { CrmModule } from '@/crm/crmModule'
 import { SlackModule } from '@/vendors/slack/slack.module'
@@ -15,7 +15,7 @@ import { UsersController } from './users.controller'
   providers: [UsersService, CrmUsersService],
   exports: [UsersService, CrmUsersService],
   imports: [
-    FilesModule,
+    AwsModule,
     AuthenticationModule,
     CrmModule,
     HttpModule,

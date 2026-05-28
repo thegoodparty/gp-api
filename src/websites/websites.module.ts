@@ -8,7 +8,6 @@ import { WebsitesService } from './services/websites.service'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { VercelModule } from 'src/vendors/vercel/vercel.module'
 import { WebsitesController } from './controllers/websites.controller'
-import { FilesModule } from 'src/files/files.module'
 import { PaymentsModule } from 'src/payments/payments.module'
 import { UsersModule } from 'src/users/users.module'
 import { WebsiteContactsService } from './services/websiteContacts.service'
@@ -28,7 +27,6 @@ import { ClerkModule } from '@/vendors/clerk/clerk.module'
     AwsModule,
     VercelModule,
     ForwardEmailModule,
-    FilesModule,
     PaymentsModule,
     UsersModule,
     StripeModule,

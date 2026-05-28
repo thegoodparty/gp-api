@@ -5,9 +5,9 @@ import { AiModule } from 'src/ai/ai.module'
 import { EmailModule } from 'src/email/email.module'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PurchaseService } from 'src/payments/services/purchase.service'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 import { GoogleModule } from 'src/vendors/google/google.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
-import { FilesModule } from '../files/files.module'
 import { PaymentsModule } from '../payments/payments.module'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
 import { VotersModule } from '../voters/voters.module'
@@ -22,7 +22,7 @@ import { OutreachPurchaseHandlerService } from './services/outreachPurchase.serv
     ClerkModule,
     HttpModule,
     EmailModule,
-    FilesModule,
+    AwsModule,
     PaymentsModule,
     forwardRef(() => PeerlyModule),
     // Outreach → Voters → Peerly → Outreach is a 3-cycle in both the file-import
