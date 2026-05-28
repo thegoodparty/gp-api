@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { AiModule } from '@/ai/ai.module'
+import { LlmModule } from '@/llm/llm.module'
 import { ContactsModule } from '@/contacts/contacts.module'
 import { ElectionsModule } from '@/elections/elections.module'
 import { OrganizationsModule } from '@/organizations/organizations.module'
@@ -9,7 +9,7 @@ import { OnboardingVoterIssuesController } from './onboardingVoterIssues.control
 import { OnboardingLocalNewsService } from './services/localNews.service'
 
 @Module({
-  imports: [AiModule, ContactsModule, ElectionsModule, OrganizationsModule],
+  imports: [LlmModule, ContactsModule, ElectionsModule, OrganizationsModule],
   controllers: [
     OnboardingContactsController,
     OnboardingLocalNewsController,

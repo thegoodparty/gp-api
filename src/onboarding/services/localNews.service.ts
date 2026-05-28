@@ -1,9 +1,11 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
-import type { ChatCompletionTool } from 'openai/resources/chat/completions'
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions'
 import { PinoLogger } from 'nestjs-pino'
-import crypto from 'node:crypto'
-import { AiService } from '@/ai/ai.service'
-import type { AiChatMessage } from '@/campaigns/ai/chat/aiChat.types'
+import { LlmService } from '@/llm/services/llm.service'
+import { extractToolCallContent } from '@/ai/util/llmResponseFormat.util'
 import {
   LocalNewsResponse,
   localNewsResponseSchema,
@@ -78,7 +80,7 @@ const tool: ChatCompletionTool = {
 @Injectable()
 export class OnboardingLocalNewsService {
   constructor(
-    private readonly ai: AiService,
+    private readonly llm: LlmService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(OnboardingLocalNewsService.name)
@@ -94,24 +96,17 @@ export class OnboardingLocalNewsService {
     office: string
   }): Promise<LocalNewsResponse> {
     const jurisdiction = city ? `${city}, ${state}` : state
-    const messages: AiChatMessage[] = [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-      },
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
         content: `Jurisdiction: ${jurisdiction}\nOffice: ${office}`,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
       },
     ]
 
-    const completion = await this.ai.getChatToolCompletion({
+    const completion = await this.llm.toolCompletion({
       messages,
-      tool,
+      tools: [tool],
       toolChoice: {
         type: 'function',
         function: { name: 'returnLocalNewsOutlets' },
@@ -121,7 +116,7 @@ export class OnboardingLocalNewsService {
       models: ['deepseek-ai/DeepSeek-V4-Pro'],
     })
 
-    const raw = completion.content?.trim()
+    const raw = extractToolCallContent(completion).trim()
     if (!raw) {
       throw new BadGatewayException(
         'AI service returned no content for local news outlets',
