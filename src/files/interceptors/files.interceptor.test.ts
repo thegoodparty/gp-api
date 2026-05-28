@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { of } from 'rxjs'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { FilesInterceptor, setNestedProperty } from './files.interceptor'
+import { FORBIDDEN_KEYS } from '@/shared/constants/forbiddenKeys'
 
-const FORBIDDEN = ['__proto__', 'constructor', 'prototype'] as const
+const FORBIDDEN = [...FORBIDDEN_KEYS]
 
 describe('setNestedProperty', () => {
   it.each(FORBIDDEN)('rejects flat forbidden key: %s', (key) => {
