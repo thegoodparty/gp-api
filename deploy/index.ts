@@ -399,7 +399,12 @@ export = async () => {
         prod: 'true',
       }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
-      MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
+      MEETING_PIPELINE_BUCKET: select({
+        preview: 'meeting-pipeline-dev',
+        dev: 'meeting-pipeline-dev',
+        qa: 'meeting-pipeline-qa',
+        prod: 'meeting-pipeline-prod',
+      }),
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ANNOTATION_ATTACHMENTS_BUCKET: annotationAttachmentsBucketName,
