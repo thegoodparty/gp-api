@@ -99,6 +99,33 @@ describe('StripeService', () => {
         service.createPaymentIntent(mockUser, payload),
       ).rejects.toThrow('stripe down')
     })
+
+    it('strips null/undefined fields from metadata', async () => {
+      const intent = { id: 'pi_2' } as Stripe.PaymentIntent
+      stripe.paymentIntents.create.mockResolvedValue(intent)
+
+      const payloadWithUndefined: PaymentIntentPayload<PaymentType.POLL> = {
+        type: PaymentType.POLL,
+        amount: 500,
+        description: 'Poll donation',
+        purchaseType: PurchaseType.POLL,
+        count: 10,
+        pollId: undefined,
+      }
+
+      await service.createPaymentIntent(mockUser, payloadWithUndefined)
+
+      const [arg] = stripe.paymentIntents.create.mock.calls[0] as [
+        Stripe.PaymentIntentCreateParams,
+      ]
+      expect(arg.metadata).not.toHaveProperty('pollId')
+      expect(arg.metadata).toEqual({
+        purchaseType: PurchaseType.POLL,
+        count: 10,
+        userId: 42,
+        paymentType: PaymentType.POLL,
+      })
+    })
   })
 
   describe('retrievePaymentIntent', () => {
@@ -303,6 +330,7 @@ describe('StripeService', () => {
       ]
       expect(arg.customer_email).toBe('u@e.com')
       expect(arg).not.toHaveProperty('customer')
+      expect(arg.payment_intent_data).toEqual({ receipt_email: 'u@e.com' })
     })
 
     it('omits both customer fields when customerId and email absent', async () => {
