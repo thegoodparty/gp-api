@@ -45,7 +45,7 @@
   `Salli`, `Ruth`, `Stephen`, `Amy`). Update default voice/engine from
   `Joanna`/`neural` to `Amy`/`generative`. Add a cross-field refine to
   `SynthesizeSpeechRequestSchema` that rejects any `voiceId` × `engine:
-  'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
+'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
 
 ## 0.5.0
 
@@ -83,6 +83,16 @@
   (`MeetingScheduleArtifact`, `MeetingsListResponse`, `MeetingBriefingResponse`)
   and their inferred types. Snake_case throughout to match the raw S3 artifact
   shape — no transform layer.
+- Add enriched campaign response schemas for M2M campaign endpoints.
+  - `RaceTargetMetricsSchema` / `RaceTargetMetrics` — live race-target metrics shape (`winNumber`, `voterContactGoal`, `projectedTurnout`).
+  - `CampaignWithPositionNameSchema` / `CampaignWithPositionName` — `ReadCampaignOutput` extended with `positionName`. Used by `GET /v1/campaigns/list` (M2M) so admins can render the human-readable position without a per-row roundtrip.
+  - `CampaignWithLiveContextSchema` / `CampaignWithLiveContext` — `CampaignWithPositionName` further extended with `raceTargetMetrics` (nullable). Used by `GET /v1/campaigns/:id` (M2M).
+
+  These centralize the shapes that `gp-api` returns and `gp-sdk` consumes, replacing the previously duplicated local definitions in both repos.
+
+### Patch Changes
+
+- Add optional `isPro` to `ListUsersPagination` for filtering users by pro campaign status.
 
 ## 0.2.0
 
