@@ -98,6 +98,28 @@ describe('WebsitesService.verifyLive', () => {
     stubDnsLookup([{ address: '93.184.216.34', family: 4 }])
   })
 
+  it('short-circuits to verified=true without fetching when OTEL_SERVICE_ENVIRONMENT=dev', async () => {
+    const original = process.env.OTEL_SERVICE_ENVIRONMENT
+    process.env.OTEL_SERVICE_ENVIRONMENT = 'dev'
+    try {
+      const result = await service.verifyLive(1)
+      expect(mockedAxiosGet).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        verified: true,
+        url: 'https://vote-jane.com/',
+        checks: {
+          http_200: true,
+          has_privacy_policy: true,
+          has_terms: true,
+          has_candidate_identity: true,
+        },
+      })
+    } finally {
+      if (original === undefined) delete process.env.OTEL_SERVICE_ENVIRONMENT
+      else process.env.OTEL_SERVICE_ENVIRONMENT = original
+    }
+  })
+
   it('returns verified=true when HTTP 200 + all required sections + identity present', async () => {
     mockedAxiosGet.mockResolvedValue({ status: 200, data: buildHtml() })
 
