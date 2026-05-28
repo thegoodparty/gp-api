@@ -1,5 +1,16 @@
 # @goodparty_org/contracts
 
+## 0.9.0
+
+### Minor Changes
+
+- `ArtifactFeedbackSchema` and `SetArtifactFeedbackRequestSchema` now carry
+  an optional `comment` string (max 2000 chars, nullable). Backs the
+  thumbs-down "tell us why" composer on agenda items. Comment is omitted
+  from PUT bodies that don't set it; `null` clears a previously-set
+  comment. The response and the GET-list endpoint echo the stored value
+  so clients can rehydrate the composer with the user's last comment.
+
 ## 0.8.0
 
 ### Minor Changes

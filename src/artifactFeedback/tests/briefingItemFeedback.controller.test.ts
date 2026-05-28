@@ -243,6 +243,102 @@ describe('PUT /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   })
 })
 
+describe('PUT comment handling', () => {
+  const SAMPLE_COMMENT = 'the summary missed the rezoning vote'
+
+  it('persists a comment supplied on first PUT and echoes it on the response', async () => {
+    const orgSlug = 'eo-fb-comment-create'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
+
+    const result = await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative', comment: SAMPLE_COMMENT },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.comment).toBe(SAMPLE_COMMENT)
+
+    const row = await service.prisma.artifactFeedback.findFirst({
+      where: { briefingId: briefing.id, submitterUserId: service.user.id },
+    })
+    expect(row?.comment).toBe(SAMPLE_COMMENT)
+  })
+
+  it('omitting `comment` on a follow-up PUT preserves the previously-stored comment', async () => {
+    const orgSlug = 'eo-fb-comment-preserve'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, DATE)
+
+    await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative', comment: 'first take' },
+      orgHeader(orgSlug),
+    )
+    // Re-vote with no `comment` key — the upsert `update` branch must
+    // skip the column so we don't accidentally null out the existing text.
+    const result = await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative' },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.comment).toBe('first take')
+  })
+
+  it('passing `comment: null` clears a previously-set comment', async () => {
+    const orgSlug = 'eo-fb-comment-clear'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, DATE)
+
+    await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative', comment: 'original take' },
+      orgHeader(orgSlug),
+    )
+    const result = await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative', comment: null },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.comment).toBeNull()
+  })
+
+  it('rejects a comment longer than 2000 characters with 400', async () => {
+    const orgSlug = 'eo-fb-comment-too-long'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, DATE)
+
+    const tooLong = 'x'.repeat(2001)
+    const result = await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'negative', comment: tooLong },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(400)
+  })
+
+  it('echoes `comment: null` for rows that have never had a comment set', async () => {
+    const orgSlug = 'eo-fb-comment-default-null'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, DATE)
+
+    const result = await service.client.put(
+      `/v1/meetings/${DATE}/briefing/items/${ITEM_ID}/feedback`,
+      { feedback: 'positive' },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.comment).toBeNull()
+  })
+})
+
 describe('DELETE /v1/meetings/:date/briefing/items/:itemId/feedback', () => {
   it('deletes the row and returns 204', async () => {
     const orgSlug = 'eo-fb-delete'
@@ -447,6 +543,40 @@ describe('GET /v1/meetings/:date/briefing/feedback', () => {
     )
     expect(byItem[ITEM_ID]).toBe('positive')
     expect(byItem[OTHER_ITEM_ID]).toBe('negative')
+    // Every row in the listing should carry a `comment` field (null when
+    // unset) so the client can rehydrate the composer without a second call.
+    for (const row of result.data.feedback) {
+      expect(row).toHaveProperty('comment')
+    }
+  })
+
+  it('echoes a stored comment in the GET listing', async () => {
+    const orgSlug = 'eo-fb-list-comment'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefing = await seedBriefing(eo.id, orgSlug, DATE)
+
+    await service.prisma.artifactFeedback.create({
+      data: {
+        organizationSlug: orgSlug,
+        briefingId: briefing.id,
+        submitterUserId: service.user.id,
+        artifactId: ITEM_ID,
+        artifactType: 'agenda_item',
+        feedback: 'negative',
+        comment: 'agenda card 3 missed the rezoning detail',
+      },
+    })
+
+    const result = await service.client.get(
+      `/v1/meetings/${DATE}/briefing/feedback`,
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.feedback).toHaveLength(1)
+    expect(result.data.feedback[0].comment).toBe(
+      'agenda card 3 missed the rezoning detail',
+    )
   })
 
   it('returns empty list when the user has no feedback', async () => {
