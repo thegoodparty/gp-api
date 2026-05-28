@@ -23,15 +23,9 @@ test.describe('Websites - Contacts', () => {
     }
   })
 
-  // ENG-10258: PUT /websites/mine with status=published now requires an
-  // attached domain in status submitted/registered/active. This test creates
-  // a fresh candidate with no domain, so the publish step 4xx's and the
-  // contact form has nothing to write against. Rewrite under the new
-  // compliance_setup flow (domain purchase first) before re-enabling.
   test('should submit contact form on published website', async ({
     request,
   }) => {
-    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -149,11 +143,7 @@ test.describe('Websites - Contacts', () => {
     expect(response.status()).toBe(403)
   })
 
-  // ENG-10258: depends on the "should submit contact form on published
-  // website" test above. Same root cause — publish requires an attached
-  // domain in the new compliance flow.
   test('should get website contacts', async ({ request }) => {
-    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()

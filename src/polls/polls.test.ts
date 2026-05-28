@@ -161,6 +161,180 @@ describe('POST /polls/initial-poll', () => {
   })
 })
 
+describe('GET /polls/:pollId/download-responses', () => {
+  const eoHeaders = () => ({
+    headers: { 'x-organization-slug': eoOrgSlug },
+    responseType: 'arraybuffer' as const,
+  })
+
+  const seedPoll = async (overrides: Partial<{ name: string }> = {}) => {
+    const electedOffice = await service.prisma.electedOffice.findFirst({
+      where: { organizationSlug: eoOrgSlug },
+    })
+    if (!electedOffice) {
+      throw new Error('test setup: elected office not seeded')
+    }
+
+    return service.prisma.poll.create({
+      data: {
+        name: overrides.name ?? 'My Test Poll',
+        messageContent: 'How do you feel about local issues?',
+        targetAudienceSize: 1000,
+        scheduledDate: new Date('2025-01-01T00:00:00Z'),
+        estimatedCompletionDate: new Date('2025-01-08T00:00:00Z'),
+        electedOfficeId: electedOffice.id,
+      },
+    })
+  }
+
+  const seedIssue = (pollId: string, title: string) =>
+    service.prisma.pollIssue.create({
+      data: {
+        id: uuidv7(),
+        pollId,
+        title,
+        summary: `summary for ${title}`,
+        details: `details for ${title}`,
+        mentionCount: 1,
+        representativeComments: [],
+      },
+    })
+
+  const seedMessage = (
+    pollId: string,
+    overrides: Partial<{
+      content: string
+      sender: 'CONSTITUENT' | 'ELECTED_OFFICIAL'
+      sentAt: Date
+      isOptOut: boolean | null
+      issueIds: string[]
+    }> = {},
+  ) =>
+    service.prisma.pollIndividualMessage.create({
+      data: {
+        id: uuidv7(),
+        personId: uuidv7(),
+        sentAt: overrides.sentAt ?? new Date('2025-01-02T00:00:00Z'),
+        sender: overrides.sender ?? 'CONSTITUENT',
+        content: overrides.content ?? 'Default constituent response',
+        isOptOut: overrides.isOptOut ?? null,
+        pollId,
+        pollIssues: overrides.issueIds
+          ? { connect: overrides.issueIds.map((id) => ({ id })) }
+          : undefined,
+      },
+    })
+
+  it('streams constituent responses as CSV with the BOM + poll name header', async () => {
+    const poll = await seedPoll({ name: 'Town Hall Poll' })
+    const housing = await seedIssue(poll.id, 'Housing')
+    const transit = await seedIssue(poll.id, 'Transit')
+
+    await seedMessage(poll.id, {
+      content: 'We need more affordable housing',
+      sentAt: new Date('2025-01-02T00:00:00Z'),
+      issueIds: [housing.id],
+    })
+    await seedMessage(poll.id, {
+      content: 'Buses need to run later',
+      sentAt: new Date('2025-01-03T00:00:00Z'),
+      issueIds: [transit.id, housing.id],
+    })
+    // Excluded: ELECTED_OFFICIAL sender
+    await seedMessage(poll.id, {
+      content: 'Thanks for your feedback',
+      sender: 'ELECTED_OFFICIAL',
+      sentAt: new Date('2025-01-04T00:00:00Z'),
+    })
+    // Excluded: opt-out
+    await seedMessage(poll.id, {
+      content: 'STOP',
+      isOptOut: true,
+      sentAt: new Date('2025-01-05T00:00:00Z'),
+    })
+
+    const result = await service.client.get(
+      `/v1/polls/${poll.id}/download-responses`,
+      eoHeaders(),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.headers['content-type']).toContain('text/csv')
+    expect(result.headers['content-disposition']).toContain(
+      'attachment; filename="Town Hall Poll.csv"',
+    )
+
+    const body = Buffer.from(result.data as ArrayBuffer).toString('utf-8')
+    const lines = body.split('\n')
+
+    expect(lines[0]).toBe('\uFEFFTown Hall Poll')
+    expect(lines[1]).toBe('message_content,associated_clusters')
+    // Postgres COPY only quotes fields that contain the delimiter, quote
+    // characters, or newlines. Issues are joined alphabetically with "; ".
+    expect(lines[2]).toBe('We need more affordable housing,Housing')
+    expect(lines[3]).toBe('Buses need to run later,Housing; Transit')
+    // No ELECTED_OFFICIAL row and no opt-out row
+    expect(body).not.toContain('Thanks for your feedback')
+    expect(body).not.toContain('STOP')
+  })
+
+  it('returns 404 for an unknown poll id', async () => {
+    const result = await service.client.get(
+      `/v1/polls/${uuidv7()}/download-responses`,
+      eoHeaders(),
+    )
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 403 when the poll belongs to a different elected office', async () => {
+    const otherEoId = uuidv7()
+    const otherOrgSlug = `eo-${otherEoId}`
+    await service.prisma.organization.create({
+      data: { slug: otherOrgSlug, ownerId: service.user.id },
+    })
+    await service.prisma.electedOffice.create({
+      data: {
+        id: otherEoId,
+        userId: service.user.id,
+        organizationSlug: otherOrgSlug,
+      },
+    })
+    const foreignPoll = await service.prisma.poll.create({
+      data: {
+        name: 'Foreign Poll',
+        messageContent: 'msg',
+        targetAudienceSize: 100,
+        scheduledDate: new Date(),
+        estimatedCompletionDate: new Date(),
+        electedOfficeId: otherEoId,
+      },
+    })
+
+    const result = await service.client.get(
+      `/v1/polls/${foreignPoll.id}/download-responses`,
+      eoHeaders(),
+    )
+    expect(result.status).toBe(403)
+  })
+
+  it('emits only the BOM + name + header when the poll has no constituent responses', async () => {
+    const poll = await seedPoll({ name: 'Empty Poll' })
+    await seedMessage(poll.id, {
+      sender: 'ELECTED_OFFICIAL',
+      content: 'Hello',
+    })
+
+    const result = await service.client.get(
+      `/v1/polls/${poll.id}/download-responses`,
+      eoHeaders(),
+    )
+
+    expect(result.status).toBe(200)
+    const body = Buffer.from(result.data as ArrayBuffer).toString('utf-8')
+    expect(body).toBe('\uFEFFEmpty Poll\nmessage_content,associated_clusters\n')
+  })
+})
+
 describe('POST /polls/analyze-bias', () => {
   let pollBiasAnalysisService: PollBiasAnalysisService
 

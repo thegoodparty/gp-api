@@ -23,13 +23,7 @@ test.describe('Websites - Views', () => {
     }
   })
 
-  // ENG-10258: publishing now requires an attached domain in
-  // submitted/registered/active. Fresh candidates here have no domain, so
-  // the publish step 4xx's and the public track-view endpoint can't find
-  // the published vanity path. Rewrite under the new compliance_setup flow
-  // before re-enabling.
   test('should track website view', async ({ request }) => {
-    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -88,12 +82,9 @@ test.describe('Websites - Views', () => {
     expect(view.websiteId).toBeDefined()
   })
 
-  // ENG-10258: same root cause as "should track website view" above —
-  // publish requires an attached domain in the new flow.
   test('should track multiple views from different visitors', async ({
     request,
   }) => {
-    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()

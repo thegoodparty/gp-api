@@ -95,13 +95,7 @@ test.describe('Candidate Website', () => {
     expect(result).toHaveProperty('available')
   })
 
-  // ENG-10258: publishing now requires an attached domain in
-  // submitted/registered/active. Without a domain, the PUT below 4xx's,
-  // the website stays unpublished, and the public GET returns 403 (not
-  // 200 / 404). Rewrite under the new compliance_setup flow before
-  // re-enabling.
   test('should get website by vanity path', async ({ request }) => {
-    test.skip()
     const createResponse = await request.post('/v1/websites', {
       headers: authHeaders(authToken, orgSlug),
     })

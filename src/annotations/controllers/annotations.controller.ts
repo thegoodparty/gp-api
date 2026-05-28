@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   Param,
   Post,
@@ -11,6 +12,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice, User } from '@prisma/client'
 import {
   AnnotationResponseSchema,
+  AttachmentDownloadUrlResponseSchema,
   AttachmentPresignRequest,
   AttachmentPresignRequestSchema,
   UpdateNoteRequest,
@@ -90,6 +92,23 @@ export class AnnotationsController {
     @ReqElectedOffice() electedOffice: ElectedOffice,
   ): Promise<void> {
     await this.attachments.completeUpload(
+      annotationId,
+      attachmentId,
+      user.id,
+      electedOffice,
+    )
+  }
+
+  @UseElectedOffice()
+  @Get(':annotationId/note/attachments/:attachmentId/download-url')
+  @ResponseSchema(AttachmentDownloadUrlResponseSchema)
+  async getAttachmentDownloadUrl(
+    @Param('annotationId') annotationId: string,
+    @Param('attachmentId') attachmentId: string,
+    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+  ) {
+    return this.attachments.createDownloadUrl(
       annotationId,
       attachmentId,
       user.id,

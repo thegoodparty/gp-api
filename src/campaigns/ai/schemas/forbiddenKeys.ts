@@ -1,1 +1,1 @@
-export const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+export { FORBIDDEN_KEYS } from '@/shared/constants/forbiddenKeys'
