@@ -1,3 +1,6 @@
+import type { RaceTargetMetrics } from '@goodparty_org/contracts'
+export type { RaceTargetMetrics } from '@goodparty_org/contracts'
+
 export type BDElection = {
   id: string
   electionDay: string
@@ -60,13 +63,16 @@ export type ProjectedTurnout = {
   modelVersion: string
 }
 
-export type RaceTargetMetrics = {
-  winNumber: number
-  voterContactGoal: number
-  projectedTurnout: number
-}
-
-export type RaceTargetDetailsResult = RaceTargetMetrics
+/**
+ * District-only race target calculation result. Does NOT include filing fee
+ * fields — those only come from the position lookup path. Callers using this
+ * (e.g. `buildRaceTargetDetails`) must default filingFee/filingRequirementsText
+ * to null themselves when assembling the final `RaceTargetMetrics`.
+ */
+export type RaceTargetDetailsResult = Pick<
+  RaceTargetMetrics,
+  'winNumber' | 'voterContactGoal' | 'projectedTurnout'
+>
 
 export type VoterIssue = {
   label: string
@@ -144,6 +150,21 @@ export type PositionWithOptionalDistrict = {
   state: string
   name: string
   district?: District
+  filingFee?: number | null
+  filingRequirementsText?: string | null
+  filingFeeExtractionSource?: string | null
+}
+
+/**
+ * Shape returned by election-api `GET /races/by-br-hash-id/:hashId/filing-fee`.
+ * Mirrors `FilingFeeResult` on the election-api side so the shapes stay
+ * aligned. `extractionSource` is informational (audit / debugging) and not
+ * surfaced to clients today.
+ */
+export type FilingFeeByBrHashResult = {
+  filingFee: number | null
+  filingRequirementsText: string | null
+  extractionSource: string | null
 }
 
 type SourceProjectedTurnout = {

@@ -752,6 +752,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const { electionDate } = details ?? {}
     if (!electionDate) return null
 
+    // details is `Prisma.JsonValue` so raceId isn't on its TS shape; the
+    // office picker (gp-webapp) writes the BallotReady race hash here.
+    let raceId: string | undefined
+    if (details && typeof details === 'object' && !Array.isArray(details)) {
+      const candidate = (details as Record<string, unknown>).raceId
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        raceId = candidate
+      }
+    }
+
     const org = organizationSlug
       ? await this.organizations.findUnique({
           where: { slug: organizationSlug },
@@ -759,6 +769,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       : null
 
     if (!org?.overrideDistrictId && !org?.positionId) return null
+
+    // Prefer the race-hash-based filing fee when the campaign has a BR race
+    // hash on details.raceId — it resolves with a single Race lookup and
+    // doesn't depend on Position.placeId being populated (which it isn't
+    // in the election-api mart today). Falls back to the Position-side
+    // filing fee on the positionId branch when raceId is missing or the
+    // race-hash lookup fails.
+    const filingFeeFromRaceHash = raceId
+      ? await this.elections.fetchFilingFeeByRaceHash(raceId)
+      : null
 
     if (org.overrideDistrictId) {
       const result = await this.elections
@@ -775,6 +795,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         projectedTurnout,
         winNumber: winNumber ?? 0,
         voterContactGoal: voterContactGoal ?? 0,
+        filingFee: filingFeeFromRaceHash?.filingFee ?? null,
+        filingRequirementsText:
+          filingFeeFromRaceHash?.filingRequirementsText ?? null,
       }
     }
 
@@ -790,7 +813,30 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (!result || result.projectedTurnout <= 0) return null
 
-    const { projectedTurnout, winNumber, voterContactGoal } = result
-    return { projectedTurnout, winNumber, voterContactGoal }
+    const {
+      projectedTurnout,
+      winNumber,
+      voterContactGoal,
+      filingFee,
+      filingRequirementsText,
+    } = result
+    return {
+      projectedTurnout,
+      winNumber,
+      voterContactGoal,
+      // Race-hash result wins when we successfully fetched it (even when its
+      // filingFee is null — that's a legitimate "BR has no fee data for
+      // this race" signal, not an absence of an answer). Falls back to the
+      // Position-side result only when no raceId was set or the race-hash
+      // call errored out.
+      filingFee:
+        filingFeeFromRaceHash !== null
+          ? filingFeeFromRaceHash.filingFee
+          : (filingFee ?? null),
+      filingRequirementsText:
+        filingFeeFromRaceHash !== null
+          ? filingFeeFromRaceHash.filingRequirementsText
+          : (filingRequirementsText ?? null),
+    }
   }
 }

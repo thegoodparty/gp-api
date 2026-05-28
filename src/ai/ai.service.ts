@@ -46,6 +46,9 @@ type GetChatToolCompletionArgs = {
   toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
   models?: string[]
+  enableReasoning?: boolean // Together AI: leave reasoning on for reasoning-native models (e.g. DeepSeek) that need it to emit tool args.
+  reasoningEffort?: 'low' | 'medium' | 'high' // Together AI: cap how much budget the model spends thinking before emitting output.
+  maxTokens?: number // Together AI defaults to ~2048; reasoning models need more headroom to finish thinking AND emit the tool call.
 }
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
@@ -207,15 +210,16 @@ export class AiService {
     })
   }
 
-  private extractToolContent(
-    message: ChatCompletion.Choice['message'],
-  ): string {
+  private extractToolContent(message: ChatCompletion.Choice['message']): {
+    content: string
+    fromToolCall: boolean
+  } {
     const toolCalls = message.tool_calls
     if (toolCalls?.length) {
       const args = toolCalls[0]?.function?.arguments
-      if (args) return args
+      if (args) return { content: args, fromToolCall: true }
     }
-    return message.content || ''
+    return { content: message.content || '', fromToolCall: false }
   }
 
   async getChatToolCompletion({
@@ -226,6 +230,9 @@ export class AiService {
     toolChoice,
     timeout = 300000,
     models,
+    enableReasoning = false,
+    reasoningEffort,
+    maxTokens,
   }: GetChatToolCompletionArgs) {
     const modelsToTry = models?.length ? models : PARSED_AI_MODELS
     for (const model of modelsToTry) {
@@ -242,18 +249,36 @@ export class AiService {
             temperature,
             ...(tool && { tools: [tool] }),
             ...(toolChoice && { tool_choice: toolChoice }),
-            ...(isTogetherAi && { reasoning: { enabled: false } }),
+            ...(isTogetherAi && {
+              reasoning: {
+                enabled: enableReasoning,
+                ...(enableReasoning &&
+                  reasoningEffort && { effort: reasoningEffort }),
+              },
+            }),
+            ...(maxTokens !== undefined && { max_tokens: maxTokens }),
           },
           { timeout },
         )
 
         const message = completion.choices[0]?.message
-        let content = message ? this.extractToolContent(message) : ''
-        content = content.trim()
-        content = this.applyToolResponseFallback(content)
+        const extracted = message
+          ? this.extractToolContent(message)
+          : { content: '', fromToolCall: false }
+        let content = extracted.content.trim()
+        const fallback = this.applyToolResponseFallback(content)
+        content = fallback.content
+        const isToolContent = extracted.fromToolCall || fallback.matched
 
         content = AiService.stripHtmlFences(content)
-        content = content.replace(/\n/g, '<br/><br/>')
+        // Only apply the prose `\n -> <br/><br/>` transform to plain message
+        // content. Tool-call arguments and the `<function=...>` fallback JSON
+        // are both structured JSON; that substitution would corrupt
+        // pretty-printed payloads and silently mangle newlines inside string
+        // fields.
+        if (!isToolContent) {
+          content = content.replace(/\n/g, '<br/><br/>')
+        }
 
         this.logger.debug({ content }, 'completion success')
         return {
@@ -280,16 +305,22 @@ export class AiService {
     return { content: '', tokens: 0 }
   }
 
-  private applyToolResponseFallback(content: string): string {
-    if (!content.includes('<function=')) return content
+  private applyToolResponseFallback(content: string): {
+    content: string
+    matched: boolean
+  } {
+    if (!content.includes('<function=')) return { content, matched: false }
     const toolResponse = this.parseToolResponse(content)
-    return toolResponse ? toolResponse.arguments : content
+    if (!toolResponse) return { content, matched: false }
+    return { content: toolResponse.arguments, matched: true }
   }
 
   private parseToolResponse(
     response: string,
   ): { function: string; arguments: string } | undefined {
-    const match = response.match(/<function=(\w+)>(.*?)<\/function>/)
+    // Use [\s\S]*? so pretty-printed JSON (which contains \n) inside a
+    // <function=...> block still matches — `.` alone doesn't match newlines.
+    const match = response.match(/<function=(\w+)>([\s\S]*?)<\/function>/)
     if (!match) return undefined
 
     const [, functionName, argsString] = match
