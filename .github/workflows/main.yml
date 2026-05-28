@@ -15,34 +15,18 @@ env:
   IMAGE_URI: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api:${{ github.sha }}
 
 jobs:
-  main:
-    name: Build & Deploy
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
-      cancel-in-progress: false
-    services:
-      shadow-db:
-        image: postgres:16
-        env:
-          POSTGRES_USER: prisma
-          POSTGRES_PASSWORD: prisma
-          POSTGRES_DB: shadow
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U prisma"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
     outputs:
+      contracts-changed: ${{ steps.contracts-changed.outputs.contracts }}
       environment: ${{ steps.context.outputs.environment }}
-      service_url: ${{ steps.pulumi.outputs.service_url }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
+          submodules: recursive
 
       - name: Check contracts changes
         id: contracts-changed
@@ -58,106 +42,153 @@ jobs:
           echo "contracts=$RESULT" >> "$GITHUB_OUTPUT"
           echo "Contracts changed: $RESULT (comparing $PREV..$CURRENT)"
 
+      - name: Determine deployment context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.ref_name }}" in
+              develop) echo "environment=dev" >> "$GITHUB_OUTPUT" ;;
+              qa) echo "environment=qa" >> "$GITHUB_OUTPUT" ;;
+              master) echo "environment=prod" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm ci
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Check Prisma schema is in sync with migrations
-        run: |
-          npx prisma migrate diff \
-            --from-migrations ./prisma/schema/migrations \
-            --to-schema-datamodel ./prisma/schema \
-            --shadow-database-url "postgresql://prisma:prisma@localhost:5432/shadow" \
-            --exit-code
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
 
-      # Validation
-      - run: npm run generate
+      - name: Generate Prisma client and route types
+        run: npm run generate
 
       - name: Build contracts
         run: cd contracts && npm run build
 
-      - run: npx tsc --noEmit
+      - name: Upload build-deps artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-deps
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            node_modules/.prisma
+            contracts/dist
+
+  lint:
+    name: Lint
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
       - run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
+      - run: npx tsc --noEmit
+
+  test:
+    name: Test
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
       - run: npm run test -- --coverage
-
-      - run: npm run build
-
-      - name: Setup Node 24 for npm publish
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: RC version contracts
-        if: >-
-          github.ref_name != 'master'
-          && steps.contracts-changed.outputs.contracts == 'true'
-        id: rc-version
-        working-directory: contracts
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            SNAPSHOT_TAG="rc-pr-${{ github.event.number }}"
-          else
-            SNAPSHOT_TAG="rc-${{ github.ref_name }}"
-          fi
-          BEFORE=$(node -p "require('./package.json').version")
-          npx changeset version --snapshot "$SNAPSHOT_TAG" --snapshot-prerelease-template '{tag}.{commit}'
-          AFTER=$(node -p "require('./package.json').version")
-          echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
-          echo "version=$AFTER" >> "$GITHUB_OUTPUT"
-
-      - name: Publish RC contracts
-        if: >-
-          github.ref_name != 'master'
-          && steps.rc-version.outputs.changed == 'true'
-          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        working-directory: contracts
-        run: npx changeset publish --tag rc
-
-      - name: Comment RC version on PR
-        if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.number }}
-          body: |
-            **@goodparty_org/contracts** RC published: `${{ steps.rc-version.outputs.version }}`
-            ```
-            npm install @goodparty_org/contracts@${{ steps.rc-version.outputs.version }}
-            ```
-
-      - name: Generate App token
-        if: >-
-          github.ref_name == 'master'
-          && steps.contracts-changed.outputs.contracts == 'true'
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Symlink changeset config for changesets/action
-        if: >-
-          github.ref_name == 'master'
-          && steps.contracts-changed.outputs.contracts == 'true'
-        run: ln -s contracts/.changeset .changeset
-
-      - name: Create Release PR or Publish contracts
-        if: >-
-          github.ref_name == 'master'
-          && steps.contracts-changed.outputs.contracts == 'true'
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: npx changeset publish
-          title: 'chore: release @goodparty_org/contracts'
-          cwd: contracts
-          createGithubReleases: false
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Calculate overall coverage
         id: coverage-calc
@@ -190,21 +221,209 @@ jobs:
             **${{ steps.coverage-calc.outputs.overall_pct }}%** (average of lines, statements, functions, and branches)
           comment-id: ${{ steps.coverage-calc.outputs.comment-id }}
 
-      # Determine deployment context
-      - name: Determine deployment context
-        id: context
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "environment=preview" >> "$GITHUB_OUTPUT"
-          else
-            case "${{ github.ref_name }}" in
-              develop) echo "environment=dev" >> "$GITHUB_OUTPUT" ;;
-              qa) echo "environment=qa" >> "$GITHUB_OUTPUT" ;;
-              master) echo "environment=prod" >> "$GITHUB_OUTPUT" ;;
-            esac
-          fi
+  prisma-check:
+    name: Prisma migrations in sync
+    needs: setup
+    runs-on: ubuntu-latest
+    services:
+      shadow-db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U prisma"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
-      # Docker build and push
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Check Prisma schema is in sync with migrations
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/schema/migrations \
+            --to-schema-datamodel ./prisma/schema \
+            --shadow-database-url "postgresql://prisma:prisma@localhost:5432/shadow" \
+            --exit-code
+
+  contracts-rc:
+    name: Contracts RC publish
+    needs: [setup, lint, typecheck, test, prisma-check]
+    if: needs.setup.outputs.contracts-changed == 'true' && github.ref_name != 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
+      - name: RC version contracts
+        id: rc-version
+        working-directory: contracts
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SNAPSHOT_TAG="rc-pr-${{ github.event.number }}"
+          else
+            SNAPSHOT_TAG="rc-${{ github.ref_name }}"
+          fi
+          BEFORE=$(node -p "require('./package.json').version")
+          npx changeset version --snapshot "$SNAPSHOT_TAG" --snapshot-prerelease-template '{tag}.{commit}'
+          AFTER=$(node -p "require('./package.json').version")
+          echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "version=$AFTER" >> "$GITHUB_OUTPUT"
+
+      - name: Publish RC contracts
+        if: >-
+          steps.rc-version.outputs.changed == 'true'
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        working-directory: contracts
+        run: npx changeset publish --tag rc
+
+      - name: Comment RC version on PR
+        if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            **@goodparty_org/contracts** RC published: `${{ steps.rc-version.outputs.version }}`
+            ```
+            npm install @goodparty_org/contracts@${{ steps.rc-version.outputs.version }}
+            ```
+
+  contracts-release:
+    name: Contracts release PR
+    needs: [setup, lint, typecheck, test, prisma-check]
+    if: needs.setup.outputs.contracts-changed == 'true' && github.ref_name == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Symlink changeset config for changesets/action
+        run: ln -s contracts/.changeset .changeset
+
+      - name: Create Release PR or Publish contracts
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: npx changeset publish
+          title: 'chore: release @goodparty_org/contracts'
+          cwd: contracts
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+  docker-build:
+    name: Docker build & push
+    needs: setup
+    runs-on: ubuntu-latest
+    outputs:
+      ecr-exists: ${{ steps.ecr-check.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -227,13 +446,69 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Nest build (produces dist/)
+        if: steps.ecr-check.outputs.exists != 'true'
+        run: npm run build
+
+      - name: Set up Docker Buildx
+        if: steps.ecr-check.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push Docker image
         if: steps.ecr-check.outputs.exists != 'true'
-        run: |
-          docker build -t "${IMAGE_URI}" -f deploy/Dockerfile .
-          docker push "${IMAGE_URI}"
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_URI }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Pulumi deployment
+  deploy:
+    name: Deploy
+    needs: [setup, lint, typecheck, test, prisma-check, docker-build]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
+      cancel-in-progress: false
+    outputs:
+      environment: ${{ needs.setup.outputs.environment }}
+      service_url: ${{ steps.pulumi.outputs.service_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Restore node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Download build-deps
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deps
+          path: .
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Install Pulumi
         uses: pulumi/actions@v6
         with:
@@ -250,11 +525,10 @@ jobs:
           CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          npm run infra deploy ${{ steps.context.outputs.environment }}
+          npm run infra deploy ${{ needs.setup.outputs.environment }}
           cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
           echo "service_url=${SERVICE_URL}" >> "$GITHUB_OUTPUT"
 
-      # PR comment for preview environments
       - name: Find existing PR comment
         if: github.event_name == 'pull_request'
         uses: peter-evans/find-comment@v3
@@ -281,7 +555,6 @@ jobs:
 
             > This environment will be automatically destroyed when the PR is closed.
 
-      # Slack notifications
       - name: Notify Slack on Deploy Success
         if: success() && github.event_name == 'push'
         uses: 8398a7/action-slack@v3
@@ -302,7 +575,7 @@ jobs:
 
   tests:
     name: E2E Tests
-    needs: main
+    needs: deploy
     if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -322,22 +595,22 @@ jobs:
       - name: Run Playwright tests
         id: run-tests
         env:
-          API_BASE_URL: ${{ needs.main.outputs.service_url }}
+          API_BASE_URL: ${{ needs.deploy.outputs.service_url }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
           CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          CANDIDATE_ID: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CANDIDATE_ID || secrets.DEV_CANDIDATE_ID }}
-          CAMPAIGN_SLUG: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CAMPAIGN_SLUG || secrets.DEV_CAMPAIGN_SLUG }}
+          CANDIDATE_ID: ${{ needs.deploy.outputs.environment == 'qa' && secrets.QA_CANDIDATE_ID || secrets.DEV_CANDIDATE_ID }}
+          CAMPAIGN_SLUG: ${{ needs.deploy.outputs.environment == 'qa' && secrets.QA_CAMPAIGN_SLUG || secrets.DEV_CAMPAIGN_SLUG }}
         run: npm run test:e2e
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-reports-${{ needs.main.outputs.environment }}-${{ github.sha }}
+          name: playwright-reports-${{ needs.deploy.outputs.environment }}-${{ github.sha }}
           path: |
             e2e-tests/playwright-report
             e2e-tests/test-results
@@ -381,7 +654,7 @@ jobs:
               text: 'E2E Tests Passed',
               attachments: [{
                 color: 'good',
-                text: `${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>`
+                text: `${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.deploy.outputs.environment }}\n${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>`
               }]
             }
         env:
@@ -397,7 +670,7 @@ jobs:
               "text": "${{ steps.test-results.outputs.tests_ran == 'true' && 'E2E Tests Failed (Non-blocking)' || 'Test Environment Not Ready' }}",
               "attachments": [{
                 "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
-                "text": "${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('{0}/{1} tests failed\n{2}/{1} tests passed\n\nFailed Tests:\n{3}', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || 'Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>"
+                "text": "${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.deploy.outputs.environment }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('{0}/{1} tests failed\n{2}/{1} tests passed\n\nFailed Tests:\n{3}', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || 'Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>"
               }]
             }
         env:
