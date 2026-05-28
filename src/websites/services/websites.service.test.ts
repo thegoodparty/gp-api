@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { PinoLogger } from 'nestjs-pino'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
 import * as dns from 'node:dns'
 import {
@@ -71,8 +71,16 @@ describe('WebsitesService.verifyLive', () => {
   let mockPrisma: {
     website: { findUnique: ReturnType<typeof vi.fn> }
   }
+  let originalOtelEnv: string | undefined
 
   beforeEach(async () => {
+    // verifyLive short-circuits when OTEL_SERVICE_ENVIRONMENT !== 'prod' so the
+    // dev placeholder page doesn't fail the content checks. Pin to 'prod' here
+    // so every test exercises the real code path; the single bypass test
+    // overrides this locally.
+    originalOtelEnv = process.env.OTEL_SERVICE_ENVIRONMENT
+    process.env.OTEL_SERVICE_ENVIRONMENT = 'prod'
+
     mockPrisma = {
       website: {
         findUnique: vi.fn().mockResolvedValue({
@@ -96,6 +104,14 @@ describe('WebsitesService.verifyLive', () => {
     service = module.get<WebsitesService>(WebsitesService)
     vi.clearAllMocks()
     stubDnsLookup([{ address: '93.184.216.34', family: 4 }])
+  })
+
+  afterEach(() => {
+    if (originalOtelEnv === undefined) {
+      delete process.env.OTEL_SERVICE_ENVIRONMENT
+    } else {
+      process.env.OTEL_SERVICE_ENVIRONMENT = originalOtelEnv
+    }
   })
 
   it('short-circuits to verified=true without fetching when OTEL_SERVICE_ENVIRONMENT=dev', async () => {
