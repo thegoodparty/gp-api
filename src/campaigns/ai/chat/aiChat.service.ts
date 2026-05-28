@@ -26,7 +26,7 @@ const AI_CHAT_TOP_P = 0.1
 
 const toChatCompletionMessage = (
   m: AiChatMessage,
-): ChatCompletionMessageParam => {
+): ChatCompletionMessageParam | undefined => {
   switch (m.role) {
     case 'system':
       return { role: 'system', content: m.content }
@@ -34,8 +34,14 @@ const toChatCompletionMessage = (
       return { role: 'user', content: m.content }
     case 'assistant':
       return { role: 'assistant', content: m.content }
+    default:
+      return undefined
   }
 }
+
+const isChatCompletionMessage = (
+  m: ChatCompletionMessageParam | undefined,
+): m is ChatCompletionMessageParam => m !== undefined
 
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {
@@ -205,7 +211,9 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
 
     const messages: ChatCompletionMessageParam[] = [
       { role: 'system', content: `${systemPrompt}\n${candidateContext}` },
-      ...priorMessages.map(toChatCompletionMessage),
+      ...priorMessages
+        .map(toChatCompletionMessage)
+        .filter(isChatCompletionMessage),
       { role: 'user', content: message.content },
     ]
 

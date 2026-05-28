@@ -1,7 +1,7 @@
 import { ToolCall } from '@/llm/services/llm.service'
 
 const HTML_FENCE_REGEX = /```html([\s\S]*?)```/
-const FUNCTION_TAG_REGEX = /<function=(\w+)>(.*?)<\/function>/
+const FUNCTION_TAG_REGEX = /<function=(\w+)>([\s\S]*?)<\/function>/
 
 /**
  * Post-processing applied to LLM content for HTML rendering paths
