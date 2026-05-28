@@ -482,18 +482,10 @@ describe('DomainsService', () => {
         (c) => c[0] as string,
       )
       expect(tried.sort()).toEqual(
-        [
-          'voteforoneill.com',
-          'voteforoneill.org',
-          'voteforoneill.vote',
-        ].sort(),
+        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
       )
       expect(result.candidates.map((c) => c.domain).sort()).toEqual(
-        [
-          'voteforoneill.com',
-          'voteforoneill.org',
-          'voteforoneill.vote',
-        ].sort(),
+        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
       )
     })
 
