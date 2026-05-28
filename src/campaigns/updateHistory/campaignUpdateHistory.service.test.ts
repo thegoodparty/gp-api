@@ -5,12 +5,16 @@ import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CampaignsService } from '../services/campaigns.service'
 
 const mockDeleteMany = vi.fn()
+const mockHistoryCreate = vi.fn()
 const mockCampaignFindUniqueOrThrow = vi.fn()
 const mockCampaignUpdate = vi.fn()
 const mockExecuteRaw = vi.fn()
 
 const mockTx = {
-  campaignUpdateHistory: { deleteMany: mockDeleteMany },
+  campaignUpdateHistory: {
+    deleteMany: mockDeleteMany,
+    create: mockHistoryCreate,
+  },
   campaign: {
     findUniqueOrThrow: mockCampaignFindUniqueOrThrow,
     update: mockCampaignUpdate,
@@ -19,8 +23,8 @@ const mockTx = {
 }
 
 const mockTransaction = vi.fn(
-  async (cb: (tx: typeof mockTx) => Promise<void>) => {
-    await cb(mockTx)
+  async <T>(cb: (tx: typeof mockTx) => Promise<T>) => {
+    return cb(mockTx)
   },
 )
 
@@ -61,6 +65,49 @@ describe('CampaignUpdateHistoryService', () => {
       configurable: true,
     })
     service.findFirstOrThrow = mockFindFirstOrThrow
+  })
+
+  describe('create', () => {
+    it('acquires lock and increments voter goals', async () => {
+      const campaign = makeCampaign({
+        data: { reportedVoterGoals: { doorKnocking: 50 } },
+      })
+      mockCampaignFindUniqueOrThrow.mockResolvedValue(campaign)
+      mockCampaignUpdate.mockResolvedValue({})
+      mockHistoryCreate.mockResolvedValue({
+        id: 1,
+        type: 'doorKnocking',
+        quantity: 10,
+        campaignId: 1,
+        userId: 10,
+      })
+
+      await service.create(campaign, {
+        type: CampaignUpdateHistoryType.doorKnocking,
+        quantity: 10,
+      })
+
+      expect(mockExecuteRaw).toHaveBeenCalled()
+      expect(mockCampaignFindUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 1 },
+      })
+      expect(mockCampaignUpdate).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          data: expect.objectContaining({
+            reportedVoterGoals: { doorKnocking: 60 },
+          }),
+        },
+      })
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          type: CampaignUpdateHistoryType.doorKnocking,
+          quantity: 10,
+          campaignId: 1,
+          userId: 10,
+        },
+      })
+    })
   })
 
   describe('delete', () => {

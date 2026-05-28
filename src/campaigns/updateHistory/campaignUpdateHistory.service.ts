@@ -18,31 +18,38 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
   }
 
   async create(
-    campaign: Campaign,
+    { id: campaignId, userId }: Campaign,
     { type, quantity }: CreateUpdateHistorySchema,
   ) {
-    const { data } = campaign
-    const { reportedVoterGoals = {} } = data
+    return this.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${VOTER_GOALS_ADVISORY_LOCK_KEY}::integer, ${campaignId}::integer)`
 
-    // Initialize or increment the voter goal count
-    reportedVoterGoals[type] = (reportedVoterGoals[type] || 0) + quantity
+      const campaign = await tx.campaign.findUniqueOrThrow({
+        where: { id: campaignId },
+      })
+      const { data } = campaign
+      const reportedVoterGoals = (data.reportedVoterGoals || {}) as Record<
+        string,
+        number
+      >
 
-    data.reportedVoterGoals = { ...reportedVoterGoals }
+      reportedVoterGoals[type] = (reportedVoterGoals[type] || 0) + quantity
 
-    await this.campaigns.update({
-      where: { id: campaign.id },
-      data: {
-        data,
-      },
-    })
+      data.reportedVoterGoals = { ...reportedVoterGoals }
 
-    return this.model.create({
-      data: {
-        type,
-        quantity,
-        campaignId: campaign.id,
-        userId: campaign.userId,
-      },
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: { data },
+      })
+
+      return tx.campaignUpdateHistory.create({
+        data: {
+          type,
+          quantity,
+          campaignId,
+          userId,
+        },
+      })
     })
   }
 
