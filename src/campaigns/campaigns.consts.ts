@@ -1,0 +1,1 @@
+export const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274

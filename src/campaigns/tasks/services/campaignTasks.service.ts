@@ -58,8 +58,9 @@ import { CompleteTaskBodySchema } from '../schemas/completeTaskBody.schema'
 import { AiGenerationService } from './aiGeneration.service'
 import { CampaignsService } from '../../services/campaigns.service'
 
+import { VOTER_GOALS_ADVISORY_LOCK_KEY } from '../../campaigns.consts'
+
 const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
-const VOTER_GOALS_ADVISORY_LOCK_KEY = 918_274
 const MAX_TASK_WINDOW_DAYS = 49
 const SHORTENED_WINDOW_BUFFER_DAYS = 7
 const FULL_WINDOW_THRESHOLD_DAYS = 56

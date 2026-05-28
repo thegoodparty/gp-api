@@ -89,8 +89,12 @@ export class CampaignUpdateHistoryController {
   }
 
   @Delete(':id')
+  @UseCampaign()
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.updateHistory.delete(id)
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    await this.updateHistory.delete(id, campaign.id)
   }
 }
