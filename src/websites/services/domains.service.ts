@@ -67,7 +67,7 @@ const DOMAIN_PURCHASE_IN_PROGRESS_MESSAGE =
 
 const GP_CAMPAIGN_DOMAIN_FORWARD_ADDRESS = 'candidate-domains@goodparty.org'
 
-const { ENABLE_DOMAIN_SETUP } = process.env
+const { ENABLE_DOMAIN_PURCHASE } = process.env
 
 @Injectable()
 export class DomainsService
@@ -119,7 +119,7 @@ export class DomainsService
   }
 
   shouldEnableDomainPurchase(): boolean {
-    return ENABLE_DOMAIN_SETUP === 'true'
+    return ENABLE_DOMAIN_PURCHASE === 'true'
   }
 
   private validateDomainSearchResult(searchResult: DomainSearchResult) {
