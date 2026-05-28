@@ -10,14 +10,13 @@ import { UpdateEcanvasserSchema } from '../schemas/updateEcanvasser.schema'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
+import { subDays, subMinutes } from 'date-fns'
 import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
-
-const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
 @Injectable()
 export class EcanvasserIntegrationService extends createPrismaBase(
@@ -79,8 +78,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
 
   private groupInteractionsByDay(interactions: EcanvasserInteraction[]) {
     const recentInteractions = interactions.filter(
-      (interaction) =>
-        interaction.createdAt > new Date(Date.now() - THIRTY_DAYS),
+      (interaction) => interaction.createdAt > subDays(new Date(), 30),
     )
 
     return recentInteractions.reduce<Record<string, Record<string, number>>>(
@@ -201,7 +199,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
     }
     // Check if we should sync based on last sync time
     if (!force && ecanvasser.lastSync) {
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+      const thirtyMinutesAgo = subMinutes(new Date(), 30)
       const lastSyncDate = new Date(ecanvasser.lastSync)
       if (lastSyncDate > thirtyMinutesAgo) {
         return ecanvasser // Return existing data if last sync was less than 30 minutes ago
