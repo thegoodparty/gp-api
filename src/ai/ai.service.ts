@@ -266,14 +266,17 @@ export class AiService {
           ? this.extractToolContent(message)
           : { content: '', fromToolCall: false }
         let content = extracted.content.trim()
-        content = this.applyToolResponseFallback(content)
+        const fallback = this.applyToolResponseFallback(content)
+        content = fallback.content
+        const isToolContent = extracted.fromToolCall || fallback.matched
 
         content = AiService.stripHtmlFences(content)
         // Only apply the prose `\n -> <br/><br/>` transform to plain message
-        // content. Tool-call arguments are JSON; that substitution would
-        // corrupt pretty-printed payloads and silently mangle newlines inside
-        // string fields.
-        if (!extracted.fromToolCall) {
+        // content. Tool-call arguments and the `<function=...>` fallback JSON
+        // are both structured JSON; that substitution would corrupt
+        // pretty-printed payloads and silently mangle newlines inside string
+        // fields.
+        if (!isToolContent) {
           content = content.replace(/\n/g, '<br/><br/>')
         }
 
@@ -302,16 +305,22 @@ export class AiService {
     return { content: '', tokens: 0 }
   }
 
-  private applyToolResponseFallback(content: string): string {
-    if (!content.includes('<function=')) return content
+  private applyToolResponseFallback(content: string): {
+    content: string
+    matched: boolean
+  } {
+    if (!content.includes('<function=')) return { content, matched: false }
     const toolResponse = this.parseToolResponse(content)
-    return toolResponse ? toolResponse.arguments : content
+    if (!toolResponse) return { content, matched: false }
+    return { content: toolResponse.arguments, matched: true }
   }
 
   private parseToolResponse(
     response: string,
   ): { function: string; arguments: string } | undefined {
-    const match = response.match(/<function=(\w+)>(.*?)<\/function>/)
+    // Use [\s\S]*? so pretty-printed JSON (which contains \n) inside a
+    // <function=...> block still matches — `.` alone doesn't match newlines.
+    const match = response.match(/<function=(\w+)>([\s\S]*?)<\/function>/)
     if (!match) return undefined
 
     const [, functionName, argsString] = match

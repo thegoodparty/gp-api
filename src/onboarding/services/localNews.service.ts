@@ -135,13 +135,20 @@ export class OnboardingLocalNewsService {
     office: string
     campaign: Campaign
   }): Promise<LocalNewsResponse> {
+    const cityKey = city ?? null
     const existing = campaign.data?.onboarding?.localMediaOutlets
+    const matchesKey =
+      existing?.office === office &&
+      existing?.city === cityKey &&
+      existing?.state === state
 
-    if (existing && existing.office === office) {
+    if (existing && matchesKey) {
       if (existing.status === 'ready') {
         this.logger.info(
           {
             office,
+            city: cityKey,
+            state,
             outletCount: existing.outlets.length,
             campaignId: campaign.id,
           },
@@ -157,7 +164,11 @@ export class OnboardingLocalNewsService {
       }
     }
 
-    const claimed = await this.markPending(campaign.id, office)
+    const claimed = await this.markPending(campaign.id, {
+      office,
+      city: cityKey,
+      state,
+    })
     if (claimed) {
       void this.runFetch({ campaignId: campaign.id, city, state, office })
     }
@@ -238,7 +249,11 @@ export class OnboardingLocalNewsService {
         throw new Error('AI returned unexpected outlet shape')
       }
 
-      await this.writeReady(campaignId, office, validated.data.outlets)
+      await this.writeReady(
+        campaignId,
+        { office, city: city ?? null, state },
+        validated.data.outlets,
+      )
       this.logger.info(
         {
           jurisdiction,
@@ -254,15 +269,20 @@ export class OnboardingLocalNewsService {
         { error, campaignId, office, elapsedMs: Date.now() - startedAt },
         'getLocalNews background fetch failed',
       )
-      await this.expirePending(campaignId, office)
+      await this.expirePending(campaignId, {
+        office,
+        city: city ?? null,
+        state,
+      })
     }
   }
 
-  // Atomically attempt to claim the slot for (campaign, office). Re-reads the
-  // campaign inside the same call so a concurrent request can't both see "no
-  // pending marker" and both kick off an AI run. Returns true if this caller
-  // claimed the slot and should run the AI fetch; false if another caller
-  // already owns a fresh pending marker for the same office.
+  // Atomically attempt to claim the slot for the (campaign, jurisdiction)
+  // key. Re-reads the campaign inside the same call so a concurrent request
+  // can't both see "no pending marker" and both kick off an AI run. Returns
+  // true if this caller claimed the slot and should run the AI fetch; false
+  // if another caller already owns a fresh pending marker for the SAME
+  // (office, city, state) jurisdiction.
   //
   // Note: this is "good enough" for the single-user onboarding case (the only
   // realistic concurrency is React Strict Mode double-mounts or multi-tab).
@@ -270,64 +290,57 @@ export class OnboardingLocalNewsService {
   // update; the cost-benefit doesn't justify it here.
   private async markPending(
     campaignId: number,
-    office: string,
+    key: { office: string; city: string | null; state: string },
   ): Promise<boolean> {
     const fresh = await this.campaigns.findFirst({ where: { id: campaignId } })
     const current = fresh?.data?.onboarding?.localMediaOutlets
     if (
-      current?.office === office &&
+      current?.office === key.office &&
+      current.city === key.city &&
+      current.state === key.state &&
       current.status === 'pending' &&
       Date.now() - current.startedAt < PENDING_TTL_MS
     ) {
       return false
     }
-    await this.campaigns.updateJsonFields(campaignId, {
-      data: {
-        onboarding: {
-          localMediaOutlets: {
-            office,
-            status: 'pending',
-            startedAt: Date.now(),
-          },
-        },
-      },
+    await this.writeLocalMediaOutlets(campaignId, {
+      ...key,
+      status: 'pending',
+      startedAt: Date.now(),
     })
     return true
   }
 
   private async writeReady(
     campaignId: number,
-    office: string,
+    key: { office: string; city: string | null; state: string },
     outlets: LocalNewsOutlet[],
   ): Promise<void> {
-    await this.campaigns.updateJsonFields(campaignId, {
-      data: {
-        onboarding: {
-          localMediaOutlets: {
-            office,
-            status: 'ready',
-            outlets,
-          },
-        },
-      },
+    await this.writeLocalMediaOutlets(campaignId, {
+      ...key,
+      status: 'ready',
+      outlets,
     })
   }
 
   private async expirePending(
     campaignId: number,
-    office: string,
+    key: { office: string; city: string | null; state: string },
   ): Promise<void> {
     try {
       const fresh = await this.campaigns.findFirst({
         where: { id: campaignId },
       })
       const current = fresh?.data?.onboarding?.localMediaOutlets
-      // Only invalidate if the pending marker still belongs to this office.
-      // A newer caller may have overwritten it with a different office (or a
-      // successful ready result) and we don't want to clobber that.
+      // Only invalidate if the pending marker still belongs to this exact
+      // jurisdiction. A newer caller may have overwritten it with a different
+      // (office, city, state) (or a successful ready result) and we don't
+      // want to clobber that.
       if (
         !current ||
-        current.office !== office ||
+        current.office !== key.office ||
+        current.city !== key.city ||
+        current.state !== key.state ||
         current.status !== 'pending'
       ) {
         return
@@ -335,22 +348,48 @@ export class OnboardingLocalNewsService {
       // Set startedAt to 0 so the TTL check immediately treats this as
       // expired. The next poll will trigger a fresh fetch instead of waiting
       // out the full TTL window.
-      await this.campaigns.updateJsonFields(campaignId, {
-        data: {
-          onboarding: {
-            localMediaOutlets: {
-              office,
-              status: 'pending',
-              startedAt: 0,
-            },
-          },
-        },
+      await this.writeLocalMediaOutlets(campaignId, {
+        ...key,
+        status: 'pending',
+        startedAt: 0,
       })
     } catch (error) {
       this.logger.error(
-        { error, campaignId, office },
+        { error, campaignId, ...key },
         'Failed to expire pending localMediaOutlets marker',
       )
     }
+  }
+
+  // Replace data.onboarding.localMediaOutlets wholesale. We bypass
+  // CampaignsService.updateJsonFields here because its deepMerge concatenates
+  // arrays and preserves keys not in the source — both bugs for this slot:
+  //
+  // - writeReady -> deepMerge concats the new `outlets` array onto the
+  //   previous run's array, growing the list unboundedly across cache misses.
+  // - markPending -> deepMerge keeps the stale `outlets` from a prior ready
+  //   write under the pending object, so the next ready write deepMerges
+  //   into it and concats again.
+  //
+  // Doing a direct read + replace + update on the campaign row sidesteps
+  // both. Other onboarding fields (structuredOffice, ballotStatus, etc.)
+  // are preserved by spreading the existing data through.
+  private async writeLocalMediaOutlets(
+    campaignId: number,
+    next: PrismaJson.LocalMediaOutletsCache,
+  ): Promise<void> {
+    const fresh = await this.campaigns.findFirst({ where: { id: campaignId } })
+    if (!fresh) return
+    const nextData: PrismaJson.CampaignData = {
+      ...(fresh.data ?? {}),
+      onboarding: {
+        ...(fresh.data?.onboarding ?? {}),
+        localMediaOutlets: next,
+      },
+    }
+    await this.campaigns.model.update({
+      where: { id: campaignId },
+      data: { data: nextData },
+    })
   }
 }
