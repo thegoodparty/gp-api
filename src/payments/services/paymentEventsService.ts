@@ -17,7 +17,7 @@ import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { IS_PROD_DEPLOY } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -443,8 +443,7 @@ export class PaymentEventsService {
           slug
         }\` ended their pro subscription!`,
       },
-      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+      IS_PROD_DEPLOY ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
@@ -453,8 +452,7 @@ export class PaymentEventsService {
       {
         text: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
-      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+      IS_PROD_DEPLOY ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
@@ -481,8 +479,7 @@ export class PaymentEventsService {
             : 'No CRM company found'
         }`,
       },
-      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+      IS_PROD_DEPLOY ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 }

@@ -1,5 +1,5 @@
 import { OrgDistrict } from '@/organizations/organizations.types'
-import { IS_PROD } from '@/shared/util/appEnvironment.util'
+import { IS_PROD_DEPLOY } from '@/shared/util/appEnvironment.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
 import { Inject, OnModuleInit } from '@nestjs/common'
@@ -55,8 +55,7 @@ export class VoterFileDownloadAccessService implements OnModuleInit {
         {
           text: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}\nvisit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data\n${alertSlackMessage}`,
         },
-        // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-        IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+        IS_PROD_DEPLOY ? SlackChannel.botPolitics : SlackChannel.botDev,
       )
     }
   }
