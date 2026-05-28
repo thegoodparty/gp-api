@@ -43,6 +43,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { ClerkUserEnricherService } from '@/vendors/clerk/services/clerk-user-enricher.service'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { McpTool } from '@/mcp/decorators/McpTool.decorator'
+import { GP_DOMAIN_CONTACT } from '@/vendors/vercel/vercel.const'
 import { MyWebsiteResponseSchema } from '../schemas/WebsiteResponse.schema'
 import { VerifyLiveResponseSchema } from '../schemas/VerifyLive.schema'
 import { serializeWebsiteWithDomain } from '../util/serializeWebsite.util'
@@ -101,10 +102,25 @@ const REQUIRED_PUBLISH_FIELDS: Array<{
           isIssueReadyToPublish(issue as WebsiteIssueForPublish),
       ),
   },
-  { path: 'contact.address', check: (c) => isNonEmpty(c.contact?.address) },
   { path: 'contact.email', check: (c) => isNonEmpty(c.contact?.email) },
-  { path: 'contact.phone', check: (c) => isNonEmpty(c.contact?.phone) },
 ]
+
+// contact.address and contact.phone are required for TCR/10DLC rendering but
+// fall back to the organization's registered contact when the candidate
+// hasn't filled them in — see applyContactFallbacks at publish time.
+const formatGpFallbackAddress = (): string =>
+  `${GP_DOMAIN_CONTACT.addressLine1}, ${GP_DOMAIN_CONTACT.city}, ` +
+  `${GP_DOMAIN_CONTACT.state} ${GP_DOMAIN_CONTACT.zipCode}`
+
+const applyContactFallbacks = (content: PrismaJson.WebsiteContent) => {
+  content.contact ||= {}
+  if (!isNonEmpty(content.contact.address)) {
+    content.contact.address = formatGpFallbackAddress()
+  }
+  if (!isNonEmpty(content.contact.phone)) {
+    content.contact.phone = GP_DOMAIN_CONTACT.phoneNumber
+  }
+}
 
 const assertReadyToPublish = (content: PrismaJson.WebsiteContent) => {
   const missing = REQUIRED_PUBLISH_FIELDS.filter(
@@ -230,13 +246,16 @@ export class WebsitesController {
       "Update the calling campaign's website content and optionally " +
       'publish it. The body deep-merges into Website.content; pass only ' +
       'fields you want to change. To publish, send `status: "published"` ' +
-      '— this requires (1) the required content sections (main.title, ' +
-      'about.bio, about.issues with title+description, contact.address, ' +
-      'contact.email, contact.phone) to be present, and (2) a custom ' +
-      'domain attached to the website with Domain.status of `submitted`, ' +
-      '`registered`, or `active`. Calling with `status: "published"` ' +
-      'without an attached domain (or with the domain still `pending` / ' +
-      '`inactive`) returns 400. After a successful publish call, poll ' +
+      '— this requires the content sections main.title, about.bio, ' +
+      'about.issues (with title+description), and contact.email to be ' +
+      'present. `contact.address` and `contact.phone` are auto-filled ' +
+      'from the organization fallback if missing. If a custom domain ' +
+      'is attached to the website, its `Domain.status` must be ' +
+      '`submitted`, `registered`, or `active` (publishing while the ' +
+      'attached domain is still `pending` or `inactive` returns 400). ' +
+      'The compliance_setup agent flow calls `POST /v1/domains/purchase` ' +
+      'before this so the attached domain has reached `submitted` by ' +
+      'publish time. After a successful publish call, poll ' +
       '`POST /v1/websites/mine/verify-live` to confirm the live URL ' +
       'serves the rendered site with required TCR sections.',
   })
@@ -273,18 +292,15 @@ export class WebsitesController {
       },
     })
 
-    if (body.status === WebsiteStatus.published) {
-      if (!domain && !hasEverBeenPublished) {
-        throw new BadRequestException(
-          'Cannot publish: no custom domain is attached to this website.',
-        )
-      }
-      if (domain && !PUBLISHABLE_DOMAIN_STATUSES.includes(domain.status)) {
-        throw new BadRequestException(
-          `Cannot publish: attached domain is in status "${domain.status}". ` +
-            'Domain must reach status `submitted` or later before publish.',
-        )
-      }
+    if (
+      body.status === WebsiteStatus.published &&
+      domain &&
+      !PUBLISHABLE_DOMAIN_STATUSES.includes(domain.status)
+    ) {
+      throw new BadRequestException(
+        `Cannot publish: attached domain is in status "${domain.status}". ` +
+          'Domain must reach status `submitted` or later before publish.',
+      )
     }
 
     const updatedContent: PrismaJson.WebsiteContent = merge(
@@ -298,6 +314,7 @@ export class WebsitesController {
     }
 
     if (body.status === WebsiteStatus.published) {
+      applyContactFallbacks(updatedContent)
       assertReadyToPublish(updatedContent)
     }
 

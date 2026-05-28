@@ -96,15 +96,7 @@ test.describe('Websites - CRUD Operations', () => {
     expect(website).toHaveProperty('content')
   })
 
-  // ENG-10258: PUT /websites/mine with status=published now requires an
-  // attached domain in status submitted/registered/active. This test
-  // publishes from a fresh candidate with no domain; the publish 4xx's.
-  // Content-update behavior IS still covered by the
-  // "should update website and merge with existing content" test below
-  // (which uses status=unpublished). Rewrite under the new flow before
-  // re-enabling.
   test('should update website with text fields', async ({ request }) => {
-    test.skip()
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
