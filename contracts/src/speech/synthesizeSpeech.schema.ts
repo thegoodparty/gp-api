@@ -65,13 +65,12 @@ export const SynthesizeSpeechRequestSchema = z.object({
     ),
   options: z
     .object({
-      voiceId: SpeechSynthesisVoiceSchema.default('Amy'),
+      voiceId: SpeechSynthesisVoiceSchema.default('Ruth'),
       engine: SpeechSynthesisEngineSchema.default('generative'),
     })
     .refine(
       ({ voiceId, engine }) =>
-        engine !== 'generative' ||
-        GENERATIVE_VOICE_VALUES.includes(voiceId),
+        engine !== 'generative' || GENERATIVE_VOICE_VALUES.includes(voiceId),
       { message: 'Selected voice does not support the generative engine' },
     )
     .optional(),

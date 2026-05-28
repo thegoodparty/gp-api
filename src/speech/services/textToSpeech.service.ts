@@ -57,7 +57,7 @@ export class TextToSpeechService {
       )
     }
 
-    const voiceId: VoiceId = request.options?.voiceId ?? 'Amy'
+    const voiceId: VoiceId = request.options?.voiceId ?? 'Ruth'
     const engine: Engine = request.options?.engine ?? 'generative'
 
     // The contracts schema enforces non-empty + max length on request.text;
