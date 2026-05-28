@@ -584,11 +584,15 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   tests:
-    name: E2E Tests
+    name: E2E Tests (shard ${{ matrix.shard }}/3)
     needs: deploy
     if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v6
 
@@ -603,7 +607,6 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        id: run-tests
         env:
           API_BASE_URL: ${{ needs.deploy.outputs.service_url }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -614,9 +617,45 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           CANDIDATE_ID: ${{ needs.deploy.outputs.environment == 'qa' && secrets.QA_CANDIDATE_ID || secrets.DEV_CANDIDATE_ID }}
           CAMPAIGN_SLUG: ${{ needs.deploy.outputs.environment == 'qa' && secrets.QA_CAMPAIGN_SLUG || secrets.DEV_CAMPAIGN_SLUG }}
-        run: npm run test:e2e
+        run: npx playwright test --config=e2e-tests/playwright.config.ts --shard=${{ matrix.shard }}/3 --reporter=blob
 
-      - name: Upload test reports
+      - name: Upload blob report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 1
+          if-no-files-found: ignore
+
+  tests-merge:
+    name: E2E Tests merge
+    needs: [deploy, tests]
+    if: always() && github.ref_name != 'master' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge reports into HTML + JSON
+        if: always()
+        run: npx playwright merge-reports --config=e2e-tests/playwright.config.ts ./all-blob-reports
+
+      - name: Upload merged reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -655,7 +694,7 @@ jobs:
           fi
 
       - name: Notify Slack on Test Success
-        if: steps.run-tests.outcome == 'success'
+        if: steps.test-results.outputs.tests_ran == 'true' && steps.test-results.outputs.failed_count == '0'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -671,7 +710,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on Test Failure
-        if: steps.run-tests.outcome == 'failure' || failure()
+        if: steps.test-results.outputs.tests_ran != 'true' || steps.test-results.outputs.failed_count != '0'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
