@@ -857,6 +857,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
   const mockElections: Partial<ElectionsService> = {
     getPositionMatchedRaceTargetDetails: vi.fn(),
     buildRaceTargetDetails: vi.fn(),
+    fetchFilingFeeByRaceHash: vi.fn(),
   }
 
   let service: CampaignsService
@@ -899,6 +900,8 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 10000,
       winNumber: 5001,
       voterContactGoal: 25005,
+      filingFee: 250,
+      filingRequirementsText: 'Filing fee is $250.',
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
@@ -907,6 +910,8 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 10000,
       winNumber: 5001,
       voterContactGoal: 25005,
+      filingFee: 250,
+      filingRequirementsText: 'Filing fee is $250.',
     })
     expect(
       mockElections.getPositionMatchedRaceTargetDetails,
@@ -985,6 +990,8 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: -1,
       winNumber: -1,
       voterContactGoal: -1,
+      filingFee: null,
+      filingRequirementsText: null,
     })
 
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
@@ -1010,6 +1017,8 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 6000,
       winNumber: 3001,
       voterContactGoal: 15005,
+      filingFee: null,
+      filingRequirementsText: null,
     })
     expect(mockElections.buildRaceTargetDetails).toHaveBeenCalledWith({
       districtId: 'override-district-uuid',
@@ -1038,6 +1047,8 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       projectedTurnout: 4000,
       winNumber: 2001,
       voterContactGoal: 10005,
+      filingFee: null,
+      filingRequirementsText: null,
     })
   })
 
@@ -1054,5 +1065,137 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     const result = await service.fetchLiveRaceTargetMetrics(baseCampaign)
 
     expect(result).toBeNull()
+  })
+
+  describe('details.raceId race-hash filing fee path', () => {
+    const campaignWithRaceId = {
+      ...baseCampaign,
+      details: { electionDate: '2026-11-03', raceId: 'Z2lk-hash' },
+    } as unknown as Campaign
+
+    beforeEach(() => {
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockReset()
+      vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+        positionId: 'pos-123',
+      } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+      vi.mocked(
+        mockElections.getPositionMatchedRaceTargetDetails!,
+      ).mockResolvedValue({
+        district: {
+          id: 'd-1',
+          L2DistrictType: 'State_Senate',
+          L2DistrictName: 'STATE SENATE 001',
+          projectedTurnout: null,
+        },
+        projectedTurnout: 10000,
+        winNumber: 5001,
+        voterContactGoal: 25005,
+        filingFee: 250,
+        filingRequirementsText: 'Position-side text.',
+      })
+    })
+
+    it('prefers race-hash result over position-side filingFee', async () => {
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue({
+        filingFee: 75,
+        filingRequirementsText: 'BR-hash text.',
+        extractionSource: 'direct_dollar',
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(mockElections.fetchFilingFeeByRaceHash).toHaveBeenCalledWith(
+        'Z2lk-hash',
+      )
+      expect(result).toEqual({
+        projectedTurnout: 10000,
+        winNumber: 5001,
+        voterContactGoal: 25005,
+        filingFee: 75,
+        filingRequirementsText: 'BR-hash text.',
+      })
+    })
+
+    it('keeps null filingFee from race-hash when BR has no fee data (does not fall back)', async () => {
+      // Race-hash lookup found the Race row but couldn't extract a clean fee
+      // (e.g. multi_value or no_match). The raw text + null fee are the
+      // authoritative answer — we must NOT silently fall back to a stale
+      // position-side fee.
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue({
+        filingFee: null,
+        filingRequirementsText: 'Fee varies; see BR.',
+        extractionSource: 'multi_value',
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result).toEqual({
+        projectedTurnout: 10000,
+        winNumber: 5001,
+        voterContactGoal: 25005,
+        filingFee: null,
+        filingRequirementsText: 'Fee varies; see BR.',
+      })
+    })
+
+    it('falls back to position-side filingFee when race-hash returns null', async () => {
+      // `fetchFilingFeeByRaceHash` returns null when the underlying election-api
+      // call failed (e.g. 5xx, network) — it catches internally and never
+      // rejects. Distinct from the "found, no fee" case above, which returns
+      // { filingFee: null, ...} (an object).
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result).toEqual({
+        projectedTurnout: 10000,
+        winNumber: 5001,
+        voterContactGoal: 25005,
+        filingFee: 250,
+        filingRequirementsText: 'Position-side text.',
+      })
+    })
+
+    it('uses race-hash filingFee on the overrideDistrictId branch', async () => {
+      vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+        positionId: null,
+        overrideDistrictId: 'override-district-uuid',
+      } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+      vi.mocked(mockElections.buildRaceTargetDetails!).mockResolvedValue({
+        projectedTurnout: 4000,
+        winNumber: 2001,
+        voterContactGoal: 10005,
+      })
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue({
+        filingFee: 50,
+        filingRequirementsText: 'BR-hash text.',
+        extractionSource: 'direct_dollar',
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result).toEqual({
+        projectedTurnout: 4000,
+        winNumber: 2001,
+        voterContactGoal: 10005,
+        filingFee: 50,
+        filingRequirementsText: 'BR-hash text.',
+      })
+    })
+
+    it('skips race-hash call when details.raceId is missing', async () => {
+      const noRaceId = {
+        ...baseCampaign,
+        details: { electionDate: '2026-11-03' },
+      } as unknown as Campaign
+
+      await service.fetchLiveRaceTargetMetrics(noRaceId)
+
+      expect(mockElections.fetchFilingFeeByRaceHash).not.toHaveBeenCalled()
+    })
   })
 })

@@ -41,6 +41,8 @@ export interface LlmChatCompletionOptions {
 export interface LlmToolCompletionOptions extends LlmChatCompletionOptions {
   tools: ChatCompletionTool[]
   toolChoice?: ChatCompletionToolChoiceOption
+  enableReasoning?: boolean
+  reasoningEffort?: 'low' | 'medium' | 'high'
 }
 
 export interface LlmJsonCompletionOptions<T> extends LlmChatCompletionOptions {
@@ -362,6 +364,8 @@ export class LlmService {
       timeout = this.defaultTimeout,
       userId,
       retries = this.defaultRetries,
+      enableReasoning,
+      reasoningEffort,
     } = options
 
     if (!tools.length) {
@@ -385,6 +389,8 @@ export class LlmService {
           maxTokens,
           timeout,
           userId,
+          enableReasoning,
+          reasoningEffort,
         }),
     )
 
@@ -869,6 +875,8 @@ export class LlmService {
     maxTokens,
     timeout,
     userId,
+    enableReasoning,
+    reasoningEffort,
   }: {
     model: string
     messages: ChatCompletionMessageParam[]
@@ -879,10 +887,23 @@ export class LlmService {
     maxTokens?: number
     timeout: number
     userId?: string
+    enableReasoning?: boolean
+    reasoningEffort?: 'low' | 'medium' | 'high'
   }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
-    const requestParams: ChatCompletionCreateParamsNonStreaming = {
+    const reasoning = enableReasoning
+      ? {
+          enabled: true,
+          ...(reasoningEffort && { effort: reasoningEffort }),
+        }
+      : undefined
+
+    // Together AI accepts a non-OpenAI `reasoning` field for reasoning-
+    // capable models (e.g. DeepSeek). The OpenAI SDK params type does not
+    // model it, so we widen the literal here and the request is forwarded
+    // through as JSON.
+    const requestParams = {
       model,
       messages,
       tools,
@@ -890,9 +911,10 @@ export class LlmService {
       temperature,
       top_p: topP,
       ...(maxTokens && { max_tokens: maxTokens }),
+      ...(reasoning && { reasoning }),
       ...userIdentification,
-      stream: false,
-    }
+      stream: false as const,
+    } as ChatCompletionCreateParamsNonStreaming
 
     const completion = await this.createCompletionLogged(
       requestParams,
