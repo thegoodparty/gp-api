@@ -281,16 +281,10 @@ export class OnboardingLocalNewsService {
     ) {
       return false
     }
-    await this.campaigns.updateJsonFields(campaignId, {
-      data: {
-        onboarding: {
-          localMediaOutlets: {
-            office,
-            status: 'pending',
-            startedAt: Date.now(),
-          },
-        },
-      },
+    await this.writeLocalMediaOutlets(campaignId, {
+      office,
+      status: 'pending',
+      startedAt: Date.now(),
     })
     return true
   }
@@ -300,16 +294,10 @@ export class OnboardingLocalNewsService {
     office: string,
     outlets: LocalNewsOutlet[],
   ): Promise<void> {
-    await this.campaigns.updateJsonFields(campaignId, {
-      data: {
-        onboarding: {
-          localMediaOutlets: {
-            office,
-            status: 'ready',
-            outlets,
-          },
-        },
-      },
+    await this.writeLocalMediaOutlets(campaignId, {
+      office,
+      status: 'ready',
+      outlets,
     })
   }
 
@@ -335,16 +323,10 @@ export class OnboardingLocalNewsService {
       // Set startedAt to 0 so the TTL check immediately treats this as
       // expired. The next poll will trigger a fresh fetch instead of waiting
       // out the full TTL window.
-      await this.campaigns.updateJsonFields(campaignId, {
-        data: {
-          onboarding: {
-            localMediaOutlets: {
-              office,
-              status: 'pending',
-              startedAt: 0,
-            },
-          },
-        },
+      await this.writeLocalMediaOutlets(campaignId, {
+        office,
+        status: 'pending',
+        startedAt: 0,
       })
     } catch (error) {
       this.logger.error(
@@ -352,5 +334,37 @@ export class OnboardingLocalNewsService {
         'Failed to expire pending localMediaOutlets marker',
       )
     }
+  }
+
+  // Replace data.onboarding.localMediaOutlets wholesale. We bypass
+  // CampaignsService.updateJsonFields here because its deepMerge concatenates
+  // arrays and preserves keys not in the source — both bugs for this slot:
+  //
+  // - writeReady -> deepMerge concats the new `outlets` array onto the
+  //   previous run's array, growing the list unboundedly across cache misses.
+  // - markPending -> deepMerge keeps the stale `outlets` from a prior ready
+  //   write under the pending object, so the next ready write deepMerges
+  //   into it and concats again.
+  //
+  // Doing a direct read + replace + update on the campaign row sidesteps
+  // both. Other onboarding fields (structuredOffice, ballotStatus, etc.)
+  // are preserved by spreading the existing data through.
+  private async writeLocalMediaOutlets(
+    campaignId: number,
+    next: PrismaJson.LocalMediaOutletsCache,
+  ): Promise<void> {
+    const fresh = await this.campaigns.findFirst({ where: { id: campaignId } })
+    if (!fresh) return
+    const nextData: PrismaJson.CampaignData = {
+      ...(fresh.data ?? {}),
+      onboarding: {
+        ...(fresh.data?.onboarding ?? {}),
+        localMediaOutlets: next,
+      },
+    }
+    await this.campaigns.model.update({
+      where: { id: campaignId },
+      data: { data: nextData },
+    })
   }
 }
