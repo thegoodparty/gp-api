@@ -139,11 +139,7 @@ export function FilesInterceptor(
   }
 }
 
-const FORBIDDEN_KEYS = new Set([
-  '__proto__',
-  'constructor',
-  'prototype',
-])
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 /**
  * Helper function to set nested object properties
@@ -162,9 +158,7 @@ function setNestedProperty(
     return
   }
 
-  const keys = path
-    .split(/[\[\]]/)
-    .filter((key) => key !== '')
+  const keys = path.split(/[\[\]]/).filter((key) => key !== '')
 
   if (keys.some((k) => FORBIDDEN_KEYS.has(k))) return
 
@@ -180,15 +174,9 @@ function setNestedProperty(
       current[key] = isNextKeyNumeric ? [] : {}
     } else if (typeof current[key] !== 'object') {
       current[key] = isNextKeyNumeric ? [] : {}
-    } else if (
-      isNextKeyNumeric &&
-      !Array.isArray(current[key])
-    ) {
+    } else if (isNextKeyNumeric && !Array.isArray(current[key])) {
       current[key] = []
-    } else if (
-      !isNextKeyNumeric &&
-      Array.isArray(current[key])
-    ) {
+    } else if (!isNextKeyNumeric && Array.isArray(current[key])) {
       current[key] = {}
     }
 
