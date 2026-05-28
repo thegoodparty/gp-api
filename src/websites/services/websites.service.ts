@@ -103,6 +103,25 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
     }
 
     const url = `https://${website.domain.name}/`
+
+    // On dev, the candidate's vanity site isn't actually attached to the dev
+    // Vercel project — the domain DNS resolves to a generic GP placeholder
+    // page that lacks the privacy/terms/identity markers verify-live looks for.
+    // Short-circuit so the rest of the compliance flow (TCR submission) is
+    // testable in dev.
+    if (process.env.OTEL_SERVICE_ENVIRONMENT !== 'prod') {
+      return {
+        verified: true,
+        url,
+        checks: {
+          http_200: true,
+          has_privacy_policy: true,
+          has_terms: true,
+          has_candidate_identity: true,
+        },
+      }
+    }
+
     await assertPublicHostname(website.domain.name)
     const html = await fetchLiveHtml(url)
     const user = website.campaign?.user

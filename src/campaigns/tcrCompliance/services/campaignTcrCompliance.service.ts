@@ -70,6 +70,8 @@ const AGENTIC_DISPATCH_CLAIM_TTL_MINUTES = 5
 
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/
 
+const NON_PROD_BYPASS_CV_TOKEN = 'non-prod-bypass-cv-token'
+
 type PeerlySubmissionResult = {
   peerlyIdentityId: string
   peerlyIdentityProfileLink: string | null
@@ -1008,6 +1010,13 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     pin: string,
     { peerlyIdentityId }: TcrCompliance,
   ) {
+    // In non-prod deploys, TCR submission to Peerly is short-circuited
+    // (see websites.service.ts verifyLive), so there is no real Peerly
+    // identity / PIN to verify against. Accept any PIN so testers can
+    // exercise the rest of the compliance flow.
+    if (process.env.OTEL_SERVICE_ENVIRONMENT !== 'prod') {
+      return NON_PROD_BYPASS_CV_TOKEN
+    }
     if (!peerlyIdentityId) {
       throw new BadRequestException(
         'TCR compliance does not have a Peerly identity ID',
@@ -1038,6 +1047,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
   ) {
+    if (process.env.OTEL_SERVICE_ENVIRONMENT !== 'prod') {
+      return undefined
+    }
     return this.peerlyIdentityService.approve10DLCBrand(
       tcrCompliance,
       campaignVerifyToken,

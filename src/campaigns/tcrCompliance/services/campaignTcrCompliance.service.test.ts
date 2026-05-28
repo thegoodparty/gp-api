@@ -1310,3 +1310,143 @@ describe('CampaignTcrComplianceService - submitToPeerlyForAgent', () => {
     expect(mockTcrModel.update).not.toHaveBeenCalled()
   })
 })
+
+describe('CampaignTcrComplianceService - PIN submission non-prod bypass', () => {
+  let service: CampaignTcrComplianceService
+  let mockPeerly: {
+    verifyCampaignVerifyPin: ReturnType<typeof vi.fn>
+    createCampaignVerifyToken: ReturnType<typeof vi.fn>
+    approve10DLCBrand: ReturnType<typeof vi.fn>
+  }
+  let mockModel: { findFirstOrThrow: ReturnType<typeof vi.fn> }
+  let mockPrisma: { tcrCompliance: typeof mockModel }
+
+  const tcrCompliance = {
+    id: 'tcr-1',
+    peerlyIdentityId: null,
+  } as unknown as Parameters<
+    CampaignTcrComplianceService['retrieveCampaignVerifyToken']
+  >[1]
+
+  beforeEach(async () => {
+    mockPeerly = {
+      verifyCampaignVerifyPin: vi.fn(),
+      createCampaignVerifyToken: vi.fn(),
+      approve10DLCBrand: vi.fn(),
+    }
+    mockModel = { findFirstOrThrow: vi.fn() }
+    mockPrisma = { tcrCompliance: mockModel }
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: PeerlyIdentityService, useValue: mockPeerly },
+        {
+          provide: WebsitesService,
+          useValue: { findFirstOrThrow: vi.fn() },
+        },
+        {
+          provide: CampaignsService,
+          useValue: { updateJsonFields: vi.fn() },
+        },
+        {
+          provide: CrmCampaignsService,
+          useValue: { trackCampaign: vi.fn() },
+        },
+        {
+          provide: ComplianceStateService,
+          useValue: { findStateForCampaign: vi.fn() },
+        },
+        {
+          provide: QueueProducerService,
+          useValue: { sendMessage: vi.fn() },
+        },
+        {
+          provide: ExperimentRunsService,
+          useValue: { findFirst: vi.fn(), dispatchRun: vi.fn() },
+        },
+        { provide: PinoLogger, useValue: createMockLogger() },
+        CampaignTcrComplianceService,
+      ],
+    }).compile()
+
+    service = module.get(CampaignTcrComplianceService)
+  })
+
+  const withEnv = async (
+    value: string | undefined,
+    body: () => Promise<void>,
+  ) => {
+    const original = process.env.OTEL_SERVICE_ENVIRONMENT
+    if (value === undefined) delete process.env.OTEL_SERVICE_ENVIRONMENT
+    else process.env.OTEL_SERVICE_ENVIRONMENT = value
+    try {
+      await body()
+    } finally {
+      if (original === undefined) delete process.env.OTEL_SERVICE_ENVIRONMENT
+      else process.env.OTEL_SERVICE_ENVIRONMENT = original
+    }
+  }
+
+  it('retrieveCampaignVerifyToken short-circuits in non-prod without calling Peerly', async () => {
+    await withEnv('dev', async () => {
+      const token = await service.retrieveCampaignVerifyToken(
+        'any-pin',
+        tcrCompliance,
+      )
+
+      expect(token).toBe('non-prod-bypass-cv-token')
+      expect(mockPeerly.verifyCampaignVerifyPin).not.toHaveBeenCalled()
+      expect(mockPeerly.createCampaignVerifyToken).not.toHaveBeenCalled()
+      expect(mockModel.findFirstOrThrow).not.toHaveBeenCalled()
+    })
+  })
+
+  it('retrieveCampaignVerifyToken short-circuits in qa too', async () => {
+    await withEnv('qa', async () => {
+      const token = await service.retrieveCampaignVerifyToken(
+        'any-pin',
+        tcrCompliance,
+      )
+      expect(token).toBe('non-prod-bypass-cv-token')
+      expect(mockPeerly.verifyCampaignVerifyPin).not.toHaveBeenCalled()
+    })
+  })
+
+  it('submitCampaignVerifyToken short-circuits in non-prod without calling Peerly', async () => {
+    await withEnv('dev', async () => {
+      const result = await service.submitCampaignVerifyToken(
+        tcrCompliance,
+        'token',
+      )
+
+      expect(result).toBeUndefined()
+      expect(mockPeerly.approve10DLCBrand).not.toHaveBeenCalled()
+    })
+  })
+
+  it('retrieveCampaignVerifyToken calls Peerly when OTEL_SERVICE_ENVIRONMENT=prod', async () => {
+    await withEnv('prod', async () => {
+      await expect(
+        service.retrieveCampaignVerifyToken('any-pin', tcrCompliance),
+      ).rejects.toThrow(BadRequestException)
+      // peerlyIdentityId is null on the stub, so we hit the original guard
+      // — proving the bypass did not intercept.
+    })
+  })
+
+  it('submitCampaignVerifyToken calls Peerly when OTEL_SERVICE_ENVIRONMENT=prod', async () => {
+    mockPeerly.approve10DLCBrand.mockResolvedValueOnce({ brand: 'ok' })
+    await withEnv('prod', async () => {
+      const result = await service.submitCampaignVerifyToken(
+        tcrCompliance,
+        'token',
+      )
+      expect(result).toEqual({ brand: 'ok' })
+      expect(mockPeerly.approve10DLCBrand).toHaveBeenCalledWith(
+        tcrCompliance,
+        'token',
+      )
+    })
+  })
+})
