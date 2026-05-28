@@ -53,6 +53,8 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
 
+const SUPPORTED_TLDS = ['com', 'org', 'vote'] as const
+
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
 const DOMAIN_RESERVATION_KIND = {
@@ -423,9 +425,9 @@ export class DomainsService
       electionDate = new Date()
     }
 
-    let candidates: string[]
+    let expanded: string[]
     try {
-      candidates = expandDomainPatterns(
+      expanded = expandDomainPatterns(
         patterns,
         {
           firstName: campaign.user.firstName ?? '',
@@ -442,6 +444,19 @@ export class DomainsService
       }
       throw error
     }
+
+    // Per the @McpTool description on POST /domains/search, callers may pass
+    // bare SLD patterns (no TLD) and the server fans them out across the
+    // supported TLDs. Patterns that already include a TLD are passed through
+    // unchanged so existing alternation syntax (e.g. `vote-x.(run|bio)`)
+    // keeps working.
+    const candidates = Array.from(
+      new Set(
+        expanded.flatMap((c) =>
+          c.includes('.') ? [c] : SUPPORTED_TLDS.map((tld) => `${c}.${tld}`),
+        ),
+      ),
+    )
 
     const checked = await Promise.allSettled(
       candidates.map((domain) =>

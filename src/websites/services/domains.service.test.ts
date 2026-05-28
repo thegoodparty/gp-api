@@ -466,6 +466,75 @@ describe('DomainsService', () => {
       expect(mockRoute53.checkDomainAvailability).not.toHaveBeenCalled()
     })
 
+    it('fans bare SLD patterns out across the supported TLDs', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['voteforoneill'],
+        10,
+      )
+
+      const tried = mockRoute53.checkDomainAvailability.mock.calls.map(
+        (c) => c[0] as string,
+      )
+      expect(tried.sort()).toEqual(
+        [
+          'voteforoneill.com',
+          'voteforoneill.org',
+          'voteforoneill.vote',
+        ].sort(),
+      )
+      expect(result.candidates.map((c) => c.domain).sort()).toEqual(
+        [
+          'voteforoneill.com',
+          'voteforoneill.org',
+          'voteforoneill.vote',
+        ].sort(),
+      )
+    })
+
+    it('does not fan out patterns that already include a TLD', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['vote-{last_name}.run'],
+        10,
+      )
+
+      const tried = mockRoute53.checkDomainAvailability.mock.calls.map(
+        (c) => c[0] as string,
+      )
+      expect(tried).toEqual(['vote-oneill.run'])
+    })
+
+    it('dedupes after fan-out when bare and TLD-bearing patterns overlap', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['voteoneill', 'voteoneill.com'],
+        10,
+      )
+
+      const tried = mockRoute53.checkDomainAvailability.mock.calls.map(
+        (c) => c[0] as string,
+      )
+      expect(tried.sort()).toEqual(
+        ['voteoneill.com', 'voteoneill.org', 'voteoneill.vote'].sort(),
+      )
+    })
+
     it('skips candidate when Route53 throws BadRequest (e.g. UnsupportedTLD)', async () => {
       mockRoute53.checkDomainAvailability.mockImplementation(() => {
         throw new BadRequestException('UnsupportedTLD')
