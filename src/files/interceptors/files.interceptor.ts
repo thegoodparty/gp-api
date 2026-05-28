@@ -146,7 +146,7 @@ export function FilesInterceptor(
  * @param path The field name with bracket notation (e.g., 'user[name]', 'items[0]')
  * @param value The value to set
  */
-function setNestedProperty(
+export function setNestedProperty(
   obj: Prisma.JsonObject,
   path: string,
   value: Prisma.JsonValue,
