@@ -21,6 +21,10 @@ import {
   PurchaseDomainResponseSchema,
 } from '../schemas/PurchaseDomain.schema'
 import {
+  SubmitRegistrantVerificationBodySchema,
+  SubmitRegistrantVerificationResponseSchema,
+} from '../schemas/SubmitRegistrantVerification.schema'
+import {
   createMockCampaign,
   createMockUser,
 } from '@/shared/test-utils/mockData.util'
@@ -215,6 +219,111 @@ describe('DomainsController.purchaseDomain', () => {
   })
 })
 
+describe('DomainsController.submitRegistrantVerification', () => {
+  let controller: DomainsController
+  let mockDomains: {
+    submitRegistrantVerificationForCampaign: ReturnType<typeof vi.fn>
+  }
+
+  const verifiedAt = new Date('2026-05-13T00:00:00.000Z')
+
+  beforeEach(async () => {
+    mockDomains = {
+      submitRegistrantVerificationForCampaign: vi.fn().mockResolvedValue({
+        domain: 'voteforjane.run',
+        alreadyVerified: true,
+        registrantVerifiedAt: verifiedAt,
+      }),
+    }
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [DomainsController],
+      providers: [
+        { provide: DomainsService, useValue: mockDomains },
+        { provide: WebsitesService, useValue: {} },
+      ],
+    })
+      .overrideGuard(UseCampaignGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
+
+    controller = module.get<DomainsController>(DomainsController)
+  })
+
+  it('delegates to submitRegistrantVerificationForCampaign and propagates alreadyVerified', async () => {
+    const campaign = createMockCampaign({ id: 7 })
+
+    const result = await controller.submitRegistrantVerification(campaign, {
+      domain: 'voteforjane.run',
+      verificationUrl: 'https://vercel.com/verify?token=abc',
+    })
+
+    expect(
+      mockDomains.submitRegistrantVerificationForCampaign,
+    ).toHaveBeenCalledWith(
+      7,
+      'voteforjane.run',
+      'https://vercel.com/verify?token=abc',
+    )
+    expect(result).toEqual({
+      domain: 'voteforjane.run',
+      alreadyVerified: true,
+      registrantVerifiedAt: verifiedAt,
+    })
+  })
+
+  it('handler is registered for POST /registrant-verification with @UseCampaign(), @HttpCode(200), and @McpTool description', () => {
+    const reflector = new Reflector()
+
+    const path = Reflect.getMetadata(
+      'path',
+      controller.submitRegistrantVerification,
+    )
+    const method = Reflect.getMetadata(
+      'method',
+      controller.submitRegistrantVerification,
+    )
+    expect(path).toBe('registrant-verification')
+    expect(method).toBe(RequestMethod.POST)
+
+    const statusCode = Reflect.getMetadata(
+      '__httpCode__',
+      controller.submitRegistrantVerification,
+    )
+    expect(statusCode).toBe(HttpStatus.OK)
+
+    const useCampaignMeta = reflector.get(
+      REQUIRE_CAMPAIGN_META_KEY,
+      controller.submitRegistrantVerification,
+    )
+    expect(useCampaignMeta).toBeDefined()
+
+    const mcpMeta = reflector.get(
+      MCP_TOOL_KEY,
+      controller.submitRegistrantVerification,
+    )
+    expect(mcpMeta).toBeDefined()
+    expect(mcpMeta.description).toMatch(/vercel\.com/)
+    expect(mcpMeta.description).toMatch(/4xx/)
+  })
+
+  it('SubmitRegistrantVerificationBodySchema requires a valid URL and FQDN', () => {
+    expect(
+      SubmitRegistrantVerificationBodySchema.schema.safeParse({
+        domain: 'voteforjane.run',
+        verificationUrl: 'https://vercel.com/verify?token=abc',
+      }).success,
+    ).toBe(true)
+
+    expect(
+      SubmitRegistrantVerificationBodySchema.schema.safeParse({
+        domain: 'voteforjane.run',
+        verificationUrl: 'not-a-url',
+      }).success,
+    ).toBe(false)
+  })
+})
+
 describe('DomainsController.purchaseDomain MCP discoverability', () => {
   const buildModule = (): ModuleMetadata => ({
     imports: [DiscoveryModule],
@@ -263,5 +372,27 @@ describe('DomainsController.purchaseDomain MCP discoverability', () => {
     )
     expect(purchase!.inputDeclarations.query.declared).toBe(false)
     expect(purchase!.inputDeclarations.params.declared).toBe(false)
+  })
+
+  it('exposes POST_domains_registrant_verification with full input/output schemas', async () => {
+    const moduleRef = await Test.createTestingModule(buildModule())
+      .overrideGuard(UseCampaignGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
+    await moduleRef.init()
+
+    const tools = moduleRef.get(McpServerService).getTools()
+    const verify = tools.find(
+      (t) => t.toolName === 'POST_domains_registrant_verification',
+    )
+
+    expect(verify).toBeDefined()
+    expect(verify!.outputSchema).toBe(
+      SubmitRegistrantVerificationResponseSchema,
+    )
+    expect(verify!.inputDeclarations.body.declared).toBe(true)
+    expect(verify!.inputDeclarations.body.schema).toBe(
+      SubmitRegistrantVerificationBodySchema.schema,
+    )
   })
 })

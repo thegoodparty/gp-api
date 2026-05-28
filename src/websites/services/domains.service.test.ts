@@ -64,6 +64,7 @@ describe('DomainsService', () => {
     createTXTVerificationRecord: ReturnType<typeof vi.fn>
     submitDomainRegistrantVerification: ReturnType<typeof vi.fn>
     getDomainDetails: ReturnType<typeof vi.fn>
+    isAllowedVercelUrl: ReturnType<typeof vi.fn>
   }
   let mockForwardEmail: {
     getDomain: ReturnType<typeof vi.fn>
@@ -111,6 +112,7 @@ describe('DomainsService', () => {
       getDomainDetails: vi.fn().mockResolvedValue({
         domain: { verified: true, name: 'test-domain.com' },
       }),
+      isAllowedVercelUrl: vi.fn().mockReturnValue(true),
     }
     mockForwardEmail = {
       getDomain: vi.fn().mockResolvedValue(null),
@@ -917,6 +919,45 @@ describe('DomainsService', () => {
       expect(completeOrder).toBeGreaterThan(createOrder)
     })
 
+    it('registers sites@goodparty.org as the contact email, not the candidate email', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+      mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+        content: { contact: {} },
+      })
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+      const created = {
+        ...mockDomain,
+        name: domainName,
+        paymentId: null,
+        price: new Decimal(12),
+      }
+      mockPrisma.domain.create.mockResolvedValue(created)
+      mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+        ...created,
+        status: DomainStatus.submitted,
+      })
+      const completeSpy = vi
+        .spyOn(service, 'completeDomainRegistration')
+        .mockResolvedValue({
+          vercelResult: null,
+          projectResult: null,
+          message: 'Disabled',
+        })
+
+      await service.purchaseDomainForCampaign(
+        campaignWithUser,
+        domainName,
+        maxPrice,
+      )
+
+      const [, contactArg] = completeSpy.mock.calls[0]
+      expect(contactArg.email).toBe('sites@goodparty.org')
+      expect(contactArg.email).not.toBe(mockUser.email)
+    })
+
     it('throws ConflictException when looked-up price exceeds maxPrice; no Domain row created', async () => {
       mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
       mockRoute53.checkDomainAvailability.mockResolvedValue({
@@ -1291,6 +1332,86 @@ describe('DomainsService', () => {
         service.submitRegistrantVerification('foo.com', verifyUrl),
       ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
       expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('rejects a non-Vercel verificationUrl with 400 before any DB or Vercel call', async () => {
+      mockVercel.isAllowedVercelUrl.mockReturnValueOnce(false)
+
+      await expect(
+        service.submitRegistrantVerification(
+          'foo.com',
+          'https://evil.example.com/verify',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+
+      expect(mockPrisma.domain.findUnique).not.toHaveBeenCalled()
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('submitRegistrantVerificationForCampaign', () => {
+    const verifyUrl =
+      'https://vercel.com/verify-domain?token=abc&domain=foo.com'
+
+    it('throws NotFoundException when the campaign has no domain', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({ domain: null })
+
+      await expect(
+        service.submitRegistrantVerificationForCampaign(
+          42,
+          'foo.com',
+          verifyUrl,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException)
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('throws ForbiddenException when the domain belongs to another campaign', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        domain: { ...mockDomain, name: 'someone-elses.com' },
+      })
+
+      await expect(
+        service.submitRegistrantVerificationForCampaign(
+          42,
+          'foo.com',
+          verifyUrl,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+      expect(
+        mockVercel.submitDomainRegistrantVerification,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('delegates to submitRegistrantVerification with the campaign-owned domain and propagates alreadyVerified', async () => {
+      mockPrisma.website.findUnique.mockResolvedValue({
+        domain: { ...mockDomain, name: 'foo.com' },
+      })
+      const verifiedAt = new Date('2026-05-13T00:00:00.000Z')
+      const submitSpy = vi
+        .spyOn(service, 'submitRegistrantVerification')
+        .mockResolvedValue({
+          domain: 'foo.com',
+          alreadyVerified: true,
+          registrantVerifiedAt: verifiedAt,
+        })
+
+      const result = await service.submitRegistrantVerificationForCampaign(
+        42,
+        'FOO.COM',
+        verifyUrl,
+      )
+
+      expect(submitSpy).toHaveBeenCalledWith('foo.com', verifyUrl)
+      expect(result).toEqual({
+        domain: 'foo.com',
+        alreadyVerified: true,
+        registrantVerifiedAt: verifiedAt,
+      })
     })
   })
 
