@@ -509,9 +509,12 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
 })
 
 describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
     mockResolveServeContext(null)
+    // The cron claims a once-per-day lease; clear it so each test's first
+    // invocation wins the claim (all tests run on the same UTC date).
+    await service.prisma.cronRun.deleteMany({})
   })
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -609,6 +612,35 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
         }),
       }),
     )
+  })
+
+  it('runs the dispatch loop once when invoked twice the same day (multi-replica guard)', async () => {
+    const orgSlug = `eo-cron-guard-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-guard' })
+    const campaign = await service.prisma.campaign.findFirst({
+      where: { organizationSlug: orgSlug },
+    })
+    await service.prisma.electedOffice.create({
+      data: {
+        organizationSlug: orgSlug,
+        userId: service.user.id,
+        campaignId: campaign?.id,
+      },
+    })
+
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const svc = service.app.get(MeetingBriefingsService)
+    // Simulate both ECS replicas firing the cron on the same day. The second
+    // invocation must lose the lease and skip the loop entirely.
+    await svc.dispatchDailyBriefings()
+    await svc.dispatchDailyBriefings()
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
   })
 
   it('dispatches for EOs regardless of when they were created', async () => {
