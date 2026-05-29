@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { formatInTimeZone } from 'date-fns-tz'
 import ms from 'ms'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { isUniqueConstraintError } from '@/prisma/util/prismaErrors.util'
-import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+import { getMidnightForDate } from '@/shared/util/date.util'
 
 // A claim that is still incomplete after this long is assumed to belong to a
 // crashed run and may be taken over. Must comfortably exceed the longest a
@@ -13,10 +12,6 @@ const STALE_CLAIM_MS = ms('6h')
 
 @Injectable()
 export class CronLockService extends createPrismaBase(MODELS.CronRun) {
-  private runDateFor(now: Date): Date {
-    return parseIsoDateAsUTC(formatInTimeZone(now, 'UTC', 'yyyy-MM-dd'))
-  }
-
   /**
    * Claims the once-per-day run slot for `jobName`. Returns `true` if this
    * process won the claim and should run the job, `false` if another process
@@ -39,7 +34,7 @@ export class CronLockService extends createPrismaBase(MODELS.CronRun) {
     jobName: string,
     now: Date = new Date(),
   ): Promise<boolean> {
-    const runDate = this.runDateFor(now)
+    const runDate = getMidnightForDate(now)
 
     try {
       // createdAt doubles as the claim timestamp for staleness checks, so set it
@@ -87,7 +82,7 @@ export class CronLockService extends createPrismaBase(MODELS.CronRun) {
    * @param now Defaults to the current time; injectable for tests.
    */
   async markCompleted(jobName: string, now: Date = new Date()): Promise<void> {
-    const runDate = this.runDateFor(now)
+    const runDate = getMidnightForDate(now)
     await this.model.updateMany({
       where: { jobName, runDate },
       data: { completedAt: now },

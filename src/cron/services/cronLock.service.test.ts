@@ -75,6 +75,24 @@ describe('CronLockService.tryClaimDailyRun', () => {
     ).toBe(true)
   })
 
+  it('lets only one of two concurrent takeovers win', async () => {
+    const lock = service.app.get(CronLockService)
+
+    expect(
+      await lock.tryClaimDailyRun(JOB, new Date('2026-05-29T07:00:00.000Z')),
+    ).toBe(true)
+
+    // Two replicas race to take over the same stale claim; the conditional
+    // update must let exactly one succeed.
+    const later = new Date('2026-05-29T14:00:00.000Z')
+    const results = await Promise.all([
+      lock.tryClaimDailyRun(JOB, later),
+      lock.tryClaimDailyRun(JOB, later),
+    ])
+
+    expect(results.filter(Boolean)).toHaveLength(1)
+  })
+
   it('never takes over a completed claim, even when stale', async () => {
     const lock = service.app.get(CronLockService)
     const now = new Date('2026-05-29T07:00:00.000Z')

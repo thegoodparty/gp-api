@@ -210,19 +210,23 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
+    // Pin a single timestamp for the whole run so the lease claim and its
+    // completion resolve to the same UTC run-date even if the long loop below
+    // crosses midnight.
+    const now = new Date()
+
     // Every ECS replica fires this @Cron, so without a guard each office would
     // be enqueued once per replica (2x in prod). Claim a once-per-day lease so
     // only the winning replica runs the long batched dispatch loop below.
     const claimed = await this.cronLock.tryClaimDailyRun(
       DAILY_BRIEFINGS_CRON_JOB,
+      now,
     )
     if (!claimed) return
 
     const offices = await this.client.electedOffice.findMany({
       select: { id: true, organizationSlug: true, userId: true },
     })
-
-    const now = new Date()
 
     const chunks = chunk(offices, CRON_CONFIG.batchSize)
 
@@ -244,7 +248,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     // Mark the claim complete so a crashed-run takeover (see CronLockService)
     // is only triggered when the loop did not finish.
-    await this.cronLock.markCompleted(DAILY_BRIEFINGS_CRON_JOB)
+    await this.cronLock.markCompleted(DAILY_BRIEFINGS_CRON_JOB, now)
   }
 
   private async dispatchBriefingIfNeeded(
