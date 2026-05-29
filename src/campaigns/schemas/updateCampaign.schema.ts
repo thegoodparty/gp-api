@@ -13,6 +13,7 @@ const CampaignDetailsSchema = z
     ballotLevel: BallotReadyPositionLevelSchema,
     electionDate: z.string(),
     primaryElectionDate: z.string(),
+    primaryResult: z.enum(['won', 'lost']),
     zip: z.string(),
     knowRun: z.enum(['yes']),
     runForOffice: z.enum(['yes', 'no']),

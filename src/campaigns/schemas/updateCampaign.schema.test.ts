@@ -28,4 +28,23 @@ describe('updateCampaignBodySchema', () => {
     expect(result.details).not.toHaveProperty(field)
     expect(result.details).toHaveProperty('state', 'CA')
   })
+
+  it.each(['won', 'lost'])(
+    'preserves primaryResult "%s" so the election result persists',
+    (primaryResult) => {
+      const result = updateCampaignBodySchema.parse({
+        details: { primaryResult },
+      })
+
+      expect(result.details).toHaveProperty('primaryResult', primaryResult)
+    },
+  )
+
+  it('rejects an invalid primaryResult value', () => {
+    expect(() =>
+      updateCampaignBodySchema.parse({
+        details: { primaryResult: 'maybe' },
+      }),
+    ).toThrow()
+  })
 })
