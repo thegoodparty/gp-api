@@ -8,7 +8,10 @@ describe('OutreachController', () => {
   let controller: OutreachController
   let mockTcrComplianceService: { findFirst: ReturnType<typeof vi.fn> }
   let mockOutreachService: { create: ReturnType<typeof vi.fn> }
-  let mockFilesService: { uploadFile: ReturnType<typeof vi.fn> }
+  let mockS3Service: {
+    buildKey: ReturnType<typeof vi.fn>
+    uploadFile: ReturnType<typeof vi.fn>
+  }
   let mockPeerlyP2pJobService: Record<string, ReturnType<typeof vi.fn>>
 
   const mockUser = {
@@ -55,7 +58,11 @@ describe('OutreachController', () => {
     mockOutreachService = {
       create: vi.fn().mockResolvedValue({ id: 1 }),
     }
-    mockFilesService = {
+    mockS3Service = {
+      buildKey: vi.fn(
+        (folder?: string, fileName?: string) =>
+          `${folder ?? ''}/${fileName ?? ''}`,
+      ),
       uploadFile: vi
         .fn()
         .mockResolvedValue('https://cdn.example.com/image.png'),
@@ -65,7 +72,7 @@ describe('OutreachController', () => {
     controller = new OutreachController(
       mockTcrComplianceService as never,
       mockOutreachService as never,
-      mockFilesService as never,
+      mockS3Service as never,
       mockPeerlyP2pJobService as never,
       createMockLogger(),
     )
@@ -139,7 +146,7 @@ describe('OutreachController', () => {
     })
 
     it('throws BadRequestException when P2P image upload fails (no imageUrl)', async () => {
-      mockFilesService.uploadFile.mockResolvedValue(undefined)
+      mockS3Service.uploadFile.mockResolvedValue(undefined)
 
       await expect(
         controller.create(
@@ -160,7 +167,7 @@ describe('OutreachController', () => {
     })
 
     it('creates text outreach with uploaded imageUrl', async () => {
-      mockFilesService.uploadFile.mockResolvedValue(
+      mockS3Service.uploadFile.mockResolvedValue(
         'https://cdn.example.com/uploaded.png',
       )
       mockOutreachService.create.mockResolvedValue({ id: 1, ...textDto })
@@ -172,21 +179,30 @@ describe('OutreachController', () => {
         mockImage as never,
       )
 
-      expect(mockFilesService.uploadFile).toHaveBeenCalledWith(
-        mockImage,
+      expect(mockS3Service.buildKey).toHaveBeenCalledWith(
         expect.stringContaining('scheduled-campaign/jane-doe/text/'),
+        mockImage.filename,
+      )
+      expect(mockS3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        mockImage.data,
+        expect.stringContaining('scheduled-campaign/jane-doe/text/'),
+        expect.objectContaining({
+          contentType: mockImage.mimetype,
+          cacheControl: expect.stringContaining('max-age='),
+        }),
       )
       expect(mockOutreachService.create).toHaveBeenCalledWith(
         mockUser,
         baseCampaign,
         textDto,
         'https://cdn.example.com/uploaded.png',
-        undefined, // no p2pImage for text outreach
+        undefined,
       )
     })
 
     it('creates P2P outreach passing p2pImage with stream, filename, mimetype', async () => {
-      mockFilesService.uploadFile.mockResolvedValue(
+      mockS3Service.uploadFile.mockResolvedValue(
         'https://cdn.example.com/p2p.png',
       )
       mockOutreachService.create.mockResolvedValue({ id: 2, ...p2pDto })
@@ -237,7 +253,7 @@ describe('OutreachController', () => {
         undefined,
       )
 
-      expect(mockFilesService.uploadFile).not.toHaveBeenCalled()
+      expect(mockS3Service.uploadFile).not.toHaveBeenCalled()
       expect(mockOutreachService.create).toHaveBeenCalledWith(
         mockUser,
         baseCampaign,

@@ -416,6 +416,34 @@ export class OrganizationsService extends createPrismaBase(
     return this.resolveDistrict(org)
   }
 
+  async resolveServeContext(org: Organization): Promise<{
+    state: string
+    positionName: string
+    l2DistrictType?: string
+    l2DistrictName?: string
+  } | null> {
+    const [position, overrideDistrict] = await Promise.all([
+      org.positionId
+        ? this.electionsService.getPositionById(org.positionId, {
+            includeDistrict: true,
+          })
+        : Promise.resolve(null),
+      org.overrideDistrictId
+        ? this.electionsService.getDistrict(org.overrideDistrictId)
+        : Promise.resolve(null),
+    ])
+    const state = position?.state ?? overrideDistrict?.state ?? ''
+    const positionName = org.customPositionName ?? position?.name ?? ''
+    if (!state || !positionName) return null
+    const district = overrideDistrict ?? position?.district
+    return {
+      state,
+      positionName,
+      l2DistrictType: district?.L2DistrictType,
+      l2DistrictName: district?.L2DistrictName,
+    }
+  }
+
   private async resolveDistrict(
     org: Organization,
   ): Promise<OrgDistrict | null> {
@@ -435,6 +463,7 @@ export class OrganizationsService extends createPrismaBase(
 
     return {
       id: district.id,
+      state: district.state,
       l2Type: district.L2DistrictType,
       l2Name: district.L2DistrictName,
     }
@@ -468,6 +497,7 @@ export class OrganizationsService extends createPrismaBase(
     const district: OrgDistrict | null = rawDistrict
       ? {
           id: rawDistrict.id,
+          state: rawDistrict.state,
           l2Type: rawDistrict.L2DistrictType,
           l2Name: rawDistrict.L2DistrictName,
         }

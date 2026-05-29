@@ -16,6 +16,7 @@ import { UseCampaignGuard } from 'src/campaigns/guards/UseCampaign.guard'
 import { REQUIRE_CAMPAIGN_META_KEY } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { MCP_TOOL_KEY } from '@/mcp/decorators/McpTool.decorator'
 import { McpServerService } from '@/mcp/services/mcpServer.service'
+import { AgentMcpMarker } from '@/authentication/agentMcpMarker'
 import {
   PurchaseDomainBodySchema,
   PurchaseDomainResponseSchema,
@@ -221,6 +222,7 @@ describe('DomainsController.purchaseDomain MCP discoverability', () => {
     controllers: [DomainsController],
     providers: [
       McpServerService,
+      AgentMcpMarker,
       { provide: DomainsService, useValue: {} },
       { provide: WebsitesService, useValue: {} },
       {

@@ -649,6 +649,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       name: 'Mayor',
       district: {
         id: 'district-xyz',
+        state: 'CA',
         L2DistrictType: 'City',
         L2DistrictName: 'San Francisco',
         projectedTurnout: null,
@@ -662,6 +663,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       name: 'Mayor',
       district: {
         id: 'district-xyz',
+        state: 'CA',
         L2DistrictType: 'City',
         L2DistrictName: 'San Francisco',
         projectedTurnout: null,
@@ -669,6 +671,7 @@ describe('PATCH /v1/organizations/:slug', () => {
     })
     vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
       id: 'different-district',
+      state: 'CA',
       L2DistrictType: 'City',
       L2DistrictName: 'Los Angeles',
       projectedTurnout: null,
@@ -739,6 +742,7 @@ describe('PATCH /v1/organizations/:slug', () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
       id: 'existing-district',
+      state: 'CA',
       L2DistrictType: 'County',
       L2DistrictName: 'Test County',
       projectedTurnout: null,
@@ -780,6 +784,7 @@ describe('PATCH /v1/organizations/:slug', () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
       id: 'keep-this-district',
+      state: 'CA',
       L2DistrictType: 'County',
       L2DistrictName: 'Test County',
       projectedTurnout: null,
@@ -829,6 +834,7 @@ describe('PATCH /v1/organizations/:slug', () => {
         name: 'Mayor',
         district: {
           id: 'dist-inc',
+          state: 'CA',
           L2DistrictType: 'City',
           L2DistrictName: 'Oakland',
           projectedTurnout: null,

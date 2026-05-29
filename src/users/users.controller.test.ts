@@ -2,7 +2,7 @@ import { User, UserRole } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersController } from './users.controller'
 import { UsersService } from './services/users.service'
-import { FilesService } from 'src/files/files.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { FileUpload } from 'src/files/files.types'
 import { AuthenticationService } from '../authentication/authentication.service'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
@@ -47,7 +47,7 @@ function getGuards(methodName: keyof UsersController) {
 describe('UsersController', () => {
   let controller: UsersController
   let usersService: UsersService
-  let filesService: FilesService
+  let s3Service: S3Service
   let authService: AuthenticationService
 
   beforeEach(() => {
@@ -61,11 +61,14 @@ describe('UsersController', () => {
     }
     usersService = usersServiceMock as UsersService
 
-    const filesServiceMock: Partial<FilesService> = {
+    const s3ServiceMock: Partial<S3Service> = {
+      buildKey: vi.fn(
+        (folder?: string, fileName?: string) => `${folder}/${fileName}`,
+      ),
       uploadFile: vi.fn(),
-      generateSignedUploadUrl: vi.fn(),
+      getSignedUrlForUpload: vi.fn(),
     }
-    filesService = filesServiceMock as FilesService
+    s3Service = s3ServiceMock as S3Service
 
     const authServiceMock: Partial<AuthenticationService> = {
       validatePassword: vi.fn(),
@@ -74,7 +77,7 @@ describe('UsersController', () => {
 
     controller = new UsersController(
       usersService,
-      filesService,
+      s3Service,
       authService,
       createMockLogger(),
     )
@@ -381,7 +384,7 @@ describe('UsersController', () => {
         encoding: '7bit',
         fieldname: 'file',
       }
-      vi.spyOn(filesService, 'uploadFile').mockResolvedValue(
+      vi.spyOn(s3Service, 'uploadFile').mockResolvedValue(
         'https://cdn.example.com/avatar.png',
       )
       vi.spyOn(usersService, 'updateUser').mockResolvedValue({
@@ -391,7 +394,16 @@ describe('UsersController', () => {
 
       const result = await controller.uploadImage(mockUser, file)
 
-      expect(filesService.uploadFile).toHaveBeenCalledWith(file, 'uploads')
+      expect(s3Service.buildKey).toHaveBeenCalledWith('uploads', file.filename)
+      expect(s3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        file.data,
+        expect.stringContaining('uploads/'),
+        expect.objectContaining({
+          contentType: file.mimetype,
+          cacheControl: expect.stringContaining('max-age='),
+        }),
+      )
       expect(usersService.updateUser).toHaveBeenCalledWith(
         { id: userId },
         { avatar: 'https://cdn.example.com/avatar.png' },
@@ -455,7 +467,7 @@ describe('UsersController', () => {
 
   describe('generateSignedUploadUrl', () => {
     it('returns the signed upload URL', async () => {
-      vi.spyOn(filesService, 'generateSignedUploadUrl').mockResolvedValue(
+      vi.spyOn(s3Service, 'getSignedUrlForUpload').mockResolvedValue(
         'https://s3.example.com/signed-url',
       )
 
@@ -466,7 +478,15 @@ describe('UsersController', () => {
       }
       const result = await controller.generateSignedUploadUrl(mockUser, args)
 
-      expect(filesService.generateSignedUploadUrl).toHaveBeenCalledWith(args)
+      expect(s3Service.buildKey).toHaveBeenCalledWith(
+        args.bucket,
+        args.fileName,
+      )
+      expect(s3Service.getSignedUrlForUpload).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('uploads/'),
+        { contentType: args.fileType },
+      )
       expect(result).toEqual({
         signedUploadUrl: 'https://s3.example.com/signed-url',
       })

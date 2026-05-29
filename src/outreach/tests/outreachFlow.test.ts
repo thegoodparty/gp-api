@@ -22,7 +22,7 @@ import { SlackChannel } from '@/vendors/slack/slackService.types'
 import { PeerlyP2pJobService } from '@/vendors/peerly/services/peerlyP2pJob.service'
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { AreaCodeFromZipService } from '@/ai/util/areaCodeFromZip.util'
-import { FilesService } from '@/files/files.service'
+import { S3Service } from '@/vendors/aws/services/s3.service'
 import { Campaign, OutreachType } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -81,8 +81,8 @@ beforeEach(async () => {
     areaCodeFromZip,
   )
 
-  const filesSvc = service.app.get(FilesService)
-  vi.spyOn(filesSvc, 'uploadFile').mockImplementation(filesUploadFile)
+  const s3Svc = service.app.get(S3Service)
+  vi.spyOn(s3Svc, 'uploadFile').mockImplementation(filesUploadFile)
 
   // -- Default success-shaped mock returns. Override per-test as needed. --------------
 

@@ -29,11 +29,12 @@ import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
-import { FilesService } from 'src/files/files.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
-import { MimeTypes } from 'http-constants-ts'
+import { CacheControls, MimeTypes } from 'http-constants-ts'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { AuthenticationService } from '../authentication/authentication.service'
 import {
   UpdateUserAdminInputSchema,
@@ -56,7 +57,7 @@ class UpdatePasswordDto extends createZodDto(UpdatePasswordSchema) {}
 export class UsersController {
   constructor(
     private usersService: UsersService,
-    private readonly filesService: FilesService,
+    private readonly s3: S3Service,
     private readonly authenticationService: AuthenticationService,
     private readonly logger: PinoLogger,
   ) {
@@ -113,7 +114,12 @@ export class UsersController {
       throw new BadRequestException('No file found')
     }
 
-    const avatar = await this.filesService.uploadFile(file, 'uploads')
+    const key = this.s3.buildKey('uploads', file.filename)
+    const avatar = await this.s3.uploadFile(ASSET_DOMAIN, file.data, key, {
+      contentType: file.mimetype,
+      cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
+      baseUrl: `https://${ASSET_DOMAIN}`,
+    })
     return this.usersService.updateUser({ id: user.id }, { avatar })
   }
 
@@ -125,8 +131,11 @@ export class UsersController {
     if (!user) {
       throw new UnauthorizedException('User session required')
     }
+    const key = this.s3.buildKey(args.bucket, args.fileName)
     return {
-      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
+      signedUploadUrl: await this.s3.getSignedUrlForUpload(ASSET_DOMAIN, key, {
+        contentType: args.fileType,
+      }),
     }
   }
 

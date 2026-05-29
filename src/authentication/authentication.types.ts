@@ -7,4 +7,5 @@ export interface IncomingRequest extends Request {
   actorUser?: User
   actorSub?: string
   m2mToken?: VerifiedM2MToken
+  agentToken?: boolean
 }

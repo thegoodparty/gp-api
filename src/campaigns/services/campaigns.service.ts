@@ -12,6 +12,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { formatISO } from 'date-fns'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -423,8 +424,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
     await this.patchCampaignDetails(campaignId, {
-      isProUpdatedAt: Date.now(),
-    }) // TODO: this should be an ISO dateTime string, not a unix timestamp
+      isProUpdatedAt: formatISO(new Date()),
+    })
 
     if (isBecomingProFirstTime) {
       void this.campaignTasks.notifySlackOnProUpgrade(campaignId)

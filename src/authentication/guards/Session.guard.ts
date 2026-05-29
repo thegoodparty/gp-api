@@ -13,6 +13,10 @@ import {
   AuthProvider,
 } from '@/authentication/interfaces/auth-provider.interface'
 import { IncomingRequest } from '@/authentication/authentication.types'
+import {
+  AgentMcpMarker,
+  MCP_INTERNAL_MARKER_HEADER,
+} from '@/authentication/agentMcpMarker'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
 import { TRANSCRIBE_STREAM_PATH } from '@/speech/ws/speechToText.gateway'
 import { UsersService } from '@/users/services/users.service'
@@ -29,6 +33,7 @@ export class SessionGuard implements CanActivate {
     private readonly clerkEnricher: ClerkUserEnricherService,
     private readonly logger: PinoLogger,
     private readonly reflector: Reflector,
+    private readonly agentMcpMarker: AgentMcpMarker,
   ) {
     this.logger.setContext(SessionGuard.name)
   }
@@ -62,8 +67,12 @@ export class SessionGuard implements CanActivate {
     }
 
     try {
-      const { externalUserId, actor } =
+      const { externalUserId, actor, isAgentToken } =
         await this.authProvider.verifySessionToken(token)
+
+      if (isAgentToken) {
+        request.agentToken = true
+      }
 
       if (actor?.sub) {
         request.actorSub = actor.sub
@@ -94,6 +103,11 @@ export class SessionGuard implements CanActivate {
       }
       if (actorUser) {
         request.actorUser = actorUser
+      }
+      if (request.agentToken && !this.agentTokenAllowedHere(context, request)) {
+        throw new UnauthorizedException(
+          'Agent token is only valid on the MCP endpoint',
+        )
       }
       this.sessions.trackSession(user)
     } catch (err) {
@@ -174,5 +188,24 @@ export class SessionGuard implements CanActivate {
       )
       return null
     }
+  }
+
+  private agentTokenAllowedHere(
+    context: ExecutionContext,
+    request: IncomingRequest,
+  ): boolean {
+    // (1) the outer /v1/mcp request — its handler is McpController; or
+    // (2) an internal fastify.inject sub-request stamped by the MCP dispatch.
+    const isMcpRoute = context.getClass()?.name === 'McpController'
+    const headers =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      request.headers as unknown as Record<
+        string,
+        string | string[] | undefined
+      >
+    const isInternal = this.agentMcpMarker.matches(
+      headers[MCP_INTERNAL_MARKER_HEADER],
+    )
+    return isMcpRoute || isInternal
   }
 }
