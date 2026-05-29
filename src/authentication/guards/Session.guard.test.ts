@@ -94,6 +94,7 @@ describe('SessionGuard — impersonating flag', () => {
       clerkEnricher as never,
       createMockLogger(),
       new Reflector(),
+      { token: 'test-token', matches: vi.fn().mockReturnValue(false) } as never,
     )
   })
 
