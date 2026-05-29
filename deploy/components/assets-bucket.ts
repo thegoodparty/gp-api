@@ -24,8 +24,9 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
   })
 
   // Block public bucket policies but allow per-object ACLs for now.
-  // Legacy AwsS3Service sets ACL: public_read on uploads -- once that code is
-  // migrated to the new S3Service (no ACL), flip these back to true.
+  // Historical uploads carry ACL: public_read from the now-removed
+  // AwsS3Service; once those objects no longer rely on public ACLs, flip
+  // these back to true.
   new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
     bucket: bucket.id,
     blockPublicAcls: false,

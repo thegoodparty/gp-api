@@ -19,6 +19,7 @@ const makePosition = (
   name: 'State House 005',
   district: {
     id: 'district-1',
+    state: 'TX',
     L2DistrictType: 'State_House',
     L2DistrictName: 'STATE HOUSE 005',
     projectedTurnout:

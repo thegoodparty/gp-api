@@ -9,7 +9,7 @@ import {
 import { rrulestr } from 'rrule'
 import { formatInTimeZone } from 'date-fns-tz'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
@@ -33,10 +33,6 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
-
-const DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR = new Date(
-  '2026-03-01T00:00:00.000Z',
-)
 
 const isAutomationEnabled = () =>
   process.env.MEETINGS_AUTOMATION_ENABLED === 'true'
@@ -66,7 +62,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 ) {
   constructor(
     private readonly s3: S3Service,
-    private readonly elections: ElectionsService,
+    private readonly organizations: OrganizationsService,
     private readonly experimentRuns: ExperimentRunsService,
     private readonly segment: SegmentService,
     private readonly llm: LlmService,
@@ -202,9 +198,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
     const offices = await this.client.electedOffice.findMany({
-      where: {
-        createdAt: { gte: DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR },
-      },
       select: { id: true, organizationSlug: true, userId: true },
     })
 
@@ -250,7 +243,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       }),
       this.client.organization.findUnique({
         where: { slug: electedOffice.organizationSlug },
-        select: { positionId: true, customPositionName: true },
       }),
     ])
 
@@ -262,23 +254,18 @@ export class MeetingBriefingsService extends createPrismaBase(
       return null
     }
 
-    const position = organization?.positionId
-      ? await this.elections.getPositionById(organization.positionId, {
-          includeDistrict: true,
-        })
-      : null
-    const state = position?.state ?? ''
-    const positionName =
-      organization?.customPositionName ?? position?.name ?? ''
     const officialName = getUserFullName(user)
+    const serveCtx = organization
+      ? await this.organizations.resolveServeContext(organization)
+      : null
 
-    if (!state || !positionName || !officialName) {
+    if (!serveCtx || !officialName) {
       this.logger.warn(
         {
           electedOfficeId: electedOffice.id,
           missing: {
-            state: !state,
-            positionName: !positionName,
+            state: !serveCtx?.state,
+            positionName: !serveCtx?.positionName,
             officialName: !officialName,
           },
         },
@@ -292,10 +279,10 @@ export class MeetingBriefingsService extends createPrismaBase(
       organizationSlug: electedOffice.organizationSlug,
       clerkUserId: user.clerkId,
       officialName,
-      state,
-      positionName,
-      l2DistrictType: position?.district?.L2DistrictType,
-      l2DistrictName: position?.district?.L2DistrictName,
+      state: serveCtx.state,
+      positionName: serveCtx.positionName,
+      l2DistrictType: serveCtx.l2DistrictType,
+      l2DistrictName: serveCtx.l2DistrictName,
     }
   }
 

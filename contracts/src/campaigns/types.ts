@@ -137,7 +137,9 @@ export type CampaignDetails = {
   knowRun?: 'yes' | null
   runForOffice?: 'yes' | 'no' | null
   pledged?: boolean
-  isProUpdatedAt?: number
+  // ISO string for new writes; legacy unix-ms numbers persist in existing
+  // rows until backfilled
+  isProUpdatedAt?: string | number
   customIssues?: CustomIssue[]
   runningAgainst?: Opponent[]
   geoLocation?: GeoLocation

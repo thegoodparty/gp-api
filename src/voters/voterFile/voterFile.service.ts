@@ -3,7 +3,7 @@ import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { IS_PROD_DEPLOY } from 'src/shared/util/appEnvironment.util'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
@@ -195,8 +195,7 @@ export class VoterFileService {
 
     await this.slack.message(
       slackBlocks,
-      // TODO(ENG-10165): IS_PROD is true in every deploy; should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+      IS_PROD_DEPLOY ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
 
     return true

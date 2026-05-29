@@ -9,6 +9,7 @@ import { User } from '@prisma/client'
 import { FastifyRequest } from 'fastify'
 import { Observable, catchError, throwError } from 'rxjs'
 import { recordBlockedStateEvent } from '@/observability/grafana/otel.client'
+import { OTEL_SERVICE_ENVIRONMENT } from '@/shared/util/appEnvironment.util'
 import { deriveRootCause, shouldRecordBlockedState } from './blockedState.rules'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -124,8 +125,7 @@ export class BlockedStateInterceptor implements NestInterceptor {
 
         const blockedStateAttributes = {
           service: 'gp-api' as const,
-          // TODO(ENG-10165): NODE_ENV is 'production' in every deploy; for accurate observability env tagging use `process.env.OTEL_SERVICE_ENVIRONMENT`. See appEnvironment.util.ts.
-          environment: process.env.NODE_ENV,
+          environment: OTEL_SERVICE_ENVIRONMENT,
           userId,
           endpoint,
           method,
