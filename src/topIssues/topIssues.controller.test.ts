@@ -34,21 +34,15 @@ describe('TopIssuesController', () => {
     })
 
     it('requires admin role for createTopIssue', () => {
-      expect(getRoles('createTopIssue')).toEqual(
-        [UserRole.admin],
-      )
+      expect(getRoles('createTopIssue')).toEqual([UserRole.admin])
     })
 
     it('requires admin role for updateTopIssue', () => {
-      expect(getRoles('updateTopIssue')).toEqual(
-        [UserRole.admin],
-      )
+      expect(getRoles('updateTopIssue')).toEqual([UserRole.admin])
     })
 
     it('requires admin role for deleteTopIssue', () => {
-      expect(getRoles('deleteTopIssue')).toEqual(
-        [UserRole.admin],
-      )
+      expect(getRoles('deleteTopIssue')).toEqual([UserRole.admin])
     })
   })
 
