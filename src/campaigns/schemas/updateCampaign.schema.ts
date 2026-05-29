@@ -13,7 +13,6 @@ const CampaignDetailsSchema = z
     ballotLevel: BallotReadyPositionLevelSchema,
     electionDate: z.string(),
     primaryElectionDate: z.string(),
-    primaryResult: z.enum(['won', 'lost']),
     zip: z.string(),
     knowRun: z.enum(['yes']),
     runForOffice: z.enum(['yes', 'no']),
@@ -73,6 +72,7 @@ export const updateCampaignBodySchema = CampaignSchema.pick({
   .partial()
   .extend({
     details: CampaignDetailsSchema.optional(),
+    primaryResult: z.enum(['won', 'lost']).optional(),
   })
   .strict()
 

@@ -30,21 +30,25 @@ describe('updateCampaignBodySchema', () => {
   })
 
   it.each(['won', 'lost'])(
-    'preserves primaryResult "%s" so the election result persists',
+    'accepts top-level primaryResult "%s" so the election result persists',
     (primaryResult) => {
-      const result = updateCampaignBodySchema.parse({
-        details: { primaryResult },
-      })
+      const result = updateCampaignBodySchema.parse({ primaryResult })
 
-      expect(result.details).toHaveProperty('primaryResult', primaryResult)
+      expect(result).toHaveProperty('primaryResult', primaryResult)
     },
   )
 
   it('rejects an invalid primaryResult value', () => {
     expect(() =>
-      updateCampaignBodySchema.parse({
-        details: { primaryResult: 'maybe' },
-      }),
+      updateCampaignBodySchema.parse({ primaryResult: 'maybe' }),
     ).toThrow()
+  })
+
+  it('strips primaryResult from details (it is a top-level column)', () => {
+    const result = updateCampaignBodySchema.parse({
+      details: { state: 'CA', primaryResult: 'won' },
+    })
+
+    expect(result.details).not.toHaveProperty('primaryResult')
   })
 })

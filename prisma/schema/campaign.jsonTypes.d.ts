@@ -24,7 +24,6 @@ declare global {
       ballotLevel?: BallotReadyPositionLevel
       electionDate?: string
       primaryElectionDate?: string
-      primaryResult?: 'won' | 'lost'
       zip?: User['zip']
       knowRun?: 'yes' | null
       runForOffice?: 'yes' | 'no' | null

@@ -21,6 +21,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     isPro: faker.datatype.boolean(0.5),
     isDemo: faker.datatype.boolean(0.1),
     didWin: faker.datatype.boolean(0.5),
+    primaryResult: faker.helpers.arrayElement(['won', 'lost', null]),
     dateVerified: null,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
     formattedAddress: null,
