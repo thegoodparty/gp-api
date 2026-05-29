@@ -106,8 +106,22 @@ export const useTestService = (): TestServiceContext => {
     app = await bootstrap({ loggingEnabled: false })
 
     const authProvider = app.get<AuthProvider>(AUTH_PROVIDER_TOKEN)
+    // .bind() returns any — TypeScript cannot infer the bound method signature
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const realVerifySessionToken: AuthProvider['verifySessionToken'] =
+      authProvider.verifySessionToken.bind(authProvider)
     vi.spyOn(authProvider, 'verifySessionToken').mockImplementation(
       async (token: string) => {
+        // Broker-signed agent tokens verify locally with no Clerk dependency,
+        // so delegate to the real method and exercise the production branch.
+        const unverified = jwt.decode(token)
+        if (
+          typeof unverified === 'object' &&
+          unverified !== null &&
+          unverified.iss === 'gp-broker'
+        ) {
+          return realVerifySessionToken(token)
+        }
         const decoded = jwt.verify(token, process.env.AUTH_SECRET!)
         const sub = typeof decoded === 'object' ? decoded.sub : undefined
         if (!sub) {

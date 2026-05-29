@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import jwt from 'jsonwebtoken'
 import { useTestService } from '@/test-service'
 
 const service = useTestService()
@@ -100,5 +101,117 @@ describe('POST /v1/mcp (JSON-RPC over HTTP)', () => {
       statusCode: 401,
       message: 'Unauthorized',
     })
+  })
+})
+
+describe('agent token (broker-signed)', () => {
+  const signAgentToken = (clerkUserId: string) =>
+    jwt.sign(
+      { act: { sub: 'user_agent_fleet' }, run_id: 'test-run' },
+      process.env.AGENT_MCP_TOKEN_SECRET as string,
+      {
+        issuer: 'gp-broker',
+        audience: 'gp-api',
+        subject: clerkUserId,
+        expiresIn: 120,
+      },
+    )
+
+  it('happy path: agent token accepted on /v1/mcp and tools/call succeeds', async () => {
+    const org = await service.prisma.organization.create({
+      data: { slug: 'agent-test-org', ownerId: service.user.id },
+    })
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'agent-test-campaign',
+        details: {},
+        organizationSlug: org.slug,
+      },
+    })
+
+    const res = await service.client.post(
+      '/v1/mcp',
+      {
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: { name: 'GET_campaigns_mine', arguments: {} },
+      },
+      {
+        headers: {
+          Accept: MCP_ACCEPT,
+          'x-organization-slug': org.slug,
+          Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+        },
+      },
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.data.result.isError).toBe(false)
+
+    const toolResult = JSON.parse(res.data.result.content[0].text)
+    expect(toolResult).toMatchObject({ slug: 'agent-test-campaign' })
+  })
+
+  it('rejected directly on a non-MCP route', async () => {
+    const org = await service.prisma.organization.create({
+      data: { slug: 'agent-nonmcp-org', ownerId: service.user.id },
+    })
+
+    const res = await service.client.get('/v1/campaigns/mine', {
+      headers: {
+        'x-organization-slug': org.slug,
+        Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+      },
+      validateStatus: () => true,
+    })
+
+    expect(res.status).toBe(401)
+  })
+
+  it('forged x-mcp-internal-marker is rejected on non-MCP route', async () => {
+    const org = await service.prisma.organization.create({
+      data: { slug: 'agent-forged-org', ownerId: service.user.id },
+    })
+
+    const res = await service.client.get('/v1/campaigns/mine', {
+      headers: {
+        'x-organization-slug': org.slug,
+        Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+        'x-mcp-internal-marker': 'guessed',
+      },
+      validateStatus: () => true,
+    })
+
+    expect(res.status).toBe(401)
+  })
+
+  it('bad-signature agent token rejected on /v1/mcp', async () => {
+    const badToken = jwt.sign({}, 'wrong-secret', {
+      issuer: 'gp-broker',
+      audience: 'gp-api',
+      subject: service.user.clerkId,
+      expiresIn: 120,
+    })
+
+    const res = await service.client.post(
+      '/v1/mcp',
+      {
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/list',
+        params: {},
+      },
+      {
+        headers: {
+          Accept: MCP_ACCEPT,
+          Authorization: `Bearer ${badToken}`,
+        },
+        validateStatus: () => true,
+      },
+    )
+
+    expect(res.status).toBe(401)
   })
 })
