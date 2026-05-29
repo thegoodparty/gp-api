@@ -54,6 +54,7 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   result.district = org.district
     ? {
         id: org.district.id,
+        state: org.district.state,
         l2Type: org.district.l2Type,
         l2Name: org.district.l2Name,
       }
