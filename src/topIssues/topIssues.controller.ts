@@ -12,9 +12,11 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
+import { UserRole } from '@prisma/client'
 import { TopIssuesService } from './topIssues.service'
 import { CreateTopIssueDto } from './schemas/topIssues.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { Roles } from '@/authentication/decorators/Roles.decorator'
 
 @Controller('top-issues')
 @UsePipes(ZodValidationPipe)
@@ -27,11 +29,13 @@ export class TopIssuesController {
   }
 
   @Post()
+  @Roles(UserRole.admin)
   async createTopIssue(@Body() body: CreateTopIssueDto) {
     return await this.topIssuesService.create(body)
   }
 
   @Put(':id')
+  @Roles(UserRole.admin)
   async updateTopIssue(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CreateTopIssueDto,
@@ -40,6 +44,7 @@ export class TopIssuesController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteTopIssue(@Param('id', ParseIntPipe) id: number) {
     await this.topIssuesService.delete(id)
