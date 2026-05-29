@@ -32,6 +32,20 @@ describe('CronLockService.tryClaimDailyRun', () => {
     ).toBe(false)
   })
 
+  it('denies a second instance firing ~1s later the same day (two-replica race)', async () => {
+    const lock = service.app.get(CronLockService)
+
+    // The two ECS replicas fire their @Cron a fraction of a second apart. The
+    // lock keys on the date only, so both resolve to the same runDate and only
+    // the first wins — sub-second clock differences must not let both through.
+    expect(
+      await lock.tryClaimDailyRun(JOB, new Date('2026-05-29T07:00:00.123Z')),
+    ).toBe(true)
+    expect(
+      await lock.tryClaimDailyRun(JOB, new Date('2026-05-29T07:00:01.456Z')),
+    ).toBe(false)
+  })
+
   it('grants the claim again on a different UTC day', async () => {
     const lock = service.app.get(CronLockService)
 

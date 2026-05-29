@@ -35,6 +35,11 @@ export class CronLockService extends createPrismaBase(MODELS.CronRun) {
     jobName: string,
     now: Date = new Date(),
   ): Promise<boolean> {
+    // The lock key is the UTC calendar date only: getMidnightForDate zeroes the
+    // time and run_date is a @db.Date column, so two replicas whose `now` differ
+    // by a fraction of a second still collapse to the same runDate and collide
+    // on the unique (jobName, runDate) constraint. `now` keeps its time because
+    // createdAt (below) uses it as the claim timestamp for staleness/takeover.
     const runDate = getMidnightForDate(now)
 
     try {
