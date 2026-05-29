@@ -1,6 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { verifyToken, ClerkClient } from '@clerk/backend'
 import { PinoLogger } from 'nestjs-pino'
+import jwt from 'jsonwebtoken'
 import {
   AuthProvider,
   VerifiedM2MToken,
@@ -9,8 +10,12 @@ import {
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { M2M_TOKEN_PREFIX } from '@/vendors/clerk/clerk.consts'
 
-const { CLERK_SECRET_KEY, GP_WEBAPP_MACHINE_SECRET, CLERK_AUTHORIZED_PARTIES } =
-  process.env
+const {
+  CLERK_SECRET_KEY,
+  GP_WEBAPP_MACHINE_SECRET,
+  CLERK_AUTHORIZED_PARTIES,
+  AGENT_MCP_TOKEN_SECRET,
+} = process.env
 
 if (!CLERK_SECRET_KEY) {
   throw new Error('CLERK_SECRET_KEY is required for application startup')
@@ -20,6 +25,10 @@ if (!GP_WEBAPP_MACHINE_SECRET) {
   throw new Error(
     'GP_WEBAPP_MACHINE_SECRET must be set in the environment variables',
   )
+}
+
+if (!AGENT_MCP_TOKEN_SECRET && process.env.NODE_ENV !== 'test') {
+  throw new Error('AGENT_MCP_TOKEN_SECRET must be set in the environment')
 }
 
 const authorizedParties = CLERK_AUTHORIZED_PARTIES
@@ -48,6 +57,39 @@ export class ClerkAuthService implements AuthProvider {
   }
 
   async verifySessionToken(token: string): Promise<VerifiedSession> {
+    // Broker-issued agent tokens are HS256 with iss=gp-broker. Detect by the
+    // unverified iss claim, then verify with the shared secret. Clerk tokens
+    // carry iss = the Clerk Frontend API URL and fall through to verifyToken.
+    const unverified = jwt.decode(token)
+    if (
+      typeof unverified === 'object' &&
+      unverified !== null &&
+      unverified.iss === 'gp-broker'
+    ) {
+      let payload: jwt.JwtPayload
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        payload = jwt.verify(token, AGENT_MCP_TOKEN_SECRET as string, {
+          issuer: 'gp-broker',
+          audience: 'gp-api',
+        }) as jwt.JwtPayload
+      } catch {
+        throw new UnauthorizedException('Agent token verification failed')
+      }
+      if (!payload.sub) {
+        throw new UnauthorizedException('Agent token missing sub claim')
+      }
+      return {
+        externalUserId: payload.sub,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        actor: isActorClaim(payload.act as Record<string, unknown> | undefined)
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (payload.act as { sub: string })
+          : undefined,
+        isAgentToken: true,
+      }
+    }
+
     const payload = await verifyToken(token, {
       secretKey: CLERK_SECRET_KEY,
       authorizedParties,
