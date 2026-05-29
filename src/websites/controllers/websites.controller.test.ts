@@ -32,6 +32,7 @@ import { UseCampaignGuard } from 'src/campaigns/guards/UseCampaign.guard'
 import { REQUIRE_CAMPAIGN_META_KEY } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { MCP_TOOL_KEY } from '@/mcp/decorators/McpTool.decorator'
 import { McpServerService } from '@/mcp/services/mcpServer.service'
+import { AgentMcpMarker } from '@/authentication/agentMcpMarker'
 import { MyWebsiteResponseSchema } from '../schemas/WebsiteResponse.schema'
 import { VerifyLiveResponseSchema } from '../schemas/VerifyLive.schema'
 
@@ -813,6 +814,7 @@ describe('WebsitesController MCP discoverability', () => {
     controllers: [WebsitesController],
     providers: [
       McpServerService,
+      AgentMcpMarker,
       { provide: PrismaService, useValue: {} },
       { provide: WebsitesService, useValue: {} },
       { provide: WebsiteContactsService, useValue: {} },
