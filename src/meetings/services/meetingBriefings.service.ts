@@ -241,6 +241,10 @@ export class MeetingBriefingsService extends createPrismaBase(
         )
       }
     }
+
+    // Mark the claim complete so a crashed-run takeover (see CronLockService)
+    // is only triggered when the loop did not finish.
+    await this.cronLock.markCompleted(DAILY_BRIEFINGS_CRON_JOB)
   }
 
   private async dispatchBriefingIfNeeded(

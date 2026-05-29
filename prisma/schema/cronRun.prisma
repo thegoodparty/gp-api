@@ -10,6 +10,12 @@ model CronRun {
   jobName String   @map("job_name")
   runDate DateTime @map("run_date") @db.Date
 
+  // When the winning replica finished the job. A row that stays null past the
+  // staleness window means the claimer crashed mid-run, so another replica may
+  // take the claim over and retry.
+  completedAt DateTime? @map("completed_at")
+
+  // Doubles as the claim timestamp: refreshed when a stale claim is taken over.
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([jobName, runDate])
