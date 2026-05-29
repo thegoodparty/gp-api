@@ -33,6 +33,10 @@ import {
 import { deriveToolName } from '../util/toolName.util'
 import { RegisteredMcpTool } from '../mcp.types'
 import { buildCombinedInputSchema } from '../util/inputSchema.util'
+import {
+  AgentMcpMarker,
+  MCP_INTERNAL_MARKER_HEADER,
+} from '@/authentication/agentMcpMarker'
 
 type FastifyInjectResponse = {
   statusCode: number
@@ -84,6 +88,7 @@ const DROPPED_REQUEST_HEADERS = new Set([
   'expect',
   'te',
   'upgrade',
+  MCP_INTERNAL_MARKER_HEADER,
 ])
 
 @Injectable()
@@ -95,6 +100,7 @@ export class McpServerService {
     private readonly httpAdapterHost: HttpAdapterHost,
     private readonly applicationConfig: ApplicationConfig,
     private readonly logger: PinoLogger,
+    private readonly agentMcpMarker: AgentMcpMarker,
   ) {
     this.logger.setContext(McpServerService.name)
   }
@@ -171,6 +177,10 @@ export class McpServerService {
           if (k.toLowerCase() === 'content-type') delete forwardHeaders[k]
         }
       }
+
+      // Mark this as an internal MCP sub-request so SessionGuard accepts an agent
+      // token here while still rejecting it on any directly-hit route.
+      forwardHeaders[MCP_INTERNAL_MARKER_HEADER] = this.agentMcpMarker.token
 
       const response = await fastify.inject({
         method: tool.method,
