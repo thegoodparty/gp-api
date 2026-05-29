@@ -33,7 +33,9 @@ declare global {
         | 'considering'
         | 'testing'
       pledged?: boolean
-      isProUpdatedAt?: number // TODO: make this an ISO dateTime string
+      // ISO string for new writes; legacy unix-ms numbers persist in
+      // existing rows until backfilled
+      isProUpdatedAt?: string | number
       proUpgradeSlackNotifiedAt?: number
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
@@ -135,6 +137,35 @@ declare global {
       electionDate: string
     }
 
+    export type LocalMediaOutlet = {
+      name: string
+      type: 'TV' | 'print' | 'radio'
+      description: string
+      email?: string | null
+      phone?: string | null
+      address?: string | null
+    }
+
+    // Cache key is the full (state, city, office) jurisdiction that was fed
+    // to the AI prompt, not just office. Without all three fields, a cache
+    // entry for "City Council" in Denver would silently satisfy a fetch for
+    // "City Council" in Boulder.
+    export type LocalMediaOutletsCache =
+      | {
+          office: string
+          city: string | null
+          state: string
+          status: 'pending'
+          startedAt: number
+        }
+      | {
+          office: string
+          city: string | null
+          state: string
+          status: 'ready'
+          outlets: LocalMediaOutlet[]
+        }
+
     export type OnboardingAnswers = {
       officePath?: OnboardingOfficePath
       manualOffice?: boolean
@@ -144,6 +175,7 @@ declare global {
       officeZip?: string
       structuredOffice?: OnboardingSelectedOffice
       manualOfficeForm?: OnboardingManualOfficeForm
+      localMediaOutlets?: LocalMediaOutletsCache
     }
 
     export type CampaignAiContent = {

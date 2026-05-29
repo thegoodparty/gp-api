@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common'
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { User, UserRole } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -94,6 +94,7 @@ describe('SessionGuard — impersonating flag', () => {
       clerkEnricher as never,
       createMockLogger(),
       new Reflector(),
+      { token: 'test-token', matches: vi.fn().mockReturnValue(false) } as never,
     )
   })
 
@@ -179,5 +180,72 @@ describe('SessionGuard — impersonating flag', () => {
     expect(req.user?.impersonating).toBe(false)
     expect(req.actorUser).toBeUndefined()
     expect(req.actorSub).toBe('user_nonexistent_789')
+  })
+
+  describe('agent token gating (agentTokenAllowedHere)', () => {
+    const MARKER = 'marker-xyz'
+
+    const buildContextForClass = (
+      req: IncomingRequest,
+      handlerClass: { name: string },
+    ) =>
+      ({
+        switchToHttp: () => ({
+          getRequest: () => req,
+        }),
+        getHandler: () => ({}),
+        getClass: () => handlerClass,
+      }) as unknown as ExecutionContext
+
+    beforeEach(() => {
+      vi.mocked(authProvider.verifySessionToken).mockResolvedValue({
+        externalUserId: baseUser.clerkId!,
+        isAgentToken: true,
+      })
+      usersService.model.findUnique.mockResolvedValue(baseUser)
+
+      guard = new SessionGuard(
+        authProvider,
+        usersService as never,
+        sessions as never,
+        clerkEnricher as never,
+        createMockLogger(),
+        new Reflector(),
+        {
+          token: MARKER,
+          matches: (v: string | string[] | undefined) => v === MARKER,
+        } as never,
+      )
+    })
+
+    it('allows an agent token when the handler is McpController', async () => {
+      class McpController {}
+      const req = buildRequest('agent-tok')
+      const ctx = buildContextForClass(req, McpController)
+
+      await expect(guard.canActivate(ctx)).resolves.toBe(true)
+      expect(req.agentToken).toBe(true)
+    })
+
+    it('allows an agent token on a non-McpController route with a valid marker', async () => {
+      class CampaignsController {}
+      const req = buildRequest('agent-tok')
+      req.headers['x-mcp-internal-marker'] = MARKER
+      const ctx = buildContextForClass(req, CampaignsController)
+
+      await expect(guard.canActivate(ctx)).resolves.toBe(true)
+      expect(req.agentToken).toBe(true)
+    })
+
+    it('rejects an agent token on a non-McpController route without a valid marker', async () => {
+      class CampaignsController {}
+      const req = buildRequest('agent-tok')
+      req.headers['x-mcp-internal-marker'] = 'wrong-marker'
+      const ctx = buildContextForClass(req, CampaignsController)
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow(
+        UnauthorizedException,
+      )
+    })
   })
 })

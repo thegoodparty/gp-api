@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { gql, GraphQLClient } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
@@ -481,16 +482,9 @@ export class BallotReadyService {
 }
 
 function getMonthBounds(dateString: string): { gt: string; lt: string } {
-  console.log('dateString', dateString)
-  // Parse the date parts directly from the string to avoid timezone issues
-  const [year, month] = dateString.split('-').map(Number)
-
-  const gt = new Date(year, month - 1, 1) // month - 1 because months are 0-based
-    .toISOString()
-    .split('T')[0]
-  const lt = new Date(year, month, 0) // Last day of the month
-    .toISOString()
-    .split('T')[0]
-
-  return { gt, lt }
+  const reference = parseISO(dateString)
+  return {
+    gt: format(startOfMonth(reference), 'yyyy-MM-dd'),
+    lt: format(endOfMonth(reference), 'yyyy-MM-dd'),
+  }
 }

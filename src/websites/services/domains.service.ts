@@ -30,7 +30,10 @@ import {
   VercelDnsRecordType,
   VercelService,
 } from 'src/vendors/vercel/services/vercel.service'
-import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
+import {
+  DOMAIN_REGISTRANT_CONTACT_EMAIL,
+  GP_DOMAIN_CONTACT,
+} from 'src/vendors/vercel/vercel.const'
 import Stripe from 'stripe'
 import { QueueProducerService } from '../../queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
@@ -376,7 +379,9 @@ export class DomainsService
     return {
       firstName: user.firstName || GP_DOMAIN_CONTACT.firstName,
       lastName: user.lastName || GP_DOMAIN_CONTACT.lastName,
-      email: user.email || GP_DOMAIN_CONTACT.email,
+      // ICANN verification email must land in a GoodParty-controlled inbox the
+      // compliance_setup agent reads, never the candidate's own email.
+      email: DOMAIN_REGISTRANT_CONTACT_EMAIL,
       phoneNumber: user.phone || GP_DOMAIN_CONTACT.phoneNumber,
       addressLine1:
         addressPlace?.formatted_address || GP_DOMAIN_CONTACT.addressLine1,
@@ -1188,10 +1193,43 @@ export class DomainsService
     }
   }
 
+  async submitRegistrantVerificationForCampaign(
+    campaignId: number,
+    domainName: string,
+    verificationUrl: string,
+  ) {
+    const website = await this.client.website.findUnique({
+      where: { campaignId },
+      include: { domain: true },
+    })
+    if (!website?.domain) {
+      throw new NotFoundException('No domain found for this campaign')
+    }
+    if (website.domain.name.toLowerCase() !== domainName.toLowerCase()) {
+      throw new ForbiddenException(
+        'Domain does not belong to the calling campaign',
+      )
+    }
+
+    return this.submitRegistrantVerification(
+      website.domain.name,
+      verificationUrl,
+    )
+  }
+
   async submitRegistrantVerification(
     domainName: string,
     verificationUrl: string,
   ) {
+    // Reject non-Vercel links at the boundary with a 4xx. VercelService rejects
+    // them too (defense in depth), but that path surfaces as a 502; the agent
+    // needs a client error so it doesn't retry a bad link from the inbox.
+    if (!this.vercel.isAllowedVercelUrl(verificationUrl)) {
+      throw new BadRequestException(
+        'verificationUrl must be an https vercel.com or *.vercel.com link',
+      )
+    }
+
     const normalized = domainName.toLowerCase()
     const domain = await this.model.findUnique({
       where: { name: normalized },
@@ -1210,29 +1248,17 @@ export class DomainsService
       }
     }
 
+    // submitDomainRegistrantVerification GETs the (host-validated, safe-redirect)
+    // verify link and throws on a non-2xx; a successful return is the registrar
+    // accepting the ICANN contact verification. Vercel exposes no queryable
+    // registrant-verification state to confirm against — getDomain's `verified`
+    // is DNS/project-ownership, a different fact — so the successful GET is the
+    // evidence we stamp on.
     try {
       await this.vercel.submitDomainRegistrantVerification(verificationUrl)
     } catch {
       throw new BadGatewayException(
         `Failed to submit registrant verification for ${normalized}`,
-      )
-    }
-
-    let confirmedVerified: boolean
-    try {
-      const detail = await this.vercel.getDomainDetails(domain.name)
-      confirmedVerified = detail.domain.verified === true
-    } catch (error) {
-      throw new BadGatewayException(
-        `Submitted verification URL for ${domain.name} but failed to confirm Vercel domain state: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      )
-    }
-
-    if (!confirmedVerified) {
-      throw new BadGatewayException(
-        `Submitted verification URL for ${domain.name} but Vercel still reports the domain as unverified; retry expected via webhook redelivery.`,
       )
     }
 

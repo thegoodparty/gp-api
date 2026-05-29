@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { IS_PROD_DEPLOY } from 'src/shared/util/appEnvironment.util'
 
 const WINNERS_ELECTION_YEAR = process.env.WINNERS_ELECTION_YEAR
 
@@ -90,8 +90,7 @@ export function buildMapFilters(
     },
   })
 
-  // TODO(ENG-10165): IS_PROD is true in every deploy (so this filter applies on dev/qa/preview too). Should be `process.env.OTEL_SERVICE_ENVIRONMENT === 'prod'`. See appEnvironment.util.ts.
-  if (IS_PROD) {
+  if (IS_PROD_DEPLOY) {
     const isProdCondition = createJsonOrConditionString('Yes', [
       'hubSpotUpdates',
       'verified_candidates',

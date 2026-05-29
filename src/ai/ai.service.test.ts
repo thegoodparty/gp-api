@@ -350,6 +350,32 @@ describe('AiService', () => {
       expect(result.content).toBe('a<br/><br/>b')
     })
 
+    it('does NOT replace newlines in tool_call arguments (would corrupt JSON)', async () => {
+      const prettyJson = '{\n  "city": "NYC"\n}'
+      mockOpenAiCreate.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                {
+                  function: { name: 'extractLocation', arguments: prettyJson },
+                },
+              ],
+            },
+          },
+        ],
+        usage: { total_tokens: 5 },
+      })
+
+      const result = await service.getChatToolCompletion({
+        messages: [userMessage('test')],
+      })
+
+      expect(result.content).toBe(prettyJson)
+      expect(() => JSON.parse(result.content)).not.toThrow()
+    })
+
     it('parses <function=...> fallback format from content', async () => {
       mockOpenAiCreate.mockResolvedValueOnce({
         choices: [
@@ -369,6 +395,29 @@ describe('AiService', () => {
       expect(result.content).toContain('city')
       expect(result.content).toContain('LA')
       expect(result.tokens).toBe(7)
+    })
+
+    it('preserves newlines and produces valid JSON in <function=...> fallback', async () => {
+      // Pretty-printed JSON inside the fallback envelope must survive — the
+      // `\n -> <br/><br/>` transform would corrupt it.
+      const prettyJson = '{\n  "city": "LA"\n}'
+      mockOpenAiCreate.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: `<function=extractLocation>${prettyJson}</function>`,
+            },
+          },
+        ],
+        usage: { total_tokens: 9 },
+      })
+
+      const result = await service.getChatToolCompletion({
+        messages: [userMessage('test')],
+      })
+
+      expect(result.content).toBe(prettyJson)
+      expect(() => JSON.parse(result.content)).not.toThrow()
     })
 
     it('tries next model on error and sends Slack notification', async () => {

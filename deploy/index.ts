@@ -4,6 +4,7 @@ import { createAnnotationAttachmentsBucket } from './components/annotation-attac
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createGrafanaResources } from './components/grafana'
+import { createMeetingPipelineBucket } from './components/meeting-pipeline-bucket'
 import { createService } from './components/service'
 import { createVpc } from './components/vpc'
 
@@ -128,6 +129,16 @@ export = async () => {
     environment === 'preview'
       ? 'annotation-attachments-dev'
       : createAnnotationAttachmentsBucket({ environment }).bucket.bucket
+
+  // Shared bucket between the external meeting_pipeline (writes briefings)
+  // and gp-api TextToSpeechService (caches Polly audio under speech/synth/,
+  // then hands the browser presigned GETs). Dev bucket exists out-of-band
+  // and is not Pulumi-owned, so preview/dev just reference its name. QA and
+  // prod buckets are created here.
+  const meetingPipelineBucketName =
+    environment === 'preview' || environment === 'dev'
+      ? 'meeting-pipeline-dev'
+      : createMeetingPipelineBucket({ environment }).bucket.bucket
 
   // Assets bucket - used for storing uploaded files, images, etc.
   if (environment !== 'preview') {
@@ -399,7 +410,7 @@ export = async () => {
         prod: 'true',
       }),
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment === 'preview' ? 'dev' : environment}`,
-      MEETING_PIPELINE_BUCKET: 'meeting-pipeline-dev',
+      MEETING_PIPELINE_BUCKET: meetingPipelineBucketName,
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ANNOTATION_ATTACHMENTS_BUCKET: annotationAttachmentsBucketName,

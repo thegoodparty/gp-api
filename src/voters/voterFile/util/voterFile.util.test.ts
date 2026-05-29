@@ -19,6 +19,7 @@ const statewideCampaign = (state: string | null | undefined) =>
 
 const statewideDistrict = {
   id: 'dist-1',
+  state: 'CO',
   l2Type: 'State',
   l2Name: 'CO',
 }

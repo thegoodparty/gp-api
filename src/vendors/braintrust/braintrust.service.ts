@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import * as braintrust from 'braintrust'
-import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
+import { OTEL_SERVICE_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { PinoLogger } from 'nestjs-pino'
 
 export const VALID_CHAT_ROLES = ['system', 'user', 'assistant'] as const
@@ -180,8 +180,10 @@ export class BraintrustService {
       span.log({
         input: options?.input,
         output,
-        // TODO(ENG-10165): CURRENT_ENVIRONMENT is 'production' in every deploy; for accurate Braintrust env tagging use `process.env.OTEL_SERVICE_ENVIRONMENT`. See appEnvironment.util.ts.
-        metadata: { environment: CURRENT_ENVIRONMENT, ...options?.metadata },
+        metadata: {
+          environment: OTEL_SERVICE_ENVIRONMENT,
+          ...options?.metadata,
+        },
       })
     } catch (err) {
       this.logger.warn(
