@@ -34,5 +34,5 @@ export interface UpdateCampaignFieldsInput {
   placeId?: string | null
   canDownloadFederal?: boolean
   overrideDistrictId?: string | null
-  primaryResult?: 'won' | 'lost'
+  primaryResult?: 'won' | 'lost' | null
 }

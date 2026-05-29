@@ -72,7 +72,7 @@ export const updateCampaignBodySchema = CampaignSchema.pick({
   .partial()
   .extend({
     details: CampaignDetailsSchema.optional(),
-    primaryResult: z.enum(['won', 'lost']).optional(),
+    primaryResult: z.enum(['won', 'lost']).nullish(),
   })
   .strict()
 

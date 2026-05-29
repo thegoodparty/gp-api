@@ -38,6 +38,12 @@ describe('updateCampaignBodySchema', () => {
     },
   )
 
+  it('accepts null primaryResult so a recorded result can be cleared', () => {
+    const result = updateCampaignBodySchema.parse({ primaryResult: null })
+
+    expect(result.primaryResult).toBeNull()
+  })
+
   it('rejects an invalid primaryResult value', () => {
     expect(() =>
       updateCampaignBodySchema.parse({ primaryResult: 'maybe' }),
