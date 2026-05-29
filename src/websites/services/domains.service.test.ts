@@ -1219,13 +1219,10 @@ describe('DomainsService', () => {
     const verifyUrl =
       'https://vercel.com/verify-domain?token=abc&domain=foo.com'
 
-    it('submits to Vercel, confirms via getDomainDetails, and stamps registrantVerifiedAt', async () => {
+    it('stamps registrantVerifiedAt after a successful submit without re-fetching domain state', async () => {
       const unverified = { ...mockDomain, name: 'foo.com' }
       const verifiedAt = new Date('2026-05-13T10:00:00.000Z')
       mockPrisma.domain.findUnique.mockResolvedValue(unverified)
-      mockVercel.getDomainDetails.mockResolvedValue({
-        domain: { verified: true, name: 'foo.com' },
-      })
       mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
         ...unverified,
         registrantVerifiedAt: verifiedAt,
@@ -1242,7 +1239,9 @@ describe('DomainsService', () => {
       expect(
         mockVercel.submitDomainRegistrantVerification,
       ).toHaveBeenCalledWith(verifyUrl)
-      expect(mockVercel.getDomainDetails).toHaveBeenCalledWith('foo.com')
+      // getDomain's `verified` is DNS-ownership, not ICANN registrant state, so
+      // it is not consulted to confirm the registrant verification.
+      expect(mockVercel.getDomainDetails).not.toHaveBeenCalled()
       expect(mockPrisma.domain.updateMany).toHaveBeenCalledWith({
         where: { id: unverified.id, registrantVerifiedAt: null },
         data: { registrantVerifiedAt: expect.any(Date) },
@@ -1252,36 +1251,6 @@ describe('DomainsService', () => {
         alreadyVerified: false,
         registrantVerifiedAt: verifiedAt,
       })
-    })
-
-    it('does NOT stamp when Vercel still reports the domain as unverified after submit', async () => {
-      const unverified = { ...mockDomain, name: 'foo.com' }
-      mockPrisma.domain.findUnique.mockResolvedValue(unverified)
-      mockVercel.getDomainDetails.mockResolvedValue({
-        domain: { verified: false, name: 'foo.com' },
-      })
-
-      await expect(
-        service.submitRegistrantVerification('foo.com', verifyUrl),
-      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
-
-      expect(mockVercel.submitDomainRegistrantVerification).toHaveBeenCalled()
-      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
-    })
-
-    it('wraps getDomainDetails failures as BadGatewayException without stamping', async () => {
-      mockPrisma.domain.findUnique.mockResolvedValue({
-        ...mockDomain,
-        name: 'foo.com',
-      })
-      mockVercel.getDomainDetails.mockRejectedValueOnce(
-        new Error('vercel API timed out'),
-      )
-
-      await expect(
-        service.submitRegistrantVerification('foo.com', verifyUrl),
-      ).rejects.toMatchObject({ status: HttpStatus.BAD_GATEWAY })
-      expect(mockPrisma.domain.updateMany).not.toHaveBeenCalled()
     })
 
     it('is idempotent — already-verified domains are not re-submitted', async () => {

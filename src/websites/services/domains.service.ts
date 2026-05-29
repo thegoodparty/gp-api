@@ -1248,29 +1248,17 @@ export class DomainsService
       }
     }
 
+    // submitDomainRegistrantVerification GETs the (host-validated, safe-redirect)
+    // verify link and throws on a non-2xx; a successful return is the registrar
+    // accepting the ICANN contact verification. Vercel exposes no queryable
+    // registrant-verification state to confirm against — getDomain's `verified`
+    // is DNS/project-ownership, a different fact — so the successful GET is the
+    // evidence we stamp on.
     try {
       await this.vercel.submitDomainRegistrantVerification(verificationUrl)
     } catch {
       throw new BadGatewayException(
         `Failed to submit registrant verification for ${normalized}`,
-      )
-    }
-
-    let confirmedVerified: boolean
-    try {
-      const detail = await this.vercel.getDomainDetails(domain.name)
-      confirmedVerified = detail.domain.verified === true
-    } catch (error) {
-      throw new BadGatewayException(
-        `Submitted verification URL for ${domain.name} but failed to confirm Vercel domain state: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      )
-    }
-
-    if (!confirmedVerified) {
-      throw new BadGatewayException(
-        `Submitted verification URL for ${domain.name} but Vercel still reports the domain as unverified; resubmit once a fresh verification link is available.`,
       )
     }
 
