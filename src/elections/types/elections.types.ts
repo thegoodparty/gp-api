@@ -138,6 +138,7 @@ export type BuildRaceTargetDetailsInput = (DistrictInfo | DistrictIdInfo) &
 
 export type District = {
   id: string
+  state: string
   L2DistrictType: string
   L2DistrictName: string
   projectedTurnout: SourceProjectedTurnout | null

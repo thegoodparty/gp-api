@@ -136,6 +136,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-1',
+          state: 'CA',
           l2Type: 'US House',
           l2Name: 'CA-12',
         }),
@@ -150,6 +151,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-2',
+          state: 'CA',
           l2Type: 'State Senate',
           l2Name: 'CA-15',
         }),
@@ -164,6 +166,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-1',
+          state: 'CA',
           l2Type: 'US House',
           l2Name: '',
         }),
@@ -220,6 +223,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-1',
+          state: 'CA',
           l2Type: 'US House',
           l2Name: 'CA-12',
         }),
@@ -269,6 +273,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-3',
+          state: 'CA',
           l2Type: 'City Council',
           l2Name: 'District 1',
         }),
@@ -291,6 +296,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       expect(
         service.canDownload(campaign, {
           id: 'dist-1',
+          state: 'CA',
           l2Type: 'US House',
           l2Name: 'CA-12',
         }),
