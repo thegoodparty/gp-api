@@ -19,6 +19,8 @@ import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { getUserFullName } from '@/users/util/users.util'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
 
 const parseBriefingArtifact = (
   raw: string,
@@ -54,6 +56,11 @@ type DispatchContext = {
   positionName: string
   l2DistrictType?: string
   l2DistrictName?: string
+}
+
+const CRON_CONFIG = {
+  batchSize: 100,
+  every: '20m' as const,
 }
 
 @Injectable()
@@ -203,13 +210,18 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     const now = new Date()
 
-    for (const eo of offices) {
-      await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
-        this.logger.error(
-          { err, electedOfficeId: eo.id },
-          'dispatchBriefingIfNeeded failed, continuing',
-        ),
-      )
+    const chunks = chunk(offices, CRON_CONFIG.batchSize)
+
+    for (const batch of chunks) {
+      for (const eo of batch) {
+        await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
+          this.logger.error(
+            { err, electedOfficeId: eo.id },
+            'dispatchBriefingIfNeeded failed, continuing',
+          ),
+        )
+      }
+      await new Promise((resolve) => setTimeout(resolve, ms(CRON_CONFIG.every)))
     }
   }
 
