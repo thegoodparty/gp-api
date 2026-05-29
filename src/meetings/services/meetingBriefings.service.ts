@@ -212,7 +212,7 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     const chunks = chunk(offices, CRON_CONFIG.batchSize)
 
-    for (const batch of chunks) {
+    for (const [i, batch] of chunks.entries()) {
       for (const eo of batch) {
         await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
           this.logger.error(
@@ -221,7 +221,11 @@ export class MeetingBriefingsService extends createPrismaBase(
           ),
         )
       }
-      await new Promise((resolve) => setTimeout(resolve, ms(CRON_CONFIG.every)))
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, ms(CRON_CONFIG.every)),
+        )
+      }
     }
   }
 
