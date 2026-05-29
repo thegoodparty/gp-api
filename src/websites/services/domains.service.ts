@@ -31,7 +31,7 @@ import {
   VercelService,
 } from 'src/vendors/vercel/services/vercel.service'
 import {
-  DOMAIN_REGISTRANT_CONTACT_EMAIL,
+  DOMAIN_REGISTRANT_CONTACT,
   GP_DOMAIN_CONTACT,
 } from 'src/vendors/vercel/vercel.const'
 import Stripe from 'stripe'
@@ -280,7 +280,6 @@ export class DomainsService
     const website = await this.client.website.findUniqueOrThrow({
       where: { id: validWebsiteId },
       select: {
-        content: true,
         domain: true,
       },
     })
@@ -319,7 +318,7 @@ export class DomainsService
       })
     }
 
-    const contactInfo = this.buildContactInfo(user, website.content)
+    const contactInfo = this.buildContactInfo()
 
     try {
       const registrationResult = await this.completeDomainRegistration(
@@ -371,32 +370,22 @@ export class DomainsService
     return websiteId
   }
 
-  private buildContactInfo(
-    user: User,
-    websiteContent: PrismaJson.WebsiteContent | null,
-  ): RegisterDomainSchema {
-    const addressPlace = websiteContent?.contact?.addressPlace
+  private buildContactInfo(): RegisterDomainSchema {
+    // Constant GoodParty registrant contact. The (firstName, lastName, email)
+    // tuple must be byte-identical across every domain so ICANN reuses the
+    // already-verified tuple and skips the verification email — so this is NOT
+    // derived from the candidate. Phone/address are GoodParty's; they don't
+    // affect the ICANN email-verification key but keep WHOIS coherent and free
+    // of candidate PII.
     return {
-      firstName: user.firstName || GP_DOMAIN_CONTACT.firstName,
-      lastName: user.lastName || GP_DOMAIN_CONTACT.lastName,
-      // ICANN verification email must land in a GoodParty-controlled inbox the
-      // compliance_setup agent reads, never the candidate's own email.
-      email: DOMAIN_REGISTRANT_CONTACT_EMAIL,
-      phoneNumber: user.phone || GP_DOMAIN_CONTACT.phoneNumber,
-      addressLine1:
-        addressPlace?.formatted_address || GP_DOMAIN_CONTACT.addressLine1,
-      city:
-        addressPlace?.address_components?.find((c) =>
-          c.types.includes('locality'),
-        )?.long_name || GP_DOMAIN_CONTACT.city,
-      state:
-        addressPlace?.address_components?.find((c) =>
-          c.types.includes('administrative_area_level_1'),
-        )?.short_name || GP_DOMAIN_CONTACT.state,
-      zipCode:
-        addressPlace?.address_components?.find((c) =>
-          c.types.includes('postal_code'),
-        )?.long_name || GP_DOMAIN_CONTACT.zipCode,
+      firstName: DOMAIN_REGISTRANT_CONTACT.firstName,
+      lastName: DOMAIN_REGISTRANT_CONTACT.lastName,
+      email: DOMAIN_REGISTRANT_CONTACT.email,
+      phoneNumber: GP_DOMAIN_CONTACT.phoneNumber,
+      addressLine1: GP_DOMAIN_CONTACT.addressLine1,
+      city: GP_DOMAIN_CONTACT.city,
+      state: GP_DOMAIN_CONTACT.state,
+      zipCode: GP_DOMAIN_CONTACT.zipCode,
     }
   }
 
@@ -741,21 +730,18 @@ export class DomainsService
     // safety bound). Browser purchases flow through handleDomainPostPurchase,
     // which sets paymentId so completeDomainRegistration's default guard fires.
     try {
-      const website = await this.client.website.findUniqueOrThrow({
-        where: { id: websiteSummary.id },
-        select: { content: true },
-      })
-      const contactInfo = this.buildContactInfo(campaign.user, website.content)
-      await this.completeDomainRegistration(websiteSummary.id, contactInfo, {
-        skipPaymentVerification: true,
-      })
+      await this.completeDomainRegistration(
+        websiteSummary.id,
+        this.buildContactInfo(),
+        { skipPaymentVerification: true },
+      )
     } catch (error) {
       // Mark inactive so preflight on retry falls through to a fresh reservation
       // instead of returning alreadyExisted: true for a stuck pending row.
       // completeDomainRegistration's Vercel-failure path sets this itself, but
-      // other failure modes (the website lookup above, top-level
-      // findUniqueOrThrow, !domain.price, getDomainDetails rethrow, final
-      // status update) do not — this is the safety net for those.
+      // other failure modes (top-level findUniqueOrThrow, !domain.price,
+      // getDomainDetails rethrow, final status update) do not — this is the
+      // safety net for those.
       await this.model.update({
         where: { id: createdDomain.id },
         data: { status: DomainStatus.inactive },

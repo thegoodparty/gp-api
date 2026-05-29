@@ -919,7 +919,7 @@ describe('DomainsService', () => {
       expect(completeOrder).toBeGreaterThan(createOrder)
     })
 
-    it('registers sites@goodparty.org as the contact email, not the candidate email', async () => {
+    it('registers a constant GoodParty registrant contact (name + email), not candidate data, so the ICANN tuple is reused', async () => {
       mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
       mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
         content: { contact: {} },
@@ -954,8 +954,16 @@ describe('DomainsService', () => {
       )
 
       const [, contactArg] = completeSpy.mock.calls[0]
-      expect(contactArg.email).toBe('sites@goodparty.org')
+      expect(contactArg).toMatchObject({
+        firstName: 'Tomer',
+        lastName: 'Almog',
+        email: 'tomer@goodparty.org',
+      })
+      // Name AND email must be candidate-independent — ICANN keys verification
+      // on the (firstName, lastName, email) tuple, so a per-candidate name would
+      // re-trigger the verification email even with a constant email.
       expect(contactArg.email).not.toBe(mockUser.email)
+      expect(contactArg.firstName).not.toBe(mockUser.firstName)
     })
 
     it('throws ConflictException when looked-up price exceeds maxPrice; no Domain row created', async () => {
