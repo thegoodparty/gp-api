@@ -1130,6 +1130,13 @@ export class DomainsService
       data: {
         operationId: `vercel-${domain.name}-${Date.now()}`,
         status: DomainStatus.submitted,
+        // The registrant contact is a constant, already-ICANN-verified
+        // GoodParty identity (see DOMAIN_REGISTRANT_CONTACT), so the registrar
+        // reuses that verified tuple and the contact is confirmed at
+        // registration with no verification email. Record it now so the
+        // compliance stage machine (deriveComplianceStage) sees the domain as
+        // registrant-verified. `?? existing` keeps the first stamp on re-runs.
+        registrantVerifiedAt: domain.registrantVerifiedAt ?? new Date(),
         ...(forwardEmailDomain
           ? { emailForwardingDomainId: forwardEmailDomain.id }
           : {}),
@@ -1176,102 +1183,6 @@ export class DomainsService
       verified: verifyResult,
       status: 'configured',
       message: 'Domain configured successfully with Vercel',
-    }
-  }
-
-  async submitRegistrantVerificationForCampaign(
-    campaignId: number,
-    domainName: string,
-    verificationUrl: string,
-  ) {
-    const website = await this.client.website.findUnique({
-      where: { campaignId },
-      include: { domain: true },
-    })
-    if (!website?.domain) {
-      throw new NotFoundException('No domain found for this campaign')
-    }
-    if (website.domain.name.toLowerCase() !== domainName.toLowerCase()) {
-      throw new ForbiddenException(
-        'Domain does not belong to the calling campaign',
-      )
-    }
-
-    return this.submitRegistrantVerification(
-      website.domain.name,
-      verificationUrl,
-    )
-  }
-
-  async submitRegistrantVerification(
-    domainName: string,
-    verificationUrl: string,
-  ) {
-    // Reject non-Vercel links at the boundary with a 4xx. VercelService rejects
-    // them too (defense in depth), but that path surfaces as a 502; the agent
-    // needs a client error so it doesn't retry a bad link from the inbox.
-    if (!this.vercel.isAllowedVercelUrl(verificationUrl)) {
-      throw new BadRequestException(
-        'verificationUrl must be an https vercel.com or *.vercel.com link',
-      )
-    }
-
-    const normalized = domainName.toLowerCase()
-    const domain = await this.model.findUnique({
-      where: { name: normalized },
-    })
-    if (!domain) {
-      throw new NotFoundException(
-        `No managed domain found matching ${normalized}`,
-      )
-    }
-
-    if (domain.registrantVerifiedAt) {
-      return {
-        domain: domain.name,
-        alreadyVerified: true,
-        registrantVerifiedAt: domain.registrantVerifiedAt,
-      }
-    }
-
-    // submitDomainRegistrantVerification GETs the (host-validated, safe-redirect)
-    // verify link and throws on a non-2xx; a successful return is the registrar
-    // accepting the ICANN contact verification. Vercel exposes no queryable
-    // registrant-verification state to confirm against — getDomain's `verified`
-    // is DNS/project-ownership, a different fact — so the successful GET is the
-    // evidence we stamp on.
-    try {
-      await this.vercel.submitDomainRegistrantVerification(verificationUrl)
-    } catch {
-      throw new BadGatewayException(
-        `Failed to submit registrant verification for ${normalized}`,
-      )
-    }
-
-    const { count } = await this.model.updateMany({
-      where: { id: domain.id, registrantVerifiedAt: null },
-      data: { registrantVerifiedAt: new Date() },
-    })
-
-    if (count === 0) {
-      const current = await this.model.findUniqueOrThrow({
-        where: { id: domain.id },
-      })
-      return {
-        domain: current.name,
-        alreadyVerified: true,
-        registrantVerifiedAt: current.registrantVerifiedAt,
-      }
-    }
-
-    const stamped = await this.model.findUniqueOrThrow({
-      where: { id: domain.id },
-    })
-
-    return {
-      domain: stamped.name,
-      alreadyVerified: false,
-      registrantVerifiedAt: stamped.registrantVerifiedAt,
     }
   }
 

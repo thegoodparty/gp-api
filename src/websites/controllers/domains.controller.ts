@@ -23,10 +23,6 @@ import {
   PurchaseDomainBodySchema,
   PurchaseDomainResponseSchema,
 } from '../schemas/PurchaseDomain.schema'
-import {
-  SubmitRegistrantVerificationBodySchema,
-  SubmitRegistrantVerificationResponseSchema,
-} from '../schemas/SubmitRegistrantVerification.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
@@ -118,38 +114,6 @@ export class DomainsController {
       alreadyExisted: result.alreadyExisted,
       message: result.message,
     }
-  }
-
-  @Post('registrant-verification')
-  @UseCampaign()
-  @HttpCode(HttpStatus.OK)
-  @ResponseSchema(SubmitRegistrantVerificationResponseSchema)
-  @McpTool({
-    description:
-      'Fallback only — NOT part of the normal compliance_setup flow. ' +
-      'Agent-provisioned domains use a constant, already-ICANN-verified ' +
-      'GoodParty registrant contact, so the registrar sends no "Verify ' +
-      'Your Domain Contact Information" email and the domain auto-confirms. ' +
-      'Do not poll any inbox for that email — it will not arrive. Call this ' +
-      'ONLY if such a verification link is actually obtained out of band ' +
-      '(e.g. the verified-tuple assumption breaks for some TLD): pass the ' +
-      'link as verificationUrl. It must be an https vercel.com or ' +
-      '*.vercel.com URL; any other host is rejected with a 4xx. domain ' +
-      "must be the campaign's own domain (a domain owned by another " +
-      'campaign is rejected). Idempotent — re-submitting an ' +
-      'already-verified domain returns alreadyVerified: true without ' +
-      'contacting Vercel again.',
-  })
-  async submitRegistrantVerification(
-    @ReqCampaign() { id: campaignId }: Campaign,
-    @Body()
-    { domain, verificationUrl }: SubmitRegistrantVerificationBodySchema,
-  ) {
-    return this.domains.submitRegistrantVerificationForCampaign(
-      campaignId,
-      domain,
-      verificationUrl,
-    )
   }
 
   @Get('status')
