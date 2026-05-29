@@ -44,6 +44,7 @@ const mockCampaign: Campaign = {
 
 const mockDistrict = {
   id: 'dist-1',
+  state: 'OR',
   l2Type: 'City_Portland',
   l2Name: 'PORTLAND',
 }

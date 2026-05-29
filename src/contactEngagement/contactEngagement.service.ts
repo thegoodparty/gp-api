@@ -6,6 +6,7 @@ import {
   PollIndividualMessageSender,
   Prisma,
 } from '@prisma/client'
+import { compareDesc, parseISO } from 'date-fns'
 import { IndividualActivityInput } from './contactEngagement.schema'
 import {
   ConstituentActivity,
@@ -52,8 +53,8 @@ export class ContactEngagementService {
 
     const allActivities: ConstituentActivity[] = []
     for (const [, pollMessages] of messagesByPollId) {
-      const sortedBySentAt = [...pollMessages].sort(
-        (a, b) => b.sentAt.getTime() - a.sentAt.getTime(),
+      const sortedBySentAt = [...pollMessages].sort((a, b) =>
+        compareDesc(a.sentAt, b.sentAt),
       )
       const mostRecent = sortedBySentAt[0]
       const events = sortedBySentAt.map((msg) => {
@@ -78,8 +79,8 @@ export class ContactEngagementService {
         },
       })
     }
-    allActivities.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    allActivities.sort((a, b) =>
+      compareDesc(parseISO(a.date), parseISO(b.date)),
     )
 
     const startIndex = after

@@ -893,6 +893,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     ).mockResolvedValue({
       district: {
         id: 'd-1',
+        state: 'CA',
         L2DistrictType: 'State_Senate',
         L2DistrictName: 'STATE SENATE 001',
         projectedTurnout: null,
@@ -983,6 +984,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     ).mockResolvedValue({
       district: {
         id: 'd-1',
+        state: 'CA',
         L2DistrictType: 'State_Senate',
         L2DistrictName: 'STATE SENATE 001',
         projectedTurnout: null,
@@ -1083,6 +1085,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       ).mockResolvedValue({
         district: {
           id: 'd-1',
+          state: 'CA',
           L2DistrictType: 'State_Senate',
           L2DistrictName: 'STATE SENATE 001',
           projectedTurnout: null,

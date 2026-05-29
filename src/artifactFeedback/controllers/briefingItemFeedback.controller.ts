@@ -37,6 +37,7 @@ export class BriefingItemFeedbackController {
       userId: user.id,
       electedOffice,
       feedback: body.feedback,
+      comment: body.comment,
     })
   }
 

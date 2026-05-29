@@ -1,6 +1,6 @@
 import { ExperimentRunStatus } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { useTestService } from '@/test-service'
@@ -10,13 +10,19 @@ const service = useTestService()
 
 const seedOrgAndCampaign = async (
   orgSlug: string,
-  options: { positionId?: string } = {},
+  options: {
+    positionId?: string
+    overrideDistrictId?: string
+    customPositionName?: string
+  } = {},
 ) => {
   await service.prisma.organization.create({
     data: {
       slug: orgSlug,
       ownerId: service.user.id,
       positionId: options.positionId ?? null,
+      overrideDistrictId: options.overrideDistrictId ?? null,
+      customPositionName: options.customPositionName ?? null,
     },
   })
   await service.prisma.campaign.create({
@@ -35,9 +41,21 @@ const mockS3 = (responses: Record<string, string | undefined>) => {
   )
 }
 
+const mockResolveServeContext = (
+  result: Awaited<ReturnType<OrganizationsService['resolveServeContext']>>,
+) => {
+  const spy = vi.spyOn(
+    service.app.get(OrganizationsService),
+    'resolveServeContext',
+  )
+  spy.mockResolvedValue(result)
+  return spy
+}
+
 describe('POST /v1/elected-office dispatches schedule + briefing in parallel', () => {
   beforeEach(() => {
     vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+    mockResolveServeContext(null)
   })
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -66,15 +84,9 @@ describe('POST /v1/elected-office dispatches schedule + briefing in parallel', (
     const orgSlug = `eo-create-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-123' })
 
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-123',
-      brDatabaseId: 'br-db-123',
+    mockResolveServeContext({
       state: 'MN',
-      name: 'City Council',
+      positionName: 'City Council',
     })
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
@@ -497,8 +509,12 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
 })
 
 describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
+    mockResolveServeContext(null)
+    // The cron claims a once-per-day lease; clear it so each test's first
+    // invocation wins the claim (all tests run on the same UTC date).
+    await service.prisma.cronRun.deleteMany({})
   })
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -559,16 +575,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
       },
     })
 
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-cron',
-      brDatabaseId: 'br-db-cron',
-      state: 'MN',
-      name: 'City Council',
-    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
 
     const existingBriefingRun = await service.prisma.experimentRun.create({
       data: {
@@ -607,7 +614,36 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
     )
   })
 
-  it('skips EOs created before 2026-03-01', async () => {
+  it('runs the dispatch loop once when invoked twice the same day (multi-replica guard)', async () => {
+    const orgSlug = `eo-cron-guard-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-guard' })
+    const campaign = await service.prisma.campaign.findFirst({
+      where: { organizationSlug: orgSlug },
+    })
+    await service.prisma.electedOffice.create({
+      data: {
+        organizationSlug: orgSlug,
+        userId: service.user.id,
+        campaignId: campaign?.id,
+      },
+    })
+
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const svc = service.app.get(MeetingBriefingsService)
+    // Simulate both ECS replicas firing the cron on the same day. The second
+    // invocation must lose the lease and skip the loop entirely.
+    await svc.dispatchDailyBriefings()
+    await svc.dispatchDailyBriefings()
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('dispatches for EOs regardless of when they were created', async () => {
     const orgSlug = `eo-cron-old-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-old' })
     const campaign = await service.prisma.campaign.findFirst({
@@ -622,16 +658,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
       },
     })
 
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-cron-old',
-      brDatabaseId: 'br-db-cron-old',
-      state: 'MN',
-      name: 'City Council',
-    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
 
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
@@ -639,11 +666,20 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
 
     await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
 
-    expect(dispatchSpy).not.toHaveBeenCalled()
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        organizationSlug: orgSlug,
+      }),
+    )
   })
 })
 
 describe('MeetingBriefingsService.dispatchManual', () => {
+  beforeEach(() => {
+    mockResolveServeContext(null)
+  })
+
   it('dispatches a schedule run regardless of the env gate', async () => {
     vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', '')
     const orgSlug = `eo-manual-schedule-${Date.now()}`
@@ -651,16 +687,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     const eo = await service.prisma.electedOffice.create({
       data: { organizationSlug: orgSlug, userId: service.user.id },
     })
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-manual-s',
-      brDatabaseId: 'br-db-manual-s',
-      state: 'MN',
-      name: 'City Council',
-    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
       .mockResolvedValue(undefined)
@@ -682,16 +709,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     const eo = await service.prisma.electedOffice.create({
       data: { organizationSlug: orgSlug, userId: service.user.id },
     })
-    vi.spyOn(
-      service.app.get(ElectionsService),
-      'getPositionById',
-    ).mockResolvedValue({
-      id: 'pos-real-id',
-      brPositionId: 'br-pos-manual-b',
-      brDatabaseId: 'br-db-manual-b',
-      state: 'MN',
-      name: 'City Council',
-    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
       .mockResolvedValue(undefined)
@@ -713,6 +731,97 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     const result = await service.app
       .get(MeetingBriefingsService)
       .dispatchManual('not-a-real-id', 'schedule')
+    expect(result.dispatched).toBe(false)
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
+  it('dispatches for override-only org (no positionId, overrideDistrictId + customPositionName set)', async () => {
+    const orgSlug = `eo-override-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, {
+      overrideDistrictId: 'district-override-id',
+      customPositionName: 'City Council Member',
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({
+      state: 'MN',
+      positionName: 'City Council Member',
+      l2DistrictType: 'City',
+      l2DistrictName: 'Minneapolis',
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
+    expect(result.dispatched).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith({
+      type: 'meeting_briefing',
+      organizationSlug: orgSlug,
+      clerkUserId: service.user.clerkId!,
+      params: {
+        officialName: `${service.user.firstName} ${service.user.lastName}`,
+        state: 'MN',
+        positionName: 'City Council Member',
+        l2DistrictType: 'City',
+        l2DistrictName: 'Minneapolis',
+      },
+    })
+  })
+
+  it('dispatches for position-based org (existing behavior: state + l2 from position)', async () => {
+    const orgSlug = `eo-position-based-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-based' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({
+      state: 'CA',
+      positionName: 'School Board',
+      l2DistrictType: 'SchoolDistrict',
+      l2DistrictName: 'LAUSD',
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
+    expect(result.dispatched).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        params: expect.objectContaining({
+          state: 'CA',
+          positionName: 'School Board',
+          l2DistrictType: 'SchoolDistrict',
+          l2DistrictName: 'LAUSD',
+        }),
+      }),
+    )
+  })
+
+  it('skips dispatch when resolveServeContext returns null (neither position nor override)', async () => {
+    const orgSlug = `eo-no-ctx-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug)
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext(null)
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
     expect(result.dispatched).toBe(false)
     expect(dispatchSpy).not.toHaveBeenCalled()
   })

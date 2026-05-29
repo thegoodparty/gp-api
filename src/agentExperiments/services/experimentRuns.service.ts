@@ -5,6 +5,7 @@ import { SQS } from '@aws-sdk/client-sqs'
 import { ExperimentRunStatus } from '@prisma/client'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
+import { subMinutes } from 'date-fns'
 import { AgentJobContracts } from '@/generated/agent-job-contracts'
 
 const sqs = new SQS({})
@@ -108,7 +109,7 @@ export class ExperimentRunsService extends createPrismaBase(
 
   @Cron('*/15 * * * *')
   async sweepStaleRuns() {
-    const cutoff = new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000)
+    const cutoff = subMinutes(new Date(), STALE_THRESHOLD_MINUTES)
     const result = await this.model.updateMany({
       where: {
         status: { in: [ExperimentRunStatus.RUNNING] },

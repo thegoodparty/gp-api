@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
+import { differenceInMilliseconds } from 'date-fns'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/services/content.service'
@@ -39,7 +40,8 @@ export class AiContentService {
     const createdAt = Number(keyStatus.createdAt)
     return (
       !Number.isNaN(createdAt) &&
-      Date.now() - createdAt > AiContentService.STALE_PROCESSING_MS
+      differenceInMilliseconds(new Date(), createdAt) >
+        AiContentService.STALE_PROCESSING_MS
     )
   }
 

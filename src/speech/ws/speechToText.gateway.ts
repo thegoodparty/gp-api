@@ -1,6 +1,7 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
+import { differenceInMilliseconds } from 'date-fns'
 import { FastifyRequest } from 'fastify'
 import { PinoLogger } from 'nestjs-pino'
 import type { RawData, WebSocket } from 'ws'
@@ -324,7 +325,7 @@ export class SpeechToTextGateway implements OnApplicationBootstrap {
   }
 
   private exceedsRateLimit(context: SessionContext): boolean {
-    const elapsedMs = Date.now() - context.startedAtMs
+    const elapsedMs = differenceInMilliseconds(new Date(), context.startedAtMs)
     if (elapsedMs < RATE_LIMIT_GRACE_MS) {
       return false
     }
@@ -371,7 +372,7 @@ export class SpeechToTextGateway implements OnApplicationBootstrap {
     this.logger.info(
       {
         userId: context.ticket.uid,
-        durationMs: Date.now() - context.startedAtMs,
+        durationMs: differenceInMilliseconds(new Date(), context.startedAtMs),
         bytesReceived: context.bytesReceived,
         reason,
       },
@@ -394,7 +395,7 @@ export class SpeechToTextGateway implements OnApplicationBootstrap {
     this.logger.info(
       {
         userId: context.ticket.uid,
-        durationMs: Date.now() - context.startedAtMs,
+        durationMs: differenceInMilliseconds(new Date(), context.startedAtMs),
         bytesReceived: context.bytesReceived,
       },
       'Speech-to-text WebSocket closed by client',

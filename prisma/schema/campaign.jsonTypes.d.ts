@@ -33,7 +33,9 @@ declare global {
         | 'considering'
         | 'testing'
       pledged?: boolean
-      isProUpdatedAt?: number // TODO: make this an ISO dateTime string
+      // ISO string for new writes; legacy unix-ms numbers persist in
+      // existing rows until backfilled
+      isProUpdatedAt?: string | number
       proUpgradeSlackNotifiedAt?: number
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]

@@ -9,7 +9,7 @@ import {
 import { rrulestr } from 'rrule'
 import { formatInTimeZone } from 'date-fns-tz'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
@@ -19,6 +19,9 @@ import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { getUserFullName } from '@/users/util/users.util'
+import { CronLockService } from '@/cron/services/cronLock.service'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
 
 const parseBriefingArtifact = (
   raw: string,
@@ -34,9 +37,8 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
 
-const DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR = new Date(
-  '2026-03-01T00:00:00.000Z',
-)
+// Identifies the daily-briefing cron in the cron_run lease table.
+const DAILY_BRIEFINGS_CRON_JOB = 'dispatchDailyBriefings'
 
 const isAutomationEnabled = () =>
   process.env.MEETINGS_AUTOMATION_ENABLED === 'true'
@@ -60,17 +62,23 @@ type DispatchContext = {
   l2DistrictName?: string
 }
 
+const CRON_CONFIG = {
+  batchSize: 100,
+  every: '20m' as const,
+}
+
 @Injectable()
 export class MeetingBriefingsService extends createPrismaBase(
   MODELS.MeetingBriefing,
 ) {
   constructor(
     private readonly s3: S3Service,
-    private readonly elections: ElectionsService,
+    private readonly organizations: OrganizationsService,
     private readonly experimentRuns: ExperimentRunsService,
     private readonly segment: SegmentService,
     private readonly llm: LlmService,
     private readonly braintrust: BraintrustService,
+    private readonly cronLock: CronLockService,
   ) {
     super()
   }
@@ -201,23 +209,46 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return
     }
+
+    // Pin a single timestamp for the whole run so the lease claim and its
+    // completion resolve to the same UTC run-date even if the long loop below
+    // crosses midnight.
+    const now = new Date()
+
+    // Every ECS replica fires this @Cron, so without a guard each office would
+    // be enqueued once per replica (2x in prod). Claim a once-per-day lease so
+    // only the winning replica runs the long batched dispatch loop below.
+    const claimed = await this.cronLock.tryClaimDailyRun(
+      DAILY_BRIEFINGS_CRON_JOB,
+      now,
+    )
+    if (!claimed) return
+
     const offices = await this.client.electedOffice.findMany({
-      where: {
-        createdAt: { gte: DAILY_BRIEFINGS_ELECTED_OFFICE_CREATED_AT_FLOOR },
-      },
       select: { id: true, organizationSlug: true, userId: true },
     })
 
-    const now = new Date()
+    const chunks = chunk(offices, CRON_CONFIG.batchSize)
 
-    for (const eo of offices) {
-      await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
-        this.logger.error(
-          { err, electedOfficeId: eo.id },
-          'dispatchBriefingIfNeeded failed, continuing',
-        ),
-      )
+    for (const [i, batch] of chunks.entries()) {
+      for (const eo of batch) {
+        await this.dispatchBriefingIfNeeded(eo, now).catch((err: unknown) =>
+          this.logger.error(
+            { err, electedOfficeId: eo.id },
+            'dispatchBriefingIfNeeded failed, continuing',
+          ),
+        )
+      }
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, ms(CRON_CONFIG.every)),
+        )
+      }
     }
+
+    // Mark the claim complete so a crashed-run takeover (see CronLockService)
+    // is only triggered when the loop did not finish.
+    await this.cronLock.markCompleted(DAILY_BRIEFINGS_CRON_JOB, now)
   }
 
   private async dispatchBriefingIfNeeded(
@@ -250,7 +281,6 @@ export class MeetingBriefingsService extends createPrismaBase(
       }),
       this.client.organization.findUnique({
         where: { slug: electedOffice.organizationSlug },
-        select: { positionId: true, customPositionName: true },
       }),
     ])
 
@@ -262,23 +292,18 @@ export class MeetingBriefingsService extends createPrismaBase(
       return null
     }
 
-    const position = organization?.positionId
-      ? await this.elections.getPositionById(organization.positionId, {
-          includeDistrict: true,
-        })
-      : null
-    const state = position?.state ?? ''
-    const positionName =
-      organization?.customPositionName ?? position?.name ?? ''
     const officialName = getUserFullName(user)
+    const serveCtx = organization
+      ? await this.organizations.resolveServeContext(organization)
+      : null
 
-    if (!state || !positionName || !officialName) {
+    if (!serveCtx || !officialName) {
       this.logger.warn(
         {
           electedOfficeId: electedOffice.id,
           missing: {
-            state: !state,
-            positionName: !positionName,
+            state: !serveCtx?.state,
+            positionName: !serveCtx?.positionName,
             officialName: !officialName,
           },
         },
@@ -292,10 +317,10 @@ export class MeetingBriefingsService extends createPrismaBase(
       organizationSlug: electedOffice.organizationSlug,
       clerkUserId: user.clerkId,
       officialName,
-      state,
-      positionName,
-      l2DistrictType: position?.district?.L2DistrictType,
-      l2DistrictName: position?.district?.L2DistrictName,
+      state: serveCtx.state,
+      positionName: serveCtx.positionName,
+      l2DistrictType: serveCtx.l2DistrictType,
+      l2DistrictName: serveCtx.l2DistrictName,
     }
   }
 
@@ -459,20 +484,24 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
 
     try {
-      await this.segment.trackEvent(userId, 'Agenda Picked Up', {
-        agenda_id: dateString,
-        meeting_date: dateString,
-        meeting_time: meetingTime,
-        meeting_timezone: meetingTimezone,
-        meeting_place: artifact.location ?? '',
-        meeting_type: meetingType,
-        exec_summary: execSummary,
-        top_3_agenda_items: topItems.map((it) => it.title),
-      })
+      await this.segment.trackEvent(
+        userId,
+        'Briefing Assistant - Agenda Created',
+        {
+          agendaId: dateString,
+          meetingDate: dateString,
+          meetingTime,
+          meetingTimezone,
+          meetingPlace: artifact.location ?? '',
+          meetingType,
+          execSummary,
+          ...flattenTopAgendaItems(topItems),
+        },
+      )
     } catch (err) {
       this.logger.error(
         { err, userId },
-        '[SEGMENT] Failed to track Agenda Picked Up',
+        '[SEGMENT] Failed to track Briefing Assistant - Agenda Created',
       )
     }
   }
@@ -532,7 +561,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     } catch (err) {
       this.logger.error(
         { err, userId, meetingDate },
-        'Failed to generate Agenda Picked Up hook; falling back to lead_in',
+        'Failed to generate Briefing Assistant - Agenda Created hook; falling back to lead_in',
       )
       return leadInFallback
     }
@@ -549,6 +578,18 @@ const readLeadIn = (artifact: PrismaJson.MeetingBriefingArtifact): string => {
   if (!isRecord(es)) return ''
   const leadIn = es['lead_in']
   return typeof leadIn === 'string' ? leadIn : ''
+}
+
+const flattenTopAgendaItems = (
+  items: { title: string; overview: string }[],
+): Record<string, string> => {
+  const flat: Record<string, string> = {}
+  items.forEach((item, idx) => {
+    const n = idx + 1
+    flat[`agendaItem${n}Name`] = item.title
+    flat[`agendaItem${n}Description`] = item.overview
+  })
+  return flat
 }
 
 const readTopAgendaItems = (

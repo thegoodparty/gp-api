@@ -18,6 +18,7 @@ import { createZodDto } from 'nestjs-zod'
 import { McpTool } from '../decorators/McpTool.decorator'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { AgentMcpMarker } from '@/authentication/agentMcpMarker'
 import { McpServerService } from './mcpServer.service'
 
 type InjectOpts = {
@@ -43,6 +44,7 @@ const buildAppModule = (controllers: unknown[], inject: InjectFn) => {
     controllers: controllers as never[],
     providers: [
       McpServerService,
+      AgentMcpMarker,
       { provide: HttpAdapterHost, useValue: mockHost },
       { provide: PinoLogger, useValue: createMockLogger() },
     ],

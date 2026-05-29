@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WebsitesController } from './websites.controller'
 import { WebsitesService } from '../services/websites.service'
 import { WebsiteContactsService } from '../services/websiteContacts.service'
-import { FilesService } from 'src/files/files.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { FileUpload } from 'src/files/files.types'
 import { WebsiteViewsService } from '../services/websiteViews.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -32,6 +32,7 @@ import { UseCampaignGuard } from 'src/campaigns/guards/UseCampaign.guard'
 import { REQUIRE_CAMPAIGN_META_KEY } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { MCP_TOOL_KEY } from '@/mcp/decorators/McpTool.decorator'
 import { McpServerService } from '@/mcp/services/mcpServer.service'
+import { AgentMcpMarker } from '@/authentication/agentMcpMarker'
 import { MyWebsiteResponseSchema } from '../schemas/WebsiteResponse.schema'
 import { VerifyLiveResponseSchema } from '../schemas/VerifyLive.schema'
 
@@ -56,7 +57,8 @@ describe('WebsitesController', () => {
   let mockAnalytics: {
     track: ReturnType<typeof vi.fn>
   }
-  let mockFilesService: {
+  let mockS3Service: {
+    buildKey: ReturnType<typeof vi.fn>
     uploadFile: ReturnType<typeof vi.fn>
   }
   let mockWebsitesService: {
@@ -85,7 +87,11 @@ describe('WebsitesController', () => {
         content: completeContent,
       }),
     }
-    mockFilesService = {
+    mockS3Service = {
+      buildKey: vi.fn(
+        (folder?: string, fileName?: string) =>
+          `${folder ?? ''}/${fileName ?? ''}`,
+      ),
       uploadFile: vi.fn().mockResolvedValue('uploaded-file-url'),
     }
 
@@ -94,7 +100,7 @@ describe('WebsitesController', () => {
         { provide: PrismaService, useValue: {} },
         { provide: WebsitesService, useValue: mockWebsitesService },
         { provide: WebsiteContactsService, useValue: {} },
-        { provide: FilesService, useValue: mockFilesService },
+        { provide: S3Service, useValue: mockS3Service },
         { provide: WebsiteViewsService, useValue: {} },
         { provide: CampaignsService, useValue: {} },
         { provide: AnalyticsService, useValue: mockAnalytics },
@@ -552,7 +558,7 @@ describe('WebsitesController', () => {
         ]),
       ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST })
 
-      expect(mockFilesService.uploadFile).not.toHaveBeenCalled()
+      expect(mockS3Service.uploadFile).not.toHaveBeenCalled()
       expect(mockWebsitesService.update).not.toHaveBeenCalled()
     })
   })
@@ -808,10 +814,11 @@ describe('WebsitesController MCP discoverability', () => {
     controllers: [WebsitesController],
     providers: [
       McpServerService,
+      AgentMcpMarker,
       { provide: PrismaService, useValue: {} },
       { provide: WebsitesService, useValue: {} },
       { provide: WebsiteContactsService, useValue: {} },
-      { provide: FilesService, useValue: {} },
+      { provide: S3Service, useValue: {} },
       { provide: WebsiteViewsService, useValue: {} },
       { provide: CampaignsService, useValue: {} },
       { provide: AnalyticsService, useValue: { track: vi.fn() } },
