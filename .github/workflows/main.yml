@@ -84,6 +84,12 @@ jobs:
           name: build-deps
           retention-days: 1
           if-no-files-found: error
+          # upload-artifact@v4 excludes dotfiles by default, which silently
+          # dropped the generated node_modules/.prisma client. Downstream jobs
+          # then fell back to the stale lockfile-keyed node_modules cache, so
+          # any schema change (new model/field) was invisible to typecheck,
+          # lint, and tests until the cache happened to be rebuilt.
+          include-hidden-files: true
           path: |
             node_modules/.prisma
             contracts/dist
