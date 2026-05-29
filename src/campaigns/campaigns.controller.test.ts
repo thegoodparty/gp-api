@@ -18,6 +18,24 @@ import { CampaignWith } from './campaigns.types'
 
 const CREATED_AT = '2025-01-01'
 
+// Shared null-filled defaults for the fields RaceTargetMetrics gained when
+// fetchLiveRaceTargetMetrics started consuming /campaign-strategy-context.
+// Tests that don't care about these can spread this into their fixture.
+const EMPTY_RACE_CONTEXT_FIELDS = {
+  registeredVoters: null,
+  uniqueCellphones: null,
+  uniqueLandlines: null,
+  projectedVoterTurnout: null,
+  candidates: [],
+  generalElectionDate: null,
+  primaryElectionDate: null,
+  relevantElectionDate: null,
+  officialOfficeName: null,
+  officeLevel: null,
+  officeType: null,
+  numberOfSeats: null,
+}
+
 const userDefaults = {
   createdAt: new Date(CREATED_AT),
   updatedAt: new Date(CREATED_AT),
@@ -250,6 +268,7 @@ describe('CampaignsController', () => {
         voterContactGoal: 20005,
         filingFee: null,
         filingRequirementsText: null,
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       }
       vi.spyOn(
         campaignsService,
@@ -402,6 +421,7 @@ describe('CampaignsController', () => {
         voterContactGoal: 12505,
         filingFee: null,
         filingRequirementsText: null,
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       }
       vi.spyOn(
         campaignsService,

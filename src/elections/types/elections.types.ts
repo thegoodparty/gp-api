@@ -168,6 +168,51 @@ export type FilingFeeByBrHashResult = {
   extractionSource: string | null
 }
 
+/**
+ * Candidate row from election-api's campaign-strategy-context endpoint.
+ * snake_case to match the upstream payload.
+ */
+export type CampaignStrategyContextCandidate = {
+  gp_candidate_id: string | null
+  first_name: string
+  last_name: string
+  full_name: string
+  email: string | null
+  website_url: string | null
+  party: string | null
+  is_incumbent: boolean | null
+}
+
+/**
+ * Response shape from election-api `POST /campaign-strategy-context`. The
+ * endpoint takes the BR race hash on `campaign.details.raceId` and returns
+ * the per-race civics context — voter counts, candidate roster, win-number
+ * variants, election dates. See election-api
+ * `CampaignStrategyContextResponse` for the source of truth.
+ */
+export type CampaignStrategyContextResponse = {
+  candidate_count: number
+  candidate_office: string | null
+  candidates: CampaignStrategyContextCandidate[]
+  civics_win_number: number | null
+  contacts_needed_estimate: number | null
+  general_election_date: string | null
+  number_of_seats: number | null
+  office_level: string | null
+  office_type: string | null
+  official_office_name: string | null
+  primary_election_date: string | null
+  projected_turnout: number | null
+  projected_voter_turnout: number | null
+  registered_voters: number | null
+  unique_cellphones: number | null
+  unique_landlines: number | null
+  relevant_election_date: string | null
+  state: string | null
+  win_number_effective: number | null
+  win_number_estimate: number | null
+}
+
 type SourceProjectedTurnout = {
   id: string
   createdAt: Date
