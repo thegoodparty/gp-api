@@ -126,12 +126,14 @@ export class DomainsController {
   @ResponseSchema(SubmitRegistrantVerificationResponseSchema)
   @McpTool({
     description:
-      'Submit the ICANN registrant-contact verification link for a domain ' +
-      'owned by the calling campaign. Use during compliance_setup after ' +
-      'purchasing a domain: read the sites@goodparty.org inbox for the ' +
-      'Vercel registrar email titled "Verify Your Domain Contact ' +
-      'Information", extract the "VERIFY EMAIL ADDRESS NOW" link, and pass ' +
-      'it as verificationUrl. The link must be an https vercel.com or ' +
+      'Fallback only — NOT part of the normal compliance_setup flow. ' +
+      'Agent-provisioned domains use a constant, already-ICANN-verified ' +
+      'GoodParty registrant contact, so the registrar sends no "Verify ' +
+      'Your Domain Contact Information" email and the domain auto-confirms. ' +
+      'Do not poll any inbox for that email — it will not arrive. Call this ' +
+      'ONLY if such a verification link is actually obtained out of band ' +
+      '(e.g. the verified-tuple assumption breaks for some TLD): pass the ' +
+      'link as verificationUrl. It must be an https vercel.com or ' +
       '*.vercel.com URL; any other host is rejected with a 4xx. domain ' +
       "must be the campaign's own domain (a domain owned by another " +
       'campaign is rejected). Idempotent — re-submitting an ' +
