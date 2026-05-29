@@ -466,7 +466,7 @@ describe('UsersController', () => {
   })
 
   describe('generateSignedUploadUrl', () => {
-    it('returns the signed upload URL', async () => {
+    it('returns the signed upload URL scoped to the user', async () => {
       vi.spyOn(s3Service, 'getSignedUrlForUpload').mockResolvedValue(
         'https://s3.example.com/signed-url',
       )
@@ -476,15 +476,18 @@ describe('UsersController', () => {
         fileName: 'doc.pdf',
         fileType: 'application/pdf' as const,
       }
-      const result = await controller.generateSignedUploadUrl(mockUser, args)
+      const result = await controller.generateSignedUploadUrl(
+        mockUser,
+        args,
+      )
 
       expect(s3Service.buildKey).toHaveBeenCalledWith(
-        args.bucket,
+        `${args.bucket}/${mockUser.id}`,
         args.fileName,
       )
       expect(s3Service.getSignedUrlForUpload).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('uploads/'),
+        expect.stringContaining(`uploads/${mockUser.id}/`),
         { contentType: args.fileType },
       )
       expect(result).toEqual({
