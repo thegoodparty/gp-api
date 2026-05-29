@@ -12,7 +12,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { formatISO } from 'date-fns'
+import { differenceInMilliseconds, formatISO } from 'date-fns'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -674,8 +674,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (regenerate === false && foundKey === true && versions[key].length > 0) {
       const lastVersion = versions[key][0] as PlanVersion
       const lastVersionDate = new Date(lastVersion?.date || 0)
-      const now = new Date()
-      const diff = now.getTime() - lastVersionDate.getTime()
+      const diff = differenceInMilliseconds(new Date(), lastVersionDate)
       if (diff < 300000) {
         updateExistingVersion = true
       }

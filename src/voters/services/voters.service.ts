@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
+import { addDays } from 'date-fns'
 import { firstValueFrom } from 'rxjs'
 import {
   EthnicityCounts,
@@ -195,10 +196,7 @@ export class VotersService {
     // Calculate the number of days to add to reach the first Tuesday
     const daysToAdd = (2 + 7 - dayOfWeek) % 7
 
-    // Set the date to the first Tuesday of November
-    november.setDate(1 + daysToAdd)
-
-    return november
+    return addDays(november, daysToAdd)
   }
 
   private getProjectedTurnout(counts: VoterCounts, turnoutCounts: number[]) {
