@@ -1,3 +1,4 @@
+import { AgentMcpMarkerModule } from '@/authentication/agentMcpMarker'
 import { AgentExperimentsModule } from '@/agentExperiments/agentExperiments.module'
 import { BriefingChatsModule } from '@/chats/briefing-chats/briefing-chats.module'
 import { McpModule } from '@/mcp/mcp.module'
@@ -53,6 +54,7 @@ import { loggerModule } from './observability/logging/logger-module'
 @Module({
   imports: [
     loggerModule,
+    AgentMcpMarkerModule,
     ScheduleModule.forRoot(),
     BraintrustModule,
     GeminiModule,
