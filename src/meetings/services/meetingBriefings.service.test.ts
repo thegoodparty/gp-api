@@ -607,7 +607,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
     )
   })
 
-  it('skips EOs created before 2026-03-01', async () => {
+  it('dispatches for EOs regardless of when they were created', async () => {
     const orgSlug = `eo-cron-old-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-old' })
     const campaign = await service.prisma.campaign.findFirst({
@@ -639,7 +639,12 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
 
     await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
 
-    expect(dispatchSpy).not.toHaveBeenCalled()
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        organizationSlug: orgSlug,
+      }),
+    )
   })
 })
 
