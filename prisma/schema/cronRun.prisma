@@ -1,0 +1,17 @@
+/// A once-per-day claim row used as a durable, multi-instance lock for cron
+/// jobs. With multiple ECS replicas every replica fires its own @Cron, so a
+/// job that must run exactly once per day inserts a row keyed by
+/// (jobName, runDate). The unique constraint lets exactly one replica win the
+/// insert; the others get a unique-violation and skip. Unlike a session
+/// advisory lock this cannot leak across connection-pool churn.
+model CronRun {
+  id String @id @default(uuid(7))
+
+  jobName String   @map("job_name")
+  runDate DateTime @map("run_date") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([jobName, runDate])
+  @@map("cron_run")
+}
