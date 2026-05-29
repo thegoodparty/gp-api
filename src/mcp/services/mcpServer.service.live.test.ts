@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import jwt from 'jsonwebtoken'
-import { useTestService } from '@/test-service'
+import { TEST_CLERK_ID, useTestService } from '@/test-service'
 
 const service = useTestService()
 
@@ -142,7 +142,7 @@ describe('agent token (broker-signed)', () => {
         headers: {
           Accept: MCP_ACCEPT,
           'x-organization-slug': org.slug,
-          Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+          Authorization: `Bearer ${signAgentToken(TEST_CLERK_ID)}`,
         },
       },
     )
@@ -162,7 +162,7 @@ describe('agent token (broker-signed)', () => {
     const res = await service.client.get('/v1/campaigns/mine', {
       headers: {
         'x-organization-slug': org.slug,
-        Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+        Authorization: `Bearer ${signAgentToken(TEST_CLERK_ID)}`,
       },
       validateStatus: () => true,
     })
@@ -178,7 +178,7 @@ describe('agent token (broker-signed)', () => {
     const res = await service.client.get('/v1/campaigns/mine', {
       headers: {
         'x-organization-slug': org.slug,
-        Authorization: `Bearer ${signAgentToken(service.user.clerkId)}`,
+        Authorization: `Bearer ${signAgentToken(TEST_CLERK_ID)}`,
         'x-mcp-internal-marker': 'guessed',
       },
       validateStatus: () => true,
@@ -191,7 +191,7 @@ describe('agent token (broker-signed)', () => {
     const badToken = jwt.sign({}, 'wrong-secret', {
       issuer: 'gp-broker',
       audience: 'gp-api',
-      subject: service.user.clerkId,
+      subject: TEST_CLERK_ID,
       expiresIn: 120,
     })
 

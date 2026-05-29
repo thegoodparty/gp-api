@@ -20,7 +20,7 @@ import {
 import './configrc'
 import { PrismaService } from './prisma/prisma.service'
 
-const TEST_CLERK_ID = 'user_test_123'
+export const TEST_CLERK_ID = 'user_test_123'
 
 export type TestServiceContext = {
   /** A client targeting the test service. */
