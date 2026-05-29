@@ -12,6 +12,7 @@ export const CampaignSchema = z.object({
   isPro: z.boolean().nullish(),
   isDemo: z.boolean(),
   didWin: z.boolean().nullish(),
+  primaryResult: z.enum(['won', 'lost']).nullish(),
   dateVerified: z.coerce.date().nullish(),
   tier: CampaignTierSchema.nullish(),
   formattedAddress: z.string().nullish(),
