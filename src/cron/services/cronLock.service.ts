@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { subMilliseconds } from 'date-fns'
 import ms from 'ms'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { isUniqueConstraintError } from '@/prisma/util/prismaErrors.util'
@@ -48,7 +49,7 @@ export class CronLockService extends createPrismaBase(MODELS.CronRun) {
       // A row already exists. Take it over only if it never completed and its
       // claim is stale — refreshing createdAt so concurrent takeovers can't
       // both win (the conditional update matches at most one row).
-      const cutoff = new Date(now.getTime() - STALE_CLAIM_MS)
+      const cutoff = subMilliseconds(now, STALE_CLAIM_MS)
       const { count } = await this.model.updateMany({
         where: {
           jobName,
