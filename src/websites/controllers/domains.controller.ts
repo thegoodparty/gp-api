@@ -23,10 +23,6 @@ import {
   PurchaseDomainBodySchema,
   PurchaseDomainResponseSchema,
 } from '../schemas/PurchaseDomain.schema'
-import {
-  SubmitRegistrantVerificationBodySchema,
-  SubmitRegistrantVerificationResponseSchema,
-} from '../schemas/SubmitRegistrantVerification.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
@@ -118,36 +114,6 @@ export class DomainsController {
       alreadyExisted: result.alreadyExisted,
       message: result.message,
     }
-  }
-
-  @Post('registrant-verification')
-  @UseCampaign()
-  @HttpCode(HttpStatus.OK)
-  @ResponseSchema(SubmitRegistrantVerificationResponseSchema)
-  @McpTool({
-    description:
-      'Submit the ICANN registrant-contact verification link for a domain ' +
-      'owned by the calling campaign. Use during compliance_setup after ' +
-      'purchasing a domain: read the sites@goodparty.org inbox for the ' +
-      'Vercel registrar email titled "Verify Your Domain Contact ' +
-      'Information", extract the "VERIFY EMAIL ADDRESS NOW" link, and pass ' +
-      'it as verificationUrl. The link must be an https vercel.com or ' +
-      '*.vercel.com URL; any other host is rejected with a 4xx. domain ' +
-      "must be the campaign's own domain (a domain owned by another " +
-      'campaign is rejected). Idempotent — re-submitting an ' +
-      'already-verified domain returns alreadyVerified: true without ' +
-      'contacting Vercel again.',
-  })
-  async submitRegistrantVerification(
-    @ReqCampaign() { id: campaignId }: Campaign,
-    @Body()
-    { domain, verificationUrl }: SubmitRegistrantVerificationBodySchema,
-  ) {
-    return this.domains.submitRegistrantVerificationForCampaign(
-      campaignId,
-      domain,
-      verificationUrl,
-    )
   }
 
   @Get('status')
