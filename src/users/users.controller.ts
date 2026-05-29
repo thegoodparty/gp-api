@@ -134,11 +134,9 @@ export class UsersController {
     const scopedFolder = `${args.bucket}/${user.id}`
     const key = this.s3.buildKey(scopedFolder, args.fileName)
     return {
-      signedUploadUrl: await this.s3.getSignedUrlForUpload(
-        ASSET_DOMAIN,
-        key,
-        { contentType: args.fileType },
-      ),
+      signedUploadUrl: await this.s3.getSignedUrlForUpload(ASSET_DOMAIN, key, {
+        contentType: args.fileType,
+      }),
     }
   }
 

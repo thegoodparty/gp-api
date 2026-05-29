@@ -476,10 +476,7 @@ describe('UsersController', () => {
         fileName: 'doc.pdf',
         fileType: 'application/pdf' as const,
       }
-      const result = await controller.generateSignedUploadUrl(
-        mockUser,
-        args,
-      )
+      const result = await controller.generateSignedUploadUrl(mockUser, args)
 
       expect(s3Service.buildKey).toHaveBeenCalledWith(
         `${args.bucket}/${mockUser.id}`,
