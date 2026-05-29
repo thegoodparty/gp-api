@@ -182,7 +182,7 @@ export class VercelService {
     }
   }
 
-  private isAllowedVercelUrl(urlString: string) {
+  isAllowedVercelUrl(urlString: string) {
     try {
       const url = new URL(urlString)
       return (
