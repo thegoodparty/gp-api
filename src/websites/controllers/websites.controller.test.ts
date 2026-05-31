@@ -583,12 +583,14 @@ describe('WebsitesController', () => {
         fieldname: 'logoFile',
         filename: 'logo.png',
         mimetype: 'image/png',
+        encoding: '7bit',
         data: Buffer.from('logo'),
       }
       const heroFile: FileUpload = {
         fieldname: 'heroFile',
         filename: 'hero.png',
         mimetype: 'image/png',
+        encoding: '7bit',
         data: Buffer.from('hero'),
       }
 
