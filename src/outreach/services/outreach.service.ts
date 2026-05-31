@@ -16,6 +16,7 @@ import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { PeerlyP2pJobService } from 'src/vendors/peerly/services/peerlyP2pJob.service'
 import { Readable } from 'stream'
+import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
 import {
   resolveP2pJobGeography as resolveP2pJobGeographyUtil,
@@ -42,6 +43,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
     private readonly notificationService: OutreachNotificationService,
+    private readonly voterFileFilterService: VoterFileFilterService,
   ) {
     super()
   }
@@ -137,6 +139,17 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     imageUrl?: string,
     p2pImage?: P2pOutreachImageInput,
   ) {
+    if (createOutreachDto.voterFileFilterId) {
+      const filter =
+        await this.voterFileFilterService.findByIdAndOrganizationSlug(
+          createOutreachDto.voterFileFilterId,
+          campaign.organizationSlug,
+        )
+      if (!filter) {
+        throw new BadRequestException('Voter file filter not found')
+      }
+    }
+
     const isP2p = createOutreachDto.outreachType === OutreachType.p2p
 
     if (isP2p) {
