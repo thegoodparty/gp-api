@@ -11,7 +11,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { DomainsService } from '../services/domains.service'
+import { DomainsService, SUPPORTED_TLDS } from '../services/domains.service'
 import { PaymentStatus } from 'src/payments/payments.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
@@ -62,13 +62,16 @@ export class DomainsController {
   @ResponseSchema(SearchDomainsResponseSchema)
   @McpTool({
     description:
-      'Find available .com / .org / .vote domains for the calling ' +
-      'campaign matching one or more name patterns, under a per-domain ' +
-      'price cap. Use during the compliance_setup flow after the ' +
-      "candidate's profile is saved, to pick a domain before purchase. " +
-      'Patterns are literal candidate domain strings without TLD ' +
-      '(e.g. ["janeforsenate", "voteforjane"]); the server checks ' +
-      'availability across supported TLDs and returns { candidates: ' +
+      'Find available campaign domains for the calling campaign ' +
+      'matching one or more name patterns, under a per-domain price ' +
+      'cap. Only GoodParty-approved campaign TLDs are searched: ' +
+      `${SUPPORTED_TLDS.map((tld) => `.${tld}`).join(' / ')} — ` +
+      '.com/.org/.net are never offered. Use during the ' +
+      "compliance_setup flow after the candidate's profile is saved, " +
+      'to pick a domain before purchase. Patterns may be bare SLDs ' +
+      '(e.g. ["janeforsenate", "voteforjane"]), which the server fans ' +
+      'out across all approved TLDs, or include an explicit approved ' +
+      'TLD (e.g. "janeforsenate.run"). Returns { candidates: ' +
       '[{ domain, price }] } for ranking. Returns only available ' +
       'domains; an empty candidates list means nothing matched under ' +
       'the cap. Read-only; safe to retry.',

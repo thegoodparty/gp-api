@@ -477,10 +477,24 @@ describe('DomainsService', () => {
         (c) => c[0] as string,
       )
       expect(tried.sort()).toEqual(
-        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
+        [
+          'voteforoneill.run',
+          'voteforoneill.bio',
+          'voteforoneill.fyi',
+          'voteforoneill.win',
+          'voteforoneill.digital',
+          'voteforoneill.site',
+        ].sort(),
       )
       expect(result.candidates.map((c) => c.domain).sort()).toEqual(
-        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
+        [
+          'voteforoneill.run',
+          'voteforoneill.bio',
+          'voteforoneill.fyi',
+          'voteforoneill.win',
+          'voteforoneill.digital',
+          'voteforoneill.site',
+        ].sort(),
       )
     })
 
@@ -510,7 +524,7 @@ describe('DomainsService', () => {
 
       await service.searchDomainsForCampaign(
         campaignWithUser,
-        ['voteoneill', 'voteoneill.com'],
+        ['voteoneill', 'voteoneill.run'],
         10,
       )
 
@@ -518,7 +532,14 @@ describe('DomainsService', () => {
         (c) => c[0] as string,
       )
       expect(tried.sort()).toEqual(
-        ['voteoneill.com', 'voteoneill.org', 'voteoneill.vote'].sort(),
+        [
+          'voteoneill.run',
+          'voteoneill.bio',
+          'voteoneill.fyi',
+          'voteoneill.win',
+          'voteoneill.digital',
+          'voteoneill.site',
+        ].sort(),
       )
     })
 

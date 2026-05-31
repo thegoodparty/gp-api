@@ -56,7 +56,18 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
 
-const SUPPORTED_TLDS = ['com', 'org', 'vote'] as const
+// GoodParty's approved campaign TLD allowlist. Must stay in sync with the
+// compliance_setup agent instruction (runbooks experiments/compliance_setup/
+// instruction.md), which rejects any out-of-allowlist TLD as
+// `unapproved_tld_returned`. .com/.org/.net/.vote are intentionally excluded.
+export const SUPPORTED_TLDS = [
+  'run',
+  'bio',
+  'fyi',
+  'win',
+  'digital',
+  'site',
+] as const
 
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
