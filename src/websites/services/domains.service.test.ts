@@ -516,6 +516,25 @@ describe('DomainsService', () => {
       expect(tried).toEqual(['vote-oneill.run'])
     })
 
+    it('drops dot-containing patterns whose TLD is not on the allowlist', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['voteoneill.com', 'voteoneill.org', 'voteoneill.run'],
+        10,
+      )
+
+      const tried = mockRoute53.checkDomainAvailability.mock.calls.map(
+        (c) => c[0] as string,
+      )
+      expect(tried).toEqual(['voteoneill.run'])
+      expect(result.candidates.map((c) => c.domain)).toEqual(['voteoneill.run'])
+    })
+
     it('dedupes after fan-out when bare and TLD-bearing patterns overlap', async () => {
       mockRoute53.checkDomainAvailability.mockResolvedValue({
         Availability: DomainAvailability.AVAILABLE,

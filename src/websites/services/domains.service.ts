@@ -44,8 +44,10 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import {
   DomainPurchaseMetadata,
   DomainSearchResult,
+  hasSupportedTld,
   PatternedDomainCandidate,
   PatternedDomainSearchResult,
+  SUPPORTED_TLDS,
 } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import {
@@ -55,19 +57,6 @@ import {
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
-
-// GoodParty's approved campaign TLD allowlist. Must stay in sync with the
-// compliance_setup agent instruction (runbooks experiments/compliance_setup/
-// instruction.md), which rejects any out-of-allowlist TLD as
-// `unapproved_tld_returned`. .com/.org/.net/.vote are intentionally excluded.
-export const SUPPORTED_TLDS = [
-  'run',
-  'bio',
-  'fyi',
-  'win',
-  'digital',
-  'site',
-] as const
 
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
@@ -454,12 +443,16 @@ export class DomainsService
     // bare SLD patterns (no TLD) and the server fans them out across the
     // supported TLDs. Patterns that already include a TLD are passed through
     // unchanged so existing alternation syntax (e.g. `vote-x.(run|bio)`)
-    // keeps working.
+    // keeps working — but only when that TLD is on the allowlist, so an
+    // explicit `candidate.com` can't bypass the "never offered" promise.
     const candidates = Array.from(
       new Set(
-        expanded.flatMap((c) =>
-          c.includes('.') ? [c] : SUPPORTED_TLDS.map((tld) => `${c}.${tld}`),
-        ),
+        expanded.flatMap((c) => {
+          if (!c.includes('.')) {
+            return SUPPORTED_TLDS.map((tld) => `${c}.${tld}`)
+          }
+          return hasSupportedTld(c) ? [c] : []
+        }),
       ),
     )
 

@@ -11,7 +11,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { DomainsService, SUPPORTED_TLDS } from '../services/domains.service'
+import { DomainsService } from '../services/domains.service'
 import { PaymentStatus } from 'src/payments/payments.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
@@ -33,6 +33,7 @@ import {
   DomainOperationType,
   DomainStatusResponse,
   PatternedDomainSearchResult,
+  SUPPORTED_TLDS,
 } from '../domains.types'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { McpTool } from '@/mcp/decorators/McpTool.decorator'
