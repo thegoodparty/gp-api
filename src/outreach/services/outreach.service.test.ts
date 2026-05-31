@@ -35,6 +35,7 @@ const mockPeerlyCreateJob = vi.fn()
 const mockResolveP2pJobGeography = vi.fn()
 const mockNotifySuccess = vi.fn()
 const mockFindVoterFileFilter = vi.fn()
+const mockFilterAccessCheck = vi.fn()
 
 vi.mock('../util/campaignGeography.util', () => ({
   resolveP2pJobGeography: (
@@ -92,6 +93,8 @@ describe('OutreachService', () => {
     mockNotifySuccess.mockReset()
     mockNotifySuccess.mockResolvedValue(undefined)
     mockFindVoterFileFilter.mockReset()
+    mockFilterAccessCheck.mockReset()
+    mockFilterAccessCheck.mockResolvedValue(undefined)
 
     const mockPrismaService = {
       outreach: {
@@ -129,6 +132,7 @@ describe('OutreachService', () => {
           provide: VoterFileFilterService,
           useValue: {
             findByIdAndOrganizationSlug: mockFindVoterFileFilter,
+            filterAccessCheck: mockFilterAccessCheck,
           },
         },
         OutreachService,
@@ -361,11 +365,12 @@ describe('OutreachService', () => {
       )
 
       expect(mockFindVoterFileFilter).toHaveBeenCalledWith(42, 'org-test')
+      expect(mockFilterAccessCheck).toHaveBeenCalledWith('org-test')
       expect(mockOutreachCreate).toHaveBeenCalledTimes(1)
       expect(result).toEqual(created)
     })
 
-    it('throws BadRequest when voterFileFilterId does not belong to the campaign org', async () => {
+    it('throws NotFoundException when voterFileFilterId does not belong to the campaign org', async () => {
       const dto: CreateOutreachSchema = {
         ...baseCreateDto,
         voterFileFilterId: 99,
@@ -374,12 +379,36 @@ describe('OutreachService', () => {
 
       await expect(
         service.create(mockUser, mockCampaign, dto, undefined, undefined),
-      ).rejects.toThrow(BadRequestException)
+      ).rejects.toThrow(NotFoundException)
       await expect(
         service.create(mockUser, mockCampaign, dto, undefined, undefined),
       ).rejects.toThrow(/Voter file filter not found/)
 
       expect(mockFindVoterFileFilter).toHaveBeenCalledWith(99, 'org-test')
+      expect(mockFilterAccessCheck).not.toHaveBeenCalled()
+      expect(mockOutreachCreate).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequest when filterAccessCheck rejects a non-pro campaign', async () => {
+      const dto: CreateOutreachSchema = {
+        ...baseCreateDto,
+        voterFileFilterId: 42,
+      }
+      mockFindVoterFileFilter.mockResolvedValue({
+        id: 42,
+        organizationSlug: 'org-test',
+      })
+      mockFilterAccessCheck.mockRejectedValue(
+        new BadRequestException('Campaign is not pro'),
+      )
+
+      await expect(
+        service.create(mockUser, mockCampaign, dto, undefined, undefined),
+      ).rejects.toThrow(BadRequestException)
+      await expect(
+        service.create(mockUser, mockCampaign, dto, undefined, undefined),
+      ).rejects.toThrow(/Campaign is not pro/)
+
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 
