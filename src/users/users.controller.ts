@@ -114,7 +114,7 @@ export class UsersController {
       throw new BadRequestException('No file found')
     }
 
-    const key = this.s3.buildKey('uploads', file.filename)
+    const key = this.s3.buildKey(`uploads/${user.id}`, file.filename)
     const avatar = await this.s3.uploadFile(ASSET_DOMAIN, file.data, key, {
       contentType: file.mimetype,
       cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,

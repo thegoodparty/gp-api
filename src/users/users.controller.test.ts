@@ -394,7 +394,10 @@ describe('UsersController', () => {
 
       const result = await controller.uploadImage(mockUser, file)
 
-      expect(s3Service.buildKey).toHaveBeenCalledWith('uploads', file.filename)
+      expect(s3Service.buildKey).toHaveBeenCalledWith(
+        `uploads/${mockUser.id}`,
+        file.filename,
+      )
       expect(s3Service.uploadFile).toHaveBeenCalledWith(
         expect.any(String),
         file.data,
