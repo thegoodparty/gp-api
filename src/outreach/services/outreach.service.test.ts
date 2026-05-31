@@ -34,6 +34,7 @@ const mockTcrFindFirstOrThrow = vi.fn()
 const mockPeerlyCreateJob = vi.fn()
 const mockResolveP2pJobGeography = vi.fn()
 const mockNotifySuccess = vi.fn()
+const mockFindVoterFileFilter = vi.fn()
 
 vi.mock('../util/campaignGeography.util', () => ({
   resolveP2pJobGeography: (
@@ -55,6 +56,7 @@ describe('OutreachService', () => {
   const mockCampaign = {
     id: 1,
     slug: 'jane-doe',
+    organizationSlug: 'org-test',
     aiContent: {},
     data: { hubspotId: 'hub-1' },
     details: null,
@@ -89,6 +91,7 @@ describe('OutreachService', () => {
     mockResolveP2pJobGeography.mockReset()
     mockNotifySuccess.mockReset()
     mockNotifySuccess.mockResolvedValue(undefined)
+    mockFindVoterFileFilter.mockReset()
 
     const mockPrismaService = {
       outreach: {
@@ -125,7 +128,7 @@ describe('OutreachService', () => {
         {
           provide: VoterFileFilterService,
           useValue: {
-            findByIdAndOrganizationSlug: vi.fn(),
+            findByIdAndOrganizationSlug: mockFindVoterFileFilter,
           },
         },
         OutreachService,
@@ -330,6 +333,53 @@ describe('OutreachService', () => {
       ).rejects.toThrow(/filename and MIME type|Peerly job setup/)
 
       expect(mockTcrFindFirstOrThrow).not.toHaveBeenCalled()
+      expect(mockOutreachCreate).not.toHaveBeenCalled()
+    })
+
+    it('succeeds when voterFileFilterId belongs to the campaign org', async () => {
+      const dto: CreateOutreachSchema = {
+        ...baseCreateDto,
+        voterFileFilterId: 42,
+      }
+      mockFindVoterFileFilter.mockResolvedValue({
+        id: 42,
+        organizationSlug: 'org-test',
+      })
+      const created = {
+        id: 1,
+        ...dto,
+        voterFileFilter: { id: 42 },
+      }
+      mockOutreachCreate.mockResolvedValue(created)
+
+      const result = await service.create(
+        mockUser,
+        mockCampaign,
+        dto,
+        undefined,
+        undefined,
+      )
+
+      expect(mockFindVoterFileFilter).toHaveBeenCalledWith(42, 'org-test')
+      expect(mockOutreachCreate).toHaveBeenCalledTimes(1)
+      expect(result).toEqual(created)
+    })
+
+    it('throws BadRequest when voterFileFilterId does not belong to the campaign org', async () => {
+      const dto: CreateOutreachSchema = {
+        ...baseCreateDto,
+        voterFileFilterId: 99,
+      }
+      mockFindVoterFileFilter.mockResolvedValue(null)
+
+      await expect(
+        service.create(mockUser, mockCampaign, dto, undefined, undefined),
+      ).rejects.toThrow(BadRequestException)
+      await expect(
+        service.create(mockUser, mockCampaign, dto, undefined, undefined),
+      ).rejects.toThrow(/Voter file filter not found/)
+
+      expect(mockFindVoterFileFilter).toHaveBeenCalledWith(99, 'org-test')
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 
