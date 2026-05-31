@@ -17,6 +17,7 @@ import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
+import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { PeerlyP2pJobService } from 'src/vendors/peerly/services/peerlyP2pJob.service'
 import type {
   CampaignGeographyInput,
@@ -120,6 +121,12 @@ describe('OutreachService', () => {
         {
           provide: OutreachNotificationService,
           useValue: { notifySuccess: mockNotifySuccess },
+        },
+        {
+          provide: VoterFileFilterService,
+          useValue: {
+            findByIdAndOrganizationSlug: vi.fn(),
+          },
         },
         OutreachService,
       ],
