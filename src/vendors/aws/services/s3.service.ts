@@ -216,6 +216,25 @@ export class S3Service extends AwsService {
     }, 'objectExists')
   }
 
+  async getObjectSize(
+    bucket: string,
+    key: string,
+  ): Promise<number | undefined> {
+    return this.executeAwsOperation(async () => {
+      try {
+        const { HeadObjectCommand } = await import('@aws-sdk/client-s3')
+        const head = await this.s3Client.send(
+          new HeadObjectCommand({ Bucket: bucket, Key: key }),
+        )
+        return head.ContentLength
+      } catch (error: unknown) {
+        if (error instanceof NoSuchKey) return undefined
+        if (isHttpStatusError(error, 404)) return undefined
+        throw error
+      }
+    }, 'getObjectSize')
+  }
+
   getFileUrl(
     bucket: string,
     key: string,

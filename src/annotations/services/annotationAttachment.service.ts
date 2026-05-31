@@ -26,6 +26,7 @@ const MAX_ATTACHMENTS_PER_NOTE = 20
 const UPLOAD_URL_EXPIRES_IN = 60 * 15 // 15 minutes
 const DOWNLOAD_URL_EXPIRES_IN = 60 * 15 // 15 minutes
 const OCR_TEXT_MAX_BYTES = 200_000
+const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024 // 20 MB
 
 /**
  * Attachment lifecycle on top-level briefing notes. Each step is gated by
@@ -167,9 +168,8 @@ export class AnnotationAttachmentService extends createPrismaBase(
   }
 
   /**
-   * Confirms the upload landed in S3 and enqueues the OCR job. We don't
-   * validate file contents here — the OCR worker rejects mime/size
-   * mismatches when it actually reads the bytes.
+   * Confirms the upload landed in S3, verifies the actual object size
+   * against the declared size, and enqueues the OCR job.
    */
   async completeUpload(
     annotationId: string,
@@ -184,7 +184,13 @@ export class AnnotationAttachmentService extends createPrismaBase(
     )
     const attachment = await this.client.annotationNoteAttachment.findUnique({
       where: { id: attachmentId },
-      select: { id: true, noteId: true, storageKey: true, ocrStatus: true },
+      select: {
+        id: true,
+        noteId: true,
+        storageKey: true,
+        ocrStatus: true,
+        sizeBytes: true,
+      },
     })
     if (!attachment || attachment.noteId !== noteId) {
       throw new NotFoundException('attachment_not_found')
@@ -193,15 +199,18 @@ export class AnnotationAttachmentService extends createPrismaBase(
       throw new BadRequestException('attachment_already_processed')
     }
 
-    // HEAD instead of full GET — we only need to know the object is there,
-    // not read its bytes (the OCR worker reads the bytes later via
-    // OcrService).
-    const exists = await this.s3.objectExists(
+    const actualSize = await this.s3.getObjectSize(
       this.bucket,
       attachment.storageKey,
     )
-    if (!exists) {
+    if (actualSize === undefined) {
       throw new BadRequestException('upload_not_received')
+    }
+    if (
+      actualSize > ATTACHMENT_MAX_BYTES ||
+      actualSize > attachment.sizeBytes
+    ) {
+      throw new BadRequestException('upload_size_exceeded')
     }
 
     await this.queue.sendMessage(
