@@ -180,8 +180,19 @@ parse_pg_url() {
   # password are URL-decoded so libpq sees the literal credential.
   local rest userinfo
   rest="${1#*://}"
-  _pg_db="${rest##*/}"
-  rest="${rest%/*}"
+  # Split off the /dbname suffix ONLY if it's present. Without this guard,
+  # a URL like `postgres://u:p@host:5432` (no path) would leave _pg_db
+  # set to the entire `u:p@host:5432` string (leaking the password into
+  # PGDATABASE) and PGDATABASE would later cause psql to error with
+  # `database "u:p@host:5432" does not exist`. Empty _pg_db is fine —
+  # the export guards below skip empty values and libpq falls back to
+  # the user name.
+  if [[ "$rest" == */* ]]; then
+    _pg_db="${rest##*/}"
+    rest="${rest%/*}"
+  else
+    _pg_db=""
+  fi
   if [[ "$rest" == *@* ]]; then
     # %@* takes everything before the LAST @, so passwords containing
     # un-encoded @ stay intact (rare but possible).
