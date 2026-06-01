@@ -1,13 +1,15 @@
-import { UserRole } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ROLES_KEY } from '@/authentication/decorators/Roles.decorator'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { MCP_TOOL_KEY } from '@/mcp/decorators/McpTool.decorator'
 import { AdminAgentRunsController } from './adminAgentRuns.controller'
 import { AdminAgentRunsService } from './services/adminAgentRuns.service'
 import { AdminAgentRunsListQueryDto } from './schemas/adminAgentRuns.schema'
 
-const rolesFor = (method: keyof AdminAgentRunsController) =>
-  Reflect.getMetadata(ROLES_KEY, AdminAgentRunsController.prototype[method])
+const guardsFor = (method: keyof AdminAgentRunsController) =>
+  Reflect.getMetadata(
+    '__guards__',
+    AdminAgentRunsController.prototype[method],
+  ) ?? []
 
 const mcpToolFor = (method: keyof AdminAgentRunsController) =>
   Reflect.getMetadata(MCP_TOOL_KEY, AdminAgentRunsController.prototype[method])
@@ -25,9 +27,9 @@ describe('AdminAgentRunsController', () => {
     controller = new AdminAgentRunsController(service)
   })
 
-  it('restricts both endpoints to admins', () => {
-    expect(rolesFor('list')).toEqual([UserRole.admin])
-    expect(rolesFor('detail')).toEqual([UserRole.admin])
+  it('restricts both endpoints to M2M callers (the gp-admin SDK path)', () => {
+    expect(guardsFor('list')).toContain(M2MOnly)
+    expect(guardsFor('detail')).toContain(M2MOnly)
   })
 
   it('does not expose either endpoint as an MCP tool', () => {
