@@ -7,6 +7,8 @@ import { truncateZip } from 'src/shared/util/zipcodes.util'
 import zipcodes from 'zipcodes'
 import { ElectionLevels } from '../../shared/constants/governmentLevels'
 import {
+  BallotReadyMilestone,
+  RaceMilestonesGraphResponse,
   RaceNode,
   RacesByIdNode,
   RacesByZipcode,
@@ -14,6 +16,10 @@ import {
   RaceWithOfficeHolders,
   RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
+import type {
+  MilestoneWindow,
+  RaceMilestones,
+} from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
@@ -476,10 +482,103 @@ export class BallotReadyService {
     }
   }
 
+  // Fetch the per-category milestone windows for a BR race. Source:
+  // Race.election.milestones() — BR returns one row per (category, type,
+  // feature), so we collapse via earliest OPEN / latest CLOSE per
+  // category. Returns null on any failure so callers can null-fill the
+  // field without failing the parent request — milestones are enrichment,
+  // not core.
+  async fetchMilestones(brHashId: string): Promise<RaceMilestones | null> {
+    if (!brHashId) return null
+    const query = gql`
+      query MilestonesForRace($raceId: ID!) {
+        node(id: $raceId) {
+          ... on Race {
+            election {
+              milestones {
+                category
+                type
+                at
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<
+        RaceMilestonesGraphResponse,
+        { raceId: string }
+      >(query, { raceId: brHashId })
+      const milestones = result?.node?.election?.milestones ?? []
+      return collapseMilestones(milestones)
+    } catch (error) {
+      this.logger.warn(
+        { error, brHashId },
+        'BR Race.election.milestones lookup failed',
+      )
+      return null
+    }
+  }
+
   constructor(private readonly logger: PinoLogger) {
     this.logger.setContext(BallotReadyService.name)
   }
 }
+
+// Group BR milestones by category, picking the earliest OPEN and latest
+// CLOSE per category. BR returns one row per (category, type, feature)
+// combo — e.g. REGISTRATION CLOSE has separate rows for IN_PERSON, MAIL,
+// ONLINE deadlines. Earliest OPEN captures the first opportunity to
+// register/vote; latest CLOSE captures the final deadline a voter can
+// still hit (matters because some states close ONLINE earlier than
+// IN_PERSON). UI consumers can render the window without reasoning about
+// features. Exported for direct unit testing.
+export const collapseMilestones = (
+  milestones: BallotReadyMilestone[],
+): RaceMilestones => {
+  const grouped: Record<string, { opens: string[]; closes: string[] }> = {
+    REGISTRATION: { opens: [], closes: [] },
+    EARLY_VOTING: { opens: [], closes: [] },
+    REQUEST_BALLOT: { opens: [], closes: [] },
+  }
+
+  for (const m of milestones) {
+    if (!m.at) continue
+    const bucket = grouped[m.category]
+    if (!bucket) continue
+    if (m.type === 'OPEN') bucket.opens.push(m.at)
+    else if (m.type === 'CLOSE') bucket.closes.push(m.at)
+  }
+
+  return {
+    voter_registration: toWindow(grouped.REGISTRATION),
+    early_voting: toWindow(grouped.EARLY_VOTING),
+    request_ballot: toWindow(grouped.REQUEST_BALLOT),
+  }
+}
+
+const toWindow = (bucket: {
+  opens: string[]
+  closes: string[]
+}): MilestoneWindow | null => {
+  const start = earliestDate(bucket.opens)
+  const end = latestDate(bucket.closes)
+  if (start === null && end === null) return null
+  return { start, end }
+}
+
+const earliestDate = (values: string[]): string | null => {
+  if (values.length === 0) return null
+  return toIsoDate(values.reduce((a, b) => (a < b ? a : b)))
+}
+
+const latestDate = (values: string[]): string | null => {
+  if (values.length === 0) return null
+  return toIsoDate(values.reduce((a, b) => (a > b ? a : b)))
+}
+
+const toIsoDate = (value: string): string => value.slice(0, 10)
 
 function getMonthBounds(dateString: string): { gt: string; lt: string } {
   const reference = parseISO(dateString)

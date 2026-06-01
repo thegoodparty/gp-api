@@ -3,6 +3,7 @@ import {
   CampaignStatus,
   OnboardingStep,
   type ListCampaignsPagination,
+  type RaceMilestones,
 } from '@goodparty_org/contracts'
 import {
   BadRequestException,
@@ -15,6 +16,7 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import { differenceInMilliseconds, formatISO } from 'date-fns'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import {
   CampaignStrategyContextResponse,
@@ -65,6 +67,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly stripeService: StripeService,
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
+    private readonly ballotReady: BallotReadyService,
     private readonly organizations: OrganizationsService,
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CampaignTasksService))
@@ -774,23 +777,28 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (!org?.overrideDistrictId && !org?.positionId && !raceId) return null
 
-    // Two race-hash-keyed lookups in parallel: civics context (the new
+    // Three race-hash-keyed lookups in parallel: civics context (the new
     // unified source for win number, projected turnout, voter counts,
-    // candidates, dates) and filing fee. Both return null on failure,
-    // letting us degrade gracefully to the position-based path below.
-    const [contextResult, filingFeeFromRaceHash] = await Promise.all([
-      raceId
-        ? this.elections.fetchCampaignStrategyContext(raceId)
-        : Promise.resolve(null),
-      raceId
-        ? this.elections.fetchFilingFeeByRaceHash(raceId)
-        : Promise.resolve(null),
-    ])
+    // candidates, dates), filing fee, and BR campaign-timeline milestones.
+    // Milestones come straight from BR GraphQL — election-api doesn't
+    // store or expose them. All three return null on failure, letting us
+    // degrade gracefully to the position-based path below.
+    const [contextResult, filingFeeFromRaceHash, milestones] =
+      await Promise.all([
+        raceId
+          ? this.elections.fetchCampaignStrategyContext(raceId)
+          : Promise.resolve(null),
+        raceId
+          ? this.elections.fetchFilingFeeByRaceHash(raceId)
+          : Promise.resolve(null),
+        raceId ? this.ballotReady.fetchMilestones(raceId) : Promise.resolve(null),
+      ])
 
     if (contextResult) {
       return this.mapContextToRaceTargetMetrics(
         contextResult,
         filingFeeFromRaceHash,
+        milestones,
       )
     }
 
@@ -816,6 +824,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFee: filingFeeFromRaceHash?.filingFee ?? null,
         filingRequirementsText:
           filingFeeFromRaceHash?.filingRequirementsText ?? null,
+        milestones,
       }
     }
 
@@ -853,12 +862,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFeeFromRaceHash !== null
           ? filingFeeFromRaceHash.filingRequirementsText
           : (filingRequirementsText ?? null),
+      milestones,
     }
   }
 
   private mapContextToRaceTargetMetrics(
     context: CampaignStrategyContextResponse,
     filingFeeFromRaceHash: FilingFeeByBrHashResult | null,
+    milestones: RaceMilestones | null,
   ): RaceTargetMetrics {
     // win_number_effective prefers BR's calibrated civics number when
     // available, falls back to floor(turnout / 2) + 1 — both computed on
@@ -895,6 +906,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       officeLevel: context.office_level,
       officeType: context.office_type,
       numberOfSeats: context.number_of_seats,
+      milestones,
     }
   }
 }
@@ -922,4 +934,5 @@ const emptyContextFields = (): Omit<
   officeLevel: null,
   officeType: null,
   numberOfSeats: null,
+  milestones: null,
 })

@@ -188,7 +188,10 @@ export type CampaignStrategyContextCandidate = {
  * endpoint takes the BR race hash on `campaign.details.raceId` and returns
  * the per-race civics context — voter counts, candidate roster, win-number
  * variants, election dates. See election-api
- * `CampaignStrategyContextResponse` for the source of truth.
+ * `CampaignStrategyContextResponse` for the source of truth. Milestone
+ * windows are NOT on this response — gp-api calls BR's GraphQL directly
+ * for those via `BallotReadyService.fetchMilestones` and merges them onto
+ * `RaceTargetMetrics` in `fetchLiveRaceTargetMetrics`.
  */
 export type CampaignStrategyContextResponse = {
   candidate_count: number
