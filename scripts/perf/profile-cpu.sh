@@ -103,8 +103,20 @@ display_cmd_tail() {
   fi
 }
 
+# Without these guards, `profile-cpu.sh -- node` (or `-- tsx`, `-- npx tsx`)
+# with no following script argument would `exec node …` with no script,
+# silently launching an interactive REPL — no .cpuprofile written, no
+# error printed, the process just hangs at a Node prompt. The outer
+# `$# -eq 0` check on a fully-empty invocation fires before $CMD is
+# consumed, so it doesn't cover these cases.
 case "$(basename "$CMD")" in
   node)
+    if [[ $# -eq 0 ]]; then
+      echo "✗ Missing script argument for 'node'." >&2
+      echo "  Usage: $0 -- node <script-or-dist-entry> [args...]" >&2
+      echo "  Example: $0 -- node dist/main.js" >&2
+      exit 2
+    fi
     echo "→ node ${NODE_FLAGS[*]} $(display_cmd_tail "$@")"
     echo "  Stop with ^C; one-shot scripts exit on their own."
     echo "  Profile dir: $DIR"
@@ -114,6 +126,11 @@ case "$(basename "$CMD")" in
 
   tsx)
     # Translate `tsx script.ts ...` → `node --cpu-prof ... --import tsx script.ts ...`
+    if [[ $# -eq 0 ]]; then
+      echo "✗ Missing script argument for 'tsx'." >&2
+      echo "  Usage: $0 -- tsx <script.ts> [args...]" >&2
+      exit 2
+    fi
     require_local_tsx "tsx"
     echo "→ node ${NODE_FLAGS[*]} --import tsx $(display_cmd_tail "$@")"
     echo "  Profile dir: $DIR"
@@ -125,6 +142,11 @@ case "$(basename "$CMD")" in
     # Common pattern: `npx tsx script.ts ...` — translate same as above.
     if [[ "${1:-}" == "tsx" ]]; then
       shift
+      if [[ $# -eq 0 ]]; then
+        echo "✗ Missing script argument for 'npx tsx'." >&2
+        echo "  Usage: $0 -- npx tsx <script.ts> [args...]" >&2
+        exit 2
+      fi
       require_local_tsx "npx tsx"
       echo "→ node ${NODE_FLAGS[*]} --import tsx $(display_cmd_tail "$@")  (translated from 'npx tsx')"
       echo "  Profile dir: $DIR"
