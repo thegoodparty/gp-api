@@ -213,6 +213,34 @@ describe('AiChatService.streamChat', () => {
     expect(messages[3]).toMatchObject({ role: 'assistant', content: 'resp' })
   })
 
+  it('strips legacy HTML from prior assistant messages before replaying history', async () => {
+    fakeModel.findFirstOrThrow.mockResolvedValue({
+      id: 5,
+      data: {
+        messages: [
+          { role: 'user', content: 'q1', id: 'u1' },
+          { role: 'assistant', content: 'line1<br/><br/>line2', id: 'a1' },
+        ],
+      },
+    })
+    streamChatCompletion.mockResolvedValue(makeStreamResult(['ok']))
+
+    await collect(
+      service.streamChat(
+        CAMPAIGN,
+        asBody({ threadId: 't1', message: 'q2' }),
+        null,
+      ),
+    )
+
+    const sent = streamChatCompletion.mock.calls[0][0].messages
+    const priorAssistant = sent.find(
+      (m: { role: string }) => m.role === 'assistant',
+    )
+    expect(priorAssistant.content).toBe('line1\n\nline2')
+    expect(priorAssistant.content).not.toContain('<br')
+  })
+
   it('re-sends the last user message and replaces the assistant reply on regenerate', async () => {
     fakeModel.findFirstOrThrow.mockResolvedValue({
       id: 9,

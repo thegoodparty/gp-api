@@ -142,6 +142,23 @@ describe('AiChatController.stream', () => {
     expect(captured?.aborted).toBe(true)
   })
 
+  it('cleans up the close listener and bails when writeHead throws', async () => {
+    const { controller, streamChat } = makeController(() =>
+      gen([{ type: 'text', delta: 'a' }]),
+    )
+    const reply = makeReply()
+    reply.raw.writeHead = vi.fn(() => {
+      throw new Error('socket destroyed')
+    })
+    const req = makeReq()
+
+    await controller.stream(CAMPAIGN, BODY, req as never, reply as never)
+
+    expect(req.raw.off).toHaveBeenCalledWith('close', expect.any(Function))
+    expect(streamChat).not.toHaveBeenCalled()
+    expect(reply.raw.end).not.toHaveBeenCalled()
+  })
+
   it('writes a timeout error chunk when the stream exceeds the deadline', async () => {
     vi.useFakeTimers()
     let release!: () => void

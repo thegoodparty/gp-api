@@ -248,7 +248,18 @@ export class AiChatController {
       abortController.abort()
     }, STREAM_TIMEOUT_MS)
 
-    reply.raw.writeHead(HttpStatus.OK, SSE_HEADERS)
+    // writeHead can throw if the client disconnected between the close-listener
+    // setup and here (write to a destroyed socket). Clean up the timer + close
+    // listener explicitly, since the cleanup `finally` below this point would
+    // otherwise be skipped.
+    try {
+      reply.raw.writeHead(HttpStatus.OK, SSE_HEADERS)
+    } catch (err) {
+      clearTimeout(timeout)
+      req.raw.off('close', onClose)
+      this.logger.error({ e: err }, 'failed to write SSE headers')
+      return
+    }
 
     let liveMetrics: RaceTargetMetrics | null = null
     try {

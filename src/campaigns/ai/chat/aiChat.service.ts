@@ -41,6 +41,13 @@ const MARKDOWN_FORMAT_DIRECTIVE = `Formatting requirements (these override any e
 - Respond using GitHub-flavored Markdown ONLY. Do not output raw HTML tags (no <p>, <ul>, <li>, <a>, <br>, <strong>, etc.).
 - Use **bold**, *italics*, \`inline code\`, fenced code blocks, bullet and numbered lists, ## headings, tables, and Markdown links in the form [label](https://example.com).`
 
+// Threads created before this PR stored assistant content as HTML
+// (formatHtmlLlmResponse turned \n into <br/><br/>). Strip those artifacts
+// before replaying history to the model so it follows the Markdown directive
+// instead of mimicking the HTML present in prior turns.
+const stripLegacyHtml = (content: string): string =>
+  content.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+
 const getErrorStatus = (err: unknown): number | undefined => {
   if (err && typeof err === 'object') {
     const candidate = err as { status?: number; statusCode?: number }
@@ -266,6 +273,11 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         content: `${systemPrompt}\n${candidateContext}\n\n${MARKDOWN_FORMAT_DIRECTIVE}`,
       },
       ...priorMessages
+        .map((m) =>
+          m.role === 'assistant' && typeof m.content === 'string'
+            ? { ...m, content: stripLegacyHtml(m.content) }
+            : m,
+        )
         .map(toChatCompletionMessage)
         .filter(isChatCompletionMessage),
       { role: 'user', content: userContent },
