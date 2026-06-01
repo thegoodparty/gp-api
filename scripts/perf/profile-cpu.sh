@@ -85,9 +85,27 @@ require_local_tsx() {
   fi
 }
 
+# Echo the user's command shape without exposing the full argv. The
+# script path (first arg) is shown — it's never a secret — but everything
+# after is replaced with `<args>` to keep API keys, DB URLs, tokens,
+# etc. out of stdout / CI logs / shell history. The exec() below still
+# passes the unmodified "$@", so the program receives its real args.
+display_cmd_tail() {
+  # $1 = script path (or empty); rest = args. Echoes "script [N more args]".
+  local script="${1:-}"
+  shift || true
+  if [[ -z "$script" ]]; then
+    return
+  elif [[ $# -eq 0 ]]; then
+    echo -n "$script"
+  else
+    echo -n "$script <args>"
+  fi
+}
+
 case "$(basename "$CMD")" in
   node)
-    echo "→ node ${NODE_FLAGS[*]} $*"
+    echo "→ node ${NODE_FLAGS[*]} $(display_cmd_tail "$@")"
     echo "  Stop with ^C; one-shot scripts exit on their own."
     echo "  Profile dir: $DIR"
     echo
@@ -97,7 +115,7 @@ case "$(basename "$CMD")" in
   tsx)
     # Translate `tsx script.ts ...` → `node --cpu-prof ... --import tsx script.ts ...`
     require_local_tsx "tsx"
-    echo "→ node ${NODE_FLAGS[*]} --import tsx $*"
+    echo "→ node ${NODE_FLAGS[*]} --import tsx $(display_cmd_tail "$@")"
     echo "  Profile dir: $DIR"
     echo
     exec node "${NODE_FLAGS[@]}" --import tsx "$@"
@@ -108,12 +126,13 @@ case "$(basename "$CMD")" in
     if [[ "${1:-}" == "tsx" ]]; then
       shift
       require_local_tsx "npx tsx"
-      echo "→ node ${NODE_FLAGS[*]} --import tsx $*  (translated from 'npx tsx')"
+      echo "→ node ${NODE_FLAGS[*]} --import tsx $(display_cmd_tail "$@")  (translated from 'npx tsx')"
       echo "  Profile dir: $DIR"
       echo
       exec node "${NODE_FLAGS[@]}" --import tsx "$@"
     fi
-    echo "✗ Unsupported: 'npx $*'. This script only auto-translates 'npx tsx <script>'." >&2
+    # Only show the tool name (first arg), not its args.
+    echo "✗ Unsupported: 'npx ${1:-<empty>} …'. This script only auto-translates 'npx tsx <script>'." >&2
     echo "  For other 'npx <tool>' targets, invoke node directly:" >&2
     echo "    $0 -- node <path-to-the-tool's-bin> <args>" >&2
     exit 2
