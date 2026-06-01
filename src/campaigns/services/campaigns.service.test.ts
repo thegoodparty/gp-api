@@ -1388,6 +1388,50 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       ).toHaveBeenCalled()
     })
 
+    it('threads milestones through the position-based fallback path', async () => {
+      // The fan-out fires fetchMilestones whenever raceId is present,
+      // independent of whether context resolves. Without this assertion,
+      // a regression that hardcoded `milestones: null` on the fallback
+      // branch in campaigns.service.ts would still pass every other
+      // test (mockBallotReady defaults to null + EMPTY_RACE_CONTEXT_FIELDS
+      // asserts null).
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue(
+        null,
+      )
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+      vi.mocked(
+        mockElections.getPositionMatchedRaceTargetDetails!,
+      ).mockResolvedValue({
+        district: {
+          id: 'd-1',
+          state: 'CA',
+          L2DistrictType: 'State_Senate',
+          L2DistrictName: 'STATE SENATE 001',
+          projectedTurnout: null,
+        },
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
+      })
+      vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(mockBallotReady.fetchMilestones).toHaveBeenCalledWith('Z2lk-hash')
+      expect(result?.milestones).toEqual({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+    })
+
     it('returns the context shape even when no org positionId / overrideDistrictId is set (raceId is enough)', async () => {
       vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
         positionId: null,
