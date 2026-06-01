@@ -37,6 +37,19 @@ const parseSchedule = (raw: string): MeetingSchedule =>
 const SCHEDULE_EXPERIMENT_TYPE = 'meeting_schedule'
 const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
 
+/**
+ * Extract the `elected_office_id` field from an ExperimentRun's params
+ * JSONB column without an unsafe cast. Returns null if the params is
+ * not an object, the key is missing, or the value isn't a string.
+ */
+const extractElectedOfficeId = (params: Prisma.JsonValue): string | null => {
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) {
+    return null
+  }
+  const value = params['elected_office_id']
+  return typeof value === 'string' ? value : null
+}
+
 // Identifies the daily-briefing cron in the cron_run lease table.
 const DAILY_BRIEFINGS_CRON_JOB = 'dispatchDailyBriefings'
 
@@ -304,13 +317,8 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (!isAutomationEnabled()) return
 
     // The schedule run's params include `elected_office_id` (snake_case);
-    // see dispatchSchedule().
-    const params =
-      typeof run.params === 'object' && run.params !== null ? run.params : {}
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const electedOfficeId = (params as Record<string, unknown>)[
-      'elected_office_id'
-    ] as string | undefined
+    // see dispatchSchedule(). Narrow Prisma's JsonValue to a string field.
+    const electedOfficeId = extractElectedOfficeId(run.params)
     if (!electedOfficeId) {
       this.logger.warn(
         { runId: run.runId },
