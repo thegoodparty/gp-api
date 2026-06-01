@@ -67,13 +67,17 @@ interface DrainableStream {
   off?: (event: string, cb: () => void) => void
 }
 
+// Resolves 'drained' when the socket is writable again, or 'closed' when it
+// terminated (close/error/abort). Callers must stop writing on 'closed' — a
+// terminal event can arrive before the abort signal flips, so resolving them
+// the same way would let the loop write to a destroyed socket.
 const waitForDrain = (
   stream: DrainableStream,
   signal: AbortSignal,
-): Promise<void> =>
-  new Promise<void>((resolve) => {
+): Promise<'drained' | 'closed'> =>
+  new Promise<'drained' | 'closed'>((resolve) => {
     if (typeof stream.once !== 'function') {
-      resolve()
+      resolve('drained')
       return
     }
     const cleanup = () => {
@@ -84,11 +88,11 @@ const waitForDrain = (
     }
     const onDrain = () => {
       cleanup()
-      resolve()
+      resolve('drained')
     }
     const onTerminal = () => {
       cleanup()
-      resolve()
+      resolve('closed')
     }
     stream.once('drain', onDrain)
     stream.once('close', onTerminal)
@@ -270,7 +274,11 @@ export class AiChatController {
         if (abortController.signal.aborted) break
         const flushed: boolean = reply.raw.write(formatChunk(chunk))
         if (!flushed) {
-          await waitForDrain(reply.raw, abortController.signal)
+          const drainResult = await waitForDrain(
+            reply.raw,
+            abortController.signal,
+          )
+          if (drainResult === 'closed') break
         }
       }
     } catch (err) {

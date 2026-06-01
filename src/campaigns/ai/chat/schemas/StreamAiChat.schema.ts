@@ -31,5 +31,12 @@ export class StreamAiChatSchema extends createZodDto(
           path: ['threadId'],
         })
       }
+      if (val.threadId && !val.regenerate && !val.message) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'message is required when continuing a thread',
+          path: ['message'],
+        })
+      }
     }),
 ) {}
