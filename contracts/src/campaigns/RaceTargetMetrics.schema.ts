@@ -17,6 +17,28 @@ export const RaceCandidateSchema = z.object({
 })
 
 /**
+ * Per-category milestone window. `start` is the earliest OPEN milestone
+ * (e.g. early voting start, voter registration open). `end` is the
+ * latest CLOSE milestone (e.g. voter registration deadline). Both
+ * nullable when BR doesn't return that side of the window.
+ */
+export const MilestoneWindowSchema = z.object({
+  start: z.string().nullable(),
+  end: z.string().nullable(),
+})
+
+/**
+ * Milestone windows for the three BR categories the campaign-plan UI
+ * cares about. Each category nullable when BR has no milestones for it;
+ * the whole object nullable when the BR upstream call failed.
+ */
+export const RaceMilestonesSchema = z.object({
+  voter_registration: MilestoneWindowSchema.nullable(),
+  early_voting: MilestoneWindowSchema.nullable(),
+  request_ballot: MilestoneWindowSchema.nullable(),
+})
+
+/**
  * Live race-target metrics for a single campaign, computed on-demand from the
  * elections service. Returned alongside the full campaign read shape (e.g.
  * `GET /v1/campaigns/:id`).
@@ -66,7 +88,15 @@ export const RaceTargetMetricsSchema = z.object({
   officeLevel: z.string().nullable(),
   officeType: z.string().nullable(),
   numberOfSeats: z.number().nullable(),
+  /**
+   * Campaign-timeline milestones sourced live from BallotReady. Null
+   * when BR is unreachable or the race has no upstream Election; the
+   * rest of the response stays usable in that case.
+   */
+  milestones: RaceMilestonesSchema.nullable(),
 })
 
 export type RaceCandidate = z.infer<typeof RaceCandidateSchema>
+export type MilestoneWindow = z.infer<typeof MilestoneWindowSchema>
+export type RaceMilestones = z.infer<typeof RaceMilestonesSchema>
 export type RaceTargetMetrics = z.infer<typeof RaceTargetMetricsSchema>

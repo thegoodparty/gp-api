@@ -34,6 +34,7 @@ const EMPTY_RACE_CONTEXT_FIELDS = {
   officeLevel: null,
   officeType: null,
   numberOfSeats: null,
+  milestones: null,
 }
 
 const userDefaults = {

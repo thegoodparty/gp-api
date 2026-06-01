@@ -1,3 +1,4 @@
+import { BallotReadyService } from '@/elections/services/ballotReady.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
@@ -47,6 +48,7 @@ const EMPTY_RACE_CONTEXT_FIELDS = {
   officeLevel: null,
   officeType: null,
   numberOfSeats: null,
+  milestones: null,
 }
 
 const mockPositionResponse = {
@@ -130,6 +132,10 @@ const buildOrgSyncModule = async (overrides?: {
       {
         provide: ElectionsService,
         useValue: { getPositionByBallotReadyId: mockGetPosition },
+      },
+      {
+        provide: BallotReadyService,
+        useValue: { fetchMilestones: vi.fn().mockResolvedValue(null) },
       },
       { provide: OrganizationsService, useValue: {} },
       { provide: SlackService, useValue: {} },
@@ -500,6 +506,10 @@ describe('CampaignsService - redeemFreeTexts', () => {
         {
           provide: ElectionsService,
           useValue: {},
+        },
+        {
+          provide: BallotReadyService,
+          useValue: { fetchMilestones: vi.fn().mockResolvedValue(null) },
         },
         {
           provide: OrganizationsService,
@@ -880,9 +890,15 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     fetchCampaignStrategyContext: vi.fn().mockResolvedValue(null),
   }
 
+  const mockBallotReady: Partial<BallotReadyService> = {
+    fetchMilestones: vi.fn().mockResolvedValue(null),
+  }
+
   let service: CampaignsService
 
   beforeEach(() => {
+    vi.mocked(mockBallotReady.fetchMilestones!).mockReset()
+    vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue(null)
     service = new CampaignsService(
       {} as UsersService,
       {} as CrmCampaignsService,
@@ -891,6 +907,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       {} as StripeService,
       {} as GooglePlacesService,
       mockElections as ElectionsService,
+      mockBallotReady as BallotReadyService,
       mockOrganizations as OrganizationsService,
       {} as SlackService,
       { notifySlackOnProUpgrade: vi.fn() } as unknown as CampaignTasksService,
@@ -1282,6 +1299,11 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         filingRequirementsText: 'Filing fee: $100.',
         extractionSource: 'direct_dollar',
       })
+      vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
 
       const result =
         await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
@@ -1315,6 +1337,11 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         officeLevel: 'CITY',
         officeType: 'COUNCIL',
         numberOfSeats: 1,
+        milestones: {
+          voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+          early_voting: { start: '2026-10-20', end: '2026-11-02' },
+          request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+        },
       })
 
       // The legacy position-based path must not fire when context wins.
@@ -1359,6 +1386,50 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       expect(
         mockElections.getPositionMatchedRaceTargetDetails,
       ).toHaveBeenCalled()
+    })
+
+    it('threads milestones through the position-based fallback path', async () => {
+      // The fan-out fires fetchMilestones whenever raceId is present,
+      // independent of whether context resolves. Without this assertion,
+      // a regression that hardcoded `milestones: null` on the fallback
+      // branch in campaigns.service.ts would still pass every other
+      // test (mockBallotReady defaults to null + EMPTY_RACE_CONTEXT_FIELDS
+      // asserts null).
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue(
+        null,
+      )
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+      vi.mocked(
+        mockElections.getPositionMatchedRaceTargetDetails!,
+      ).mockResolvedValue({
+        district: {
+          id: 'd-1',
+          state: 'CA',
+          L2DistrictType: 'State_Senate',
+          L2DistrictName: 'STATE SENATE 001',
+          projectedTurnout: null,
+        },
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
+      })
+      vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(mockBallotReady.fetchMilestones).toHaveBeenCalledWith('Z2lk-hash')
+      expect(result?.milestones).toEqual({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
     })
 
     it('returns the context shape even when no org positionId / overrideDistrictId is set (raceId is enough)', async () => {

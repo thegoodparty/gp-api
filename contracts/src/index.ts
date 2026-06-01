@@ -163,7 +163,13 @@ export {
 } from './campaigns/SetDistrictOutput.schema'
 
 export {
+  MilestoneWindowSchema,
+  RaceCandidateSchema,
+  RaceMilestonesSchema,
   RaceTargetMetricsSchema,
+  type MilestoneWindow,
+  type RaceCandidate,
+  type RaceMilestones,
   type RaceTargetMetrics,
 } from './campaigns/RaceTargetMetrics.schema'
 

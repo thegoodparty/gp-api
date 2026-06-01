@@ -190,3 +190,27 @@ interface Candidacy {
     electionDay: string
   }
 }
+
+// Subset of BR's MilestoneCategory enum we care about. BR also returns
+// FILING (already covered by Race.filingDateEnd) and VOTING (just the
+// election day). Only these three drive Section 6 of the campaign plan.
+export type BallotReadyMilestoneCategory =
+  | 'REGISTRATION'
+  | 'EARLY_VOTING'
+  | 'REQUEST_BALLOT'
+
+export type BallotReadyMilestoneType = 'OPEN' | 'CLOSE'
+
+export interface BallotReadyMilestone {
+  category: BallotReadyMilestoneCategory | string
+  type: BallotReadyMilestoneType | string
+  at: string | null
+}
+
+export interface RaceMilestonesGraphResponse {
+  node: {
+    election: {
+      milestones: BallotReadyMilestone[] | null
+    } | null
+  } | null
+}

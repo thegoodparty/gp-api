@@ -1,5 +1,20 @@
 # @goodparty_org/contracts
 
+## 0.10.0
+
+### Minor Changes
+
+- Add `MilestoneWindowSchema`, `RaceMilestonesSchema`, and a new optional
+  `milestones` field on `RaceTargetMetricsSchema`. Carries per-category
+  campaign-timeline windows (voter registration, early voting, absentee
+  ballot request) sourced live from BallotReady via gp-api. Each
+  category window has nullable `start` (earliest OPEN milestone) and
+  `end` (latest CLOSE milestone). The whole `milestones` object is
+  nullable when the BR upstream call fails. Drives Section 6 of the
+  Campaign Plan template in gp-webapp.
+- Also re-export `RaceCandidateSchema` (already used by
+  `RaceTargetMetricsSchema`; export was previously omitted).
+
 ## 0.9.0
 
 ### Minor Changes
@@ -45,7 +60,7 @@
   `Salli`, `Ruth`, `Stephen`, `Amy`). Update default voice/engine from
   `Joanna`/`neural` to `Amy`/`generative`. Add a cross-field refine to
   `SynthesizeSpeechRequestSchema` that rejects any `voiceId` × `engine:
-  'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
+'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
 
 ## 0.5.0
 
