@@ -163,11 +163,21 @@ url_decode() {
   # the password — which MUST be encoded in the URL form) needs to be
   # decoded here, or Postgres auth fails with a misleading "password
   # authentication failed" message.
-  #   ${val//%/\\x} replaces every `%` with `\x` → e.g. `p%40ssword`
-  #   becomes `p\x40ssword`, then `printf '%b'` interprets the
-  #   backslash escapes — `\x40` → `@`.
+  #
+  # Steps:
+  # 1. Escape every pre-existing `\` to `\\`. Without this step,
+  #    `printf '%b'` would also interpret literal backslashes that
+  #    happened to be in the credential — e.g. a password containing
+  #    a literal `\n` would be silently turned into a newline, and
+  #    auth would fail with a misleading "password authentication
+  #    failed" error.
+  # 2. Replace every `%` with `\x` so `%XX` becomes `\xXX` — the only
+  #    backslash escape `printf '%b'` should interpret (since step 1
+  #    already doubled any pre-existing backslashes, they survive as
+  #    literal `\` after `%b`).
   local val="${1:-}"
   [[ -z "$val" ]] && return
+  val="${val//\\/\\\\}"
   # Suppress printf's "missing hex digit for \x" for malformed `%` not
   # followed by two hex digits — a malformed URL would fail auth anyway,
   # and the warning would be misleading noise.
@@ -312,27 +322,34 @@ if [[ "$last_line" == *"--"* ]]; then
   echo "  Move or remove any SQL line comment at the end of the query." >&2
   exit 2
 fi
-# Count `/*` vs `*/` on the last line; if open > close, there's an
-# unclosed block comment and the appended `; ROLLBACK;` becomes part
-# of it. Uses pure-bash substring stripping rather than `grep -o | wc -l`
-# because grep exits 1 when it finds no matches, and `set -o pipefail`
-# (line 27) would silently abort the script in the common "no comments
-# at all" case.
-_open_blk=0; _close_blk=0; _tmp="$last_line"
-while [[ "$_tmp" == *"/*"* ]]; do
-  _open_blk=$(( _open_blk + 1 ))
-  _tmp="${_tmp#*"/*"}"
-done
-_tmp="$last_line"
-while [[ "$_tmp" == *"*/"* ]]; do
-  _close_blk=$(( _close_blk + 1 ))
-  _tmp="${_tmp#*"*/"}"
-done
-if (( _open_blk > _close_blk )); then
-  echo "✗ Query's last line has an unclosed '/*' — this would comment out the ROLLBACK safety wrapper." >&2
-  echo "  Close the block comment with '*/' before the end of the query." >&2
-  exit 2
+# Reject any unclosed `/*` block comment ANYWHERE in the query (not just
+# the last line). The previous last-line-only check missed multi-line
+# cases like:
+#     SELECT 1 /*
+#     FROM foo
+# where `/*` opens on line 1 and the last line has no `/*` — but the
+# comment still extends to the end of the assembled SQL, swallowing
+# `; ROLLBACK;` and committing any DML. (Postgres usually parse-errors
+# this, which aborts the transaction and saves us — but defense in
+# depth: reject before the round-trip.)
+#
+# Algorithm: strip every matched `/* … */` pair, then if any `/*` is
+# left over it's unclosed. Uses perl with `-0` (whole input as one
+# record) so the regex spans newlines — sed without `-z` is line-by-
+# line on macOS and would false-positive on valid multi-line comments.
+# The regex `[^*]*(\*[^/][^*]*)*` is the standard "stuff inside a block
+# comment" subpattern.
+if command -v perl >/dev/null 2>&1; then
+  _stripped="$(printf '%s' "$QUERY" | perl -0pe 's|/\*[^*]*(\*[^/][^*]*)*\*/||g' 2>/dev/null || printf '%s' "$QUERY")"
+  if [[ "$_stripped" == *'/*'* ]]; then
+    echo "✗ Query contains an unclosed '/*' block comment — this would comment out the ROLLBACK safety wrapper." >&2
+    echo "  Close the block comment with '*/' before the end of the query." >&2
+    exit 2
+  fi
 fi
+# (If perl is unavailable we fall through — the last-line `--` guard
+# above still catches the original single-line `-- ` hazard, and
+# Postgres parse-errors an unclosed `/*`, which aborts the transaction.)
 
 # Wrap in BEGIN; ... ROLLBACK; so DML/DDL queries passed by accident can't
 # mutate live data. EXPLAIN ANALYZE *executes* its argument unconditionally
