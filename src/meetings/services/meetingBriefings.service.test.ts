@@ -229,36 +229,44 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
   })
 
   it('does not chain a briefing when schedule completion shows no meeting inside the 5-day window', async () => {
-    const orgSlug = `eo-chain-far-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-far' })
-    const eo = await service.prisma.electedOffice.create({
-      data: { organizationSlug: orgSlug, userId: service.user.id },
-    })
-    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
-    // YEARLY with BYMONTH=1 + BYMONTHDAY=1 → next meeting on Jan 1 of next
-    // year, which is virtually always outside a 5-day window.
-    const artifactKey = await seedScheduleForOrg(orgSlug, {
-      rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
-    })
-    const scheduleRun = await service.prisma.experimentRun.create({
-      data: {
-        organizationSlug: orgSlug,
-        experimentType: 'meeting_schedule',
-        status: ExperimentRunStatus.COMPLETED,
-        artifactBucket: 'schedule-bucket',
-        artifactKey,
-        params: { elected_office_id: eo.id },
-      },
-    })
-    const dispatchSpy = vi
-      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+    // Pin the clock to mid-year so Jan 1 (the next YEARLY occurrence) is
+    // far outside the 5-day window. Without this, runs between roughly
+    // Dec 27 and Jan 1 would see Jan 1 INSIDE the window and the test
+    // would flake.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
+    try {
+      const orgSlug = `eo-chain-far-${Date.now()}`
+      await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-far' })
+      const eo = await service.prisma.electedOffice.create({
+        data: { organizationSlug: orgSlug, userId: service.user.id },
+      })
+      mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+      const artifactKey = await seedScheduleForOrg(orgSlug, {
+        rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
+      })
+      const scheduleRun = await service.prisma.experimentRun.create({
+        data: {
+          organizationSlug: orgSlug,
+          experimentType: 'meeting_schedule',
+          status: ExperimentRunStatus.COMPLETED,
+          artifactBucket: 'schedule-bucket',
+          artifactKey,
+          params: { elected_office_id: eo.id },
+        },
+      })
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(undefined)
 
-    await service.app
-      .get(MeetingBriefingsService)
-      .onExperimentRunCompleted(scheduleRun)
+      await service.app
+        .get(MeetingBriefingsService)
+        .onExperimentRunCompleted(scheduleRun)
 
-    expect(dispatchSpy).not.toHaveBeenCalled()
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not chain a briefing when schedule completion has status not_found', async () => {
@@ -759,30 +767,38 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
   })
 
   it('skips an EO when the next meeting is outside the 5-day window', async () => {
-    const orgSlug = `eo-cron-far-meeting-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-far' })
-    const campaign = await service.prisma.campaign.findFirst({
-      where: { organizationSlug: orgSlug },
-    })
-    await service.prisma.electedOffice.create({
-      data: {
-        organizationSlug: orgSlug,
-        userId: service.user.id,
-        campaignId: campaign?.id,
-      },
-    })
-    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
-    // YEARLY on Jan 1 → essentially never inside a 5-day window.
-    await seedScheduleForOrg(orgSlug, {
-      rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
-    })
-    const dispatchSpy = vi
-      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+    // Pin clock to mid-year so Jan 1 (the next YEARLY occurrence) is far
+    // outside any 5-day window. Without pinning, runs near new year would
+    // see Jan 1 inside the window and flake.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
+    try {
+      const orgSlug = `eo-cron-far-meeting-${Date.now()}`
+      await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-far' })
+      const campaign = await service.prisma.campaign.findFirst({
+        where: { organizationSlug: orgSlug },
+      })
+      await service.prisma.electedOffice.create({
+        data: {
+          organizationSlug: orgSlug,
+          userId: service.user.id,
+          campaignId: campaign?.id,
+        },
+      })
+      mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+      await seedScheduleForOrg(orgSlug, {
+        rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
+      })
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(undefined)
 
-    await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
+      await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
 
-    expect(dispatchSpy).not.toHaveBeenCalled()
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('runs the dispatch loop once when invoked twice the same day (multi-replica guard)', async () => {

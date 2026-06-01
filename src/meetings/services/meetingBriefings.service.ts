@@ -8,6 +8,7 @@ import {
 } from '@prisma/client'
 import { rrulestr } from 'rrule'
 import { formatInTimeZone } from 'date-fns-tz'
+import { addDays } from 'date-fns'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
@@ -244,7 +245,7 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return null
     }
-    const windowEnd = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000)
+    const windowEnd = addDays(now, windowDays)
     const upcoming = this.projectMeetingDates({
       schedule,
       from: now,
