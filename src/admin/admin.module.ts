@@ -4,6 +4,7 @@ import { EmailModule } from 'src/email/email.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
+import { AgentExperimentsModule } from 'src/agentExperiments/agentExperiments.module'
 import { AdminCampaignsController } from './campaigns/adminCampaigns.controller'
 import { AdminCampaignsService } from './campaigns/adminCampaigns.service'
 import { AdminUsersController } from './users/adminUsers.controller'
@@ -17,6 +18,7 @@ import { AdminAgentRunsService } from './agentRuns/services/adminAgentRuns.servi
     OrganizationsModule,
     SlackModule,
     AwsModule,
+    AgentExperimentsModule,
   ],
   controllers: [
     AdminCampaignsController,

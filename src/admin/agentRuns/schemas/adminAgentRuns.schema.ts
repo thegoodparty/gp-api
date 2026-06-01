@@ -8,6 +8,8 @@ export class AdminAgentRunsListQueryDto extends createZodDto(
 export {
   AgentRunListItemSchema,
   type AgentRunListItem,
+  AgentRunSchema,
+  type AgentRun,
   AgentRunDetailSchema,
   type AgentRunDetail,
 } from '@goodparty_org/contracts'

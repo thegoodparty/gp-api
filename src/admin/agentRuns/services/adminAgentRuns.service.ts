@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+} from '@nestjs/common'
 import { ExperimentRun, Prisma } from '@prisma/client'
 import {
   AgentRunCandidateSummary,
@@ -8,6 +12,8 @@ import {
 } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { AgentJobContracts } from '@/generated/agent-job-contracts'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -40,6 +46,28 @@ const deriveCandidate = (params: unknown): AgentRunCandidateSummary | null => {
   }
 }
 
+// Retry re-dispatches as the run's candidate, so only experiments whose params
+// carry a clerk_user_id are retryable. Today that is compliance_setup; the
+// `satisfies` keeps this list honest against the generated contract keys.
+const DISPATCHABLE_EXPERIMENT_TYPES = [
+  'compliance_setup',
+] as const satisfies readonly (keyof AgentJobContracts)[]
+
+type DispatchableExperimentType = (typeof DISPATCHABLE_EXPERIMENT_TYPES)[number]
+
+type DispatchParams = AgentJobContracts[DispatchableExperimentType]['Input']
+
+const isDispatchableExperimentType = (
+  type: string,
+): type is DispatchableExperimentType =>
+  DISPATCHABLE_EXPERIMENT_TYPES.some((known) => known === type)
+
+const clerkUserIdFromParams = (params: unknown): string | null => {
+  if (!isJsonObject(params)) return null
+  const clerkUserId = params['clerk_user_id']
+  return typeof clerkUserId === 'string' ? clerkUserId : null
+}
+
 const toListItem = (run: ExperimentRun): AgentRunListItem => ({
   runId: run.runId,
   experimentType: run.experimentType,
@@ -55,7 +83,10 @@ const toListItem = (run: ExperimentRun): AgentRunListItem => ({
 export class AdminAgentRunsService extends createPrismaBase(
   MODELS.ExperimentRun,
 ) {
-  constructor(private readonly s3: S3Service) {
+  constructor(
+    private readonly s3: S3Service,
+    private readonly experimentRuns: ExperimentRunsService,
+  ) {
     super()
   }
 
@@ -93,6 +124,47 @@ export class AdminAgentRunsService extends createPrismaBase(
     ])
 
     return { data: runs.map(toListItem), meta: { total, offset, limit } }
+  }
+
+  // Re-dispatches a finished run with its stored params as the same candidate.
+  // dispatchRun creates a fresh run row + SQS message; the original is untouched.
+  async retry(runId: string): Promise<ExperimentRun> {
+    const run = await this.model.findUniqueOrThrow({ where: { runId } })
+
+    const clerkUserId = clerkUserIdFromParams(run.params)
+    if (!clerkUserId) {
+      throw new BadRequestException(
+        'run params carry no clerk_user_id; cannot re-dispatch as the candidate',
+      )
+    }
+
+    if (!isDispatchableExperimentType(run.experimentType)) {
+      throw new BadRequestException(
+        `experiment type "${run.experimentType}" cannot be re-dispatched`,
+      )
+    }
+
+    // params were validated against this experiment's Input at the original
+    // dispatch and persisted unchanged, so re-forward them as that Input.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const params = run.params as DispatchParams
+
+    const dispatched = await this.experimentRuns.dispatchRun({
+      type: run.experimentType,
+      organizationSlug: run.organizationSlug,
+      clerkUserId,
+      params,
+    })
+
+    // dispatchRun no-ops (returns undefined) when no queue is configured, e.g.
+    // preview envs. Surface that instead of returning a 200 with no new run.
+    if (!dispatched) {
+      throw new BadGatewayException(
+        'agent dispatch is not configured for this environment',
+      )
+    }
+
+    return dispatched
   }
 
   async detail(runId: string): Promise<{

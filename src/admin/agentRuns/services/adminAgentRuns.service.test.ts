@@ -1,7 +1,9 @@
+import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { ExperimentRun, ExperimentRunStatus, Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { AdminAgentRunsService } from './adminAgentRuns.service'
 
 const makeRun = (overrides: Partial<ExperimentRun> = {}): ExperimentRun => ({
@@ -33,6 +35,7 @@ describe('AdminAgentRunsService', () => {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
   }
   const s3 = { getFile: vi.fn() }
+  const experimentRuns = { dispatchRun: vi.fn() }
   const logger = createMockLogger()
 
   beforeEach(() => {
@@ -44,7 +47,10 @@ describe('AdminAgentRunsService', () => {
       findUniqueOrThrow: vi.fn(),
     }
 
-    service = new AdminAgentRunsService(s3 as unknown as S3Service)
+    service = new AdminAgentRunsService(
+      s3 as unknown as S3Service,
+      experimentRuns as unknown as ExperimentRunsService,
+    )
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
       configurable: true,
@@ -224,6 +230,75 @@ describe('AdminAgentRunsService', () => {
 
       await expect(service.detail('missing')).rejects.toThrow()
       expect(s3.getFile).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('retry', () => {
+    it('re-dispatches with the stored type, org, params, and clerk_user_id, and returns the new run', async () => {
+      const run = makeRun()
+      const newRun = makeRun({
+        runId: 'run-2',
+        status: ExperimentRunStatus.RUNNING,
+        artifactBucket: null,
+        artifactKey: null,
+        durationSeconds: null,
+        costUsd: null,
+      })
+      mockModel.findUniqueOrThrow.mockResolvedValue(run)
+      experimentRuns.dispatchRun.mockResolvedValue(newRun)
+
+      const result = await service.retry('run-1')
+
+      expect(experimentRuns.dispatchRun).toHaveBeenCalledWith({
+        type: 'compliance_setup',
+        organizationSlug: 'org-1',
+        clerkUserId: 'user_abc',
+        params: {
+          campaign_id: 42,
+          candidate_first_name: 'Ada',
+          candidate_last_name: 'Lovelace',
+          clerk_user_id: 'user_abc',
+        },
+      })
+      expect(result).toBe(newRun)
+    })
+
+    it('rejects with 400 and never dispatches when params carry no clerk_user_id', async () => {
+      mockModel.findUniqueOrThrow.mockResolvedValue(
+        makeRun({
+          params: {
+            campaign_id: 42,
+            candidate_first_name: 'Ada',
+            candidate_last_name: 'Lovelace',
+          } as Prisma.JsonValue,
+        }),
+      )
+
+      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+    })
+
+    it('propagates the not-found error for an unknown runId, never dispatching', async () => {
+      mockModel.findUniqueOrThrow.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('No ExperimentRun found', {
+          code: 'P2025',
+          clientVersion: 'test',
+        }),
+      )
+
+      await expect(service.retry('missing')).rejects.toThrow()
+      expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+    })
+
+    it('surfaces 502 when dispatch is not configured (dispatchRun returns nothing)', async () => {
+      mockModel.findUniqueOrThrow.mockResolvedValue(makeRun())
+      experimentRuns.dispatchRun.mockResolvedValue(undefined)
+
+      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
+        BadGatewayException,
+      )
     })
   })
 })
