@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common'
-import type { ChatCompletionTool } from 'openai/resources/chat/completions'
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions'
 import { PinoLogger } from 'nestjs-pino'
-import crypto from 'node:crypto'
 import { Campaign } from '@prisma/client'
-import { AiService } from '@/ai/ai.service'
-import type { AiChatMessage } from '@/campaigns/ai/chat/aiChat.types'
+import { LlmService } from '@/llm/services/llm.service'
+import { extractToolCallContent } from '@/ai/util/llmResponseFormat.util'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import {
   aiOutletsToolResultSchema,
@@ -117,7 +119,7 @@ const PENDING_TTL_MS = 5 * 60 * 1000
 @Injectable()
 export class OnboardingLocalNewsService {
   constructor(
-    private readonly ai: AiService,
+    private readonly llm: LlmService,
     private readonly campaigns: CampaignsService,
     private readonly logger: PinoLogger,
   ) {
@@ -194,24 +196,17 @@ export class OnboardingLocalNewsService {
     )
 
     try {
-      const messages: AiChatMessage[] = [
-        {
-          role: 'system',
-          content: SYSTEM_PROMPT,
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-        },
+      const messages: ChatCompletionMessageParam[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
           content: `Jurisdiction: ${jurisdiction}\nOffice: ${office}`,
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
         },
       ]
 
-      const completion = await this.ai.getChatToolCompletion({
+      const completion = await this.llm.toolCompletion({
         messages,
-        tool,
+        tools: [tool],
         toolChoice: {
           type: 'function',
           function: { name: 'returnLocalNewsOutlets' },
@@ -223,7 +218,7 @@ export class OnboardingLocalNewsService {
         maxTokens: 8000,
       })
 
-      const raw = completion.content?.trim()
+      const raw = extractToolCallContent(completion).trim()
       if (!raw) {
         throw new Error('AI returned no content for local news outlets')
       }

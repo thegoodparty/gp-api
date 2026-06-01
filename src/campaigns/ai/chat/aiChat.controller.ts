@@ -21,7 +21,7 @@ import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { PromptReplaceCampaign } from 'src/ai/ai.service'
+import { PromptReplaceCampaign } from 'src/ai/services/promptReplace.service'
 import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/ai/chat')
