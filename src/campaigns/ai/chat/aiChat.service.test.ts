@@ -198,6 +198,11 @@ describe('AiChatService.streamChat', () => {
     )
 
     expect(chunks.at(-1)?.type).toBe('done')
+    // The thread lookup is scoped to the campaign as well, so a thread from a
+    // different campaign owned by the same user can't be continued here.
+    expect(fakeModel.findFirstOrThrow).toHaveBeenCalledWith({
+      where: { threadId: 't1', userId: 7, campaignId: 10 },
+    })
     expect(fakeModel.create).not.toHaveBeenCalled()
     expect(fakeModel.update).toHaveBeenCalledTimes(1)
     const updateArg = fakeModel.update.mock.calls[0][0]

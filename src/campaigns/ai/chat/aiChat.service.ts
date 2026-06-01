@@ -133,6 +133,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       where: {
         threadId,
         userId: campaign.user?.id,
+        campaignId: campaign.id,
       },
     })
     const data = aiChat.data as { messages: AiChatMessage[] }
@@ -303,7 +304,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       userMessage: AiChatMessage
     }
     try {
-      resolved = await this.resolveStreamThread(userId, body)
+      resolved = await this.resolveStreamThread(userId, campaign.id, body)
     } catch (err) {
       this.logger.error({ err }, 'failed to resolve campaign chat thread')
       yield this.streamError('internal', 'Chat thread is unavailable.')
@@ -410,6 +411,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
 
   private async resolveStreamThread(
     userId: number,
+    campaignId: number,
     { threadId, message, regenerate }: StreamAiChatSchema,
   ): Promise<{
     threadId: string
@@ -436,8 +438,11 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       }
     }
 
+    // Scope by campaignId too: without it a user who owns multiple campaigns
+    // could continue/regenerate a thread from a different campaign under the
+    // wrong campaign's context.
     const existing = await this.findFirstOrThrow({
-      where: { threadId, userId },
+      where: { threadId, userId, campaignId },
     })
     const existingData = existing.data as { messages: AiChatMessage[] }
     const priorMessages = [...(existingData.messages ?? [])]
