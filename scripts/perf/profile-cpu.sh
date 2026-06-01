@@ -72,6 +72,19 @@ esac
 mkdir -p "$DIR"
 NODE_FLAGS=(--cpu-prof "--cpu-prof-dir=$DIR")
 
+# `node --import tsx` requires tsx in node_modules; the global `tsx` binary
+# (or `npx tsx`) doesn't satisfy that. Fail fast with an actionable message
+# instead of letting node throw `ERR_MODULE_NOT_FOUND: Cannot find package 'tsx'`.
+require_local_tsx() {
+  if ! node -e "require.resolve('tsx')" >/dev/null 2>&1; then
+    echo "✗ This script translates '$1' to 'node --import tsx', which needs tsx in node_modules." >&2
+    echo "  tsx is NOT installed locally in this project." >&2
+    echo "  Either install it:    npm install --save-dev tsx" >&2
+    echo "  Or profile node directly: $0 -- node dist/<your-built-script>.js" >&2
+    exit 2
+  fi
+}
+
 case "$(basename "$CMD")" in
   node)
     echo "→ node ${NODE_FLAGS[*]} $*"
@@ -83,7 +96,7 @@ case "$(basename "$CMD")" in
 
   tsx)
     # Translate `tsx script.ts ...` → `node --cpu-prof ... --import tsx script.ts ...`
-    # (tsx must be installed in this project; node will error clearly if not.)
+    require_local_tsx "tsx"
     echo "→ node ${NODE_FLAGS[*]} --import tsx $*"
     echo "  Profile dir: $DIR"
     echo
@@ -94,6 +107,7 @@ case "$(basename "$CMD")" in
     # Common pattern: `npx tsx script.ts ...` — translate same as above.
     if [[ "${1:-}" == "tsx" ]]; then
       shift
+      require_local_tsx "npx tsx"
       echo "→ node ${NODE_FLAGS[*]} --import tsx $*  (translated from 'npx tsx')"
       echo "  Profile dir: $DIR"
       echo

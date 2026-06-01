@@ -29,7 +29,18 @@ FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --format) FORMAT="$2"; shift 2 ;;
+    --format)
+      # Whitelist against Postgres's four legal EXPLAIN FORMAT values.
+      # $FORMAT is interpolated into the SQL string later; without this
+      # check, '--format "TEXT) DROP TABLE foo; --"' would inject DDL.
+      case "${2:-}" in
+        TEXT|XML|JSON|YAML) FORMAT="$2" ;;
+        *)
+          echo "✗ Invalid --format value: '${2:-}'. Must be one of TEXT, XML, JSON, YAML." >&2
+          exit 2
+          ;;
+      esac
+      shift 2 ;;
     -f|--file) FILE="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//;/^set -/d'
