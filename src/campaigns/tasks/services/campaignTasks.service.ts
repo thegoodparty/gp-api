@@ -8,7 +8,9 @@ import {
 import { Campaign, Prisma } from '@prisma/client'
 import {
   addDays,
+  compareAsc,
   differenceInCalendarDays,
+  differenceInMilliseconds,
   differenceInWeeks,
   format,
   getDate,
@@ -297,9 +299,9 @@ export class CampaignTasksService extends createPrismaBase(
 
       const pollIntervalMs = 3000
       const maxWaitTimeMs = 120000
-      const startTime = Date.now()
+      const startTime = new Date()
 
-      while (Date.now() - startTime < maxWaitTimeMs) {
+      while (differenceInMilliseconds(new Date(), startTime) < maxWaitTimeMs) {
         if (subscriber.closed) return
         await sleep(pollIntervalMs)
 
@@ -702,10 +704,8 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   private sortTasksByDate(tasks: CampaignTask[]): CampaignTask[] {
-    return [...tasks].sort(
-      (a, b) =>
-        parseIsoDateString(a.date).getTime() -
-        parseIsoDateString(b.date).getTime(),
+    return [...tasks].sort((a, b) =>
+      compareAsc(parseIsoDateString(a.date), parseIsoDateString(b.date)),
     )
   }
 

@@ -60,6 +60,7 @@ const campaignDefaults = {
   isPro: false,
   isDemo: false,
   didWin: null,
+  primaryResult: null,
   dateVerified: null,
   tier: null,
   formattedAddress: null,

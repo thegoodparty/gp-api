@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { subMilliseconds } from 'date-fns'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { getDateRangeWithDefaults } from 'src/shared/util/date.util'
 
@@ -12,7 +13,7 @@ export class WebsiteViewsService extends createPrismaBase(MODELS.WebsiteView) {
       where: {
         websiteId,
         visitorId,
-        createdAt: { gte: new Date(Date.now() - RATE_LIMIT_WINDOW) },
+        createdAt: { gte: subMilliseconds(new Date(), RATE_LIMIT_WINDOW) },
       },
     })
 
