@@ -2,6 +2,11 @@
 # Quick HTTP benchmark using autocannon.
 # Backs up ai-rules/performance-tools.md §1.
 #
+# Requires: a running HTTP server on the target URL (e.g. `npm run start:dev`).
+# Without that you'll get a 0/0/0 reqs/sec table with one connection error.
+# autocannon is preferred installed globally; this script falls back to
+# `npx --yes autocannon` automatically when it isn't.
+#
 # Usage:
 #   scripts/perf/bench-endpoint.sh /health
 #   scripts/perf/bench-endpoint.sh -c 50 -d 60 /v1/things
@@ -28,9 +33,11 @@ if [[ $# -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   [[ $# -eq 0 ]] && exit 2 || exit 0
 fi
 
-if ! command -v autocannon >/dev/null 2>&1; then
-  echo "✗ autocannon not found. Install: npm i -g autocannon" >&2
-  exit 1
+if command -v autocannon >/dev/null 2>&1; then
+  AUTOCANNON=(autocannon)
+else
+  echo "→ autocannon not on PATH; falling back to 'npx --yes autocannon' (first run installs)" >&2
+  AUTOCANNON=(npx --yes autocannon)
 fi
 
 ARGS=("$@")
@@ -54,5 +61,5 @@ else
   URL="${PROTO}://${HOST}:${PORT}${TARGET}"
 fi
 
-echo "→ autocannon ${ARGS[*]} $URL"
-exec autocannon "${ARGS[@]}" "$URL"
+echo "→ ${AUTOCANNON[*]} ${ARGS[*]} $URL"
+exec "${AUTOCANNON[@]}" "${ARGS[@]}" "$URL"
