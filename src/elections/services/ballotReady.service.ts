@@ -16,10 +16,7 @@ import {
   RaceWithOfficeHolders,
   RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
-import type {
-  MilestoneWindow,
-  RaceMilestones,
-} from '@goodparty_org/contracts'
+import type { MilestoneWindow, RaceMilestones } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'

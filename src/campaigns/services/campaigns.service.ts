@@ -791,7 +791,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         raceId
           ? this.elections.fetchFilingFeeByRaceHash(raceId)
           : Promise.resolve(null),
-        raceId ? this.ballotReady.fetchMilestones(raceId) : Promise.resolve(null),
+        raceId
+          ? this.ballotReady.fetchMilestones(raceId)
+          : Promise.resolve(null),
       ])
 
     if (contextResult) {
