@@ -1,4 +1,8 @@
-import { BadGatewayException, BadRequestException } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common'
 import { ExperimentRun, ExperimentRunStatus, Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -261,6 +265,28 @@ describe('AdminAgentRunsService', () => {
         },
       })
       expect(result).toBe(newRun)
+    })
+
+    it('rejects with 409 and never dispatches when the run is still RUNNING', async () => {
+      mockModel.findUniqueOrThrow.mockResolvedValue(
+        makeRun({ status: ExperimentRunStatus.RUNNING }),
+      )
+
+      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      )
+      expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+    })
+
+    it('rejects with 400 and never dispatches when the experiment type is not retryable', async () => {
+      mockModel.findUniqueOrThrow.mockResolvedValue(
+        makeRun({ experimentType: 'meeting_briefing' }),
+      )
+
+      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
     })
 
     it('rejects with 400 and never dispatches when params carry no clerk_user_id', async () => {

@@ -1,9 +1,10 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   Injectable,
 } from '@nestjs/common'
-import { ExperimentRun, Prisma } from '@prisma/client'
+import { ExperimentRun, ExperimentRunStatus, Prisma } from '@prisma/client'
 import {
   AgentRunCandidateSummary,
   AgentRunListItem,
@@ -130,6 +131,14 @@ export class AdminAgentRunsService extends createPrismaBase(
   // dispatchRun creates a fresh run row + SQS message; the original is untouched.
   async retry(runId: string): Promise<ExperimentRun> {
     const run = await this.model.findUniqueOrThrow({ where: { runId } })
+
+    // A RUNNING run is still in flight; re-dispatching it would spawn a second
+    // parallel worker on the same params (duplicate domain buy / TCR submit).
+    if (run.status === ExperimentRunStatus.RUNNING) {
+      throw new ConflictException(
+        'run is still RUNNING; only finished runs can be retried',
+      )
+    }
 
     const clerkUserId = clerkUserIdFromParams(run.params)
     if (!clerkUserId) {
