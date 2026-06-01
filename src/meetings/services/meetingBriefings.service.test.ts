@@ -268,7 +268,9 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
       data: { organizationSlug: orgSlug, userId: service.user.id },
     })
     mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
-    const artifactKey = await seedScheduleForOrg(orgSlug, { status: 'not_found' })
+    const artifactKey = await seedScheduleForOrg(orgSlug, {
+      status: 'not_found',
+    })
     const scheduleRun = await service.prisma.experimentRun.create({
       data: {
         organizationSlug: orgSlug,

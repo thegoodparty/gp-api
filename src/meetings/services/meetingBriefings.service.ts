@@ -42,11 +42,16 @@ const BRIEFING_EXPERIMENT_TYPE = 'meeting_briefing'
  * JSONB column without an unsafe cast. Returns null if the params is
  * not an object, the key is missing, or the value isn't a string.
  */
-const extractElectedOfficeId = (params: Prisma.JsonValue): string | null => {
-  if (typeof params !== 'object' || params === null || Array.isArray(params)) {
+const extractElectedOfficeId = (params: unknown): string | null => {
+  if (
+    typeof params !== 'object' ||
+    params === null ||
+    Array.isArray(params) ||
+    !('elected_office_id' in params)
+  ) {
     return null
   }
-  const value = params['elected_office_id']
+  const value: unknown = params.elected_office_id
   return typeof value === 'string' ? value : null
 }
 
