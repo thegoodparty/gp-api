@@ -95,7 +95,21 @@ if [[ -z "$DBURL" ]]; then
     fi
   fi
   if [[ -n "$ENV_SRC" ]]; then
-    DBURL="$(grep -E '^DATABASE_URL[[:space:]]*=' "$ENV_SRC" | head -1 | sed 's/^[^=]*=//; s/^[\"\x27]//; s/[\"\x27]$//')"
+    # Match explain.sh's extract_database_url() so we don't silently report
+    # GREEN for a value that explain.sh would reject. Handles single/double
+    # quotes and trailing inline comments.
+    _raw="$(grep -E '^DATABASE_URL[[:space:]]*=' "$ENV_SRC" | head -1 || true)"
+    if [[ -n "$_raw" ]]; then
+      _val="${_raw#*=}"
+      if [[ "$_val" == \"* ]]; then
+        _val="${_val#\"}"; _val="${_val%%\"*}"
+      elif [[ "$_val" == \'* ]]; then
+        _val="${_val#\'}"; _val="${_val%%\'*}"
+      else
+        _val="${_val%%#*}"; _val="${_val%%[[:space:]]*}"
+      fi
+      DBURL="$_val"
+    fi
   fi
 fi
 if [[ -n "$DBURL" ]]; then

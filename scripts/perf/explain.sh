@@ -19,8 +19,11 @@
 #   DATABASE_URL=postgres://... scripts/perf/explain.sh '...'
 #   PG_DOCKER_CONTAINER=my-pg scripts/perf/explain.sh 'SELECT 1'
 #
-# WARNING: EXPLAIN ANALYZE *executes* the query. Don't run UPDATE / DELETE
-# without wrapping in BEGIN; ROLLBACK; (psql -1 isn't enough on its own here).
+# NOTE: EXPLAIN ANALYZE *executes* its argument. This script always wraps
+# the EXPLAIN in `BEGIN; ... ROLLBACK;` so accidentally-passed DML/DDL
+# (UPDATE, DELETE, DROP, etc.) is rolled back — but transactional safety in
+# Postgres is not absolute (e.g. side-effects from functions like nextval()
+# persist). Still: don't deliberately pass write statements.
 set -euo pipefail
 
 FORMAT="TEXT"
@@ -76,11 +79,29 @@ extract_database_url() {
 
 strip_prisma_params() {
   # Strip Prisma-specific query parameters that vanilla psql doesn't understand
-  # (schema, connection_limit, pool_timeout, pgbouncer, etc.). Echoes the
-  # cleaned URL — safe to pass to psql.
-  # Strategy: drop the entire query string. EXPLAIN ANALYZE doesn't need
-  # Prisma's pool/schema knobs, and `search_path` defaults to public anyway.
+  # (connection_limit, pool_timeout, pgbouncer, schema, etc.). Echoes the
+  # cleaned URL — safe to pass to psql. The schema= value is preserved
+  # separately via extract_pg_schema() and set on the session below.
   echo "${1%%\?*}"
+}
+
+extract_pg_schema() {
+  # Extract the schema= value from a Prisma DATABASE_URL query string and
+  # validate it as a plain SQL identifier. Defaults to "public" if absent
+  # or non-conforming. $PG_SCHEMA is interpolated into the SQL string below,
+  # so it MUST be validated here — interpolating untrusted URL text is unsafe.
+  local qs schema
+  qs="${1#*\?}"
+  if [[ "$qs" == "$1" ]]; then
+    echo "public"
+    return
+  fi
+  schema="$(echo "$qs" | tr '&' '\n' | grep '^schema=' | head -1 | cut -d= -f2)"
+  if [[ "$schema" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    echo "$schema"
+  else
+    echo "public"
+  fi
 }
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -117,8 +138,11 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 # Prisma URLs commonly include ?schema=public&connection_limit=... — psql
-# rejects those. Strip the query string for psql; the data path is unaffected.
+# rejects those. Strip the query string for psql, but keep the schema name
+# so we can set search_path explicitly (people-api uses ?schema=green for
+# the Voter table, so plain `"Voter"` lookups fail without this).
 PSQL_URL="$(strip_prisma_params "$DATABASE_URL")"
+PG_SCHEMA="$(extract_pg_schema "$DATABASE_URL")"
 
 # --- psql resolution: prefer host psql, fall back to docker exec ---
 
@@ -156,8 +180,16 @@ if [[ -z "$QUERY" ]]; then
 fi
 
 QUERY="${QUERY%;}"
-EXPLAIN="EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT $FORMAT) $QUERY;"
+
+# Wrap in BEGIN; ... ROLLBACK; so DML/DDL queries passed by accident can't
+# mutate live data. EXPLAIN ANALYZE *executes* its argument unconditionally
+# (this is a no-op for SELECT, but `EXPLAIN ANALYZE UPDATE ... ` would
+# otherwise commit by default — and this script reads DATABASE_URL from the
+# environment, which can point at prod). SET LOCAL keeps search_path
+# changes scoped to this transaction.
+SQL="BEGIN; SET LOCAL search_path TO \"$PG_SCHEMA\", public; EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT $FORMAT) $QUERY; ROLLBACK;"
 
 echo "→ EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT $FORMAT) <query>"
+echo "  (wrapped in BEGIN; ROLLBACK; search_path=$PG_SCHEMA,public)"
 echo
-exec "${PSQL_CMD[@]}" -c "$EXPLAIN"
+exec "${PSQL_CMD[@]}" -c "$SQL"
