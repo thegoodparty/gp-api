@@ -181,6 +181,20 @@ fi
 
 QUERY="${QUERY%;}"
 
+# EXPLAIN wraps exactly one statement. Interior ';' usually means the user
+# passed multiple statements (e.g. `-f migration.sql`) — psql splits on the
+# interior ';' and runs everything after the first statement *without* the
+# EXPLAIN wrapper, contradicting the user's intent. Reject early with a
+# clear message.
+# Note: this false-positives on queries with literal ';' inside string
+# literals (rare for EXPLAIN targets); rewrite the query to avoid them or
+# pass the relevant statement on its own.
+if [[ "$QUERY" == *";"* ]]; then
+  echo "✗ Query contains interior ';' — EXPLAIN wraps exactly one statement." >&2
+  echo "  Pass a single SELECT/INSERT/UPDATE/DELETE, with no internal semicolons." >&2
+  exit 2
+fi
+
 # Wrap in BEGIN; ... ROLLBACK; so DML/DDL queries passed by accident can't
 # mutate live data. EXPLAIN ANALYZE *executes* its argument unconditionally
 # (this is a no-op for SELECT, but `EXPLAIN ANALYZE UPDATE ... ` would
