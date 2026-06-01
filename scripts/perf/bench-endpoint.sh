@@ -76,5 +76,28 @@ else
   URL="${PROTO}://${HOST}:${PORT}${TARGET}"
 fi
 
-echo "→ ${AUTOCANNON[*]} ${ARGS[*]} $URL"
+# Redact `-H` header values from the printed command line. autocannon
+# headers commonly carry secrets (`-H 'authorization: Bearer <token>'`),
+# which would otherwise land in terminal output, CI logs, and shell
+# history. The actual exec() call below uses the unmodified ARGS, so
+# autocannon still sends the real headers — only the display is redacted.
+DISPLAY_ARGS=()
+skip_next=false
+for a in "${ARGS[@]}"; do
+  if $skip_next; then
+    DISPLAY_ARGS+=("<redacted>")
+    skip_next=false
+  elif [[ "$a" == "-H" || "$a" == "--header" ]]; then
+    DISPLAY_ARGS+=("$a")
+    skip_next=true
+  elif [[ "$a" == "-H"?* ]]; then
+    DISPLAY_ARGS+=("-H<redacted>")
+  elif [[ "$a" == "--header="* ]]; then
+    DISPLAY_ARGS+=("--header=<redacted>")
+  else
+    DISPLAY_ARGS+=("$a")
+  fi
+done
+
+echo "→ ${AUTOCANNON[*]} ${DISPLAY_ARGS[*]} $URL"
 exec "${AUTOCANNON[@]}" "${ARGS[@]}" "$URL"

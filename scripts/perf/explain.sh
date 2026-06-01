@@ -48,6 +48,12 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//;/^set -/d'
       exit 0 ;;
+    -*)
+      # Reject unrecognized flags so typos (e.g. `--fromat JSON 'SELECT 1'`)
+      # don't get silently swallowed as QUERY values and produce a cryptic
+      # Postgres syntax error instead of a usage hint.
+      echo "✗ Unrecognized option: '$1'. Run with -h for usage." >&2
+      exit 2 ;;
     *) QUERY="$1"; shift ;;
   esac
 done
@@ -248,6 +254,19 @@ QUERY="${QUERY%;}"
 if [[ "$QUERY" == *";"* ]]; then
   echo "✗ Query contains interior ';' — EXPLAIN wraps exactly one statement." >&2
   echo "  Pass a single SELECT/INSERT/UPDATE/DELETE, with no internal semicolons." >&2
+  exit 2
+fi
+
+# SQL line comments (`--`) appended to the query would comment out the
+# trailing `; ROLLBACK;` in the assembled SQL string, defeating the
+# transaction safety wrapper. E.g. `'UPDATE foo SET x = 1 -- oops'` would
+# expand to `... UPDATE foo SET x = 1 -- oops; ROLLBACK;` and the
+# `ROLLBACK;` would never execute — the UPDATE would commit.
+# Block-comments (`/* ... */`) inside a single line don't have this hazard
+# because they're closed before the appended SQL; only line comments do.
+if [[ "$QUERY" == *"--"* ]]; then
+  echo "✗ Query contains '--' — this would comment out the ROLLBACK safety wrapper." >&2
+  echo "  Remove SQL line comments from the query before passing it to this script." >&2
   exit 2
 fi
 
