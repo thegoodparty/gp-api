@@ -3,9 +3,12 @@ import { AuthenticationModule } from 'src/authentication/authentication.module'
 import { EmailModule } from 'src/email/email.module'
 import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 import { AdminCampaignsController } from './campaigns/adminCampaigns.controller'
 import { AdminCampaignsService } from './campaigns/adminCampaigns.service'
 import { AdminUsersController } from './users/adminUsers.controller'
+import { AdminAgentRunsController } from './agentRuns/adminAgentRuns.controller'
+import { AdminAgentRunsService } from './agentRuns/services/adminAgentRuns.service'
 
 @Module({
   imports: [
@@ -13,8 +16,13 @@ import { AdminUsersController } from './users/adminUsers.controller'
     AuthenticationModule,
     OrganizationsModule,
     SlackModule,
+    AwsModule,
   ],
-  controllers: [AdminCampaignsController, AdminUsersController],
-  providers: [AdminCampaignsService],
+  controllers: [
+    AdminCampaignsController,
+    AdminUsersController,
+    AdminAgentRunsController,
+  ],
+  providers: [AdminCampaignsService, AdminAgentRunsService],
 })
 export class AdminModule {}
