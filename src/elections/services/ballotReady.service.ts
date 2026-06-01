@@ -1,5 +1,12 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
+import {
+  compareAsc,
+  endOfMonth,
+  format,
+  parseISO,
+  startOfMonth,
+} from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { gql, GraphQLClient } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
@@ -565,17 +572,36 @@ const toWindow = (bucket: {
   return { start, end }
 }
 
+// Use `compareAsc` over raw `<`/`>` and `format(parseISO(...), 'yyyy-MM-dd')`
+// over `slice(0, 10)`: BR's `at` is a datetime string that may carry a
+// non-UTC offset (e.g. '2026-10-19T00:00:00-05:00'). Lexicographic
+// comparison would reorder dates across offsets, and a naive slice would
+// take the literal date digits — which can be the wrong calendar date
+// when the offset crosses midnight. CLAUDE.md Rule 28.
 const earliestDate = (values: string[]): string | null => {
   if (values.length === 0) return null
-  return toIsoDate(values.reduce((a, b) => (a < b ? a : b)))
+  return toIsoDate(
+    values.reduce((a, b) =>
+      compareAsc(parseISO(a), parseISO(b)) <= 0 ? a : b,
+    ),
+  )
 }
 
 const latestDate = (values: string[]): string | null => {
   if (values.length === 0) return null
-  return toIsoDate(values.reduce((a, b) => (a > b ? a : b)))
+  return toIsoDate(
+    values.reduce((a, b) =>
+      compareAsc(parseISO(a), parseISO(b)) >= 0 ? a : b,
+    ),
+  )
 }
 
-const toIsoDate = (value: string): string => value.slice(0, 10)
+// Format in UTC explicitly. `format(parseISO(...), 'yyyy-MM-dd')` would
+// use the server's local timezone, shifting the calendar date when the
+// source is UTC midnight (test machines in negative-offset zones see a
+// previous-day date). UTC keeps it deterministic across environments.
+const toIsoDate = (value: string): string =>
+  formatInTimeZone(parseISO(value), 'UTC', 'yyyy-MM-dd')
 
 function getMonthBounds(dateString: string): { gt: string; lt: string } {
   const reference = parseISO(dateString)
