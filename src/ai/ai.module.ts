@@ -1,13 +1,13 @@
-import { forwardRef, Module } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import { AwsModule } from 'src/vendors/aws/aws.module'
-import { SlackModule } from 'src/vendors/slack/slack.module'
-import { AiService } from './ai.service'
-import { AreaCodeFromZipService } from './util/areaCodeFromZip.util'
+import { LlmModule } from '@/llm/llm.module'
 import { OrganizationsModule } from '@/organizations/organizations.module'
+import { PromptReplaceService } from './services/promptReplace.service'
+import { AreaCodeFromZipService } from './util/areaCodeFromZip.util'
 
 @Module({
-  imports: [SlackModule, AwsModule, forwardRef(() => OrganizationsModule)],
-  providers: [AiService, AreaCodeFromZipService],
-  exports: [AiService, AreaCodeFromZipService],
+  imports: [AwsModule, LlmModule, OrganizationsModule],
+  providers: [PromptReplaceService, AreaCodeFromZipService],
+  exports: [PromptReplaceService, AreaCodeFromZipService],
 })
 export class AiModule {}

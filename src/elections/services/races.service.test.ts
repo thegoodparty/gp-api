@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AiService } from '../../ai/ai.service'
+import { LlmService } from '@/llm/services/llm.service'
 import type { RaceNode } from '../types/ballotReady.types'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
@@ -47,9 +47,9 @@ describe('RacesService', () => {
           useValue: ballotReadyService,
         },
         {
-          provide: AiService,
+          provide: LlmService,
           useValue: {
-            getChatToolCompletion: vi.fn(),
+            toolCompletion: vi.fn(),
           },
         },
         {
