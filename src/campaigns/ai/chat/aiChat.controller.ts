@@ -8,9 +8,12 @@ import {
   Param,
   Post,
   Put,
+  Req,
+  Res,
   UsePipes,
 } from '@nestjs/common'
 import { User } from '@prisma/client'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
@@ -18,11 +21,81 @@ import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
+import { StreamAiChatSchema } from './schemas/StreamAiChat.schema'
 import { AiChatService } from './aiChat.service'
+import { CampaignChatChunk } from './aiChat.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/services/promptReplace.service'
+import { RaceTargetMetrics } from 'src/elections/types/elections.types'
 import { PinoLogger } from 'nestjs-pino'
+
+const SSE_HEADERS: Record<string, string> = {
+  'content-type': 'text/event-stream',
+  'cache-control': 'no-cache, no-transform',
+  connection: 'keep-alive',
+  'x-accel-buffering': 'no',
+}
+
+const STREAM_TIMEOUT_MS = 300_000
+
+// A server-side timeout is NOT a user cancellation: it must use a surfaced,
+// retryable code. The client intentionally swallows `aborted` (user pressed
+// Stop), so a timeout marked `aborted` would silently show no error/retry.
+const TIMEOUT_ERROR_CHUNK = `data: ${JSON.stringify({
+  type: 'error',
+  code: 'upstream_unavailable',
+  message: 'Response took too long. Please try again.',
+  retryable: true,
+})}\n\n`
+
+const INTERNAL_ERROR_CHUNK = `data: ${JSON.stringify({
+  type: 'error',
+  code: 'internal',
+  message: 'Chat stream failed.',
+  retryable: true,
+})}\n\n`
+
+const formatChunk = (chunk: CampaignChatChunk): string =>
+  `data: ${JSON.stringify(chunk)}\n\n`
+
+interface DrainableStream {
+  once?: (event: string, cb: () => void) => void
+  off?: (event: string, cb: () => void) => void
+}
+
+const waitForDrain = (
+  stream: DrainableStream,
+  signal: AbortSignal,
+): Promise<void> =>
+  new Promise<void>((resolve) => {
+    if (typeof stream.once !== 'function') {
+      resolve()
+      return
+    }
+    const cleanup = () => {
+      stream.off?.('drain', onDrain)
+      stream.off?.('close', onTerminal)
+      stream.off?.('error', onTerminal)
+      signal.removeEventListener('abort', onTerminal)
+    }
+    const onDrain = () => {
+      cleanup()
+      resolve()
+    }
+    const onTerminal = () => {
+      cleanup()
+      resolve()
+    }
+    stream.once('drain', onDrain)
+    stream.once('close', onTerminal)
+    stream.once('error', onTerminal)
+    if (signal.aborted) {
+      onTerminal()
+      return
+    }
+    signal.addEventListener('abort', onTerminal, { once: true })
+  })
 
 @Controller('campaigns/ai/chat')
 @UsePipes(ZodValidationPipe)
@@ -137,6 +210,90 @@ export class AiChatController {
       })
       this.logApiErrorData(error)
       throw error
+    }
+  }
+
+  @Post('stream')
+  @UseCampaign({
+    include: {
+      campaignPositions: {
+        include: {
+          topIssue: true,
+          position: true,
+        },
+      },
+      campaignUpdateHistory: true,
+      user: true,
+    },
+  })
+  async stream(
+    @ReqCampaign() campaign: PromptReplaceCampaign,
+    @Body() body: StreamAiChatSchema,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: false }) reply: FastifyReply,
+  ): Promise<void> {
+    const abortController = new AbortController()
+    const onClose = () => abortController.abort()
+    req.raw.once('close', onClose)
+    let timedOut = false
+    const timeout = setTimeout(() => {
+      timedOut = true
+      abortController.abort()
+    }, STREAM_TIMEOUT_MS)
+
+    reply.raw.writeHead(HttpStatus.OK, SSE_HEADERS)
+
+    let liveMetrics: RaceTargetMetrics | null = null
+    try {
+      liveMetrics = await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+    } catch (err) {
+      this.logger.error(
+        { e: err },
+        'failed to fetch live race metrics for chat stream',
+      )
+      liveMetrics = null
+    }
+
+    const iterable = this.aiChatService.streamChat(
+      campaign,
+      body,
+      liveMetrics,
+      abortController.signal,
+    )
+
+    let errored = false
+    try {
+      for await (const chunk of iterable) {
+        if (abortController.signal.aborted) break
+        const flushed: boolean = reply.raw.write(formatChunk(chunk))
+        if (!flushed) {
+          await waitForDrain(reply.raw, abortController.signal)
+        }
+      }
+    } catch (err) {
+      errored = true
+      this.logger.error({ e: err }, 'campaign chat SSE stream failed')
+    } finally {
+      clearTimeout(timeout)
+      req.raw.off('close', onClose)
+      if (timedOut) {
+        try {
+          reply.raw.write(TIMEOUT_ERROR_CHUNK)
+        } catch (err) {
+          this.logger.warn({ e: err }, 'failed to write timeout chunk')
+        }
+      } else if (errored) {
+        try {
+          reply.raw.write(INTERNAL_ERROR_CHUNK)
+        } catch (err) {
+          this.logger.warn({ e: err }, 'failed to write error chunk')
+        }
+      }
+      try {
+        reply.raw.end()
+      } catch (err) {
+        this.logger.warn({ e: err }, 'failed to end SSE response')
+      }
     }
   }
 
