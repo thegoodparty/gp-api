@@ -54,6 +54,42 @@ describe('collapseMilestones', () => {
       end: '2026-08-15',
     })
   })
+
+  // Pins the UTC-projection behavior `toIsoDate` (formatInTimeZone) relies
+  // on. A negative-offset datetime late in the local day projects to the
+  // next UTC calendar date — important to lock down so a regression
+  // (e.g. switching back to slice) is caught.
+  it('projects a negative-offset datetime to its UTC calendar date', () => {
+    const result = collapseMilestones([
+      {
+        category: 'REGISTRATION',
+        type: 'CLOSE',
+        at: '2026-10-19T23:30:00-05:00',
+      },
+    ])
+    // 2026-10-19T23:30:00-05:00 → 2026-10-20T04:30:00Z → date is 2026-10-20
+    expect(result.voter_registration).toEqual({
+      start: null,
+      end: '2026-10-20',
+    })
+  })
+
+  // The OPEN selector picks the earliest datetime across mixed offsets,
+  // not the lexicographically smallest string — same shape catches a
+  // regression from compareAsc back to raw `<`/`>`.
+  it('compares mixed-offset datetimes by instant, not string order', () => {
+    const result = collapseMilestones([
+      // 2026-10-19T05:00:00Z — later instant
+      {
+        category: 'EARLY_VOTING',
+        type: 'OPEN',
+        at: '2026-10-19T00:00:00-05:00',
+      },
+      // 2026-10-19T00:00:00Z — earlier instant, but later as a string
+      { category: 'EARLY_VOTING', type: 'OPEN', at: '2026-10-19T00:00:00Z' },
+    ])
+    expect(result.early_voting?.start).toBe('2026-10-19')
+  })
 })
 
 describe('BallotReadyService.fetchMilestones', () => {
