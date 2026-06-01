@@ -9,12 +9,13 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import {
+  ChatCompletionMessageParam,
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
 import { PositionLevel } from 'src/generated/graphql.types'
-import { AiService } from '../../ai/ai.service'
-import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
+import { LlmService } from '@/llm/services/llm.service'
+import { extractToolCallContent } from '@/ai/util/llmResponseFormat.util'
 import {
   CITY_PROMPT,
   COUNTY_PROMPT,
@@ -40,7 +41,7 @@ export class RacesService {
   constructor(
     private readonly censusEntities: CensusEntitiesService,
     private readonly ballotReadyService: BallotReadyService,
-    private readonly ai: AiService,
+    private readonly llm: LlmService,
     private readonly elections: ElectionsService,
     private readonly logger: PinoLogger,
   ) {
@@ -434,11 +435,8 @@ export class RacesService {
       },
     }
 
-    const messages: AiChatMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: `Input: "${office}"
@@ -451,19 +449,19 @@ export class RacesService {
       function: { name: 'extractLocation' },
     }
 
-    const completion = await this.ai.getChatToolCompletion({
-      messages,
-      tool,
-      toolChoice,
-    })
-
-    this.logger.debug(
-      `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
-    )
-
-    const content = completion?.content
     let decodedContent: Record<string, string> = {}
     try {
+      const completion = await this.llm.toolCompletion({
+        messages,
+        tools: [tool],
+        toolChoice,
+      })
+
+      this.logger.debug(
+        `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
+      )
+
+      const content = extractToolCallContent(completion)
       // JSON.parse returns unknown — no way to infer parsed shape at compile time
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       decodedContent = JSON.parse(content) as Record<string, string>

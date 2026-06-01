@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
-import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import {
+  PromptReplaceCampaign,
+  PromptReplaceService,
+} from 'src/ai/services/promptReplace.service'
+import { LlmService } from '@/llm/services/llm.service'
+import { formatHtmlLlmResponse } from '@/ai/util/llmResponseFormat.util'
+import {
+  isChatCompletionMessage,
+  toChatCompletionMessage,
+} from '@/ai/util/chatMessage.util'
 import { ContentService } from 'src/content/services/content.service'
 import { RaceTargetMetrics } from 'src/elections/types/elections.types'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
@@ -8,19 +17,24 @@ import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { User } from '@prisma/client'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { requireEnv } from 'src/shared/util/env.util'
 
 const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
+const AI_CHAT_MAX_TOKENS = 500
+const AI_CHAT_TEMPERATURE = 0.7
+const AI_CHAT_TOP_P = 0.1
 
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   constructor(
-    private aiService: AiService,
-    private contentService: ContentService,
-    private slack: SlackService,
+    private readonly llm: LlmService,
+    private readonly promptReplaceService: PromptReplaceService,
+    private readonly contentService: ContentService,
+    private readonly slack: SlackService,
   ) {
     super()
   }
@@ -34,7 +48,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt(initial)
 
-    const candidateContext = await this.aiService.promptReplace(
+    const candidateContext = await this.promptReplaceService.promptReplace(
       candidateJson,
       campaign,
       liveMetrics,
@@ -47,37 +61,19 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       createdAt: new Date().valueOf(),
     }
 
-    // TODO: these aren't used (threadId is always created, just use const assignment)
-    let threadId: string | undefined
-    let messageId: string | undefined
-
-    if (!threadId) {
-      this.logger.info('creating thread')
-      threadId = crypto.randomUUID()
-      this.logger.info({ threadId }, 'threadId')
-    }
-
+    const threadId = crypto.randomUUID()
+    this.logger.info({ threadId }, 'creating thread')
     this.logger.info({ candidateContext }, 'candidateContext')
     this.logger.info({ systemPrompt }, 'systemPrompt')
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const chatResponse = await this.runAssistantCompletion({
       systemPrompt,
       candidateContext,
-      assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId: messageId!,
     })
 
-    this.logger.info({ completion }, 'completion')
-
-    const chatResponse: AiChatMessage = {
-      role: 'assistant',
-      id: completion.id,
-      content: completion.content,
-      createdAt: completion.createdAt,
-      usage: completion.usage,
-    }
+    this.logger.info({ chatResponse }, 'completion')
 
     if (!campaign.user?.id) {
       throw new Error('Campaign has no associated user')
@@ -85,7 +81,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     await this.model.create({
       data: {
         assistant: LLAMA_AI_ASSISTANT,
-        threadId: completion.threadId,
+        threadId,
         userId: campaign.user.id,
         campaignId: campaign.id,
         data: {
@@ -95,7 +91,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     })
     return {
       chat: [chatMessage, chatResponse],
-      threadId: completion.threadId,
+      threadId,
     }
   }
 
@@ -121,7 +117,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt()
 
-    const candidateContext = await this.aiService.promptReplace(
+    const candidateContext = await this.promptReplaceService.promptReplace(
       candidateJson,
       campaign,
       liveMetrics,
@@ -146,25 +142,16 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       createdAt: new Date().valueOf(),
     }
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const chatResponse = await this.runAssistantCompletion({
       systemPrompt,
       candidateContext,
-      assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId: messageId!,
+      messageId,
       existingMessages: messages,
     })
 
-    this.logger.info({ completion }, 'completion')
-
-    const chatResponse: AiChatMessage = {
-      role: 'assistant',
-      id: completion.id,
-      content: completion.content,
-      createdAt: completion.createdAt,
-      usage: completion.usage,
-    }
+    this.logger.info({ chatResponse }, 'completion')
 
     await this.model.update({
       where: { id: aiChat.id },
@@ -177,6 +164,60 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     })
 
     return { message: chatResponse }
+  }
+
+  private async runAssistantCompletion({
+    systemPrompt,
+    candidateContext,
+    threadId,
+    message,
+    messageId,
+    existingMessages,
+  }: {
+    systemPrompt: string
+    candidateContext: string
+    threadId: string
+    message: AiChatMessage
+    messageId?: string
+    existingMessages?: AiChatMessage[]
+  }): Promise<AiChatMessage> {
+    if (!systemPrompt) {
+      throw new Error('Missing required param: systemPrompt')
+    }
+    if (!threadId) {
+      throw new Error('Missing threadId for assistant completion')
+    }
+
+    this.logger.info(`running assistant on thread ${threadId}`)
+
+    const priorMessages = messageId
+      ? (existingMessages ?? []).filter((m) => m.id !== messageId)
+      : (existingMessages ?? [])
+
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: `${systemPrompt}\n${candidateContext}` },
+      ...priorMessages
+        .map(toChatCompletionMessage)
+        .filter(isChatCompletionMessage),
+      { role: 'user', content: message.content },
+    ]
+
+    this.logger.info({ messages }, 'messages')
+
+    const result = await this.llm.chatCompletion({
+      messages,
+      maxTokens: AI_CHAT_MAX_TOKENS,
+      temperature: AI_CHAT_TEMPERATURE,
+      topP: AI_CHAT_TOP_P,
+    })
+
+    return {
+      role: 'assistant',
+      content: formatHtmlLlmResponse(result.content),
+      id: crypto.randomUUID(),
+      createdAt: new Date().valueOf(),
+      usage: result.tokens,
+    }
   }
 
   delete(threadId: string, userId: number) {
