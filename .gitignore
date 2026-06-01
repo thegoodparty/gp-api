@@ -91,7 +91,7 @@ ztestfile
 scripts/*.csv
 
 # Performance tooling output (scripts/perf/*.sh + node --cpu-prof / --heap-prof / --prof)
-profiles/
+/profiles/
 *.cpuprofile
 *.heapprofile
 *.heapsnapshot

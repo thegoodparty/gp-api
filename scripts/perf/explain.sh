@@ -144,16 +144,72 @@ fi
 PSQL_URL="$(strip_prisma_params "$DATABASE_URL")"
 PG_SCHEMA="$(extract_pg_schema "$DATABASE_URL")"
 
+# Parse the URL into components so we DON'T pass the whole connection
+# string (with embedded user:password) as a positional argument to psql /
+# docker exec. argv is visible to any local user via `ps aux`; per
+# ai-rules/security.md secrets must never appear there. We pass the
+# password via the PGPASSWORD env var instead (and forward it through
+# `docker exec -e PGPASSWORD` for the docker path).
+parse_pg_url() {
+  # Accepts postgres://[user[:pass]@]host[:port]/db. Side-effects only:
+  # sets _pg_user, _pg_pass, _pg_host, _pg_port, _pg_db.
+  local rest userinfo
+  rest="${1#*://}"
+  _pg_db="${rest##*/}"
+  rest="${rest%/*}"
+  if [[ "$rest" == *@* ]]; then
+    # %@* takes everything before the LAST @, so passwords containing
+    # un-encoded @ stay intact (rare but possible).
+    userinfo="${rest%@*}"
+    rest="${rest##*@}"
+    if [[ "$userinfo" == *:* ]]; then
+      _pg_user="${userinfo%%:*}"
+      _pg_pass="${userinfo#*:}"
+    else
+      _pg_user="$userinfo"
+      _pg_pass=""
+    fi
+  else
+    _pg_user=""
+    _pg_pass=""
+  fi
+  if [[ "$rest" == *:* ]]; then
+    _pg_host="${rest%%:*}"
+    _pg_port="${rest##*:}"
+  else
+    _pg_host="$rest"
+    _pg_port="5432"
+  fi
+}
+
+parse_pg_url "$PSQL_URL"
+
+# Export libpq connection parameters as env vars instead of passing them
+# in argv. This keeps the password out of `ps aux` and also handles the
+# edge case where any individual component is empty (a positional
+# `-U ""` would fail; an unset PGUSER falls back cleanly to libpq
+# defaults). Respect any pre-set caller values.
+[[ -n "$_pg_host" && -z "${PGHOST:-}"     ]] && export PGHOST="$_pg_host"
+[[ -n "$_pg_port" && -z "${PGPORT:-}"     ]] && export PGPORT="$_pg_port"
+[[ -n "$_pg_user" && -z "${PGUSER:-}"     ]] && export PGUSER="$_pg_user"
+[[ -n "$_pg_db"   && -z "${PGDATABASE:-}" ]] && export PGDATABASE="$_pg_db"
+[[ -n "$_pg_pass" && -z "${PGPASSWORD:-}" ]] && export PGPASSWORD="$_pg_pass"
+
 # --- psql resolution: prefer host psql, fall back to docker exec ---
 
 PSQL_CMD=()
 if command -v psql >/dev/null 2>&1; then
-  PSQL_CMD=(psql "$PSQL_URL" -X)
+  # Host psql inherits PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD from env.
+  PSQL_CMD=(psql -X)
 else
   CONTAINER="${PG_DOCKER_CONTAINER:-goodparty-postgres}"
   if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
     echo "→ Using 'docker exec $CONTAINER psql' (host psql not on PATH)" >&2
-    PSQL_CMD=(docker exec -i "$CONTAINER" psql "$PSQL_URL" -X)
+    # `-e VAR` (no value) forwards from the current env — keeps all
+    # connection parameters out of the docker exec argv.
+    PSQL_CMD=(docker exec -i \
+      -e PGHOST -e PGPORT -e PGUSER -e PGDATABASE -e PGPASSWORD \
+      "$CONTAINER" psql -X)
   else
     echo "✗ psql not on PATH and no '$CONTAINER' container running." >&2
     case "$(uname -s)" in
