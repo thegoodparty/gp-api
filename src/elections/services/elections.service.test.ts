@@ -311,7 +311,7 @@ describe('ElectionsService', () => {
   })
 
   describe('getZipCodesByBrPositionId', () => {
-    it('calls /v1/positions/:brPositionId/zip-codes and returns the parsed zip array', async () => {
+    it('calls /v1/positions/by-ballotready-id/:brPositionId/zip-codes and returns the parsed zip array', async () => {
       mockHttpGet.mockReturnValue(
         of({ data: ['90210', '90211', '90212'], status: 200 }),
       )
@@ -320,7 +320,9 @@ describe('ElectionsService', () => {
 
       expect(result).toEqual(['90210', '90211', '90212'])
       expect(mockHttpGet).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/positions/br-pos-1/zip-codes'),
+        expect.stringContaining(
+          '/v1/positions/by-ballotready-id/br-pos-1/zip-codes',
+        ),
         expect.any(Object),
       )
     })

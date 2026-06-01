@@ -23,7 +23,7 @@ export const ElectionApiRoutes = {
       path: 'positions',
     },
     zipCodes: {
-      path: 'positions',
+      path: 'positions/by-ballotready-id',
     },
   },
 }
