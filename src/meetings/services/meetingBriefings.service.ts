@@ -67,6 +67,18 @@ const CRON_CONFIG = {
   every: '20m' as const,
 }
 
+// Briefings are dispatched only when the official's next scheduled meeting
+// falls inside this window. Outside the window we skip — the agent's
+// run would either bail to a placeholder (no packet published yet) or
+// repeat work we'll redo when the meeting gets closer.
+const IMMINENCE_WINDOW_DAYS = 5
+
+type TargetMeeting = {
+  meetingDate: string // YYYY-MM-DD
+  meetingTime: string // HH:MM
+  meetingTimezone: string // IANA
+}
+
 @Injectable()
 export class MeetingBriefingsService extends createPrismaBase(
   MODELS.MeetingBriefing,
@@ -142,7 +154,11 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    await Promise.all([this.dispatchSchedule(ctx), this.dispatchBriefing(ctx)])
+    // Only the schedule fires here. When the schedule run completes,
+    // `onExperimentRunCompleted` checks the imminence gate and dispatches
+    // the briefing if a meeting falls inside the window. This guarantees
+    // we never run a briefing without a fresh schedule.
+    await this.dispatchSchedule(ctx)
   }
 
   private async dispatchSchedule(ctx: DispatchContext): Promise<void> {
@@ -158,7 +174,10 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
   }
 
-  private async dispatchBriefing(ctx: DispatchContext): Promise<void> {
+  private async dispatchBriefing(
+    ctx: DispatchContext,
+    meeting: TargetMeeting,
+  ): Promise<void> {
     await this.experimentRuns.dispatchRun({
       type: BRIEFING_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
@@ -167,10 +186,64 @@ export class MeetingBriefingsService extends createPrismaBase(
         officialName: ctx.officialName,
         state: ctx.state,
         positionName: ctx.positionName,
+        meetingDate: meeting.meetingDate,
+        meetingTime: meeting.meetingTime,
+        meetingTimezone: meeting.meetingTimezone,
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
         ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
       },
     })
+  }
+
+  /**
+   * Look up the official's latest meeting_schedule, project the next
+   * meeting from its RRULE, and return the target meeting payload — or
+   * null if no schedule exists, the schedule was not_found, or no
+   * meeting falls inside the window.
+   *
+   * Callers pass `windowDays` to bound how far out to project. The cron
+   * uses IMMINENCE_WINDOW_DAYS; manual dispatches use a wider window
+   * (e.g. 60) so a user clicking "brief now" can override the gate.
+   */
+  private async resolveTargetMeeting(
+    organizationSlug: string,
+    electedOfficeId: string,
+    now: Date,
+    windowDays: number,
+  ): Promise<TargetMeeting | null> {
+    const schedule = await this.loadLatestScheduleForOrg(organizationSlug)
+    if (!schedule) {
+      this.logger.info(
+        { electedOfficeId },
+        'skipping briefing: no meeting_schedule available for org',
+      )
+      return null
+    }
+    if (schedule.status === 'not_found') {
+      this.logger.info(
+        { electedOfficeId },
+        'skipping briefing: meeting_schedule is not_found',
+      )
+      return null
+    }
+    const windowEnd = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000)
+    const upcoming = this.projectMeetingDates({
+      schedule,
+      from: now,
+      to: windowEnd,
+    })
+    if (upcoming.length === 0) {
+      this.logger.info(
+        { electedOfficeId, windowDays },
+        'skipping briefing: no projected meeting inside window',
+      )
+      return null
+    }
+    return {
+      meetingDate: upcoming[0],
+      meetingTime: schedule.time,
+      meetingTimezone: schedule.timezone,
+    }
   }
 
   async dispatchManual(
@@ -187,9 +260,21 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     if (kind === 'schedule') {
       await this.dispatchSchedule(ctx)
-    } else {
-      await this.dispatchBriefing(ctx)
+      return { dispatched: true }
     }
+
+    // Manual briefing dispatch bypasses the 5-day imminence gate but still
+    // needs a meetingDate from the schedule. Project up to 60 days out so
+    // an operator can pre-brief a meeting that's still a few weeks away.
+    const target = await this.resolveTargetMeeting(
+      ctx.organizationSlug,
+      ctx.electedOfficeId,
+      new Date(),
+      60,
+    )
+    if (!target) return { dispatched: false }
+
+    await this.dispatchBriefing(ctx, target)
     return { dispatched: true }
   }
 
@@ -198,7 +283,56 @@ export class MeetingBriefingsService extends createPrismaBase(
 
     if (run.experimentType === BRIEFING_EXPERIMENT_TYPE) {
       await this.upsertBriefingRow(run)
+      return
     }
+
+    if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
+      await this.maybeDispatchBriefingAfterSchedule(run)
+    }
+  }
+
+  /**
+   * When a meeting_schedule run completes, check whether that office now
+   * qualifies for a meeting_briefing dispatch (imminence gate + coverage
+   * dedupe). This is the path that fires the first briefing for a newly
+   * created elected office: onElectedOfficeCreated dispatches only the
+   * schedule; this hook dispatches the briefing once the schedule lands.
+   */
+  private async maybeDispatchBriefingAfterSchedule(
+    run: ExperimentRun,
+  ): Promise<void> {
+    if (!isAutomationEnabled()) return
+
+    // The schedule run's params include `elected_office_id` (snake_case);
+    // see dispatchSchedule().
+    const params =
+      typeof run.params === 'object' && run.params !== null ? run.params : {}
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const electedOfficeId = (params as Record<string, unknown>)[
+      'elected_office_id'
+    ] as string | undefined
+    if (!electedOfficeId) {
+      this.logger.warn(
+        { runId: run.runId },
+        'schedule run completed without elected_office_id in params; cannot chain to briefing',
+      )
+      return
+    }
+
+    const eo = await this.client.electedOffice.findUnique({
+      where: { id: electedOfficeId },
+      select: { id: true, organizationSlug: true, userId: true },
+    })
+    if (!eo) return
+
+    await this.dispatchBriefingIfNeeded(eo, new Date()).catch(
+      (err: unknown) => {
+        this.logger.error(
+          { err, electedOfficeId, scheduleRunId: run.runId },
+          'dispatchBriefingIfNeeded failed after schedule completion',
+        )
+      },
+    )
   }
 
   @Cron('0 7 * * *')
@@ -255,11 +389,22 @@ export class MeetingBriefingsService extends createPrismaBase(
     eo: { id: string; organizationSlug: string; userId: number },
     now: Date,
   ): Promise<void> {
+    // Coverage dedupe: skip if a briefing already covers an upcoming meeting.
     const futureBriefing = await this.model.findFirst({
       where: { electedOfficeId: eo.id, meetingDate: { gte: now } },
       select: { id: true },
     })
     if (futureBriefing) return
+
+    // Imminence gate: only dispatch when the schedule shows a meeting
+    // within IMMINENCE_WINDOW_DAYS. No schedule → no briefing.
+    const target = await this.resolveTargetMeeting(
+      eo.organizationSlug,
+      eo.id,
+      now,
+      IMMINENCE_WINDOW_DAYS,
+    )
+    if (!target) return
 
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { id: eo.id },
@@ -269,7 +414,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 
-    await this.dispatchBriefing(ctx)
+    await this.dispatchBriefing(ctx, target)
   }
 
   private async resolveDispatchContext(
