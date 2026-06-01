@@ -290,7 +290,14 @@ if [[ -z "$QUERY" ]]; then
   exit 2
 fi
 
-QUERY="${QUERY%;}"
+# Strip a trailing `;` along with any whitespace before it. Plain
+# `${QUERY%;}` only matches a bare semicolon, so `'SELECT 1 ;'` (common
+# when copy-pasting from psql or a SQL editor) would survive the strip
+# and then false-positive on the interior-semicolon check below. The
+# extglob `*([[:space:]]);` matches "zero-or-more whitespace then `;`".
+shopt -s extglob
+QUERY="${QUERY%%*([[:space:]]);}"
+shopt -u extglob
 
 # EXPLAIN wraps exactly one statement. Interior ';' usually means the user
 # passed multiple statements (e.g. `-f migration.sql`) — psql splits on the
