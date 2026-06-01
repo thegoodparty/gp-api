@@ -156,9 +156,28 @@ PG_SCHEMA="$(extract_pg_schema "$DATABASE_URL")"
 # ai-rules/security.md secrets must never appear there. We pass the
 # password via the PGPASSWORD env var instead (and forward it through
 # `docker exec -e PGPASSWORD` for the docker path).
+url_decode() {
+  # Decode %XX percent-encoding to literal bytes. libpq treats
+  # PGUSER/PGPASSWORD as literal strings (not URI-decoded), so any
+  # percent-encoded credential (e.g. `p%40ssword` for a literal `@` in
+  # the password — which MUST be encoded in the URL form) needs to be
+  # decoded here, or Postgres auth fails with a misleading "password
+  # authentication failed" message.
+  #   ${val//%/\\x} replaces every `%` with `\x` → e.g. `p%40ssword`
+  #   becomes `p\x40ssword`, then `printf '%b'` interprets the
+  #   backslash escapes — `\x40` → `@`.
+  local val="${1:-}"
+  [[ -z "$val" ]] && return
+  # Suppress printf's "missing hex digit for \x" for malformed `%` not
+  # followed by two hex digits — a malformed URL would fail auth anyway,
+  # and the warning would be misleading noise.
+  printf '%b' "${val//%/\\x}" 2>/dev/null
+}
+
 parse_pg_url() {
   # Accepts postgres://[user[:pass]@]host[:port]/db. Side-effects only:
-  # sets _pg_user, _pg_pass, _pg_host, _pg_port, _pg_db.
+  # sets _pg_user, _pg_pass, _pg_host, _pg_port, _pg_db. The user and
+  # password are URL-decoded so libpq sees the literal credential.
   local rest userinfo
   rest="${1#*://}"
   _pg_db="${rest##*/}"
@@ -169,10 +188,10 @@ parse_pg_url() {
     userinfo="${rest%@*}"
     rest="${rest##*@}"
     if [[ "$userinfo" == *:* ]]; then
-      _pg_user="${userinfo%%:*}"
-      _pg_pass="${userinfo#*:}"
+      _pg_user="$(url_decode "${userinfo%%:*}")"
+      _pg_pass="$(url_decode "${userinfo#*:}")"
     else
-      _pg_user="$userinfo"
+      _pg_user="$(url_decode "$userinfo")"
       _pg_pass=""
     fi
   else
@@ -257,16 +276,18 @@ if [[ "$QUERY" == *";"* ]]; then
   exit 2
 fi
 
-# SQL line comments (`--`) appended to the query would comment out the
-# trailing `; ROLLBACK;` in the assembled SQL string, defeating the
-# transaction safety wrapper. E.g. `'UPDATE foo SET x = 1 -- oops'` would
-# expand to `... UPDATE foo SET x = 1 -- oops; ROLLBACK;` and the
+# SQL line comments (`--`) on the LAST LINE of the query would comment
+# out the trailing `; ROLLBACK;` in the assembled SQL string, defeating
+# the transaction safety wrapper. E.g. `'UPDATE foo SET x = 1 -- oops'`
+# would expand to `... UPDATE foo SET x = 1 -- oops; ROLLBACK;` and the
 # `ROLLBACK;` would never execute — the UPDATE would commit.
-# Block-comments (`/* ... */`) inside a single line don't have this hazard
-# because they're closed before the appended SQL; only line comments do.
-if [[ "$QUERY" == *"--"* ]]; then
-  echo "✗ Query contains '--' — this would comment out the ROLLBACK safety wrapper." >&2
-  echo "  Remove SQL line comments from the query before passing it to this script." >&2
+# Comments on earlier lines are safe because the newline terminates the
+# line comment before the appended SQL. Block comments (`/* ... */`)
+# inside a single line are also safe — they're closed by `*/`.
+last_line="${QUERY##*$'\n'}"
+if [[ "$last_line" == *"--"* ]]; then
+  echo "✗ Query's last line contains '--' — this would comment out the ROLLBACK safety wrapper." >&2
+  echo "  Move or remove any SQL line comment at the end of the query." >&2
   exit 2
 fi
 

@@ -87,13 +87,17 @@ for a in "${ARGS[@]}"; do
   if $skip_next; then
     DISPLAY_ARGS+=("<redacted>")
     skip_next=false
-  elif [[ "$a" == "-H" || "$a" == "--header" ]]; then
+  elif [[ "$a" == "-H" || "$a" == "--header" || "$a" == "-b" || "$a" == "--body" ]]; then
     DISPLAY_ARGS+=("$a")
     skip_next=true
   elif [[ "$a" == "-H"?* ]]; then
     DISPLAY_ARGS+=("-H<redacted>")
   elif [[ "$a" == "--header="* ]]; then
     DISPLAY_ARGS+=("--header=<redacted>")
+  elif [[ "$a" == "-b"?* ]]; then
+    DISPLAY_ARGS+=("-b<redacted>")
+  elif [[ "$a" == "--body="* ]]; then
+    DISPLAY_ARGS+=("--body=<redacted>")
   else
     DISPLAY_ARGS+=("$a")
   fi
