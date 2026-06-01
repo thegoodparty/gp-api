@@ -155,8 +155,15 @@ export class AdminAgentRunsService extends createPrismaBase(
 
     // params were validated against this experiment's Input at the original
     // dispatch and persisted unchanged, so re-forward them as that Input.
+    // Override trigger to recovery_resume so the agent treats this as a
+    // re-dispatch (consult durable gp-api state), not a first-time dispatch that
+    // would re-run paid side effects (domain purchase, TCR submission).
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const params = run.params as DispatchParams
+    const storedParams = run.params as DispatchParams
+    const params: DispatchParams = {
+      ...storedParams,
+      trigger: 'recovery_resume',
+    }
 
     const dispatched = await this.experimentRuns.dispatchRun({
       type: run.experimentType,

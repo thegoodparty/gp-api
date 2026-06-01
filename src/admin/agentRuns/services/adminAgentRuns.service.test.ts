@@ -20,6 +20,7 @@ const makeRun = (overrides: Partial<ExperimentRun> = {}): ExperimentRun => ({
     candidate_first_name: 'Ada',
     candidate_last_name: 'Lovelace',
     clerk_user_id: 'user_abc',
+    trigger: 'initial',
   } as Prisma.JsonValue,
   artifactBucket: 'agent-artifacts',
   artifactKey: 'compliance_setup/run-1/artifact.json',
@@ -257,11 +258,14 @@ describe('AdminAgentRunsService', () => {
         type: 'compliance_setup',
         organizationSlug: 'org-1',
         clerkUserId: 'user_abc',
+        // trigger flips initial -> recovery_resume so the re-dispatch resumes
+        // from durable state instead of re-running paid side effects.
         params: {
           campaign_id: 42,
           candidate_first_name: 'Ada',
           candidate_last_name: 'Lovelace',
           clerk_user_id: 'user_abc',
+          trigger: 'recovery_resume',
         },
       })
       expect(result).toBe(newRun)
