@@ -263,6 +263,15 @@ else
 fi
 
 if [[ -n "$FILE" ]]; then
+  # Reject the both-provided case rather than silently dropping the
+  # positional query — EXPLAIN ANALYZE executes its argument, so the
+  # user would otherwise get a plan for a query they didn't intend to
+  # run with no indication that their positional input was ignored.
+  if [[ -n "$QUERY" ]]; then
+    echo "✗ Provide either a positional query string OR -f file.sql, not both." >&2
+    echo "  (Got both. The positional query would otherwise be silently dropped.)" >&2
+    exit 2
+  fi
   QUERY="$(cat "$FILE")"
 fi
 
@@ -294,11 +303,34 @@ fi
 # `ROLLBACK;` would never execute — the UPDATE would commit.
 # Comments on earlier lines are safe because the newline terminates the
 # line comment before the appended SQL. Block comments (`/* ... */`)
-# inside a single line are also safe — they're closed by `*/`.
+# inside a single line are safe *only when closed* — an unclosed `/*` on
+# the last line has the same effect as `--` (Postgres treats everything
+# after the unmatched `/*` as comment text, including our `; ROLLBACK;`).
 last_line="${QUERY##*$'\n'}"
 if [[ "$last_line" == *"--"* ]]; then
   echo "✗ Query's last line contains '--' — this would comment out the ROLLBACK safety wrapper." >&2
   echo "  Move or remove any SQL line comment at the end of the query." >&2
+  exit 2
+fi
+# Count `/*` vs `*/` on the last line; if open > close, there's an
+# unclosed block comment and the appended `; ROLLBACK;` becomes part
+# of it. Uses pure-bash substring stripping rather than `grep -o | wc -l`
+# because grep exits 1 when it finds no matches, and `set -o pipefail`
+# (line 27) would silently abort the script in the common "no comments
+# at all" case.
+_open_blk=0; _close_blk=0; _tmp="$last_line"
+while [[ "$_tmp" == *"/*"* ]]; do
+  _open_blk=$(( _open_blk + 1 ))
+  _tmp="${_tmp#*"/*"}"
+done
+_tmp="$last_line"
+while [[ "$_tmp" == *"*/"* ]]; do
+  _close_blk=$(( _close_blk + 1 ))
+  _tmp="${_tmp#*"*/"}"
+done
+if (( _open_blk > _close_blk )); then
+  echo "✗ Query's last line has an unclosed '/*' — this would comment out the ROLLBACK safety wrapper." >&2
+  echo "  Close the block comment with '*/' before the end of the query." >&2
   exit 2
 fi
 
