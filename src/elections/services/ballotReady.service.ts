@@ -514,7 +514,13 @@ export class BallotReadyService {
         RaceMilestonesGraphResponse,
         { raceId: string }
       >(query, { raceId: brHashId })
-      const milestones = result?.node?.election?.milestones ?? []
+      // No race (unknown raceId) or no linked Election → no data to
+      // collapse. Return top-level null so callers can null-fill cleanly
+      // and don't conflate "race not found" with "election exists but
+      // returned zero milestones" (which yields an all-null-windows
+      // object via collapseMilestones below).
+      if (!result?.node?.election) return null
+      const milestones = result.node.election.milestones ?? []
       return collapseMilestones(milestones)
     } catch (error) {
       this.logger.warn(

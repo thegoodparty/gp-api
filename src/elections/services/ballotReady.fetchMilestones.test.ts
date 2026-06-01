@@ -75,19 +75,23 @@ describe('collapseMilestones', () => {
   })
 
   // The OPEN selector picks the earliest datetime across mixed offsets,
-  // not the lexicographically smallest string — same shape catches a
-  // regression from compareAsc back to raw `<`/`>`.
+  // not the lexicographically smallest string. Inputs are chosen so the
+  // lex-smaller string is the *later* instant AND the two project to
+  // *different* UTC calendar dates — so a regression from compareAsc
+  // back to raw `<`/`>` produces the wrong output and fails the test.
   it('compares mixed-offset datetimes by instant, not string order', () => {
     const result = collapseMilestones([
-      // 2026-10-19T05:00:00Z — later instant
+      // 2026-10-20T01:00:00+05:00 = 2026-10-19T20:00:00Z — earlier instant, lex-later string
       {
         category: 'EARLY_VOTING',
         type: 'OPEN',
-        at: '2026-10-19T00:00:00-05:00',
+        at: '2026-10-20T01:00:00+05:00',
       },
-      // 2026-10-19T00:00:00Z — earlier instant, but later as a string
-      { category: 'EARLY_VOTING', type: 'OPEN', at: '2026-10-19T00:00:00Z' },
+      // 2026-10-20T00:00:00Z — later instant, lex-earlier string
+      { category: 'EARLY_VOTING', type: 'OPEN', at: '2026-10-20T00:00:00Z' },
     ])
+    // Correct (compareAsc): earliest instant = 2026-10-19T20:00:00Z → UTC date 2026-10-19
+    // Buggy (lexicographic): smallest string = '2026-10-20T00:00:00Z' → UTC date 2026-10-20
     expect(result.early_voting?.start).toBe('2026-10-19')
   })
 })
@@ -161,13 +165,15 @@ describe('BallotReadyService.fetchMilestones', () => {
     })
   })
 
-  it('returns all-null windows when node is null (unknown raceId)', async () => {
+  it('returns null when node is null (unknown raceId)', async () => {
     mockRequest.mockResolvedValue({ node: null })
     const result = await service.fetchMilestones('br-hash-unknown')
-    expect(result).toEqual({
-      voter_registration: null,
-      early_voting: null,
-      request_ballot: null,
-    })
+    expect(result).toBeNull()
+  })
+
+  it('returns null when node.election is null (race not linked to an Election)', async () => {
+    mockRequest.mockResolvedValue({ node: { election: null } })
+    const result = await service.fetchMilestones('br-hash-no-election')
+    expect(result).toBeNull()
   })
 })
