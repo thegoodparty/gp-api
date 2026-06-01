@@ -5,7 +5,6 @@ import {
   PromptReplaceService,
 } from 'src/ai/services/promptReplace.service'
 import { LlmService, LlmStreamResult } from '@/llm/services/llm.service'
-import { formatHtmlLlmResponse } from '@/ai/util/llmResponseFormat.util'
 import {
   isChatCompletionMessage,
   toChatCompletionMessage,
@@ -233,9 +232,13 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       topP: AI_CHAT_TOP_P,
     })
 
+    // Store raw Markdown in every path. The HTML post-processor
+    // (formatHtmlLlmResponse) would mangle the Markdown the model now emits and
+    // would mix HTML/Markdown across the shared thread store (a thread started
+    // here and continued via streamChat, or vice versa).
     return {
       role: 'assistant',
-      content: formatHtmlLlmResponse(result.content),
+      content: result.content,
       id: crypto.randomUUID(),
       createdAt: new Date().valueOf(),
       usage: result.tokens,
@@ -307,22 +310,35 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       return
     }
 
-    const { candidateJson, systemPrompt } =
-      await this.contentService.getChatSystemPrompt(
-        resolved.isNewThread && initial,
+    let messages: ChatCompletionMessageParam[]
+    try {
+      const { candidateJson, systemPrompt } =
+        await this.contentService.getChatSystemPrompt(
+          resolved.isNewThread && initial,
+        )
+      const candidateContext = await this.promptReplaceService.promptReplace(
+        candidateJson,
+        campaign,
+        liveMetrics,
       )
-    const candidateContext = await this.promptReplaceService.promptReplace(
-      candidateJson,
-      campaign,
-      liveMetrics,
-    )
 
-    const messages = this.buildMessages({
-      systemPrompt,
-      candidateContext,
-      priorMessages: resolved.priorMessages,
-      userContent: resolved.userMessage.content,
-    })
+      messages = this.buildMessages({
+        systemPrompt,
+        candidateContext,
+        priorMessages: resolved.priorMessages,
+        userContent: resolved.userMessage.content,
+      })
+    } catch (err) {
+      // Keep prompt-build failures inside the generator so the client gets a
+      // classified `internal` chunk instead of the controller's generic
+      // last-resort error (which would otherwise diverge on the retryable flag).
+      this.logger.error(
+        { err, threadId: resolved.threadId },
+        'failed to build campaign chat prompt',
+      )
+      yield this.streamError('internal', 'Chat is unavailable.')
+      return
+    }
 
     let result: LlmStreamResult
     try {

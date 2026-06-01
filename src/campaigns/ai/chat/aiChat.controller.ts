@@ -49,11 +49,14 @@ const TIMEOUT_ERROR_CHUNK = `data: ${JSON.stringify({
   retryable: true,
 })}\n\n`
 
+// `retryable: false` matches the service's classification of an unclassified
+// internal error (AiChatService.streamError defaults `internal` to false), so
+// the client gets a consistent signal regardless of where the failure surfaces.
 const INTERNAL_ERROR_CHUNK = `data: ${JSON.stringify({
   type: 'error',
   code: 'internal',
   message: 'Chat stream failed.',
-  retryable: true,
+  retryable: false,
 })}\n\n`
 
 const formatChunk = (chunk: CampaignChatChunk): string =>

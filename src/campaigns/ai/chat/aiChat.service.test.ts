@@ -5,6 +5,7 @@ import { AiChatService } from './aiChat.service'
 import type { PromptReplaceCampaign } from 'src/ai/services/promptReplace.service'
 import type { CampaignChatChunk } from './aiChat.types'
 import type { StreamAiChatSchema } from './schemas/StreamAiChat.schema'
+import type { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 
 const CAMPAIGN = {
   id: 10,
@@ -37,6 +38,7 @@ const asBody = (body: Partial<StreamAiChatSchema>): StreamAiChatSchema =>
 describe('AiChatService.streamChat', () => {
   let service: AiChatService
   let streamChatCompletion: ReturnType<typeof vi.fn>
+  let chatCompletion: ReturnType<typeof vi.fn>
   let fakeModel: {
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
@@ -45,7 +47,8 @@ describe('AiChatService.streamChat', () => {
 
   beforeEach(() => {
     streamChatCompletion = vi.fn()
-    const llm = { streamChatCompletion }
+    chatCompletion = vi.fn()
+    const llm = { streamChatCompletion, chatCompletion }
     const promptReplace = { promptReplace: vi.fn().mockResolvedValue('CTX') }
     const content = {
       getChatSystemPrompt: vi
@@ -147,6 +150,31 @@ describe('AiChatService.streamChat', () => {
     expect(messages[0].role).toBe('system')
     expect(messages[0].content).toMatch(/Markdown/i)
     expect(messages[0].content).toMatch(/do not output raw HTML/i)
+  })
+
+  it('stores raw Markdown (no HTML post-processing) on the create path', async () => {
+    // All paths share the AiChat store, so the non-streaming create path must
+    // also emit the Markdown directive and store raw Markdown — not HTML with
+    // <br/> conversions — to avoid mixed-format threads.
+    chatCompletion.mockResolvedValue({
+      content: 'line one\nline two',
+      tokens: 5,
+    })
+
+    await service.create(
+      CAMPAIGN,
+      { message: 'hi', initial: true } as CreateAiChatSchema,
+      null,
+    )
+
+    const sent = chatCompletion.mock.calls[0][0].messages
+    expect(sent[0].role).toBe('system')
+    expect(sent[0].content).toMatch(/Markdown/i)
+
+    const storedAssistant =
+      fakeModel.create.mock.calls[0][0].data.data.messages[1]
+    expect(storedAssistant.content).toBe('line one\nline two')
+    expect(storedAssistant.content).not.toContain('<br')
   })
 
   it('appends to an existing thread on a follow-up message', async () => {
@@ -257,6 +285,9 @@ describe('AiChatService.streamChat', () => {
       code: 'aborted',
       retryable: false,
     })
+    // The aborted-signal guard must fire before any delta is emitted — no
+    // partial text should leak ahead of the abort error.
+    expect(chunks.every((c) => c.type !== 'text')).toBe(true)
     expect(fakeModel.create).not.toHaveBeenCalled()
     expect(fakeModel.update).not.toHaveBeenCalled()
   })
