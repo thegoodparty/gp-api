@@ -322,11 +322,12 @@ export class CampaignStrategyService
   // race details (officialOfficeName, officeLevel, primaryElectionDate)
   // with campaign.details (state, city) and a district zip resolved from
   // the BR race ID via RacesService. The resolver returns every zip the
-  // race's position touches; we take the first one so the LLM grounds its
-  // search inside the actual district instead of the candidate's home zip
-  // (which may not be inside the district they're running for). Falls back
-  // to campaign/user zip on resolver failure so the request still has
-  // something usable.
+  // race's position touches; we hand the full list to the LLM so it can
+  // ground events across the whole district (a city-council race may
+  // span 3-5 zips, a state-rep race 20-30). For statewide races where
+  // the resolver returns more than STATEWIDE_ZIP_THRESHOLD zips, we drop
+  // the zip entirely — listing them would add noise without precision,
+  // and the LLM can reason from officeName + state + city alone.
   private async buildEventsContext(
     campaign: CampaignWith<'user'>,
     brHashId: string,
@@ -338,8 +339,7 @@ export class CampaignStrategyService
 
     const detailZip = (details.zip ?? '').trim()
     const userZip = (campaign.user?.zip ?? '').trim()
-    const zip =
-      (await this.resolveDistrictZip(brHashId)) || detailZip || userZip
+    const zip = await this.resolveDistrictZip(brHashId, [detailZip, userZip])
 
     return {
       today: format(new Date(), 'yyyy-MM-dd'),
@@ -354,26 +354,36 @@ export class CampaignStrategyService
   }
 
   // Resolve a comma-joined district zip list from the BR race id via
-  // election-api's position → zip-codes endpoint. The LLM gets fuller
-  // geographic coverage when we hand it every zip the district touches
-  // (a city-council race might span 3-5 zips, a state-rep race 20-30).
-  // Returns '' when:
-  //   - the race isn't in BR / has no position
-  //   - the resolver fails for any other reason
-  //   - the position spans more than STATEWIDE_ZIP_THRESHOLD zips
-  //     (likely a statewide race where the full list is too coarse to
-  //     be useful and the campaign/user's own zip is a better signal)
-  // The caller falls back to campaign/user zip on '' — we never want a
-  // resolver hiccup to block events generation entirely.
+  // election-api's position → zip-codes endpoint, with three branches:
+  //
+  //   1. Resolver returned 1-STATEWIDE_ZIP_THRESHOLD zips →
+  //      return them comma-joined. The LLM gets the full district.
+  //   2. Resolver returned >STATEWIDE_ZIP_THRESHOLD zips →
+  //      return '' (statewide skip). We do NOT fall back to the
+  //      candidate's own zip because for statewide races the home zip
+  //      isn't representative of where the campaign actually operates.
+  //      The prompt's orNotAvailable() renders the absent zip as
+  //      "not available"; the LLM reasons from officeName + state + city.
+  //   3. Resolver returned 0 zips OR threw →
+  //      try the candidate's own zips (detail → user) so generation
+  //      still has *some* geographic signal when BR data is missing.
+  //
+  // Logs at info for the statewide branch and warn for the error branch
+  // so we can spot how often each fires in production.
   private static readonly STATEWIDE_ZIP_THRESHOLD = 75
-  private async resolveDistrictZip(brHashId: string): Promise<string> {
+  private async resolveDistrictZip(
+    brHashId: string,
+    candidateFallbacks: string[],
+  ): Promise<string> {
+    const fallback = (): string =>
+      candidateFallbacks.find((z) => z.length > 0) ?? ''
     try {
       const zips = await this.races.getZipCodesByRaceId(brHashId)
-      if (zips.length === 0) return ''
+      if (zips.length === 0) return fallback()
       if (zips.length > CampaignStrategyService.STATEWIDE_ZIP_THRESHOLD) {
         this.logger.info(
           { raceId: brHashId, zipCount: zips.length },
-          'District zip resolver returned statewide-sized array; falling back to campaign/user zip for better geographic precision',
+          'District zip resolver returned statewide-sized array; dropping zip from the prompt so the LLM reasons from office + state instead',
         )
         return ''
       }
@@ -386,7 +396,7 @@ export class CampaignStrategyService
         },
         'District zip resolver failed; falling back to campaign/user zip',
       )
-      return ''
+      return fallback()
     }
   }
 

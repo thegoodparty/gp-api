@@ -866,18 +866,37 @@ describe('CampaignStrategyService', () => {
       expect(ctx?.zip).toBe('94110')
     })
 
-    it('falls back to campaign zip when the resolver returns a statewide-sized array', async () => {
+    it('drops the zip entirely when the resolver returns a statewide-sized array', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
         communityEvents: null,
       })
-      // 76 zips trips the STATEWIDE_ZIP_THRESHOLD (75) — listing every zip
-      // for a statewide race would dilute the LLM's grounding more than
-      // it'd help, so the campaign's own zip wins.
+      // 76 zips trips the STATEWIDE_ZIP_THRESHOLD (75) — for statewide
+      // races the campaign's home zip isn't representative of where the
+      // candidate actually operates, so the resolver returns '' and the
+      // prompt renders the zip field as "not available". The LLM reasons
+      // from officeName + state + city for these races.
       const statewideZips = Array.from(
         { length: 76 },
         (_, i) => `9${i.toString().padStart(4, '0')}`,
       )
       mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(statewideZips)
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('')
+    })
+
+    it('falls back to campaign zip when the resolver returns an empty array', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // BR has the race but no zips on file for its position — still a
+      // recoverable case where the candidate's home zip is useful.
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce([])
 
       await service.getOrGenerateCommunityEvents(
         buildCampaign({ details: eventsDetails }),
