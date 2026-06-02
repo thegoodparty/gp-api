@@ -95,6 +95,18 @@ export interface AgentJobContracts {
        */
       l2DistrictType?: string
       /**
+       * Target meeting date in YYYY-MM-DD. Required. The caller (gp-api) supplies this from the official's meeting_schedule.
+       */
+      meetingDate: string
+      /**
+       * Start time of the target meeting in 24-hour HH:MM (local time of meetingTimezone). Optional but recommended.
+       */
+      meetingTime?: string
+      /**
+       * IANA timezone name for meetingTime (e.g. "America/New_York"). Optional but recommended.
+       */
+      meetingTimezone?: string
+      /**
        * Full name of the elected official (e.g. "Shekar Krishnan").
        */
       officialName: string
