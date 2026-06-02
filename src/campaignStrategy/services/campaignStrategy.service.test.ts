@@ -41,6 +41,7 @@ describe('CampaignStrategyService', () => {
   let experimentRuns: {
     findUnique: ReturnType<typeof vi.fn>
     dispatchRun: ReturnType<typeof vi.fn>
+    markFailed: ReturnType<typeof vi.fn>
   }
   let persister: {
     persistOpponents: ReturnType<typeof vi.fn>
@@ -62,6 +63,7 @@ describe('CampaignStrategyService', () => {
     experimentRuns = {
       findUnique: vi.fn().mockResolvedValue(null),
       dispatchRun: vi.fn(),
+      markFailed: vi.fn().mockResolvedValue(undefined),
     }
     persister = {
       persistOpponents: vi.fn().mockResolvedValue(undefined),
@@ -103,10 +105,24 @@ describe('CampaignStrategyService', () => {
     expect(params.build).toHaveBeenCalledTimes(1)
     expect(experimentRuns.dispatchRun).toHaveBeenCalledTimes(2)
     const types = experimentRuns.dispatchRun.mock.calls.map((c) => c[0].type)
-    expect(types).toEqual([
+    expect(types.sort()).toEqual([
+      'opportunities_and_challenges',
+      'opposition_research',
+    ])
+    // both dispatches carry the resolved org slug, clerk id, and built params
+    for (const type of [
       'opposition_research',
       'opportunities_and_challenges',
-    ])
+    ]) {
+      expect(experimentRuns.dispatchRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type,
+          organizationSlug: 'org-99',
+          clerkUserId: 'clerk-1',
+          params: { race_id: 'br-general' },
+        }),
+      )
+    }
     expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
       where: { id: 42 },
       data: { oppositionRunId: 'opp-run' },
@@ -115,6 +131,15 @@ describe('CampaignStrategyService', () => {
       where: { id: 42 },
       data: { opportunitiesRunId: 'oc-run' },
     })
+  })
+
+  it('reports failed (not generating) when dispatch produces no run', async () => {
+    experimentRuns.dispatchRun.mockResolvedValue(undefined) // no queue configured
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'failed' })
+    expect(prisma.campaignStrategy.update).not.toHaveBeenCalled()
   })
 
   it('throws when the user has no clerkId', async () => {
@@ -272,5 +297,68 @@ describe('CampaignStrategyService', () => {
     expect(s3.getFile).not.toHaveBeenCalled()
     expect(persister.persistOpponents).not.toHaveBeenCalled()
     expect(persister.persistOpportunitiesAndChallenges).not.toHaveBeenCalled()
+  })
+
+  it('persists an empty opponent list for an uncontested race', async () => {
+    s3.getFile.mockResolvedValue(JSON.stringify({ opponents: [] }))
+
+    await service.onExperimentRunCompleted(
+      run({ runId: 'opp-run', experimentType: 'opposition_research' }),
+    )
+
+    expect(persister.persistOpponents).toHaveBeenCalledWith(42, [])
+    expect(experimentRuns.markFailed).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when no plan references the completed run', async () => {
+    prisma.campaignStrategy.findFirst.mockResolvedValue(null)
+    s3.getFile.mockResolvedValue(JSON.stringify({ opponents: [] }))
+
+    await service.onExperimentRunCompleted(
+      run({ runId: 'orphan', experimentType: 'opposition_research' }),
+    )
+
+    expect(s3.getFile).not.toHaveBeenCalled()
+    expect(persister.persistOpponents).not.toHaveBeenCalled()
+    expect(experimentRuns.markFailed).not.toHaveBeenCalled()
+  })
+
+  it('marks the run failed when persisting the artifact throws', async () => {
+    s3.getFile.mockResolvedValue(
+      JSON.stringify({
+        opponents: [
+          {
+            full_name: 'Rival',
+            party_affiliation: 'Nonpartisan',
+            incumbent: true,
+          },
+        ],
+      }),
+    )
+    persister.persistOpponents.mockRejectedValue(new Error('db down'))
+
+    await expect(
+      service.onExperimentRunCompleted(
+        run({ runId: 'opp-run', experimentType: 'opposition_research' }),
+      ),
+    ).rejects.toThrow('db down')
+
+    expect(experimentRuns.markFailed).toHaveBeenCalledWith('opp-run', 'db down')
+  })
+
+  it('marks the run failed when the artifact body is empty', async () => {
+    s3.getFile.mockResolvedValue(undefined)
+
+    await expect(
+      service.onExperimentRunCompleted(
+        run({ runId: 'opp-run', experimentType: 'opposition_research' }),
+      ),
+    ).rejects.toThrow()
+
+    expect(experimentRuns.markFailed).toHaveBeenCalledWith(
+      'opp-run',
+      'artifact is missing or empty',
+    )
+    expect(persister.persistOpponents).not.toHaveBeenCalled()
   })
 })

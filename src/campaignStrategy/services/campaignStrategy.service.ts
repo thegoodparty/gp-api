@@ -29,6 +29,11 @@ const OPPORTUNITIES = 'opportunities_and_challenges'
 // BallotReady race hash election-api keys on.
 const CampaignDetailsSchema = z.object({ raceId: z.string().optional() })
 
+// BallotReady brHashId is a base64(url) string. Allowlist its charset and
+// bound the length before it flows into the election-api body and the
+// BallotReady GraphQL hop, so a stray quote/character can't break out.
+const RACE_ID_PATTERN = /^[A-Za-z0-9+/=_-]{1,256}$/
+
 const resolveRaceId = (details: CampaignWith<'user'>['details']): string => {
   const parsed = CampaignDetailsSchema.safeParse(details)
   const raceId = parsed.success ? (parsed.data.raceId ?? '').trim() : ''
@@ -36,6 +41,9 @@ const resolveRaceId = (details: CampaignWith<'user'>['details']): string => {
     throw new BadRequestException(
       'Campaign has no raceId — finish onboarding before generating a strategy.',
     )
+  }
+  if (!RACE_ID_PATTERN.test(raceId)) {
+    throw new BadRequestException('Campaign raceId is malformed.')
   }
   return raceId
 }
@@ -67,8 +75,10 @@ export class CampaignStrategyService extends createPrismaBase(
     const brHashId = resolveRaceId(campaign.details)
     const plan = await this.upsertForCampaign(campaign.id)
 
-    const opposition = await this.runFor(plan.oppositionRunId)
-    const opportunities = await this.runFor(plan.opportunitiesRunId)
+    const [opposition, opportunities] = await Promise.all([
+      this.runFor(plan.oppositionRunId),
+      this.runFor(plan.opportunitiesRunId),
+    ])
 
     // A failed run is terminal — never retry, just report it. The client
     // surfaces an error instead of polling forever.
@@ -83,11 +93,14 @@ export class CampaignStrategyService extends createPrismaBase(
       }
     }
 
-    await this.dispatchPending(campaign, plan, brHashId, {
+    // If a needed dispatch produced no run (e.g. no dispatch queue configured
+    // in preview), there's no way to make progress — report failed rather than
+    // poll 'generating' forever.
+    const dispatched = await this.dispatchPending(campaign, plan, brHashId, {
       opposition,
       opportunities,
     })
-    return { status: 'generating' }
+    return dispatched ? { status: 'generating' } : { status: 'failed' }
   }
 
   // Queue-consumer hook: when one of the two CAP runs completes, load its
@@ -111,19 +124,32 @@ export class CampaignStrategyService extends createPrismaBase(
     })
     if (!plan) return
 
-    const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
-    if (!raw) return
+    // If loading, parsing, or persisting the artifact fails, the run was
+    // marked COMPLETED upstream but its section never landed. Flip it to
+    // FAILED so the endpoint reports 'failed' rather than a permanent
+    // hollow 'ready'. Rethrow so the consumer logs it.
+    try {
+      const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
+      if (!raw) throw new Error('artifact is missing or empty')
 
-    if (run.experimentType === OPPOSITION) {
-      await this.persister.persistOpponents(plan.id, parseOpponents(raw))
-      return
+      if (run.experimentType === OPPOSITION) {
+        await this.persister.persistOpponents(plan.id, parseOpponents(raw))
+      } else {
+        const { opportunities, challenges } =
+          parseOpportunitiesAndChallenges(raw)
+        await this.persister.persistOpportunitiesAndChallenges(
+          plan.id,
+          opportunities,
+          challenges,
+        )
+      }
+    } catch (error) {
+      await this.experimentRuns.markFailed(
+        run.runId,
+        error instanceof Error ? error.message : String(error),
+      )
+      throw error
     }
-    const { opportunities, challenges } = parseOpportunitiesAndChallenges(raw)
-    await this.persister.persistOpportunitiesAndChallenges(
-      plan.id,
-      opportunities,
-      challenges,
-    )
   }
 
   private runFor(runId: string | null): Promise<ExperimentRun | null> {
@@ -145,6 +171,9 @@ export class CampaignStrategyService extends createPrismaBase(
     return run === null
   }
 
+  // Returns true if every experiment that needed dispatching produced a run
+  // (or nothing needed dispatching). False means a needed dispatch yielded no
+  // run (no queue configured) and the caller should report failed.
   private async dispatchPending(
     campaign: CampaignWith<'user'>,
     plan: CampaignStrategy,
@@ -153,10 +182,10 @@ export class CampaignStrategyService extends createPrismaBase(
       opposition: ExperimentRun | null
       opportunities: ExperimentRun | null
     },
-  ): Promise<void> {
+  ): Promise<boolean> {
     const dispatchOpposition = this.needsDispatch(runs.opposition)
     const dispatchOpportunities = this.needsDispatch(runs.opportunities)
-    if (!dispatchOpposition && !dispatchOpportunities) return
+    if (!dispatchOpposition && !dispatchOpportunities) return true
 
     const clerkUserId = campaign.user?.clerkId
     if (!clerkUserId) {
@@ -172,6 +201,8 @@ export class CampaignStrategyService extends createPrismaBase(
       params,
     }
 
+    let ok = true
+
     if (dispatchOpposition) {
       const run = await this.experimentRuns.dispatchRun({
         type: OPPOSITION,
@@ -182,6 +213,8 @@ export class CampaignStrategyService extends createPrismaBase(
           where: { id: plan.id },
           data: { oppositionRunId: run.runId },
         })
+      } else {
+        ok = false
       }
     }
 
@@ -195,8 +228,12 @@ export class CampaignStrategyService extends createPrismaBase(
           where: { id: plan.id },
           data: { opportunitiesRunId: run.runId },
         })
+      } else {
+        ok = false
       }
     }
+
+    return ok
   }
 
   private upsertForCampaign(campaignId: number): Promise<CampaignStrategy> {
