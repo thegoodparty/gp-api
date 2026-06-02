@@ -8,6 +8,7 @@ import { Campaign, CampaignStrategy, User } from '@prisma/client'
 import { format } from 'date-fns'
 import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'
+import { RacesService } from '@/elections/services/races.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import { getUserFullName } from '@/users/util/users.util'
@@ -57,13 +58,6 @@ const CampaignDetailsSchema = z
     officeTermLength: z.number().nullable().optional(),
   })
   .partial()
-
-// Placeholder zip used by the community-events search when neither the
-// campaign nor user has one. Coworker is exposing race_id → zipcode
-// separately; swap to that resolver when it lands. Grep for this constant
-// to find the call sites that need updating.
-// TODO: replace with race_id → zipcode resolver
-const HARDCODED_ZIP_FALLBACK = '90210'
 
 const resolvePartyAffiliation = (details: Campaign['details']): string => {
   const parsed = CampaignDetailsSchema.safeParse(details)
@@ -162,6 +156,7 @@ export class CampaignStrategyService
     private readonly strategicLandscape: StrategicLandscapeService,
     private readonly communityEvents: CommunityEventsService,
     private readonly electionApi: ElectionApiService,
+    private readonly races: RacesService,
   ) {
     super()
   }
@@ -325,10 +320,13 @@ export class CampaignStrategyService
 
   // Build the community-events prompt context by combining election-api's
   // race details (officialOfficeName, officeLevel, primaryElectionDate)
-  // with campaign.details (state, city, zip). Mirrors how
-  // buildRaceContext composes strategic-landscape inputs. Falls back to
-  // a hardcoded zip when neither campaign.details.zip nor user.zip is
-  // populated — TODO replace with race_id → zipcode resolver.
+  // with campaign.details (state, city) and a district zip resolved from
+  // the BR race ID via RacesService. The resolver returns every zip the
+  // race's position touches; we take the first one so the LLM grounds its
+  // search inside the actual district instead of the candidate's home zip
+  // (which may not be inside the district they're running for). Falls back
+  // to campaign/user zip on resolver failure so the request still has
+  // something usable.
   private async buildEventsContext(
     campaign: CampaignWith<'user'>,
     brHashId: string,
@@ -340,7 +338,8 @@ export class CampaignStrategyService
 
     const detailZip = (details.zip ?? '').trim()
     const userZip = (campaign.user?.zip ?? '').trim()
-    const zip = detailZip || userZip || HARDCODED_ZIP_FALLBACK
+    const zip =
+      (await this.resolveDistrictZip(brHashId)) || detailZip || userZip
 
     return {
       today: format(new Date(), 'yyyy-MM-dd'),
@@ -351,6 +350,28 @@ export class CampaignStrategyService
       zip,
       officeName: race.officialOfficeName ?? race.candidateOffice ?? null,
       officeLevel: race.officeLevel ?? null,
+    }
+  }
+
+  // Resolve a single district zip from the BR race id via election-api's
+  // position → zip-codes endpoint. Returns the first zip the resolver
+  // produces, or '' when the race isn't in BR, has no position, or the
+  // resolver fails for any other reason. The caller falls back to
+  // campaign/user zip on '' — we never want a resolver hiccup to block
+  // events generation entirely.
+  private async resolveDistrictZip(brHashId: string): Promise<string> {
+    try {
+      const zips = await this.races.getZipCodesByRaceId(brHashId)
+      return zips[0] ?? ''
+    } catch (error) {
+      this.logger.warn(
+        {
+          raceId: brHashId,
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'District zip resolver failed; falling back to campaign/user zip',
+      )
+      return ''
     }
   }
 

@@ -8,6 +8,7 @@ import { CampaignStrategyService } from './campaignStrategy.service'
 import { CommunityEventsService } from './communityEvents.service'
 import { ElectionApiService } from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
+import { RacesService } from '@/elections/services/races.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { RaceContextFromApi } from '../types/electionApi.types'
 
@@ -121,6 +122,7 @@ describe('CampaignStrategyService', () => {
   let mockStrategic: { generate: ReturnType<typeof vi.fn> }
   let mockEvents: { generate: ReturnType<typeof vi.fn> }
   let mockElectionApi: { getRaceContext: ReturnType<typeof vi.fn> }
+  let mockRaces: { getZipCodesByRaceId: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
     mockPrisma = {
@@ -138,6 +140,9 @@ describe('CampaignStrategyService', () => {
     mockStrategic = { generate: vi.fn() }
     mockEvents = { generate: vi.fn() }
     mockElectionApi = { getRaceContext: vi.fn().mockResolvedValue(apiCtx) }
+    mockRaces = {
+      getZipCodesByRaceId: vi.fn().mockResolvedValue(['94110']),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -145,6 +150,7 @@ describe('CampaignStrategyService', () => {
         { provide: StrategicLandscapeService, useValue: mockStrategic },
         { provide: CommunityEventsService, useValue: mockEvents },
         { provide: ElectionApiService, useValue: mockElectionApi },
+        { provide: RacesService, useValue: mockRaces },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignStrategyService,
       ],
@@ -818,6 +824,41 @@ describe('CampaignStrategyService', () => {
         ),
       ).rejects.toThrow(BadRequestException)
       expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('uses the district zip resolver as the primary source for zip', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // Resolver returns a zip distinct from both campaign.details.zip
+      // ('94110') and the user's home zip — confirms the resolver wins.
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(['10025', '10026'])
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      expect(mockRaces.getZipCodesByRaceId).toHaveBeenCalledWith('hash-abc')
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('10025')
+    })
+
+    it('falls back to campaign zip when the resolver throws', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      mockRaces.getZipCodesByRaceId.mockRejectedValueOnce(
+        new Error('br lookup failed'),
+      )
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('94110')
     })
   })
 })
