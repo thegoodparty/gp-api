@@ -158,6 +158,16 @@ export class ExperimentRunsService extends createPrismaBase(
         { runId: run.runId },
         'run params carry no clerk_user_id; cannot resume without actor identity',
       )
+      await this.model.updateMany({
+        where: {
+          runId: run.runId,
+          status: ExperimentRunStatus.AWAITING_RESUME,
+        },
+        data: {
+          status: ExperimentRunStatus.FAILED,
+          error: 'Cannot resume: run params carry no clerk_user_id',
+        },
+      })
       return
     }
 

@@ -14,7 +14,7 @@ import {
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
-import { addMinutes, format, isBefore } from 'date-fns'
+import { addMinutes, format, isBefore, isValid, parseISO } from 'date-fns'
 import { groupBy } from 'es-toolkit'
 import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
@@ -921,7 +921,13 @@ export class QueueConsumerService {
       nextAction.scheduled_for !== ''
         ? nextAction.scheduled_for
         : null
-    const scheduledFor = scheduledForRaw ? new Date(scheduledForRaw) : null
+    const parsedScheduledFor = scheduledForRaw
+      ? parseISO(scheduledForRaw)
+      : null
+    const scheduledFor =
+      parsedScheduledFor && isValid(parsedScheduledFor)
+        ? parsedScheduledFor
+        : null
 
     if (overall === 'partial') {
       return {

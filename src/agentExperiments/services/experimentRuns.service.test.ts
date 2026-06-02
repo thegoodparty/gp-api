@@ -379,11 +379,11 @@ describe('ExperimentRunsService', () => {
     )
 
     it(
-      'does not claim the row and sends no SQS message when ' +
-        'params has no clerk_user_id',
+      'fails the run (guarded on AWAITING_RESUME) and sends no SQS ' +
+        'message when params has no clerk_user_id',
       async () => {
         sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-3' })
-        mockModel.updateMany.mockResolvedValue({ count: 0 })
+        mockModel.updateMany.mockResolvedValue({ count: 1 })
 
         await service.resumeRun({
           runId: 'run-missing-user',
@@ -394,7 +394,23 @@ describe('ExperimentRunsService', () => {
           resumeAttempts: 0,
         })
 
-        expect(mockModel.updateMany).not.toHaveBeenCalled()
+        expect(mockModel.updateMany).toHaveBeenCalledWith({
+          where: {
+            runId: 'run-missing-user',
+            status: ExperimentRunStatus.AWAITING_RESUME,
+          },
+          data: {
+            status: ExperimentRunStatus.FAILED,
+            error: expect.stringContaining('clerk_user_id'),
+          },
+        })
+        expect(mockModel.updateMany).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: ExperimentRunStatus.RUNNING,
+            }),
+          }),
+        )
         expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
         expect(logger.error).toHaveBeenCalledWith(
           expect.objectContaining({ runId: 'run-missing-user' }),
