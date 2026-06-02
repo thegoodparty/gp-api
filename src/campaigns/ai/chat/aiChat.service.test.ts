@@ -219,7 +219,11 @@ describe('AiChatService.streamChat', () => {
       data: {
         messages: [
           { role: 'user', content: 'q1', id: 'u1' },
-          { role: 'assistant', content: 'line1<br/><br/>line2', id: 'a1' },
+          {
+            role: 'assistant',
+            content: 'line1<br/><br/><b>line2</b>',
+            id: 'a1',
+          },
         ],
       },
     })
@@ -238,7 +242,7 @@ describe('AiChatService.streamChat', () => {
       (m: { role: string }) => m.role === 'assistant',
     )
     expect(priorAssistant.content).toBe('line1\n\nline2')
-    expect(priorAssistant.content).not.toContain('<br')
+    expect(priorAssistant.content).not.toMatch(/<[^>]*>|<br/)
   })
 
   it('re-sends the last user message and replaces the assistant reply on regenerate', async () => {

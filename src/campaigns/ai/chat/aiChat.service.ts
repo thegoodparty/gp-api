@@ -44,9 +44,18 @@ const MARKDOWN_FORMAT_DIRECTIVE = `Formatting requirements (these override any e
 // Threads created before this PR stored assistant content as HTML
 // (formatHtmlLlmResponse turned \n into <br/><br/>). Strip those artifacts
 // before replaying history to the model so it follows the Markdown directive
-// instead of mimicking the HTML present in prior turns.
-const stripLegacyHtml = (content: string): string =>
-  content.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+// instead of mimicking the HTML present in prior turns. The tag removal repeats
+// until the string is stable so overlapping/nested tags (e.g. "<<b>b>") can't
+// leave a partial tag behind (a single pass is an incomplete sanitization).
+const stripLegacyHtml = (content: string): string => {
+  let result = content.replace(/<br\s*\/?>/gi, '\n')
+  let previous: string
+  do {
+    previous = result
+    result = result.replace(/<[^>]*>/g, '')
+  } while (result !== previous)
+  return result
+}
 
 const getErrorStatus = (err: unknown): number | undefined => {
   if (err && typeof err === 'object') {
