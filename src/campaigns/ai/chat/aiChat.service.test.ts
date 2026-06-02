@@ -380,4 +380,25 @@ describe('AiChatService.streamChat', () => {
     expect(chunks[0]).toMatchObject({ type: 'error', code: 'internal' })
     expect(streamChatCompletion).not.toHaveBeenCalled()
   })
+
+  it('errors with a non-retryable internal error when the thread lookup fails', async () => {
+    fakeModel.findFirstOrThrow.mockRejectedValue(new Error('Not found'))
+
+    const chunks = await collect(
+      service.streamChat(
+        CAMPAIGN,
+        asBody({ threadId: 'missing-thread', message: 'hi' }),
+        null,
+      ),
+    )
+
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toMatchObject({
+      type: 'error',
+      code: 'internal',
+      message: 'Chat thread is unavailable.',
+      retryable: false,
+    })
+    expect(streamChatCompletion).not.toHaveBeenCalled()
+  })
 })
