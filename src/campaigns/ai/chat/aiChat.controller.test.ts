@@ -142,6 +142,32 @@ describe('AiChatController.stream', () => {
     expect(captured?.aborted).toBe(true)
   })
 
+  it('forwards a service-yielded error chunk without writing a duplicate internal chunk', async () => {
+    const { controller } = makeController(() =>
+      gen([
+        { type: 'text', delta: 'a' },
+        {
+          type: 'error',
+          code: 'upstream_unavailable',
+          message: 'Service error.',
+          retryable: true,
+        },
+      ]),
+    )
+    const reply = makeReply()
+    const req = makeReq()
+
+    await controller.stream(CAMPAIGN, BODY, req as never, reply as never)
+
+    expect(reply.raw.write).toHaveBeenCalledWith(
+      expect.stringContaining('Service error.'),
+    )
+    expect(reply.raw.write).not.toHaveBeenCalledWith(
+      expect.stringContaining('Chat stream failed'),
+    )
+    expect(reply.raw.end).toHaveBeenCalledTimes(1)
+  })
+
   it('cleans up the close listener and bails when writeHead throws', async () => {
     const { controller, streamChat } = makeController(() =>
       gen([{ type: 'text', delta: 'a' }]),

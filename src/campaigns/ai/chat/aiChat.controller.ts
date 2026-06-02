@@ -280,10 +280,12 @@ export class AiChatController {
     )
 
     let errored = false
+    let doneWritten = false
     try {
       for await (const chunk of iterable) {
         if (abortController.signal.aborted) break
         const flushed: boolean = reply.raw.write(formatChunk(chunk))
+        if (chunk.type === 'done') doneWritten = true
         if (!flushed) {
           const drainResult = await waitForDrain(
             reply.raw,
@@ -298,7 +300,10 @@ export class AiChatController {
     } finally {
       clearTimeout(timeout)
       req.raw.off('close', onClose)
-      if (timedOut) {
+      // Suppress the timeout chunk if a `done` already went out — the timer can
+      // fire between writing `done` and the loop exhausting, which would append
+      // a contradictory error after a successful completion.
+      if (timedOut && !doneWritten) {
         try {
           reply.raw.write(TIMEOUT_ERROR_CHUNK)
         } catch (err) {
