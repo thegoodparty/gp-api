@@ -29,8 +29,19 @@ import {
 } from '../types/electionApi.types'
 import { CommunityEventsPromptContext } from './communityEvents.prompts'
 import { CommunityEventsService } from './communityEvents.service'
-import { ElectionApiService } from './electionApi.service'
+import {
+  ElectionApiRaceNotFoundError,
+  ElectionApiService,
+} from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
+
+const EMPTY_STRATEGIC_LANDSCAPE: StrategicLandscapeResult = {
+  opportunities: [],
+  challenges: [],
+  opponents: [],
+}
+
+const EMPTY_COMMUNITY_EVENTS: CommunityEventsResult = { events: [] }
 
 // Defensive Zod parse over Campaign.details — the column is Prisma JSON,
 // so we can't trust the shadow type at runtime. Only the keys we read here
@@ -152,6 +163,19 @@ export class CampaignStrategyService
   // other behind a single per-campaign mutex.
   private readonly inFlightEvents = new Map<number, Promise<void>>()
 
+  // Per-pod cache of campaigns whose race lookup against election-api
+  // returned 404. The next runGeneration / runEventsGeneration for the
+  // same campaign would just 404 again, and the next browser poll would
+  // re-kick the loop. Caching here short-circuits the loop so the
+  // polling endpoint returns `{ status: 'ready', data: <empty> }` and
+  // the webapp falls through to its existing empty-state UI.
+  //
+  // We don't persist this. The 404 is almost always a dev-env data gap
+  // that resolves on the next election-api dbt run; a pod restart is the
+  // natural "retry" point and that's an acceptable cadence for what's
+  // ultimately a transient data-import issue.
+  private readonly raceDataUnavailable = new Set<number>()
+
   constructor(
     private readonly strategicLandscape: StrategicLandscapeService,
     private readonly communityEvents: CommunityEventsService,
@@ -174,6 +198,14 @@ export class CampaignStrategyService
     // rather than getting swallowed in the background, where it would leave
     // the client stuck in a generating poll loop.
     const brHashId = resolveRaceId(campaign.details)
+
+    // Short-circuit when we've already learned this campaign's race
+    // doesn't exist in election-api. Otherwise the controller would
+    // keep returning 'generating' on every 3s poll and the background
+    // would keep 404ing forever. See raceDataUnavailable definition.
+    if (this.raceDataUnavailable.has(campaign.id)) {
+      return { status: 'ready', data: EMPTY_STRATEGIC_LANDSCAPE }
+    }
 
     const plan = await this.upsertForCampaign(campaign.id)
     const cached = await this.readStrategicLandscape(plan.id)
@@ -205,6 +237,14 @@ export class CampaignStrategyService
     // poll loop.
     const brHashId = resolveRaceId(campaign.details)
     const electionDate = resolveElectionDate(campaign.details)
+
+    // See raceDataUnavailable definition. Both pipelines (community
+    // events and strategic landscape) call electionApi.getRaceContext,
+    // so a 404 affects both — the cache is shared and either pipeline
+    // hitting the 404 short-circuits the other too.
+    if (this.raceDataUnavailable.has(campaign.id)) {
+      return { status: 'ready', data: EMPTY_COMMUNITY_EVENTS }
+    }
 
     const plan = await this.upsertForCampaign(campaign.id)
     const cached = await this.readCommunityEvents(plan.id)
@@ -256,6 +296,10 @@ export class CampaignStrategyService
         GENERATION_WATCHDOG_MS,
       )
     } catch (error) {
+      if (error instanceof ElectionApiRaceNotFoundError) {
+        this.markRaceUnavailable(campaign.id, brHashId, 'strategic-landscape')
+        return
+      }
       this.logger.error(
         {
           campaignId: campaign.id,
@@ -296,6 +340,10 @@ export class CampaignStrategyService
         GENERATION_WATCHDOG_MS,
       )
     } catch (error) {
+      if (error instanceof ElectionApiRaceNotFoundError) {
+        this.markRaceUnavailable(campaign.id, brHashId, 'community-events')
+        return
+      }
       this.logger.error(
         {
           campaignId: campaign.id,
@@ -306,6 +354,23 @@ export class CampaignStrategyService
     } finally {
       this.inFlightEvents.delete(campaign.id)
     }
+  }
+
+  // Add the campaign to the per-pod raceDataUnavailable cache so
+  // subsequent polls short-circuit to `{ status: 'ready', data: <empty> }`
+  // instead of re-kicking generation that will 404 again. Logged at
+  // warn (not error) because a missing Race row is usually a dev-env
+  // data gap, not an outage worth paging on.
+  private markRaceUnavailable(
+    campaignId: number,
+    brHashId: string,
+    pipeline: 'strategic-landscape' | 'community-events',
+  ): void {
+    this.raceDataUnavailable.add(campaignId)
+    this.logger.warn(
+      { campaignId, raceId: brHashId, pipeline },
+      'election-api has no data for this race; marking campaign as race-data-unavailable so polling stops looping',
+    )
   }
 
   private async runEventsGenerationCore(

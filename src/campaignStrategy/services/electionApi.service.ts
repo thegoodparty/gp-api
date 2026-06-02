@@ -6,6 +6,17 @@ import { lastValueFrom } from 'rxjs'
 import { z } from 'zod'
 import { ApiCandidate, RaceContextFromApi } from '../types/electionApi.types'
 
+// Distinguishable error for the 404 case (election-api has no Race row
+// for the candidate's brHashId). Callers in CampaignStrategyService use
+// this to break the infinite-poll loop by persisting a "no data" marker
+// instead of retrying generation every 3 seconds.
+export class ElectionApiRaceNotFoundError extends Error {
+  constructor(public readonly brHashId: string) {
+    super(`election-api has no Race row for brHashId=${brHashId}`)
+    this.name = 'ElectionApiRaceNotFoundError'
+  }
+}
+
 const ApiCandidateSchema = z.object({
   gp_candidate_id: z.string().nullable(),
   first_name: z.string(),
@@ -122,6 +133,16 @@ export class ElectionApiService {
     } catch (error) {
       if (error instanceof BadGatewayException) throw error
       const status = isAxiosError(error) ? error.response?.status : undefined
+      if (status === 404) {
+        // Throw at debug-log level (the caller decides whether to escalate).
+        // This is usually a dev-env data gap that resolves on the next
+        // election-api dbt run; not noisy-error-worthy on its own.
+        this.logger.warn(
+          { brHashId },
+          'election-api has no Race row for brHashId; caller should mark race as unavailable',
+        )
+        throw new ElectionApiRaceNotFoundError(brHashId)
+      }
       this.logger.error(
         {
           brHashId,
