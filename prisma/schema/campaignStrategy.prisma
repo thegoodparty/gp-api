@@ -10,5 +10,11 @@ model CampaignStrategy {
   challenges    CampaignStrategyChallenge[]
   opponents     CampaignStrategyOpponent[]
 
+  // Section 7 community events — populated by CommunityEventsService via
+  // Gemini search + structured + Braintrust. JSON over a relational table
+  // because events are read whole and don't need indexed sub-queries.
+  // Sidecar type: PrismaJson.CommunityEventsResult.
+  communityEvents Json? @map("community_events")
+
   @@map("campaign_strategy")
 }

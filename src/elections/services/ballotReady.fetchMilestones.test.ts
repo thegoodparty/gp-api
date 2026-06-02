@@ -3,17 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BallotReadyMilestone } from '../types/ballotReady.types'
 import { BallotReadyService, collapseMilestones } from './ballotReady.service'
 
+// BR's Milestone.date is `ISO8601Date` per introspection — a calendar
+// date string like '2026-09-01' with no time / offset component. All
+// fixtures here use that shape.
+
 describe('collapseMilestones', () => {
   it('groups milestones by category and picks earliest OPEN / latest CLOSE', () => {
     const input: BallotReadyMilestone[] = [
       // REGISTRATION: two CLOSE rows (different features) + one OPEN
-      { category: 'REGISTRATION', type: 'OPEN', at: '2026-01-01T00:00:00Z' },
-      { category: 'REGISTRATION', type: 'CLOSE', at: '2026-09-01T00:00:00Z' },
-      { category: 'REGISTRATION', type: 'CLOSE', at: '2026-08-15T00:00:00Z' },
+      { category: 'REGISTRATION', type: 'OPEN', date: '2026-01-01' },
+      { category: 'REGISTRATION', type: 'CLOSE', date: '2026-09-01' },
+      { category: 'REGISTRATION', type: 'CLOSE', date: '2026-08-15' },
       // EARLY_VOTING: only OPEN
-      { category: 'EARLY_VOTING', type: 'OPEN', at: '2026-08-20T00:00:00Z' },
+      { category: 'EARLY_VOTING', type: 'OPEN', date: '2026-08-20' },
       // REQUEST_BALLOT: only CLOSE
-      { category: 'REQUEST_BALLOT', type: 'CLOSE', at: '2026-08-30T00:00:00Z' },
+      { category: 'REQUEST_BALLOT', type: 'CLOSE', date: '2026-08-30' },
     ]
 
     const result = collapseMilestones(input)
@@ -35,19 +39,22 @@ describe('collapseMilestones', () => {
 
   it('ignores VOTING / FILING / unknown categories', () => {
     const result = collapseMilestones([
-      { category: 'VOTING', type: 'OPEN', at: '2026-09-01T00:00:00Z' },
-      { category: 'FILING', type: 'CLOSE', at: '2026-06-01T00:00:00Z' },
-      { category: 'WHATEVER', type: 'OPEN', at: '2026-05-01T00:00:00Z' },
+      { category: 'VOTING', type: 'OPEN', date: '2026-09-01' },
+      { category: 'FILING', type: 'CLOSE', date: '2026-06-01' },
+      { category: 'WHATEVER', type: 'OPEN', date: '2026-05-01' },
     ])
     expect(result.voter_registration).toBeNull()
     expect(result.early_voting).toBeNull()
     expect(result.request_ballot).toBeNull()
   })
 
-  it('skips entries with null at', () => {
+  // BR's schema marks `date` as NON_NULL, but we treat a missing/empty
+  // value defensively (the type-checked falsy guard in the service is
+  // belt-and-suspenders against a schema change or transport corruption).
+  it('skips entries with falsy date', () => {
     const result = collapseMilestones([
-      { category: 'REGISTRATION', type: 'OPEN', at: null },
-      { category: 'REGISTRATION', type: 'CLOSE', at: '2026-08-15T00:00:00Z' },
+      { category: 'REGISTRATION', type: 'OPEN', date: '' },
+      { category: 'REGISTRATION', type: 'CLOSE', date: '2026-08-15' },
     ])
     expect(result.voter_registration).toEqual({
       start: null,
@@ -55,44 +62,23 @@ describe('collapseMilestones', () => {
     })
   })
 
-  // Pins the UTC-projection behavior `toIsoDate` (formatInTimeZone) relies
-  // on. A negative-offset datetime late in the local day projects to the
-  // next UTC calendar date — important to lock down so a regression
-  // (e.g. switching back to slice) is caught.
-  it('projects a negative-offset datetime to its UTC calendar date', () => {
+  // For ISO8601Date strings (yyyy-MM-dd) string compare and chronological
+  // compare are equivalent — this test pins that BR's actual date format
+  // gives the expected min/max behavior regardless of which underlying
+  // comparator we use.
+  it('selects min open / max close across an unsorted input', () => {
     const result = collapseMilestones([
-      {
-        category: 'REGISTRATION',
-        type: 'CLOSE',
-        at: '2026-10-19T23:30:00-05:00',
-      },
+      { category: 'EARLY_VOTING', type: 'OPEN', date: '2026-10-25' },
+      { category: 'EARLY_VOTING', type: 'OPEN', date: '2026-10-20' },
+      { category: 'EARLY_VOTING', type: 'OPEN', date: '2026-10-22' },
+      { category: 'EARLY_VOTING', type: 'CLOSE', date: '2026-11-01' },
+      { category: 'EARLY_VOTING', type: 'CLOSE', date: '2026-11-03' },
+      { category: 'EARLY_VOTING', type: 'CLOSE', date: '2026-11-02' },
     ])
-    // 2026-10-19T23:30:00-05:00 → 2026-10-20T04:30:00Z → date is 2026-10-20
-    expect(result.voter_registration).toEqual({
-      start: null,
-      end: '2026-10-20',
+    expect(result.early_voting).toEqual({
+      start: '2026-10-20',
+      end: '2026-11-03',
     })
-  })
-
-  // The OPEN selector picks the earliest datetime across mixed offsets,
-  // not the lexicographically smallest string. Inputs are chosen so the
-  // lex-smaller string is the *later* instant AND the two project to
-  // *different* UTC calendar dates — so a regression from compareAsc
-  // back to raw `<`/`>` produces the wrong output and fails the test.
-  it('compares mixed-offset datetimes by instant, not string order', () => {
-    const result = collapseMilestones([
-      // 2026-10-20T01:00:00+05:00 = 2026-10-19T20:00:00Z — earlier instant, lex-later string
-      {
-        category: 'EARLY_VOTING',
-        type: 'OPEN',
-        at: '2026-10-20T01:00:00+05:00',
-      },
-      // 2026-10-20T00:00:00Z — later instant, lex-earlier string
-      { category: 'EARLY_VOTING', type: 'OPEN', at: '2026-10-20T00:00:00Z' },
-    ])
-    // Correct (compareAsc): earliest instant = 2026-10-19T20:00:00Z → UTC date 2026-10-19
-    // Buggy (lexicographic): smallest string = '2026-10-20T00:00:00Z' → UTC date 2026-10-20
-    expect(result.early_voting?.start).toBe('2026-10-19')
   })
 })
 
@@ -120,16 +106,8 @@ describe('BallotReadyService.fetchMilestones', () => {
       node: {
         election: {
           milestones: [
-            {
-              category: 'REGISTRATION',
-              type: 'CLOSE',
-              at: '2026-09-01T00:00:00Z',
-            },
-            {
-              category: 'EARLY_VOTING',
-              type: 'OPEN',
-              at: '2026-08-20T00:00:00Z',
-            },
+            { category: 'REGISTRATION', type: 'CLOSE', date: '2026-09-01' },
+            { category: 'EARLY_VOTING', type: 'OPEN', date: '2026-08-20' },
           ],
         },
       },

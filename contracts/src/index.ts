@@ -174,6 +174,17 @@ export {
 } from './campaigns/RaceTargetMetrics.schema'
 
 export {
+  CommunityEventSchema,
+  CommunityEventsResultSchema,
+  CommunityEventsReadySchema,
+  CommunityEventsGeneratingSchema,
+  CommunityEventsResponseSchema,
+  type CommunityEvent,
+  type CommunityEventsResult,
+  type CommunityEventsResponse,
+} from './campaigns/CommunityEvents.schema'
+
+export {
   CampaignWithPositionNameSchema,
   type CampaignWithPositionName,
 } from './campaigns/CampaignWithPositionName.schema'
