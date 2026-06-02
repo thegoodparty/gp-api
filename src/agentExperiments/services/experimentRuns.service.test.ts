@@ -434,9 +434,12 @@ describe('ExperimentRunsService', () => {
 
       await service.resumeRun(awaitingRun)
 
-      expect(mockModel.update).toHaveBeenCalledWith(
+      expect(mockModel.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { runId: awaitingRun.runId },
+          where: {
+            runId: awaitingRun.runId,
+            status: ExperimentRunStatus.RUNNING,
+          },
           data: expect.objectContaining({
             status: ExperimentRunStatus.AWAITING_RESUME,
           }),
@@ -452,6 +455,16 @@ describe('ExperimentRunsService', () => {
 
       expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
       expect(mockModel.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('resolves the queue url once and caches it across resumes', async () => {
+      sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
+      mockModel.updateMany.mockResolvedValue({ count: 1 })
+
+      await service.resumeRun(awaitingRun)
+      await service.resumeRun(awaitingRun)
+
+      expect(sqsMock.commandCalls(GetQueueUrlCommand)).toHaveLength(1)
     })
   })
 

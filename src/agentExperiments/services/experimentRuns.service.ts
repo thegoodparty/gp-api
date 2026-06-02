@@ -36,13 +36,23 @@ type ResumeRunInput = {
 export class ExperimentRunsService extends createPrismaBase(
   MODELS.ExperimentRun,
 ) {
+  private cachedQueueUrl: string | undefined
+
+  // The queue name is static per environment, so resolve the URL once and cache
+  // it on the instance — a sweep re-dispatching N runs would otherwise issue N
+  // GetQueueUrl calls.
   private async resolveQueueUrl(): Promise<string | undefined> {
+    if (this.cachedQueueUrl) {
+      return this.cachedQueueUrl
+    }
+
     const queueName = process.env.AGENT_DISPATCH_QUEUE_NAME
     if (!queueName) {
       return
     }
 
     const { QueueUrl } = await sqs.getQueueUrl({ QueueName: queueName })
+    this.cachedQueueUrl = QueueUrl
 
     return QueueUrl
   }
@@ -203,8 +213,11 @@ export class ExperimentRunsService extends createPrismaBase(
         { error, runId: run.runId },
         'Failed to re-enqueue resumed run — releasing claim',
       )
-      await this.model.update({
-        where: { runId: run.runId },
+      await this.model.updateMany({
+        where: {
+          runId: run.runId,
+          status: ExperimentRunStatus.RUNNING,
+        },
         data: {
           status: ExperimentRunStatus.AWAITING_RESUME,
           resumeAttempts: { decrement: 1 },
