@@ -9,6 +9,7 @@ import {
   ExperimentRunStatus,
 } from '@prisma/client'
 import { z } from 'zod'
+import { isBefore, subMinutes } from 'date-fns'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
@@ -25,6 +26,12 @@ import { StrategicLandscapePersister } from './strategicLandscape.persister'
 
 const OPPOSITION = 'opposition_research'
 const OPPORTUNITIES = 'opportunities_and_challenges'
+
+// A run that's COMPLETED but whose section never persisted past this window is
+// treated as failed. Recovers a stuck run if persistence AND the markFailed
+// fallback both fail (a double DB fault) — otherwise it would poll 'generating'
+// forever.
+const PERSIST_GRACE_MINUTES = 5
 
 // Both CAP experiments share one input contract.
 type StrategicLandscapeParams =
@@ -88,6 +95,16 @@ export class CampaignStrategyService extends createPrismaBase(
     // A failed run is terminal — never retry, just report it. The client
     // surfaces an error instead of polling forever.
     if (this.isFailed(opposition) || this.isFailed(opportunities)) {
+      return { status: 'failed' }
+    }
+
+    // Safety net: a run that completed but whose section never persisted (and
+    // stayed that way past the grace window) is stuck — report failed rather
+    // than poll 'generating' forever.
+    if (
+      this.isStuck(opposition, plan.oppositionPersistedAt) ||
+      this.isStuck(opportunities, plan.opportunitiesPersistedAt)
+    ) {
       return { status: 'failed' }
     }
 
@@ -178,15 +195,30 @@ export class CampaignStrategyService extends createPrismaBase(
     return run?.status === ExperimentRunStatus.FAILED
   }
 
+  // COMPLETED, but its section never persisted, and the completion is older
+  // than the grace window — the persist step silently dropped it.
+  private isStuck(
+    run: ExperimentRun | null,
+    persistedAt: Date | null,
+  ): boolean {
+    return (
+      run?.status === ExperimentRunStatus.COMPLETED &&
+      !persistedAt &&
+      isBefore(run.updatedAt, subMinutes(new Date(), PERSIST_GRACE_MINUTES))
+    )
+  }
+
   // Only dispatch an experiment that was never started. A failed run is NOT
   // re-dispatched (see getOrGenerateStrategicLandscape) — no retry loop.
   private needsDispatch(run: ExperimentRun | null): boolean {
     return run === null
   }
 
-  // Returns true if every experiment that needed dispatching produced a run
-  // (or nothing needed dispatching). False means a needed dispatch yielded no
-  // run (no queue configured) and the caller should report failed.
+  // Returns true if at least one needed experiment was dispatched (or nothing
+  // needed dispatching). False only when something needed dispatching and none
+  // succeeded. A partial success returns true (generating): the successful run
+  // is kept and the un-dispatched one retries on the next poll, so 'failed'
+  // never flips back to 'generating'.
   private async dispatchPending(
     campaign: CampaignWith<'user'>,
     plan: CampaignStrategy,
@@ -214,7 +246,7 @@ export class CampaignStrategyService extends createPrismaBase(
       params,
     }
 
-    let ok = true
+    let dispatchedAny = false
 
     if (dispatchOpposition) {
       const runId = await this.tryDispatch(OPPOSITION, base)
@@ -223,8 +255,7 @@ export class CampaignStrategyService extends createPrismaBase(
           where: { id: plan.id },
           data: { oppositionRunId: runId },
         })
-      } else {
-        ok = false
+        dispatchedAny = true
       }
     }
 
@@ -235,12 +266,11 @@ export class CampaignStrategyService extends createPrismaBase(
           where: { id: plan.id },
           data: { opportunitiesRunId: runId },
         })
-      } else {
-        ok = false
+        dispatchedAny = true
       }
     }
 
-    return ok
+    return dispatchedAny
   }
 
   // A dispatch failure (no queue, or SQS send error -> BadGateway) yields no

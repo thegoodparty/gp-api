@@ -136,13 +136,30 @@ describe('CampaignStrategyService', () => {
     })
   })
 
-  it('reports failed (not generating) when dispatch produces no run', async () => {
+  it('reports failed (not generating) when NO dispatch produces a run', async () => {
     experimentRuns.dispatchRun.mockResolvedValue(undefined) // no queue configured
 
     const res = await service.getOrGenerateStrategicLandscape(campaign())
 
     expect(res).toEqual({ status: 'failed' })
     expect(prisma.campaignStrategy.update).not.toHaveBeenCalled()
+  })
+
+  it('stays generating on a partial dispatch (one run created), no failed flip', async () => {
+    // opposition dispatches, opportunities send fails -> keep the one that
+    // worked and report generating; the other retries next poll.
+    experimentRuns.dispatchRun
+      .mockResolvedValueOnce({ runId: 'opp-run' })
+      .mockResolvedValueOnce(undefined)
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'generating' })
+    expect(prisma.campaignStrategy.update).toHaveBeenCalledTimes(1)
+    expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
+      where: { id: 42 },
+      data: { oppositionRunId: 'opp-run' },
+    })
   })
 
   it('throws when the user has no clerkId', async () => {
@@ -226,6 +243,35 @@ describe('CampaignStrategyService', () => {
     const res = await service.getOrGenerateStrategicLandscape(campaign())
 
     expect(res).toEqual({ status: 'generating' })
+    expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('reports failed when a COMPLETED run is unpersisted past the grace window', async () => {
+    // markFailed + persist both failed: run stuck COMPLETED with no marker.
+    const stale = new Date(Date.now() - 30 * 60 * 1000) // 30 min ago
+    prisma.campaignStrategy.upsert.mockResolvedValue(
+      planRow({
+        oppositionRunId: 'opp-run',
+        opportunitiesRunId: 'oc-run',
+        oppositionPersistedAt: null,
+        opportunitiesPersistedAt: new Date(),
+      }),
+    )
+    const runsById: Record<string, unknown> = {
+      'opp-run': run({ runId: 'opp-run', updatedAt: stale }),
+      'oc-run': run({
+        runId: 'oc-run',
+        experimentType: 'opportunities_and_challenges',
+      }),
+    }
+    experimentRuns.findUnique.mockImplementation(
+      (args: { where: { runId: string } }) =>
+        Promise.resolve(runsById[args.where.runId] ?? null),
+    )
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'failed' })
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
