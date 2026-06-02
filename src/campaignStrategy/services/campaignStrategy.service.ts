@@ -355,13 +355,25 @@ export class CampaignStrategyService
 
   // Resolve a single district zip from the BR race id via election-api's
   // position → zip-codes endpoint. Returns the first zip the resolver
-  // produces, or '' when the race isn't in BR, has no position, or the
-  // resolver fails for any other reason. The caller falls back to
-  // campaign/user zip on '' — we never want a resolver hiccup to block
-  // events generation entirely.
+  // produces, or '' when:
+  //   - the race isn't in BR / has no position
+  //   - the resolver fails for any other reason
+  //   - the position spans more than STATEWIDE_ZIP_THRESHOLD zips
+  //     (likely a statewide race where any single zip is too coarse to
+  //     be useful — the campaign/user's own zip is a better signal)
+  // The caller falls back to campaign/user zip on '' — we never want a
+  // resolver hiccup to block events generation entirely.
+  private static readonly STATEWIDE_ZIP_THRESHOLD = 50
   private async resolveDistrictZip(brHashId: string): Promise<string> {
     try {
       const zips = await this.races.getZipCodesByRaceId(brHashId)
+      if (zips.length > CampaignStrategyService.STATEWIDE_ZIP_THRESHOLD) {
+        this.logger.info(
+          { raceId: brHashId, zipCount: zips.length },
+          'District zip resolver returned statewide-sized array; falling back to campaign/user zip for better geographic precision',
+        )
+        return ''
+      }
       return zips[0] ?? ''
     } catch (error) {
       this.logger.warn(

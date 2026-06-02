@@ -863,5 +863,27 @@ describe('CampaignStrategyService', () => {
       const ctx = mockEvents.generate.mock.calls[0]?.[2]
       expect(ctx?.zip).toBe('94110')
     })
+
+    it('falls back to campaign zip when the resolver returns a statewide-sized array', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // 51 zips trips the STATEWIDE_ZIP_THRESHOLD (50) — any single zip
+      // from a statewide race's position is too coarse to ground the
+      // community-events search, so the campaign's own zip wins.
+      const statewideZips = Array.from(
+        { length: 51 },
+        (_, i) => `9000${i.toString().padStart(2, '0')}`,
+      )
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(statewideZips)
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('94110')
+    })
   })
 })
