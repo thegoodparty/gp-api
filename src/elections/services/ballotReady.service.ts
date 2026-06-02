@@ -6,7 +6,6 @@ import {
   parseISO,
   startOfMonth,
 } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
 import { gql, GraphQLClient } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
@@ -492,6 +491,12 @@ export class BallotReadyService {
   // category. Returns null on any failure so callers can null-fill the
   // field without failing the parent request — milestones are enrichment,
   // not core.
+  //
+  // Field name `date` (not `at`) confirmed via GraphQL introspection
+  // 2026-06-01. BR's Milestone.date is ISO8601Date (yyyy-MM-dd), so the
+  // datetime/offset gymnastics we needed for the original `at` guess are
+  // unnecessary — string sort matches chronological order for
+  // ISO8601Date and the value never needs reformatting.
   async fetchMilestones(brHashId: string): Promise<RaceMilestones | null> {
     if (!brHashId) return null
     const query = gql`
@@ -502,7 +507,7 @@ export class BallotReadyService {
               milestones {
                 category
                 type
-                at
+                date
               }
             }
           }
@@ -554,11 +559,11 @@ export const collapseMilestones = (
   }
 
   for (const m of milestones) {
-    if (!m.at) continue
+    if (!m.date) continue
     const bucket = grouped[m.category]
     if (!bucket) continue
-    if (m.type === 'OPEN') bucket.opens.push(m.at)
-    else if (m.type === 'CLOSE') bucket.closes.push(m.at)
+    if (m.type === 'OPEN') bucket.opens.push(m.date)
+    else if (m.type === 'CLOSE') bucket.closes.push(m.date)
   }
 
   return {
@@ -578,36 +583,28 @@ const toWindow = (bucket: {
   return { start, end }
 }
 
-// Use `compareAsc` over raw `<`/`>` and `format(parseISO(...), 'yyyy-MM-dd')`
-// over `slice(0, 10)`: BR's `at` is a datetime string that may carry a
-// non-UTC offset (e.g. '2026-10-19T00:00:00-05:00'). Lexicographic
-// comparison would reorder dates across offsets, and a naive slice would
-// take the literal date digits — which can be the wrong calendar date
-// when the offset crosses midnight. CLAUDE.md Rule 28.
+// BR's Milestone.date is ISO8601Date (yyyy-MM-dd, no time component) per
+// schema introspection 2026-06-01. For that format string sort matches
+// chronological order, so compareAsc and lex compare give the same
+// result here. We keep compareAsc anyway for CLAUDE.md Rule 28 and so
+// the helper stays correct if BR ever swaps to the nullable
+// `datetime: ISO8601DateTime` field (which can carry a non-UTC offset
+// where lex order would diverge from chronological order). The returned
+// value is the input string verbatim — no reformatting needed because
+// the source is already yyyy-MM-dd.
 const earliestDate = (values: string[]): string | null => {
   if (values.length === 0) return null
-  return toIsoDate(
-    values.reduce((a, b) =>
-      compareAsc(parseISO(a), parseISO(b)) <= 0 ? a : b,
-    ),
+  return values.reduce((a, b) =>
+    compareAsc(parseISO(a), parseISO(b)) <= 0 ? a : b,
   )
 }
 
 const latestDate = (values: string[]): string | null => {
   if (values.length === 0) return null
-  return toIsoDate(
-    values.reduce((a, b) =>
-      compareAsc(parseISO(a), parseISO(b)) >= 0 ? a : b,
-    ),
+  return values.reduce((a, b) =>
+    compareAsc(parseISO(a), parseISO(b)) >= 0 ? a : b,
   )
 }
-
-// Format in UTC explicitly. `format(parseISO(...), 'yyyy-MM-dd')` would
-// use the server's local timezone, shifting the calendar date when the
-// source is UTC midnight (test machines in negative-offset zones see a
-// previous-day date). UTC keeps it deterministic across environments.
-const toIsoDate = (value: string): string =>
-  formatInTimeZone(parseISO(value), 'UTC', 'yyyy-MM-dd')
 
 function getMonthBounds(dateString: string): { gt: string; lt: string } {
   const reference = parseISO(dateString)

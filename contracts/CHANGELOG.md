@@ -1,5 +1,31 @@
 # @goodparty_org/contracts
 
+## 0.12.0
+
+### Minor Changes
+
+- `CommunityEventSchema` gains a required `address: string | null` field
+  for the venue's physical street address (renders in Section 7's
+  Address column on the campaign-plan template). `null` when the BR
+  search results don't surface an address. Previously this column was
+  populated from the optional `url` field — a misuse that's now
+  corrected. Non-breaking: existing `url` field is unchanged; consumers
+  that read `url` continue to work; new `address` is additive.
+
+## 0.11.0
+
+### Minor Changes
+
+- Add `CommunityEventSchema`, `CommunityEventsResultSchema`,
+  `CommunityEventsReadySchema`, `CommunityEventsGeneratingSchema`, and
+  `CommunityEventsResponseSchema` plus inferred types `CommunityEvent`,
+  `CommunityEventsResult`, `CommunityEventsResponse`. Backs the new
+  `POST /v1/campaignStrategy/mine/community-events` polling endpoint
+  that drives Section 7 of the campaign-plan template. Capped at 3
+  events per the ClickUp template spec; empty array means
+  "no qualifying events found" (UI shows the empty state without
+  re-polling).
+
 ## 0.10.0
 
 ### Minor Changes

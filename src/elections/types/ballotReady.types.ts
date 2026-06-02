@@ -192,19 +192,28 @@ interface Candidacy {
 }
 
 // Subset of BR's MilestoneCategory enum we care about. BR also returns
-// FILING (already covered by Race.filingDateEnd) and VOTING (just the
-// election day). Only these three drive Section 6 of the campaign plan.
+// VOTING (just the election day) — we ignore it because `electionDate`
+// is already on the Race row. Three categories drive Section 6 of the
+// campaign plan.
 export type BallotReadyMilestoneCategory =
   | 'REGISTRATION'
   | 'EARLY_VOTING'
   | 'REQUEST_BALLOT'
 
+// MilestoneObject enum on BR. We previously called this
+// MilestoneType — `type` is the GraphQL field name, but the underlying
+// enum is `MilestoneObject`.
 export type BallotReadyMilestoneType = 'OPEN' | 'CLOSE'
 
 export interface BallotReadyMilestone {
   category: BallotReadyMilestoneCategory | string
   type: BallotReadyMilestoneType | string
-  at: string | null
+  // BR's Milestone.date is ISO8601Date (NON_NULL) — a calendar date
+  // string like '2026-09-01' with no time-of-day component. There's
+  // also a nullable `datetime: ISO8601DateTime` field; we don't need
+  // the time precision for campaign-timeline rendering. Field name
+  // confirmed via GraphQL introspection 2026-06-01.
+  date: string
 }
 
 export interface RaceMilestonesGraphResponse {

@@ -5,8 +5,10 @@ import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { BadRequestException } from '@nestjs/common'
 import { CampaignStrategyService } from './campaignStrategy.service'
+import { CommunityEventsService } from './communityEvents.service'
 import { ElectionApiService } from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
+import { RacesService } from '@/elections/services/races.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { RaceContextFromApi } from '../types/electionApi.types'
 
@@ -112,12 +114,15 @@ describe('CampaignStrategyService', () => {
       | 'findFirst'
       | 'findFirstOrThrow'
       | 'findUniqueOrThrow'
-      | 'count',
+      | 'count'
+      | 'update',
       ReturnType<typeof vi.fn>
     >
   }
   let mockStrategic: { generate: ReturnType<typeof vi.fn> }
+  let mockEvents: { generate: ReturnType<typeof vi.fn> }
   let mockElectionApi: { getRaceContext: ReturnType<typeof vi.fn> }
+  let mockRaces: { getZipCodesByRaceId: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
     mockPrisma = {
@@ -129,16 +134,23 @@ describe('CampaignStrategyService', () => {
         findFirstOrThrow: vi.fn(),
         findUniqueOrThrow: vi.fn(),
         count: vi.fn(),
+        update: vi.fn(),
       },
     }
     mockStrategic = { generate: vi.fn() }
+    mockEvents = { generate: vi.fn() }
     mockElectionApi = { getRaceContext: vi.fn().mockResolvedValue(apiCtx) }
+    mockRaces = {
+      getZipCodesByRaceId: vi.fn().mockResolvedValue(['94110']),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: PrismaService, useValue: mockPrisma },
         { provide: StrategicLandscapeService, useValue: mockStrategic },
+        { provide: CommunityEventsService, useValue: mockEvents },
         { provide: ElectionApiService, useValue: mockElectionApi },
+        { provide: RacesService, useValue: mockRaces },
         { provide: PinoLogger, useValue: createMockLogger() },
         CampaignStrategyService,
       ],
@@ -624,6 +636,232 @@ describe('CampaignStrategyService', () => {
         ),
       ).rejects.toThrow(BadRequestException)
       expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+    })
+
+    // Regression: details has raceId populated AND a sibling field with a
+    // literal `null` value (zip is the common one — manual entry leaves it
+    // null even on structured-office campaigns). CampaignDetailsSchema's
+    // fields must be `.nullable()` so safeParse doesn't reject the whole
+    // object on the null sibling and force resolveRaceId to throw "no
+    // raceId" for a campaign that clearly has one.
+    it('accepts a valid raceId even when other detail fields are null', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+
+      await expect(
+        service.getOrGenerateStrategicLandscape(
+          buildCampaign({
+            details: {
+              party: 'Independent',
+              raceId: 'hash-abc',
+              zip: null,
+              city: null,
+            } as unknown as Campaign['details'],
+          }),
+        ),
+      ).resolves.toEqual({ status: 'generating' })
+      await service.drainInFlight()
+      expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
+    })
+
+    // Regression: Prisma's `upsert` does a SELECT-then-INSERT under the
+    // hood and is NOT atomic in Postgres. Two concurrent
+    // getOrGenerateXxx calls for the same brand-new campaign both see
+    // "no row" and both try INSERT — the second trips
+    // @@unique([campaign_id]) with P2002. Without the retry in
+    // upsertForCampaign that surfaces as a 409 to the client (e.g. the
+    // back-to-back pre-warm POSTs from OnboardingFlow). The retry path
+    // catches P2002 and re-fetches the now-existing row.
+    it('swallows P2002 from a concurrent upsert and re-fetches the row', async () => {
+      // `isUniqueConstraintError` checks `name === 'PrismaClientKnownRequestError'`
+      // (the library-loaded-from-two-paths-dual-ESM-CJS guard documented
+      // in `prismaErrors.util.ts`), so the fixture must set that exact name.
+      const upsertError = Object.assign(
+        new Error('Unique constraint failed on the fields: (`campaign_id`)'),
+        {
+          name: 'PrismaClientKnownRequestError',
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['campaign_id'] },
+        },
+      )
+      mockPrisma.campaignStrategy.upsert.mockRejectedValueOnce(upsertError)
+      mockPrisma.campaignStrategy.findUniqueOrThrow.mockResolvedValueOnce({
+        id: 42,
+        campaignId: 99,
+      })
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+
+      await expect(
+        service.getOrGenerateStrategicLandscape(buildCampaign()),
+      ).resolves.toEqual({ status: 'generating' })
+      expect(
+        mockPrisma.campaignStrategy.findUniqueOrThrow,
+      ).toHaveBeenCalledWith({ where: { campaignId: 99 } })
+      await service.drainInFlight()
+    })
+  })
+
+  describe('getOrGenerateCommunityEvents', () => {
+    const eventsDetails = {
+      party: 'Independent',
+      raceId: 'hash-abc',
+      electionDate: '2026-11-03',
+      state: 'CA',
+      city: 'Anytown',
+      zip: '94110',
+    }
+
+    it('returns { status: ready, data } when communityEvents column is populated', async () => {
+      const cached = {
+        events: [
+          {
+            title: 'Town Hall',
+            description: 'Why',
+            date: '2026-10-15',
+            address: '123 Main St, Anytown, CA 90210',
+            url: null,
+          },
+        ],
+      }
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: cached,
+      })
+
+      const result = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+
+      expect(result).toEqual({ status: 'ready', data: cached })
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('returns { status: ready } with empty array when column is populated but has zero events', async () => {
+      // Generated, found nothing must NOT re-poll forever. The persisted
+      // shape `{ events: [] }` is a valid cache hit.
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: { events: [] },
+      })
+
+      const result = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+
+      expect(result).toEqual({ status: 'ready', data: { events: [] } })
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('treats malformed JSON as cache miss and kicks off generation', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        // Wrong shape — should fail Zod validation in readCommunityEvents.
+        communityEvents: { unexpected: 'shape' },
+      })
+
+      const result = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+
+      expect(result).toEqual({ status: 'generating' })
+    })
+
+    it('returns generating + kicks off background work on cache miss', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+
+      const result = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+
+      expect(result).toEqual({ status: 'generating' })
+      await service.drainInFlight()
+      expect(mockEvents.generate).toHaveBeenCalledTimes(1)
+    })
+
+    it('reuses the in-flight events slot for concurrent polls', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // Hold the generation open so the second poll sees it in flight.
+      // Placeholder is overwritten synchronously by the Promise executor below.
+      let release: () => void = () => {
+        /* replaced by Promise resolve */
+      }
+      mockEvents.generate.mockReturnValue(
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+      )
+
+      const r1 = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      const r2 = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+
+      expect(r1).toEqual({ status: 'generating' })
+      expect(r2).toEqual({ status: 'generating' })
+      expect(mockEvents.generate).toHaveBeenCalledTimes(1)
+
+      release()
+      await service.drainInFlight()
+    })
+
+    it('throws BadRequest when raceId is missing', async () => {
+      await expect(
+        service.getOrGenerateCommunityEvents(
+          buildCampaign({
+            details: { electionDate: '2026-11-03' },
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequest when electionDate is missing', async () => {
+      await expect(
+        service.getOrGenerateCommunityEvents(
+          buildCampaign({
+            details: { raceId: 'hash-abc' },
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('uses the district zip resolver as the primary source for zip', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // Resolver returns a zip distinct from both campaign.details.zip
+      // ('94110') and the user's home zip — confirms the resolver wins.
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(['10025', '10026'])
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      expect(mockRaces.getZipCodesByRaceId).toHaveBeenCalledWith('hash-abc')
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('10025')
+    })
+
+    it('falls back to campaign zip when the resolver throws', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      mockRaces.getZipCodesByRaceId.mockRejectedValueOnce(
+        new Error('br lookup failed'),
+      )
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('94110')
     })
   })
 })
