@@ -17,14 +17,21 @@ export class StrategicLandscapePersister extends createPrismaBase(
       await tx.campaignStrategyOpponent.deleteMany({
         where: { campaignStrategyId },
       })
-      if (opponents.length === 0) return
-      await tx.campaignStrategyOpponent.createMany({
-        data: opponents.map((o) => ({
-          campaignStrategyId,
-          fullName: o.fullName,
-          partyAffiliation: o.partyAffiliation,
-          incumbent: o.incumbent,
-        })),
+      if (opponents.length > 0) {
+        await tx.campaignStrategyOpponent.createMany({
+          data: opponents.map((o) => ({
+            campaignStrategyId,
+            fullName: o.fullName,
+            partyAffiliation: o.partyAffiliation,
+            incumbent: o.incumbent,
+          })),
+        })
+      }
+      // Mark persisted in the same tx so 'ready' can't observe rows mid-write.
+      // Set even for an uncontested race (zero opponents is a real result).
+      await tx.campaignStrategy.update({
+        where: { id: campaignStrategyId },
+        data: { oppositionPersistedAt: new Date() },
       })
     })
   }
@@ -54,6 +61,10 @@ export class StrategicLandscapePersister extends createPrismaBase(
           order: i + 1,
           content,
         })),
+      })
+      await tx.campaignStrategy.update({
+        where: { id: campaignStrategyId },
+        data: { opportunitiesPersistedAt: new Date() },
       })
     })
   }

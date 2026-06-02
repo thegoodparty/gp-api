@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BadRequestException } from '@nestjs/common'
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import { ExperimentRunStatus } from '@prisma/client'
 import { CampaignStrategyService } from './campaignStrategy.service'
 
@@ -158,20 +161,14 @@ describe('CampaignStrategyService', () => {
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
-  it('returns ready with mapped data once both runs complete', async () => {
+  it('returns ready with mapped data once both sections are persisted', async () => {
     prisma.campaignStrategy.upsert.mockResolvedValue(
-      planRow({ oppositionRunId: 'opp-run', opportunitiesRunId: 'oc-run' }),
-    )
-    const runsById: Record<string, unknown> = {
-      'opp-run': run({ runId: 'opp-run' }),
-      'oc-run': run({
-        runId: 'oc-run',
-        experimentType: 'opportunities_and_challenges',
+      planRow({
+        oppositionRunId: 'opp-run',
+        opportunitiesRunId: 'oc-run',
+        oppositionPersistedAt: new Date(),
+        opportunitiesPersistedAt: new Date(),
       }),
-    }
-    experimentRuns.findUnique.mockImplementation(
-      (args: { where: { runId: string } }) =>
-        Promise.resolve(runsById[args.where.runId] ?? null),
     )
     prisma.campaignStrategy.findUnique.mockResolvedValue({
       opportunities: [{ content: 'o1' }],
@@ -202,6 +199,59 @@ describe('CampaignStrategyService', () => {
       },
     })
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('stays generating when a run is COMPLETED but its section is not persisted', async () => {
+    // The race window: both runs done, but only one section's rows have landed.
+    prisma.campaignStrategy.upsert.mockResolvedValue(
+      planRow({
+        oppositionRunId: 'opp-run',
+        opportunitiesRunId: 'oc-run',
+        oppositionPersistedAt: new Date(),
+        opportunitiesPersistedAt: null,
+      }),
+    )
+    const runsById: Record<string, unknown> = {
+      'opp-run': run({ runId: 'opp-run' }),
+      'oc-run': run({
+        runId: 'oc-run',
+        experimentType: 'opportunities_and_challenges',
+      }),
+    }
+    experimentRuns.findUnique.mockImplementation(
+      (args: { where: { runId: string } }) =>
+        Promise.resolve(runsById[args.where.runId] ?? null),
+    )
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'generating' })
+    expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+  })
+
+  it('reports failed (not 502) when an SQS dispatch throws', async () => {
+    experimentRuns.dispatchRun.mockRejectedValue(new Error('sqs unavailable'))
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'failed' })
+    expect(prisma.campaignStrategy.update).not.toHaveBeenCalled()
+  })
+
+  it('throws if the strategy row vanishes between upsert and read', async () => {
+    prisma.campaignStrategy.upsert.mockResolvedValue(
+      planRow({
+        oppositionRunId: 'opp-run',
+        opportunitiesRunId: 'oc-run',
+        oppositionPersistedAt: new Date(),
+        opportunitiesPersistedAt: new Date(),
+      }),
+    )
+    prisma.campaignStrategy.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.getOrGenerateStrategicLandscape(campaign()),
+    ).rejects.toBeInstanceOf(InternalServerErrorException)
   })
 
   it('stays generating without re-dispatching while a run is still RUNNING', async () => {
@@ -285,18 +335,32 @@ describe('CampaignStrategyService', () => {
     )
   })
 
-  it('ignores non-CAP, non-completed, or artifact-less runs', async () => {
+  it('ignores non-CAP and non-completed runs', async () => {
     await service.onExperimentRunCompleted(
       run({ experimentType: 'district_issue_pulse' }),
     )
     await service.onExperimentRunCompleted(
       run({ status: ExperimentRunStatus.FAILED }),
     )
-    await service.onExperimentRunCompleted(run({ artifactKey: null }))
 
     expect(s3.getFile).not.toHaveBeenCalled()
     expect(persister.persistOpponents).not.toHaveBeenCalled()
     expect(persister.persistOpportunitiesAndChallenges).not.toHaveBeenCalled()
+    expect(experimentRuns.markFailed).not.toHaveBeenCalled()
+  })
+
+  it('marks the run failed when a completed run has no artifact location', async () => {
+    await expect(
+      service.onExperimentRunCompleted(
+        run({ runId: 'opp-run', artifactKey: null }),
+      ),
+    ).rejects.toThrow()
+
+    expect(experimentRuns.markFailed).toHaveBeenCalledWith(
+      'opp-run',
+      'completed run has no artifact location',
+    )
+    expect(s3.getFile).not.toHaveBeenCalled()
   })
 
   it('persists an empty opponent list for an uncontested race', async () => {

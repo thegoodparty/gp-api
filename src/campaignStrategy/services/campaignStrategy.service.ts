@@ -13,6 +13,7 @@ import { CampaignWith } from '@/campaigns/campaigns.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { AgentJobContracts } from '@/generated/agent-job-contracts'
 import {
   parseOpponents,
   parseOpportunitiesAndChallenges,
@@ -24,6 +25,10 @@ import { StrategicLandscapePersister } from './strategicLandscape.persister'
 
 const OPPOSITION = 'opposition_research'
 const OPPORTUNITIES = 'opportunities_and_challenges'
+
+// Both CAP experiments share one input contract.
+type StrategicLandscapeParams =
+  AgentJobContracts['opposition_research']['Input']
 
 // Defensive Zod parse over Campaign.details (Prisma JSON). raceId is the
 // BallotReady race hash election-api keys on.
@@ -86,7 +91,10 @@ export class CampaignStrategyService extends createPrismaBase(
       return { status: 'failed' }
     }
 
-    if (this.isComplete(opposition) && this.isComplete(opportunities)) {
+    // Ready only once BOTH sections are persisted (markers set in the same tx
+    // as the rows). Gating on run status instead would race: a run can be
+    // COMPLETED a beat before its rows land, yielding a hollow 'ready'.
+    if (plan.oppositionPersistedAt && plan.opportunitiesPersistedAt) {
       return {
         status: 'ready',
         data: await this.readStrategicLandscape(plan.id),
@@ -105,7 +113,7 @@ export class CampaignStrategyService extends createPrismaBase(
 
   // Queue-consumer hook: when one of the two CAP runs completes, load its
   // artifact and persist that section. Each section persists independently;
-  // the endpoint reports 'ready' once both runs are COMPLETED.
+  // the endpoint reports 'ready' once both sections are persisted.
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
     if (run.status !== ExperimentRunStatus.COMPLETED) return
     if (
@@ -114,7 +122,16 @@ export class CampaignStrategyService extends createPrismaBase(
     ) {
       return
     }
-    if (!run.artifactBucket || !run.artifactKey) return
+
+    // A COMPLETED CAP run with no artifact can never be persisted. Treat it as
+    // a failure so the endpoint reports 'failed' instead of sitting 'ready'.
+    if (!run.artifactBucket || !run.artifactKey) {
+      await this.experimentRuns.markFailed(
+        run.runId,
+        'completed run has no artifact location',
+      )
+      throw new Error(`run ${run.runId} completed without an artifact location`)
+    }
 
     const plan = await this.findFirst({
       where:
@@ -155,10 +172,6 @@ export class CampaignStrategyService extends createPrismaBase(
   private runFor(runId: string | null): Promise<ExperimentRun | null> {
     if (!runId) return Promise.resolve(null)
     return this.experimentRuns.findUnique({ where: { runId } })
-  }
-
-  private isComplete(run: ExperimentRun | null): boolean {
-    return run?.status === ExperimentRunStatus.COMPLETED
   }
 
   private isFailed(run: ExperimentRun | null): boolean {
@@ -204,14 +217,11 @@ export class CampaignStrategyService extends createPrismaBase(
     let ok = true
 
     if (dispatchOpposition) {
-      const run = await this.experimentRuns.dispatchRun({
-        type: OPPOSITION,
-        ...base,
-      })
-      if (run) {
+      const runId = await this.tryDispatch(OPPOSITION, base)
+      if (runId) {
         await this.client.campaignStrategy.update({
           where: { id: plan.id },
-          data: { oppositionRunId: run.runId },
+          data: { oppositionRunId: runId },
         })
       } else {
         ok = false
@@ -219,14 +229,11 @@ export class CampaignStrategyService extends createPrismaBase(
     }
 
     if (dispatchOpportunities) {
-      const run = await this.experimentRuns.dispatchRun({
-        type: OPPORTUNITIES,
-        ...base,
-      })
-      if (run) {
+      const runId = await this.tryDispatch(OPPORTUNITIES, base)
+      if (runId) {
         await this.client.campaignStrategy.update({
           where: { id: plan.id },
-          data: { opportunitiesRunId: run.runId },
+          data: { opportunitiesRunId: runId },
         })
       } else {
         ok = false
@@ -234,6 +241,25 @@ export class CampaignStrategyService extends createPrismaBase(
     }
 
     return ok
+  }
+
+  // A dispatch failure (no queue, or SQS send error -> BadGateway) yields no
+  // runId. Swallow it here so the caller reports 'failed' instead of letting a
+  // 502 bubble out on the first failure.
+  private async tryDispatch(
+    type: typeof OPPOSITION | typeof OPPORTUNITIES,
+    base: {
+      organizationSlug: string
+      clerkUserId: string
+      params: StrategicLandscapeParams
+    },
+  ): Promise<string | undefined> {
+    try {
+      const run = await this.experimentRuns.dispatchRun({ type, ...base })
+      return run?.runId
+    } catch {
+      return undefined
+    }
   }
 
   private upsertForCampaign(campaignId: number): Promise<CampaignStrategy> {
@@ -255,15 +281,21 @@ export class CampaignStrategyService extends createPrismaBase(
         opponents: true,
       },
     })
+    // The row was just upserted in this request; a null here is a real
+    // data-integrity problem, not "empty data" to paper over.
+    if (!plan) {
+      throw new InternalServerErrorException(
+        `CampaignStrategy ${campaignStrategyId} not found when reading sections`,
+      )
+    }
     return {
-      opportunities: plan?.opportunities.map((o) => o.content) ?? [],
-      challenges: plan?.challenges.map((c) => c.content) ?? [],
-      opponents:
-        plan?.opponents.map((o) => ({
-          fullName: o.fullName,
-          partyAffiliation: o.partyAffiliation,
-          incumbent: o.incumbent,
-        })) ?? [],
+      opportunities: plan.opportunities.map((o) => o.content),
+      challenges: plan.challenges.map((c) => c.content),
+      opponents: plan.opponents.map((o) => ({
+        fullName: o.fullName,
+        partyAffiliation: o.partyAffiliation,
+        incumbent: o.incumbent,
+      })),
     }
   }
 }

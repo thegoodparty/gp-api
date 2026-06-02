@@ -9,9 +9,17 @@ model CampaignStrategy {
   oppositionRunId    String? @map("opposition_run_id")
   opportunitiesRunId String? @map("opportunities_run_id")
 
+  // Set in the same transaction that writes each section's rows. The endpoint
+  // gates 'ready' on these (not on run status) so a poll between a run being
+  // marked COMPLETED and its rows landing can't return a hollow 'ready'.
+  oppositionPersistedAt    DateTime? @map("opposition_persisted_at")
+  opportunitiesPersistedAt DateTime? @map("opportunities_persisted_at")
+
   opportunities CampaignStrategyOpportunity[]
   challenges    CampaignStrategyChallenge[]
   opponents     CampaignStrategyOpponent[]
 
+  @@index([oppositionRunId])
+  @@index([opportunitiesRunId])
   @@map("campaign_strategy")
 }

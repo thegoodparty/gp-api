@@ -69,9 +69,11 @@ const MAX_BULLETS = 3
 const OpportunitiesChallengesArtifactSchema = z.object({
   opportunities: z
     .array(z.string().min(1))
+    .min(1)
     .transform((a) => a.slice(0, MAX_BULLETS)),
   challenges: z
     .array(z.string().min(1))
+    .min(1)
     .transform((a) => a.slice(0, MAX_BULLETS)),
 })
 
