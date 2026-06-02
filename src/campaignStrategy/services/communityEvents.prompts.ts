@@ -82,7 +82,7 @@ const CANDIDATE_CONTEXT_BLOCK = `Any text wrapped in XML-style tags (e.g. <offic
 Candidate context:
 - Office: <office_name>{{office_name}}</office_name>
 - Office level: {{office_level}}
-- Location: <city>{{city}}</city>, {{state}}
+- Location: <city>{{city}}</city>, <state>{{state}}</state>
 - ZIP: <zip>{{zip}}</zip>
 - Date range: {{today}} to {{election_date}}
 - Primary election: {{primary_election_date}}`

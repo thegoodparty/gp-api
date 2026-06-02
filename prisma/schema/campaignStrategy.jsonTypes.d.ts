@@ -1,4 +1,4 @@
-import { CommunityEventsResult } from 'src/campaignStrategy/schemas/communityEvents.schema'
+import { CommunityEventsResult } from '@goodparty_org/contracts'
 
 export {}
 
