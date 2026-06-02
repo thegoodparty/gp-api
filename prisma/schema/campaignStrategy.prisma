@@ -6,6 +6,9 @@ model CampaignStrategy {
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId Int      @unique @map("campaign_id")
 
+  oppositionRunId    String? @map("opposition_run_id")
+  opportunitiesRunId String? @map("opportunities_run_id")
+
   opportunities CampaignStrategyOpportunity[]
   challenges    CampaignStrategyChallenge[]
   opponents     CampaignStrategyOpponent[]
