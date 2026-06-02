@@ -1,3 +1,4 @@
+import { BallotReadyService } from '@/elections/services/ballotReady.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
@@ -29,6 +30,26 @@ import { CampaignTasksService } from '../tasks/services/campaignTasks.service'
 
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
+
+// Null-filled defaults for fields added when fetchLiveRaceTargetMetrics
+// started consuming /campaign-strategy-context. Fallback paths
+// (overrideDistrictId, position-based) emit these as null; tests for those
+// paths spread this into their expected result.
+const EMPTY_RACE_CONTEXT_FIELDS = {
+  registeredVoters: null,
+  uniqueCellphones: null,
+  uniqueLandlines: null,
+  projectedVoterTurnout: null,
+  candidates: [],
+  generalElectionDate: null,
+  primaryElectionDate: null,
+  relevantElectionDate: null,
+  officialOfficeName: null,
+  officeLevel: null,
+  officeType: null,
+  numberOfSeats: null,
+  milestones: null,
+}
 
 const mockPositionResponse = {
   id: GP_POSITION_ID,
@@ -111,6 +132,10 @@ const buildOrgSyncModule = async (overrides?: {
       {
         provide: ElectionsService,
         useValue: { getPositionByBallotReadyId: mockGetPosition },
+      },
+      {
+        provide: BallotReadyService,
+        useValue: { fetchMilestones: vi.fn().mockResolvedValue(null) },
       },
       { provide: OrganizationsService, useValue: {} },
       { provide: SlackService, useValue: {} },
@@ -481,6 +506,10 @@ describe('CampaignsService - redeemFreeTexts', () => {
         {
           provide: ElectionsService,
           useValue: {},
+        },
+        {
+          provide: BallotReadyService,
+          useValue: { fetchMilestones: vi.fn().mockResolvedValue(null) },
         },
         {
           provide: OrganizationsService,
@@ -858,11 +887,18 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
     getPositionMatchedRaceTargetDetails: vi.fn(),
     buildRaceTargetDetails: vi.fn(),
     fetchFilingFeeByRaceHash: vi.fn(),
+    fetchCampaignStrategyContext: vi.fn().mockResolvedValue(null),
+  }
+
+  const mockBallotReady: Partial<BallotReadyService> = {
+    fetchMilestones: vi.fn().mockResolvedValue(null),
   }
 
   let service: CampaignsService
 
   beforeEach(() => {
+    vi.mocked(mockBallotReady.fetchMilestones!).mockReset()
+    vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue(null)
     service = new CampaignsService(
       {} as UsersService,
       {} as CrmCampaignsService,
@@ -871,6 +907,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       {} as StripeService,
       {} as GooglePlacesService,
       mockElections as ElectionsService,
+      mockBallotReady as BallotReadyService,
       mockOrganizations as OrganizationsService,
       {} as SlackService,
       { notifySlackOnProUpgrade: vi.fn() } as unknown as CampaignTasksService,
@@ -913,6 +950,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       voterContactGoal: 25005,
       filingFee: 250,
       filingRequirementsText: 'Filing fee is $250.',
+      ...EMPTY_RACE_CONTEXT_FIELDS,
     })
     expect(
       mockElections.getPositionMatchedRaceTargetDetails,
@@ -1021,6 +1059,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       voterContactGoal: 15005,
       filingFee: null,
       filingRequirementsText: null,
+      ...EMPTY_RACE_CONTEXT_FIELDS,
     })
     expect(mockElections.buildRaceTargetDetails).toHaveBeenCalledWith({
       districtId: 'override-district-uuid',
@@ -1051,6 +1090,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       voterContactGoal: 10005,
       filingFee: null,
       filingRequirementsText: null,
+      ...EMPTY_RACE_CONTEXT_FIELDS,
     })
   })
 
@@ -1117,6 +1157,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         voterContactGoal: 25005,
         filingFee: 75,
         filingRequirementsText: 'BR-hash text.',
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       })
     })
 
@@ -1140,6 +1181,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         voterContactGoal: 25005,
         filingFee: null,
         filingRequirementsText: 'Fee varies; see BR.',
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       })
     })
 
@@ -1159,6 +1201,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         voterContactGoal: 25005,
         filingFee: 250,
         filingRequirementsText: 'Position-side text.',
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       })
     })
 
@@ -1187,6 +1230,7 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         voterContactGoal: 10005,
         filingFee: 50,
         filingRequirementsText: 'BR-hash text.',
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       })
     })
 
@@ -1199,6 +1243,231 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       await service.fetchLiveRaceTargetMetrics(noRaceId)
 
       expect(mockElections.fetchFilingFeeByRaceHash).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('campaign-strategy-context path (new unified source)', () => {
+    const campaignWithRaceId = {
+      ...baseCampaign,
+      details: { electionDate: '2026-11-03', raceId: 'Z2lk-hash' },
+    } as unknown as Campaign
+
+    beforeEach(() => {
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockReset()
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockReset()
+      vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+        positionId: 'pos-123',
+      } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+    })
+
+    it('maps context response onto RaceTargetMetrics when context returns data', async () => {
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue({
+        candidate_count: 3,
+        candidate_office: 'City Council',
+        candidates: [
+          {
+            gp_candidate_id: 'gp-1',
+            first_name: 'Ada',
+            last_name: 'Lovelace',
+            full_name: 'Ada Lovelace',
+            email: null,
+            website_url: null,
+            party: 'Independent',
+            is_incumbent: true,
+          },
+        ],
+        civics_win_number: 600,
+        contacts_needed_estimate: 3000,
+        general_election_date: '2026-11-03',
+        number_of_seats: 1,
+        office_level: 'CITY',
+        office_type: 'COUNCIL',
+        official_office_name: 'City Council Seat 5',
+        primary_election_date: '2026-08-04',
+        projected_turnout: 1200,
+        projected_voter_turnout: 1200,
+        registered_voters: 5500,
+        unique_cellphones: 3300,
+        unique_landlines: 1800,
+        relevant_election_date: '2026-11-03',
+        state: 'CA',
+        win_number_effective: 600,
+        win_number_estimate: 601,
+      })
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue({
+        filingFee: 100,
+        filingRequirementsText: 'Filing fee: $100.',
+        extractionSource: 'direct_dollar',
+      })
+      vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result).toEqual({
+        winNumber: 600,
+        voterContactGoal: 3000,
+        projectedTurnout: 1200,
+        filingFee: 100,
+        filingRequirementsText: 'Filing fee: $100.',
+        registeredVoters: 5500,
+        uniqueCellphones: 3300,
+        uniqueLandlines: 1800,
+        projectedVoterTurnout: 1200,
+        candidates: [
+          {
+            gpCandidateId: 'gp-1',
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+            fullName: 'Ada Lovelace',
+            email: null,
+            websiteUrl: null,
+            party: 'Independent',
+            isIncumbent: true,
+          },
+        ],
+        generalElectionDate: '2026-11-03',
+        primaryElectionDate: '2026-08-04',
+        relevantElectionDate: '2026-11-03',
+        officialOfficeName: 'City Council Seat 5',
+        officeLevel: 'CITY',
+        officeType: 'COUNCIL',
+        numberOfSeats: 1,
+        milestones: {
+          voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+          early_voting: { start: '2026-10-20', end: '2026-11-02' },
+          request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+        },
+      })
+
+      // The legacy position-based path must not fire when context wins.
+      expect(
+        mockElections.getPositionMatchedRaceTargetDetails,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('falls back to position-based path when context returns null', async () => {
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue(
+        null,
+      )
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+      vi.mocked(
+        mockElections.getPositionMatchedRaceTargetDetails!,
+      ).mockResolvedValue({
+        district: {
+          id: 'd-1',
+          state: 'CA',
+          L2DistrictType: 'State_Senate',
+          L2DistrictName: 'STATE SENATE 001',
+          projectedTurnout: null,
+        },
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result).toEqual({
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
+        ...EMPTY_RACE_CONTEXT_FIELDS,
+      })
+      expect(
+        mockElections.getPositionMatchedRaceTargetDetails,
+      ).toHaveBeenCalled()
+    })
+
+    it('threads milestones through the position-based fallback path', async () => {
+      // The fan-out fires fetchMilestones whenever raceId is present,
+      // independent of whether context resolves. Without this assertion,
+      // a regression that hardcoded `milestones: null` on the fallback
+      // branch in campaigns.service.ts would still pass every other
+      // test (mockBallotReady defaults to null + EMPTY_RACE_CONTEXT_FIELDS
+      // asserts null).
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue(
+        null,
+      )
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+      vi.mocked(
+        mockElections.getPositionMatchedRaceTargetDetails!,
+      ).mockResolvedValue({
+        district: {
+          id: 'd-1',
+          state: 'CA',
+          L2DistrictType: 'State_Senate',
+          L2DistrictName: 'STATE SENATE 001',
+          projectedTurnout: null,
+        },
+        projectedTurnout: 8000,
+        winNumber: 4001,
+        voterContactGoal: 20005,
+        filingFee: null,
+        filingRequirementsText: null,
+      })
+      vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(mockBallotReady.fetchMilestones).toHaveBeenCalledWith('Z2lk-hash')
+      expect(result?.milestones).toEqual({
+        voter_registration: { start: '2026-06-01', end: '2026-10-19' },
+        early_voting: { start: '2026-10-20', end: '2026-11-02' },
+        request_ballot: { start: '2026-09-01', end: '2026-10-27' },
+      })
+    })
+
+    it('returns the context shape even when no org positionId / overrideDistrictId is set (raceId is enough)', async () => {
+      vi.mocked(mockOrganizations.findUnique!).mockResolvedValue({
+        positionId: null,
+        overrideDistrictId: null,
+      } as Awaited<ReturnType<OrganizationsService['findUnique']>>)
+      vi.mocked(mockElections.fetchCampaignStrategyContext!).mockResolvedValue({
+        candidate_count: 1,
+        candidate_office: null,
+        candidates: [],
+        civics_win_number: null,
+        contacts_needed_estimate: 500,
+        general_election_date: null,
+        number_of_seats: null,
+        office_level: null,
+        office_type: null,
+        official_office_name: null,
+        primary_election_date: null,
+        projected_turnout: 200,
+        projected_voter_turnout: 200,
+        registered_voters: 900,
+        unique_cellphones: 500,
+        unique_landlines: 300,
+        relevant_election_date: '2026-11-03',
+        state: 'CA',
+        win_number_effective: 100,
+        win_number_estimate: 101,
+      })
+      vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue(null)
+
+      const result =
+        await service.fetchLiveRaceTargetMetrics(campaignWithRaceId)
+
+      expect(result?.winNumber).toBe(100)
+      expect(result?.voterContactGoal).toBe(500)
+      expect(result?.projectedTurnout).toBe(200)
+      expect(result?.registeredVoters).toBe(900)
     })
   })
 })
