@@ -6,7 +6,10 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { BadRequestException } from '@nestjs/common'
 import { CampaignStrategyService } from './campaignStrategy.service'
 import { CommunityEventsService } from './communityEvents.service'
-import { ElectionApiService } from './electionApi.service'
+import {
+  ElectionApiRaceNotFoundError,
+  ElectionApiService,
+} from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
 import { RacesService } from '@/elections/services/races.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -844,7 +847,9 @@ describe('CampaignStrategyService', () => {
 
       expect(mockRaces.getZipCodesByRaceId).toHaveBeenCalledWith('hash-abc')
       const ctx = mockEvents.generate.mock.calls[0]?.[2]
-      expect(ctx?.zip).toBe('10025')
+      // All resolver zips join into a single comma-separated value so the
+      // LLM has full geographic coverage of the district.
+      expect(ctx?.zip).toBe('10025, 10026')
     })
 
     it('falls back to campaign zip when the resolver throws', async () => {
@@ -864,16 +869,18 @@ describe('CampaignStrategyService', () => {
       expect(ctx?.zip).toBe('94110')
     })
 
-    it('falls back to campaign zip when the resolver returns a statewide-sized array', async () => {
+    it('drops the zip entirely when the resolver returns a statewide-sized array', async () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
         communityEvents: null,
       })
-      // 51 zips trips the STATEWIDE_ZIP_THRESHOLD (50) — any single zip
-      // from a statewide race's position is too coarse to ground the
-      // community-events search, so the campaign's own zip wins.
+      // 76 zips trips the STATEWIDE_ZIP_THRESHOLD (75) — for statewide
+      // races the campaign's home zip isn't representative of where the
+      // candidate actually operates, so the resolver returns '' and the
+      // prompt renders the zip field as "not available". The LLM reasons
+      // from officeName + state + city for these races.
       const statewideZips = Array.from(
-        { length: 51 },
-        (_, i) => `9000${i.toString().padStart(2, '0')}`,
+        { length: 76 },
+        (_, i) => `9${i.toString().padStart(4, '0')}`,
       )
       mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(statewideZips)
 
@@ -883,7 +890,178 @@ describe('CampaignStrategyService', () => {
       await service.drainInFlight()
 
       const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe('')
+    })
+
+    it('falls back to campaign zip when the resolver returns an empty array', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // BR has the race but no zips on file for its position — still a
+      // recoverable case where the candidate's home zip is useful.
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce([])
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
       expect(ctx?.zip).toBe('94110')
+    })
+
+    it('passes all zips comma-separated when count is at the threshold', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // 75 zips is exactly at the threshold and should be included in full.
+      const districtZips = Array.from(
+        { length: 75 },
+        (_, i) => `9${i.toString().padStart(4, '0')}`,
+      )
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(districtZips)
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe(districtZips.join(', '))
+    })
+  })
+
+  // Breaks the infinite-poll loop when election-api has no Race row for
+  // the candidate's brHashId. Without this, every 3s poll re-kicks
+  // generation and the background hits the same 404 every time —
+  // unbounded log noise, unbounded gp-api → election-api traffic, and
+  // the webapp shows a skeleton forever.
+  describe('election-api 404 → race-data-unavailable short-circuit', () => {
+    it('strategic-landscape: marks the campaign unavailable on 404 and returns ready+empty on subsequent polls', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      mockElectionApi.getRaceContext.mockRejectedValueOnce(
+        new ElectionApiRaceNotFoundError('hash-abc'),
+      )
+
+      // First call: kicks generation, gets 'generating' synchronously.
+      const first =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(first).toEqual({ status: 'generating' })
+
+      // Background generation runs, hits the 404, marks campaign as
+      // race-data-unavailable.
+      await service.drainInFlight()
+      expect(mockStrategic.generate).not.toHaveBeenCalled()
+
+      // Second call: short-circuits to ready+empty without re-kicking.
+      // mockElectionApi.getRaceContext is NOT called again (mockRejectedValueOnce
+      // would have returned undefined on a second call).
+      mockElectionApi.getRaceContext.mockClear()
+      const second =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(second).toEqual({
+        status: 'ready',
+        data: { opportunities: [], challenges: [], opponents: [] },
+      })
+      expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+      expect(mockStrategic.generate).not.toHaveBeenCalled()
+    })
+
+    it('community-events: marks the campaign unavailable on 404 and returns ready+empty on subsequent polls', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      mockElectionApi.getRaceContext.mockRejectedValueOnce(
+        new ElectionApiRaceNotFoundError('hash-abc'),
+      )
+      const eventsDetails = {
+        party: 'Independent',
+        raceId: 'hash-abc',
+        electionDate: '2026-11-03',
+        state: 'CA',
+        city: 'Anytown',
+        zip: '94110',
+      }
+
+      const first = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      expect(first).toEqual({ status: 'generating' })
+
+      await service.drainInFlight()
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+
+      mockElectionApi.getRaceContext.mockClear()
+      const second = await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      expect(second).toEqual({ status: 'ready', data: { events: [] } })
+      expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+      expect(mockEvents.generate).not.toHaveBeenCalled()
+    })
+
+    it('cache is shared across pipelines: a 404 on community-events short-circuits strategic-landscape too', async () => {
+      // Both pipelines call electionApi.getRaceContext, so a single 404
+      // proves the race won't resolve for either. The other pipeline
+      // shouldn't have to learn that lesson independently.
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      mockElectionApi.getRaceContext.mockRejectedValueOnce(
+        new ElectionApiRaceNotFoundError('hash-abc'),
+      )
+      const eventsDetails = {
+        party: 'Independent',
+        raceId: 'hash-abc',
+        electionDate: '2026-11-03',
+        state: 'CA',
+        city: 'Anytown',
+        zip: '94110',
+      }
+
+      // Community-events 404s and marks unavailable.
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      // Strategic-landscape on the same campaign should now also
+      // short-circuit without ever hitting electionApi.
+      mockElectionApi.getRaceContext.mockClear()
+      const result = await service.getOrGenerateStrategicLandscape(
+        buildCampaign({ details: eventsDetails }),
+      )
+      expect(result).toEqual({
+        status: 'ready',
+        data: { opportunities: [], challenges: [], opponents: [] },
+      })
+      expect(mockElectionApi.getRaceContext).not.toHaveBeenCalled()
+    })
+
+    it('non-404 election-api failures do NOT mark the race unavailable (transient errors should retry)', async () => {
+      // A 5xx or network timeout from election-api is transient and
+      // could clear on the next poll. We only want to short-circuit
+      // for the permanent "race not in DB" case, not for blips.
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue(buildPlanRow())
+      mockElectionApi.getRaceContext.mockRejectedValueOnce(
+        new Error('election-api request failed'),
+      )
+
+      await service.getOrGenerateStrategicLandscape(buildCampaign())
+      await service.drainInFlight()
+
+      // Second poll: NOT short-circuited — re-kicks generation.
+      mockElectionApi.getRaceContext.mockResolvedValueOnce(apiCtx)
+      mockStrategic.generate.mockResolvedValueOnce({
+        opportunities: ['a', 'b', 'c'],
+        challenges: ['x', 'y', 'z'],
+        opponents: [],
+      })
+
+      const result =
+        await service.getOrGenerateStrategicLandscape(buildCampaign())
+      expect(result).toEqual({ status: 'generating' })
+
+      await service.drainInFlight()
+      expect(mockStrategic.generate).toHaveBeenCalledTimes(1)
     })
   })
 })

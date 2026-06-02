@@ -29,8 +29,19 @@ import {
 } from '../types/electionApi.types'
 import { CommunityEventsPromptContext } from './communityEvents.prompts'
 import { CommunityEventsService } from './communityEvents.service'
-import { ElectionApiService } from './electionApi.service'
+import {
+  ElectionApiRaceNotFoundError,
+  ElectionApiService,
+} from './electionApi.service'
 import { StrategicLandscapeService } from './strategicLandscape.service'
+
+const EMPTY_STRATEGIC_LANDSCAPE: StrategicLandscapeResult = {
+  opportunities: [],
+  challenges: [],
+  opponents: [],
+}
+
+const EMPTY_COMMUNITY_EVENTS: CommunityEventsResult = { events: [] }
 
 // Defensive Zod parse over Campaign.details — the column is Prisma JSON,
 // so we can't trust the shadow type at runtime. Only the keys we read here
@@ -152,6 +163,19 @@ export class CampaignStrategyService
   // other behind a single per-campaign mutex.
   private readonly inFlightEvents = new Map<number, Promise<void>>()
 
+  // Per-pod cache of campaigns whose race lookup against election-api
+  // returned 404. The next runGeneration / runEventsGeneration for the
+  // same campaign would just 404 again, and the next browser poll would
+  // re-kick the loop. Caching here short-circuits the loop so the
+  // polling endpoint returns `{ status: 'ready', data: <empty> }` and
+  // the webapp falls through to its existing empty-state UI.
+  //
+  // We don't persist this. The 404 is almost always a dev-env data gap
+  // that resolves on the next election-api dbt run; a pod restart is the
+  // natural "retry" point and that's an acceptable cadence for what's
+  // ultimately a transient data-import issue.
+  private readonly raceDataUnavailable = new Set<number>()
+
   constructor(
     private readonly strategicLandscape: StrategicLandscapeService,
     private readonly communityEvents: CommunityEventsService,
@@ -174,6 +198,14 @@ export class CampaignStrategyService
     // rather than getting swallowed in the background, where it would leave
     // the client stuck in a generating poll loop.
     const brHashId = resolveRaceId(campaign.details)
+
+    // Short-circuit when we've already learned this campaign's race
+    // doesn't exist in election-api. Otherwise the controller would
+    // keep returning 'generating' on every 3s poll and the background
+    // would keep 404ing forever. See raceDataUnavailable definition.
+    if (this.raceDataUnavailable.has(campaign.id)) {
+      return { status: 'ready', data: EMPTY_STRATEGIC_LANDSCAPE }
+    }
 
     const plan = await this.upsertForCampaign(campaign.id)
     const cached = await this.readStrategicLandscape(plan.id)
@@ -205,6 +237,14 @@ export class CampaignStrategyService
     // poll loop.
     const brHashId = resolveRaceId(campaign.details)
     const electionDate = resolveElectionDate(campaign.details)
+
+    // See raceDataUnavailable definition. Both pipelines (community
+    // events and strategic landscape) call electionApi.getRaceContext,
+    // so a 404 affects both — the cache is shared and either pipeline
+    // hitting the 404 short-circuits the other too.
+    if (this.raceDataUnavailable.has(campaign.id)) {
+      return { status: 'ready', data: EMPTY_COMMUNITY_EVENTS }
+    }
 
     const plan = await this.upsertForCampaign(campaign.id)
     const cached = await this.readCommunityEvents(plan.id)
@@ -256,6 +296,10 @@ export class CampaignStrategyService
         GENERATION_WATCHDOG_MS,
       )
     } catch (error) {
+      if (error instanceof ElectionApiRaceNotFoundError) {
+        this.markRaceUnavailable(campaign.id, brHashId, 'strategic-landscape')
+        return
+      }
       this.logger.error(
         {
           campaignId: campaign.id,
@@ -296,6 +340,10 @@ export class CampaignStrategyService
         GENERATION_WATCHDOG_MS,
       )
     } catch (error) {
+      if (error instanceof ElectionApiRaceNotFoundError) {
+        this.markRaceUnavailable(campaign.id, brHashId, 'community-events')
+        return
+      }
       this.logger.error(
         {
           campaignId: campaign.id,
@@ -306,6 +354,23 @@ export class CampaignStrategyService
     } finally {
       this.inFlightEvents.delete(campaign.id)
     }
+  }
+
+  // Add the campaign to the per-pod raceDataUnavailable cache so
+  // subsequent polls short-circuit to `{ status: 'ready', data: <empty> }`
+  // instead of re-kicking generation that will 404 again. Logged at
+  // warn (not error) because a missing Race row is usually a dev-env
+  // data gap, not an outage worth paging on.
+  private markRaceUnavailable(
+    campaignId: number,
+    brHashId: string,
+    pipeline: 'strategic-landscape' | 'community-events',
+  ): void {
+    this.raceDataUnavailable.add(campaignId)
+    this.logger.warn(
+      { campaignId, raceId: brHashId, pipeline },
+      'election-api has no data for this race; marking campaign as race-data-unavailable so polling stops looping',
+    )
   }
 
   private async runEventsGenerationCore(
@@ -322,11 +387,12 @@ export class CampaignStrategyService
   // race details (officialOfficeName, officeLevel, primaryElectionDate)
   // with campaign.details (state, city) and a district zip resolved from
   // the BR race ID via RacesService. The resolver returns every zip the
-  // race's position touches; we take the first one so the LLM grounds its
-  // search inside the actual district instead of the candidate's home zip
-  // (which may not be inside the district they're running for). Falls back
-  // to campaign/user zip on resolver failure so the request still has
-  // something usable.
+  // race's position touches; we hand the full list to the LLM so it can
+  // ground events across the whole district (a city-council race may
+  // span 3-5 zips, a state-rep race 20-30). For statewide races where
+  // the resolver returns more than STATEWIDE_ZIP_THRESHOLD zips, we drop
+  // the zip entirely — listing them would add noise without precision,
+  // and the LLM can reason from officeName + state + city alone.
   private async buildEventsContext(
     campaign: CampaignWith<'user'>,
     brHashId: string,
@@ -338,8 +404,7 @@ export class CampaignStrategyService
 
     const detailZip = (details.zip ?? '').trim()
     const userZip = (campaign.user?.zip ?? '').trim()
-    const zip =
-      (await this.resolveDistrictZip(brHashId)) || detailZip || userZip
+    const zip = await this.resolveDistrictZip(brHashId, [detailZip, userZip])
 
     return {
       today: format(new Date(), 'yyyy-MM-dd'),
@@ -353,28 +418,41 @@ export class CampaignStrategyService
     }
   }
 
-  // Resolve a single district zip from the BR race id via election-api's
-  // position → zip-codes endpoint. Returns the first zip the resolver
-  // produces, or '' when:
-  //   - the race isn't in BR / has no position
-  //   - the resolver fails for any other reason
-  //   - the position spans more than STATEWIDE_ZIP_THRESHOLD zips
-  //     (likely a statewide race where any single zip is too coarse to
-  //     be useful — the campaign/user's own zip is a better signal)
-  // The caller falls back to campaign/user zip on '' — we never want a
-  // resolver hiccup to block events generation entirely.
-  private static readonly STATEWIDE_ZIP_THRESHOLD = 50
-  private async resolveDistrictZip(brHashId: string): Promise<string> {
+  // Resolve a comma-joined district zip list from the BR race id via
+  // election-api's position → zip-codes endpoint, with three branches:
+  //
+  //   1. Resolver returned 1-STATEWIDE_ZIP_THRESHOLD zips →
+  //      return them comma-joined. The LLM gets the full district.
+  //   2. Resolver returned >STATEWIDE_ZIP_THRESHOLD zips →
+  //      return '' (statewide skip). We do NOT fall back to the
+  //      candidate's own zip because for statewide races the home zip
+  //      isn't representative of where the campaign actually operates.
+  //      The prompt's orNotAvailable() renders the absent zip as
+  //      "not available"; the LLM reasons from officeName + state + city.
+  //   3. Resolver returned 0 zips OR threw →
+  //      try the candidate's own zips (detail → user) so generation
+  //      still has *some* geographic signal when BR data is missing.
+  //
+  // Logs at info for the statewide branch and warn for the error branch
+  // so we can spot how often each fires in production.
+  private static readonly STATEWIDE_ZIP_THRESHOLD = 75
+  private async resolveDistrictZip(
+    brHashId: string,
+    candidateFallbacks: string[],
+  ): Promise<string> {
+    const fallback = (): string =>
+      candidateFallbacks.find((z) => z.length > 0) ?? ''
     try {
       const zips = await this.races.getZipCodesByRaceId(brHashId)
+      if (zips.length === 0) return fallback()
       if (zips.length > CampaignStrategyService.STATEWIDE_ZIP_THRESHOLD) {
         this.logger.info(
           { raceId: brHashId, zipCount: zips.length },
-          'District zip resolver returned statewide-sized array; falling back to campaign/user zip for better geographic precision',
+          'District zip resolver returned statewide-sized array; dropping zip from the prompt so the LLM reasons from office + state instead',
         )
         return ''
       }
-      return zips[0] ?? ''
+      return zips.join(', ')
     } catch (error) {
       this.logger.warn(
         {
@@ -383,7 +461,7 @@ export class CampaignStrategyService
         },
         'District zip resolver failed; falling back to campaign/user zip',
       )
-      return ''
+      return fallback()
     }
   }
 
