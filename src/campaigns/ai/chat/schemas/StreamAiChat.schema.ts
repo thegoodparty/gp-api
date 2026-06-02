@@ -31,6 +31,16 @@ export class StreamAiChatSchema extends createZodDto(
           path: ['threadId'],
         })
       }
+      // regenerate replays the last user turn from history; a caller-supplied
+      // message would be silently discarded by the service, so reject it up
+      // front rather than re-ask the wrong question without warning.
+      if (val.regenerate && val.message) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'message must not be provided when regenerate is true',
+          path: ['message'],
+        })
+      }
       if (val.threadId && !val.regenerate && !val.message) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

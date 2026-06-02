@@ -35,4 +35,11 @@ describe('StreamAiChatSchema', () => {
   it('rejects an over-long message', () => {
     expect(schema.safeParse({ message: 'a'.repeat(8001) }).success).toBe(false)
   })
+
+  it('rejects regenerate with a caller-supplied message', () => {
+    expect(
+      schema.safeParse({ threadId: 't1', regenerate: true, message: 'hi' })
+        .success,
+    ).toBe(false)
+  })
 })
