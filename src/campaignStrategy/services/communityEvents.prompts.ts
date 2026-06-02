@@ -1,5 +1,3 @@
-import { format } from 'date-fns'
-
 // Subset of campaign context the community-events prompt needs. Smaller
 // than the strategic-landscape `RaceContext` — events are scoped by
 // jurisdiction (state + city + zip + office) and the election window;
@@ -39,11 +37,16 @@ export type CommunityEventsPromptVariables = {
   searchResults?: string
 }
 
+// `today` reads from ctx, not a fresh `new Date()`, so the prompt's date
+// window matches the value captured at the top of buildEventsContext.
+// A defaulted `today: Date = new Date()` argument here re-snapshots time
+// at call site, which can disagree with ctx.today across a midnight
+// boundary and cause windowAndClamp to filter against a different day
+// than the LLM was asked to search.
 export const buildEventsPromptVariables = (
   ctx: CommunityEventsPromptContext,
-  today: Date = new Date(),
 ): CommunityEventsPromptVariables => ({
-  today: format(today, 'yyyy-MM-dd'),
+  today: ctx.today,
   election_date: ctx.electionDate,
   primary_election_date: orNotAvailable(ctx.primaryElectionDate),
   state: orNotAvailable(ctx.state),
