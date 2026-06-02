@@ -7,6 +7,7 @@ import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import { subMinutes } from 'date-fns'
 import { AgentJobContracts } from '@/generated/agent-job-contracts'
+import { isJsonObject } from '@/shared/util/objects.util'
 
 const sqs = new SQS({})
 
@@ -21,9 +22,6 @@ export type ExperimentRunDispatchInput<
 
 const STALE_THRESHOLD_MINUTES = 45
 export const MAX_RESUME_ATTEMPTS = 48
-
-const isJsonObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 type ResumeRunInput = {
   runId: string

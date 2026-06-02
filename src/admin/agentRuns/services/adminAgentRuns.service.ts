@@ -15,6 +15,7 @@ import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { AgentJobContracts } from '@/generated/agent-job-contracts'
+import { isJsonObject } from '@/shared/util/objects.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -25,9 +26,6 @@ const parseArtifact = (raw: string): Record<string, unknown> =>
   // validated against AgentRunDetailSchema by the response interceptor.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   JSON.parse(raw) as Record<string, unknown>
-
-const isJsonObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // compliance_setup is the only experiment whose params carry a candidate; for
 // every other experiment type the fields are absent and this returns null.

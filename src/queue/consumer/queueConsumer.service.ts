@@ -77,9 +77,7 @@ import { OrgDistrict } from '@/organizations/organizations.types'
 import type { AgentExperimentResultData } from '../queue.types'
 
 import { ExperimentRunStatus } from '@prisma/client'
-
-const isJsonObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v)
+import { isJsonObject } from '@/shared/util/objects.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
