@@ -16,6 +16,7 @@ const makeRun = (overrides: Partial<ExperimentRun> = {}): ExperimentRun => ({
     candidate_first_name: 'Ada',
     candidate_last_name: 'Lovelace',
     clerk_user_id: 'user_abc',
+    election_date: '2026-11-03',
     trigger: 'initial',
   } as Prisma.JsonValue,
   artifactBucket: 'agent-artifacts',
@@ -261,6 +262,7 @@ describe('AdminAgentRunsService', () => {
           candidate_first_name: 'Ada',
           candidate_last_name: 'Lovelace',
           clerk_user_id: 'user_abc',
+          election_date: '2026-11-03',
           trigger: 'recovery_resume',
         },
       })
@@ -275,6 +277,7 @@ describe('AdminAgentRunsService', () => {
             candidate_first_name: 'Ada',
             candidate_last_name: 'Lovelace',
             clerk_user_id: 'user_abc',
+            election_date: '2026-11-03',
             trigger: 'initial',
             run_id: 'stale-run-id',
           } as Prisma.JsonValue,
