@@ -202,7 +202,7 @@ describe('CampaignStrategyService', () => {
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
-  it('re-dispatches only the failed experiment', async () => {
+  it('reports failed and does not retry when a run failed', async () => {
     prisma.campaignStrategy.upsert.mockResolvedValue(
       planRow({ oppositionRunId: 'opp-run', opportunitiesRunId: 'oc-run' }),
     )
@@ -214,15 +214,12 @@ describe('CampaignStrategyService', () => {
       (args: { where: { runId: string } }) =>
         Promise.resolve(runsById[args.where.runId] ?? null),
     )
-    experimentRuns.dispatchRun.mockResolvedValue({ runId: 'opp-run-2' })
 
     const res = await service.getOrGenerateStrategicLandscape(campaign())
 
-    expect(res).toEqual({ status: 'generating' })
-    expect(experimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
-    expect(experimentRuns.dispatchRun.mock.calls[0][0].type).toBe(
-      'opposition_research',
-    )
+    expect(res).toEqual({ status: 'failed' })
+    expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+    expect(params.build).not.toHaveBeenCalled()
   })
 
   it('persists opponents when an opposition run completes', async () => {

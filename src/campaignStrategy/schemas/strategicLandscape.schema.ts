@@ -34,9 +34,16 @@ export const StrategicLandscapeGeneratingSchema = z.object({
   status: z.literal('generating'),
 })
 
+// Terminal failure: at least one CAP run failed. We do NOT retry — the client
+// shows an error rather than polling forever.
+export const StrategicLandscapeFailedSchema = z.object({
+  status: z.literal('failed'),
+})
+
 export const StrategicLandscapeResponseSchema = z.discriminatedUnion('status', [
   StrategicLandscapeReadySchema,
   StrategicLandscapeGeneratingSchema,
+  StrategicLandscapeFailedSchema,
 ])
 
 export type StrategicLandscapeResponse = z.infer<

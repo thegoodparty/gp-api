@@ -70,6 +70,12 @@ export class CampaignStrategyService extends createPrismaBase(
     const opposition = await this.runFor(plan.oppositionRunId)
     const opportunities = await this.runFor(plan.opportunitiesRunId)
 
+    // A failed run is terminal — never retry, just report it. The client
+    // surfaces an error instead of polling forever.
+    if (this.isFailed(opposition) || this.isFailed(opportunities)) {
+      return { status: 'failed' }
+    }
+
     if (this.isComplete(opposition) && this.isComplete(opportunities)) {
       return {
         status: 'ready',
@@ -129,8 +135,14 @@ export class CampaignStrategyService extends createPrismaBase(
     return run?.status === ExperimentRunStatus.COMPLETED
   }
 
+  private isFailed(run: ExperimentRun | null): boolean {
+    return run?.status === ExperimentRunStatus.FAILED
+  }
+
+  // Only dispatch an experiment that was never started. A failed run is NOT
+  // re-dispatched (see getOrGenerateStrategicLandscape) — no retry loop.
   private needsDispatch(run: ExperimentRun | null): boolean {
-    return run === null || run.status === ExperimentRunStatus.FAILED
+    return run === null
   }
 
   private async dispatchPending(
