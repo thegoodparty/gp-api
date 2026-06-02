@@ -1,6 +1,7 @@
 import {
   GetObjectCommand,
   GetObjectCommandOutput,
+  HeadObjectCommand,
   ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
@@ -598,6 +599,53 @@ describe('S3Service', () => {
 
       await expect(service.listKeys(bucket, prefix)).rejects.toThrow(
         UnauthorizedException,
+      )
+    })
+  })
+
+  describe('getObjectSize', () => {
+    const bucket = 'test-bucket'
+    const key = 'folder/file.txt'
+
+    it('returns ContentLength on success', async () => {
+      s3Mock
+        .on(HeadObjectCommand)
+        .resolves({ ContentLength: 12345, $metadata: {} })
+
+      const result = await service.getObjectSize(bucket, key)
+
+      expect(result).toBe(12345)
+    })
+
+    it('returns undefined on NoSuchKey', async () => {
+      s3Mock.on(HeadObjectCommand).rejects(
+        new NoSuchKey({
+          message: 'The specified key does not exist',
+          $metadata: {},
+        }),
+      )
+
+      const result = await service.getObjectSize(bucket, key)
+
+      expect(result).toBeUndefined()
+    })
+
+    it('returns undefined on HTTP 404', async () => {
+      const error = Object.assign(new Error('NotFound'), {
+        $metadata: { httpStatusCode: 404 },
+      })
+      s3Mock.on(HeadObjectCommand).rejects(error)
+
+      const result = await service.getObjectSize(bucket, key)
+
+      expect(result).toBeUndefined()
+    })
+
+    it('rethrows unexpected errors', async () => {
+      s3Mock.on(HeadObjectCommand).rejects(new Error('Network error'))
+
+      await expect(service.getObjectSize(bucket, key)).rejects.toThrow(
+        'Network error',
       )
     })
   })
