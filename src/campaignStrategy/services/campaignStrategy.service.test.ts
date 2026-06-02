@@ -782,7 +782,10 @@ describe('CampaignStrategyService', () => {
         communityEvents: null,
       })
       // Hold the generation open so the second poll sees it in flight.
-      let release: () => void = () => {}
+      // Placeholder is overwritten synchronously by the Promise executor below.
+      let release: () => void = () => {
+        /* replaced by Promise resolve */
+      }
       mockEvents.generate.mockReturnValue(
         new Promise<void>((resolve) => {
           release = resolve
