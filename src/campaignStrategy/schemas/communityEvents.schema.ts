@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+// Shared persisted / response schemas live in @goodparty_org/contracts —
+// import from there for any cross-service shape (CommunityEvent,
+// CommunityEventsResult, CommunityEventsResponse, etc.). Only the
+// LLM-facing raw shapes below are local to gp-api, since they describe
+// the structured-output prompt contract and aren't crossed by any other
+// service.
+
 const HttpsOrHttpUrl = z
   .string()
   .url()
@@ -9,13 +16,10 @@ const HttpsOrHttpUrl = z
   )
 
 /**
- * LLM-facing shape: snake_case to match the structured-output prompt spec.
- * Extends `LlmEventResult` in
- * `gp-ai-projects/campaign_plan_lambda/event_generator.py` with an
- * `address` field for the venue's physical street address (Section 7
- * of the ClickUp Campaign Plan Template renders this in the Address
- * column). `url` and `address` are independently optional because many
- * search results have one or the other but not both.
+ * LLM-facing shape: snake_case fields plus the optional `address` /
+ * `url` keys to match what the structured-output prompt emits. The
+ * service normalizes this into the persisted `CommunityEventSchema`
+ * (from contracts) before writing to the campaign_strategy row.
  */
 export const CommunityEventRawSchema = z.object({
   title: z.string().min(1),
@@ -36,51 +40,5 @@ export const CommunityEventsRawSchema = z.object({
   events: z.array(CommunityEventRawSchema),
 })
 
-/**
- * Internal / persisted shape. `url` is normalized to `string | null` (the
- * Python pipeline used the same shape) and the array is clamped to a max
- * of 3 events per the ClickUp Campaign Plan Template § 7 spec. The lower
- * bound is 0 — an LLM run that legitimately found no events should still
- * resolve to `ready` with an empty array so the webapp can render the
- * "No Community Events Found" empty state without re-polling forever.
- */
-export const CommunityEventSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().min(1),
-  date: z.string().min(1),
-  // Physical address ("123 Main St, Springfield, MA 01103") or null
-  // when the search data didn't surface one. Normalized from the
-  // LLM-raw shape's optional `address` field by the service.
-  address: z.string().nullable(),
-  url: HttpsOrHttpUrl.nullable(),
-})
-
-export const CommunityEventsResultSchema = z.object({
-  events: z.array(CommunityEventSchema).max(3),
-})
-
-/**
- * Polling response. Same shape as `StrategicLandscapeResponseSchema` so
- * the webapp's polling hook can reuse the discriminated-union pattern.
- */
-export const CommunityEventsReadySchema = z.object({
-  status: z.literal('ready'),
-  data: CommunityEventsResultSchema,
-})
-
-export const CommunityEventsGeneratingSchema = z.object({
-  status: z.literal('generating'),
-})
-
-export const CommunityEventsResponseSchema = z.discriminatedUnion('status', [
-  CommunityEventsReadySchema,
-  CommunityEventsGeneratingSchema,
-])
-
 export type CommunityEventRaw = z.infer<typeof CommunityEventRawSchema>
 export type CommunityEventsRaw = z.infer<typeof CommunityEventsRawSchema>
-export type CommunityEvent = z.infer<typeof CommunityEventSchema>
-export type CommunityEventsResult = z.infer<typeof CommunityEventsResultSchema>
-export type CommunityEventsResponse = z.infer<
-  typeof CommunityEventsResponseSchema
->

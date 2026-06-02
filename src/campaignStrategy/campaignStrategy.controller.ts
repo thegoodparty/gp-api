@@ -18,7 +18,7 @@ import { CampaignStrategyService } from './services/campaignStrategy.service'
 import {
   CommunityEventsResponse,
   CommunityEventsResponseSchema,
-} from './schemas/communityEvents.schema'
+} from '@goodparty_org/contracts'
 import {
   StrategicLandscapeResponse,
   StrategicLandscapeResponseSchema,

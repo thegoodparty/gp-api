@@ -17,7 +17,7 @@ import {
   CommunityEventsResponse,
   CommunityEventsResult,
   CommunityEventsResultSchema,
-} from '../schemas/communityEvents.schema'
+} from '@goodparty_org/contracts'
 import {
   StrategicLandscapeResponse,
   StrategicLandscapeResult,

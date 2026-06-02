@@ -128,6 +128,7 @@ describe('CampaignStrategyController', () => {
             title: 'Town Hall',
             description: 'Why',
             date: '2026-10-15',
+            address: null,
             url: null,
           },
         ],

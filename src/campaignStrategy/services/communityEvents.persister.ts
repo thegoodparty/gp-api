@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CommunityEventsResult } from '../schemas/communityEvents.schema'
+import { CommunityEventsResult } from '@goodparty_org/contracts'
 
 @Injectable()
 export class CommunityEventsPersister extends createPrismaBase(

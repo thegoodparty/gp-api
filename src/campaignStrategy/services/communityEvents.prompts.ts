@@ -51,7 +51,7 @@ export const buildEventsPromptVariables = (
   primary_election_date: orNotAvailable(ctx.primaryElectionDate),
   state: orNotAvailable(ctx.state),
   city: orNotAvailable(ctx.city),
-  zip: ctx.zip,
+  zip: orNotAvailable(ctx.zip),
   office_name: orNotAvailable(ctx.officeName),
   office_level: orNotAvailable(ctx.officeLevel),
 })

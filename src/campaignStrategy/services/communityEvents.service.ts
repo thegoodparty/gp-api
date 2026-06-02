@@ -4,11 +4,10 @@ import { PinoLogger } from 'nestjs-pino'
 import { BraintrustService } from 'src/vendors/braintrust/braintrust.service'
 import { GEMINI_MODEL } from 'src/vendors/google/gemini.types'
 import { GeminiService } from 'src/vendors/google/services/gemini.service'
+import { CommunityEvent, CommunityEventsResult } from '@goodparty_org/contracts'
 import {
-  CommunityEvent,
   CommunityEventsRaw,
   CommunityEventsRawSchema,
-  CommunityEventsResult,
 } from '../schemas/communityEvents.schema'
 import { CommunityEventsPersister } from './communityEvents.persister'
 import {
