@@ -608,6 +608,18 @@ describe('WebsitesController', () => {
         `uploads/${mockCampaign.id}`,
         heroFile.filename,
       )
+      expect(mockS3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        logoFile.data,
+        `uploads/${mockCampaign.id}/${logoFile.filename}`,
+        expect.objectContaining({ contentType: logoFile.mimetype }),
+      )
+      expect(mockS3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        heroFile.data,
+        `uploads/${mockCampaign.id}/${heroFile.filename}`,
+        expect.objectContaining({ contentType: heroFile.mimetype }),
+      )
     })
   })
 
