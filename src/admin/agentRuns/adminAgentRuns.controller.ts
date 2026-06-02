@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Post,
   Query,
   UseGuards,
   UsePipes,
@@ -15,6 +16,7 @@ import {
   AdminAgentRunsListQueryDto,
   AgentRunDetailSchema,
   AgentRunListItemSchema,
+  AgentRunSchema,
 } from './schemas/adminAgentRuns.schema'
 
 @Controller('admin/agent-runs')
@@ -34,5 +36,12 @@ export class AdminAgentRunsController {
   @ResponseSchema(AgentRunDetailSchema)
   detail(@Param('runId') runId: string) {
     return this.agentRuns.detail(runId)
+  }
+
+  @Post(':runId/retry')
+  @UseGuards(M2MOnly)
+  @ResponseSchema(AgentRunSchema)
+  retry(@Param('runId') runId: string) {
+    return this.agentRuns.retry(runId)
   }
 }

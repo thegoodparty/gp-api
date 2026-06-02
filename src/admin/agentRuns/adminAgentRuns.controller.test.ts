@@ -22,19 +22,22 @@ describe('AdminAgentRunsController', () => {
     const serviceMock: Partial<AdminAgentRunsService> = {
       list: vi.fn(),
       detail: vi.fn(),
+      retry: vi.fn(),
     }
     service = serviceMock as AdminAgentRunsService
     controller = new AdminAgentRunsController(service)
   })
 
-  it('restricts both endpoints to M2M callers (the gp-admin SDK path)', () => {
+  it('restricts every endpoint to M2M callers (the gp-admin SDK path)', () => {
     expect(guardsFor('list')).toContain(M2MOnly)
     expect(guardsFor('detail')).toContain(M2MOnly)
+    expect(guardsFor('retry')).toContain(M2MOnly)
   })
 
-  it('does not expose either endpoint as an MCP tool', () => {
+  it('does not expose any endpoint as an MCP tool', () => {
     expect(mcpToolFor('list')).toBeUndefined()
     expect(mcpToolFor('detail')).toBeUndefined()
+    expect(mcpToolFor('retry')).toBeUndefined()
   })
 
   it('delegates list to the service and returns its paginated result', async () => {
@@ -63,5 +66,17 @@ describe('AdminAgentRunsController', () => {
 
     expect(service.detail).toHaveBeenCalledWith('run-1')
     expect(result).toBe(detail)
+  })
+
+  it('delegates retry to the service and returns the new run', async () => {
+    const newRun = { runId: 'run-2' }
+    vi.mocked(service.retry).mockResolvedValue(
+      newRun as Awaited<ReturnType<AdminAgentRunsService['retry']>>,
+    )
+
+    const result = await controller.retry('run-1')
+
+    expect(service.retry).toHaveBeenCalledWith('run-1')
+    expect(result).toBe(newRun)
   })
 })
