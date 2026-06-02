@@ -353,20 +353,23 @@ export class CampaignStrategyService
     }
   }
 
-  // Resolve a single district zip from the BR race id via election-api's
-  // position → zip-codes endpoint. Returns the first zip the resolver
-  // produces, or '' when:
+  // Resolve a comma-joined district zip list from the BR race id via
+  // election-api's position → zip-codes endpoint. The LLM gets fuller
+  // geographic coverage when we hand it every zip the district touches
+  // (a city-council race might span 3-5 zips, a state-rep race 20-30).
+  // Returns '' when:
   //   - the race isn't in BR / has no position
   //   - the resolver fails for any other reason
   //   - the position spans more than STATEWIDE_ZIP_THRESHOLD zips
-  //     (likely a statewide race where any single zip is too coarse to
-  //     be useful — the campaign/user's own zip is a better signal)
+  //     (likely a statewide race where the full list is too coarse to
+  //     be useful and the campaign/user's own zip is a better signal)
   // The caller falls back to campaign/user zip on '' — we never want a
   // resolver hiccup to block events generation entirely.
-  private static readonly STATEWIDE_ZIP_THRESHOLD = 50
+  private static readonly STATEWIDE_ZIP_THRESHOLD = 75
   private async resolveDistrictZip(brHashId: string): Promise<string> {
     try {
       const zips = await this.races.getZipCodesByRaceId(brHashId)
+      if (zips.length === 0) return ''
       if (zips.length > CampaignStrategyService.STATEWIDE_ZIP_THRESHOLD) {
         this.logger.info(
           { raceId: brHashId, zipCount: zips.length },
@@ -374,7 +377,7 @@ export class CampaignStrategyService
         )
         return ''
       }
-      return zips[0] ?? ''
+      return zips.join(', ')
     } catch (error) {
       this.logger.warn(
         {

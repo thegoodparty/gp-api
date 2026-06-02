@@ -844,7 +844,9 @@ describe('CampaignStrategyService', () => {
 
       expect(mockRaces.getZipCodesByRaceId).toHaveBeenCalledWith('hash-abc')
       const ctx = mockEvents.generate.mock.calls[0]?.[2]
-      expect(ctx?.zip).toBe('10025')
+      // All resolver zips join into a single comma-separated value so the
+      // LLM has full geographic coverage of the district.
+      expect(ctx?.zip).toBe('10025, 10026')
     })
 
     it('falls back to campaign zip when the resolver throws', async () => {
@@ -868,12 +870,12 @@ describe('CampaignStrategyService', () => {
       mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
         communityEvents: null,
       })
-      // 51 zips trips the STATEWIDE_ZIP_THRESHOLD (50) — any single zip
-      // from a statewide race's position is too coarse to ground the
-      // community-events search, so the campaign's own zip wins.
+      // 76 zips trips the STATEWIDE_ZIP_THRESHOLD (75) — listing every zip
+      // for a statewide race would dilute the LLM's grounding more than
+      // it'd help, so the campaign's own zip wins.
       const statewideZips = Array.from(
-        { length: 51 },
-        (_, i) => `9000${i.toString().padStart(2, '0')}`,
+        { length: 76 },
+        (_, i) => `9${i.toString().padStart(4, '0')}`,
       )
       mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(statewideZips)
 
@@ -884,6 +886,26 @@ describe('CampaignStrategyService', () => {
 
       const ctx = mockEvents.generate.mock.calls[0]?.[2]
       expect(ctx?.zip).toBe('94110')
+    })
+
+    it('passes all zips comma-separated when count is at the threshold', async () => {
+      mockPrisma.campaignStrategy.findUnique.mockResolvedValue({
+        communityEvents: null,
+      })
+      // 75 zips is exactly at the threshold and should be included in full.
+      const districtZips = Array.from(
+        { length: 75 },
+        (_, i) => `9${i.toString().padStart(4, '0')}`,
+      )
+      mockRaces.getZipCodesByRaceId.mockResolvedValueOnce(districtZips)
+
+      await service.getOrGenerateCommunityEvents(
+        buildCampaign({ details: eventsDetails }),
+      )
+      await service.drainInFlight()
+
+      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      expect(ctx?.zip).toBe(districtZips.join(', '))
     })
   })
 })
