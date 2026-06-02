@@ -267,6 +267,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       placeId,
       canDownloadFederal,
       overrideDistrictId,
+      primaryResult,
     } = body
 
     const runUpdate = async (tx: Prisma.TransactionClient) => {
@@ -291,6 +292,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
       if (canDownloadFederal !== undefined) {
         campaignUpdateData.canDownloadFederal = canDownloadFederal
+      }
+      if (primaryResult !== undefined) {
+        campaignUpdateData.primaryResult = primaryResult
       }
       if (details) {
         const mergedDetails = deepMerge(

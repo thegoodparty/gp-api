@@ -477,10 +477,24 @@ describe('DomainsService', () => {
         (c) => c[0] as string,
       )
       expect(tried.sort()).toEqual(
-        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
+        [
+          'voteforoneill.run',
+          'voteforoneill.bio',
+          'voteforoneill.fyi',
+          'voteforoneill.win',
+          'voteforoneill.digital',
+          'voteforoneill.site',
+        ].sort(),
       )
       expect(result.candidates.map((c) => c.domain).sort()).toEqual(
-        ['voteforoneill.com', 'voteforoneill.org', 'voteforoneill.vote'].sort(),
+        [
+          'voteforoneill.run',
+          'voteforoneill.bio',
+          'voteforoneill.fyi',
+          'voteforoneill.win',
+          'voteforoneill.digital',
+          'voteforoneill.site',
+        ].sort(),
       )
     })
 
@@ -502,6 +516,25 @@ describe('DomainsService', () => {
       expect(tried).toEqual(['vote-oneill.run'])
     })
 
+    it('drops dot-containing patterns whose TLD is not on the allowlist', async () => {
+      mockRoute53.checkDomainAvailability.mockResolvedValue({
+        Availability: DomainAvailability.AVAILABLE,
+      })
+      mockVercel.checkDomainPrice.mockResolvedValue({ price: 5 })
+
+      const result = await service.searchDomainsForCampaign(
+        campaignWithUser,
+        ['voteoneill.com', 'voteoneill.org', 'voteoneill.run'],
+        10,
+      )
+
+      const tried = mockRoute53.checkDomainAvailability.mock.calls.map(
+        (c) => c[0] as string,
+      )
+      expect(tried).toEqual(['voteoneill.run'])
+      expect(result.candidates.map((c) => c.domain)).toEqual(['voteoneill.run'])
+    })
+
     it('dedupes after fan-out when bare and TLD-bearing patterns overlap', async () => {
       mockRoute53.checkDomainAvailability.mockResolvedValue({
         Availability: DomainAvailability.AVAILABLE,
@@ -510,7 +543,7 @@ describe('DomainsService', () => {
 
       await service.searchDomainsForCampaign(
         campaignWithUser,
-        ['voteoneill', 'voteoneill.com'],
+        ['voteoneill', 'voteoneill.run'],
         10,
       )
 
@@ -518,7 +551,14 @@ describe('DomainsService', () => {
         (c) => c[0] as string,
       )
       expect(tried.sort()).toEqual(
-        ['voteoneill.com', 'voteoneill.org', 'voteoneill.vote'].sort(),
+        [
+          'voteoneill.run',
+          'voteoneill.bio',
+          'voteoneill.fyi',
+          'voteoneill.win',
+          'voteoneill.digital',
+          'voteoneill.site',
+        ].sort(),
       )
     })
 

@@ -8,6 +8,7 @@ import { Prisma, User } from '@prisma/client'
 import axios from 'axios'
 import * as dns from 'node:dns'
 import { promisify } from 'node:util'
+import * as http from 'node:http'
 import * as https from 'node:https'
 import ipaddr from 'ipaddr.js'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
@@ -199,6 +200,7 @@ const fetchLiveHtml = async (url: string): Promise<LiveFetchResult> => {
       validateStatus: () => true,
       maxRedirects: 5,
       transformResponse: [(data: string) => data],
+      httpAgent: new http.Agent({ lookup: ssrfSafeLookup }),
       httpsAgent: new https.Agent({ lookup: ssrfSafeLookup }),
     })
     const body = typeof res.data === 'string' ? res.data : null

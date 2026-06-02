@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { differenceInYears, formatISO } from 'date-fns'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
-import { AiService } from '../ai.service'
+import { LlmService } from '@/llm/services/llm.service'
 import { PinoLogger } from 'nestjs-pino'
 import { requireEnv } from 'src/shared/util/env.util'
 
@@ -25,7 +25,7 @@ type ZipToAreaCodeMapping = Record<string, ZipToAreaCodeEntry>
 export class AreaCodeFromZipService {
   constructor(
     private readonly s3Service: S3Service,
-    private readonly aiService: AiService,
+    private readonly llm: LlmService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AreaCodeFromZipService.name)
@@ -123,17 +123,12 @@ export class AreaCodeFromZipService {
     let jsonContent: string
 
     try {
-      const response = await this.aiService.llmChatCompletion(
-        [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        100,
-        0.1,
-        0.1,
-      )
+      const response = await this.llm.chatCompletion({
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 100,
+        temperature: 0.1,
+        topP: 0.1,
+      })
 
       if (!response?.content || typeof response.content !== 'string') {
         return null

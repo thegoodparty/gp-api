@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AiService } from '../../ai/ai.service'
+import { LlmService } from '@/llm/services/llm.service'
 import type { RaceNode } from '../types/ballotReady.types'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
@@ -12,7 +12,10 @@ import { RacesService } from './races.service'
 
 describe('RacesService', () => {
   let service: RacesService
-  let electionsService: { searchPositions: ReturnType<typeof vi.fn> }
+  let electionsService: {
+    searchPositions: ReturnType<typeof vi.fn>
+    getZipCodesByBrPositionId: ReturnType<typeof vi.fn>
+  }
   let ballotReadyService: {
     fetchRaceById: ReturnType<typeof vi.fn>
     fetchRaceNormalizedPosition: ReturnType<typeof vi.fn>
@@ -23,6 +26,7 @@ describe('RacesService', () => {
   beforeEach(async () => {
     electionsService = {
       searchPositions: vi.fn(),
+      getZipCodesByBrPositionId: vi.fn(),
     }
     ballotReadyService = {
       fetchRaceById: vi.fn(),
@@ -47,9 +51,9 @@ describe('RacesService', () => {
           useValue: ballotReadyService,
         },
         {
-          provide: AiService,
+          provide: LlmService,
           useValue: {
-            getChatToolCompletion: vi.fn(),
+            toolCompletion: vi.fn(),
           },
         },
         {
@@ -182,6 +186,46 @@ describe('RacesService', () => {
       expect(result.id).toBe('race-1')
       expect(result.position.name).toBe('Mayor')
       expect(result.election.electionDay).toBe('2026-11-03')
+    })
+  })
+
+  describe('getZipCodesByRaceId', () => {
+    it('resolves raceId via BallotReady then asks election-api for zips', async () => {
+      ballotReadyService.fetchRaceById.mockResolvedValue({
+        node: { position: { id: 'br-pos-1' } },
+      })
+      electionsService.getZipCodesByBrPositionId.mockResolvedValue([
+        '90210',
+        '90211',
+      ])
+
+      const result = await service.getZipCodesByRaceId('race-1')
+
+      expect(ballotReadyService.fetchRaceById).toHaveBeenCalledWith('race-1')
+      expect(electionsService.getZipCodesByBrPositionId).toHaveBeenCalledWith(
+        'br-pos-1',
+      )
+      expect(result).toEqual(['90210', '90211'])
+    })
+
+    it('throws NotFoundException when BallotReady returns no race', async () => {
+      ballotReadyService.fetchRaceById.mockResolvedValue(null)
+
+      await expect(service.getZipCodesByRaceId('race-missing')).rejects.toThrow(
+        NotFoundException,
+      )
+      expect(electionsService.getZipCodesByBrPositionId).not.toHaveBeenCalled()
+    })
+
+    it('throws NotFoundException when race has no position id', async () => {
+      ballotReadyService.fetchRaceById.mockResolvedValue({
+        node: { position: null },
+      })
+
+      await expect(service.getZipCodesByRaceId('race-1')).rejects.toThrow(
+        NotFoundException,
+      )
+      expect(electionsService.getZipCodesByBrPositionId).not.toHaveBeenCalled()
     })
   })
 })

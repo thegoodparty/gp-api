@@ -21,6 +21,13 @@ export class HubspotService {
     return !!HUBSPOT_TOKEN
   }
 
+  // False off-prod where HUBSPOT_TOKEN is unset and `client` is a no-op mock,
+  // so callers can skip writes (and their failure alerts) instead of treating
+  // the mock's undefined return as a real HubSpot failure.
+  get isConfigured(): boolean {
+    return this.isTokenAvailable()
+  }
+
   get client(): Client {
     return this.isTokenAvailable()
       ? this._client
