@@ -22,6 +22,9 @@ export const ElectionApiRoutes = {
     findById: {
       path: 'positions',
     },
+    zipCodes: {
+      path: 'positions/by-ballotready-id',
+    },
   },
   races: {
     filingFeeByBrHashId: {
