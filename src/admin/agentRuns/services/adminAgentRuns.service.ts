@@ -78,6 +78,10 @@ const toListItem = (run: ExperimentRun): AgentRunListItem => ({
   durationSeconds: run.durationSeconds,
   costUsd: run.costUsd,
   createdAt: run.createdAt,
+  stage: run.stage,
+  dataQuality: run.dataQuality,
+  resumeScheduledFor: run.resumeScheduledFor,
+  resumeAttempts: run.resumeAttempts,
 })
 
 @Injectable()
