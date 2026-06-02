@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common'
+import { BadGatewayException, ConflictException } from '@nestjs/common'
 import { ExperimentRun, ExperimentRunStatus, Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -271,6 +267,29 @@ describe('AdminAgentRunsService', () => {
       expect(result).toBe(newRun)
     })
 
+    it('drops a stale run_id so the agent uses the fresh dispatch run id', async () => {
+      mockModel.findUniqueOrThrow.mockResolvedValue(
+        makeRun({
+          params: {
+            campaign_id: 42,
+            candidate_first_name: 'Ada',
+            candidate_last_name: 'Lovelace',
+            clerk_user_id: 'user_abc',
+            trigger: 'initial',
+            run_id: 'stale-run-id',
+          } as Prisma.JsonValue,
+        }),
+      )
+      experimentRuns.dispatchRun.mockResolvedValue(makeRun({ runId: 'run-2' }))
+
+      await service.retry('run-1')
+
+      const dispatchedParams =
+        experimentRuns.dispatchRun.mock.calls[0][0].params
+      expect(dispatchedParams.run_id).toBeUndefined()
+      expect(dispatchedParams.trigger).toBe('recovery_resume')
+    })
+
     it('rejects with 409 and never dispatches when the run is still RUNNING', async () => {
       mockModel.findUniqueOrThrow.mockResolvedValue(
         makeRun({ status: ExperimentRunStatus.RUNNING }),
@@ -282,18 +301,28 @@ describe('AdminAgentRunsService', () => {
       expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
     })
 
-    it('rejects with 400 and never dispatches when the experiment type is not retryable', async () => {
+    it('rejects with 400 (wrong-type message) for a realistic non-retryable run, never dispatching', async () => {
+      // A real meeting_briefing run carries no clerk_user_id; the type guard
+      // must fire first so the message names the actual reason. Asserting the
+      // message (not just the 400) keeps the type guard from being shadowed by
+      // the clerk_user_id guard.
       mockModel.findUniqueOrThrow.mockResolvedValue(
-        makeRun({ experimentType: 'meeting_briefing' }),
+        makeRun({
+          experimentType: 'meeting_briefing',
+          params: {
+            officialName: 'Some Mayor',
+            state: 'NY',
+          } as Prisma.JsonValue,
+        }),
       )
 
-      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
-        BadRequestException,
+      await expect(service.retry('run-1')).rejects.toThrow(
+        'cannot be re-dispatched',
       )
       expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
     })
 
-    it('rejects with 400 and never dispatches when params carry no clerk_user_id', async () => {
+    it('rejects with 400 (missing-clerk message) when a retryable run lacks clerk_user_id, never dispatching', async () => {
       mockModel.findUniqueOrThrow.mockResolvedValue(
         makeRun({
           params: {
@@ -304,9 +333,7 @@ describe('AdminAgentRunsService', () => {
         }),
       )
 
-      await expect(service.retry('run-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      )
+      await expect(service.retry('run-1')).rejects.toThrow('clerk_user_id')
       expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
     })
 

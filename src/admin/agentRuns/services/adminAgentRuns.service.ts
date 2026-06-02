@@ -140,6 +140,12 @@ export class AdminAgentRunsService extends createPrismaBase(
       )
     }
 
+    if (!isDispatchableExperimentType(run.experimentType)) {
+      throw new BadRequestException(
+        `experiment type "${run.experimentType}" cannot be re-dispatched`,
+      )
+    }
+
     const clerkUserId = clerkUserIdFromParams(run.params)
     if (!clerkUserId) {
       throw new BadRequestException(
@@ -147,22 +153,19 @@ export class AdminAgentRunsService extends createPrismaBase(
       )
     }
 
-    if (!isDispatchableExperimentType(run.experimentType)) {
-      throw new BadRequestException(
-        `experiment type "${run.experimentType}" cannot be re-dispatched`,
-      )
-    }
-
     // params were validated against this experiment's Input at the original
     // dispatch and persisted unchanged, so re-forward them as that Input.
     // Override trigger to recovery_resume so the agent treats this as a
     // re-dispatch (consult durable gp-api state), not a first-time dispatch that
-    // would re-run paid side effects (domain purchase, TCR submission).
+    // would re-run paid side effects (domain purchase, TCR submission). Drop a
+    // stale run_id so the agent falls back to the fresh dispatch's run id rather
+    // than filing the artifact under the original run.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const storedParams = run.params as DispatchParams
     const params: DispatchParams = {
       ...storedParams,
       trigger: 'recovery_resume',
+      run_id: undefined,
     }
 
     const dispatched = await this.experimentRuns.dispatchRun({
