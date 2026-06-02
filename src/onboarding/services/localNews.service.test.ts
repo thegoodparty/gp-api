@@ -23,8 +23,8 @@ const cacheKey = (
 })
 
 function makeService() {
-  const ai = {
-    getChatToolCompletion: vi.fn(),
+  const llm = {
+    toolCompletion: vi.fn(),
   }
   const model = {
     update: vi.fn().mockResolvedValue(undefined),
@@ -34,11 +34,11 @@ function makeService() {
     model,
   }
   const service = new OnboardingLocalNewsService(
-    ai as never,
+    llm as never,
     campaigns as never,
     createMockLogger(),
   )
-  return { service, ai, campaigns, model }
+  return { service, llm, campaigns, model }
 }
 
 function readyOutlets(extra: { name: string }[] = []) {
@@ -69,7 +69,7 @@ describe('OnboardingLocalNewsService', () => {
 
   describe('getLocalNews', () => {
     it('returns the cached outlets when the (office, city, state) key matches', async () => {
-      const { service, ai } = makeService()
+      const { service, llm } = makeService()
       const outlets = readyOutlets()
       const cached = { ...cacheKey(), status: 'ready', outlets }
 
@@ -83,13 +83,13 @@ describe('OnboardingLocalNewsService', () => {
       })
 
       expect(result).toEqual({ status: 'ready', outlets })
-      expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
+      expect(llm.toolCompletion).not.toHaveBeenCalled()
     })
 
     it('ignores a cached entry for a different city even when office matches', async () => {
       // The bug this guards against: Denver City Council cache hit served to
       // a Boulder City Council fetch because office matched.
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, llm, model } = makeService()
       const denverCached = {
         office: OFFICE,
         city: 'Denver',
@@ -101,7 +101,11 @@ describe('OnboardingLocalNewsService', () => {
         id: 1,
         data: { onboarding: { localMediaOutlets: denverCached } },
       })
-      ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
+      llm.toolCompletion.mockResolvedValue({
+        content: '',
+        tokens: 0,
+        model: 'm',
+      })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -127,7 +131,7 @@ describe('OnboardingLocalNewsService', () => {
     })
 
     it('returns pending without calling markPending when a fresh pending entry exists for the same key', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, llm, model } = makeService()
       const result = await service.getLocalNews({
         state: STATE,
         office: OFFICE,
@@ -148,11 +152,11 @@ describe('OnboardingLocalNewsService', () => {
       expect(result).toEqual({ status: 'pending' })
       expect(campaigns.findFirst).not.toHaveBeenCalled()
       expect(model.update).not.toHaveBeenCalled()
-      expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
+      expect(llm.toolCompletion).not.toHaveBeenCalled()
     })
 
     it('falls through TTL-expired pending into markPending', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, llm, model } = makeService()
       const expiredCampaign = {
         id: 1,
         data: {
@@ -166,7 +170,11 @@ describe('OnboardingLocalNewsService', () => {
         },
       }
       campaigns.findFirst.mockResolvedValue(expiredCampaign)
-      ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
+      llm.toolCompletion.mockResolvedValue({
+        content: '',
+        tokens: 0,
+        model: 'm',
+      })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -216,7 +224,7 @@ describe('OnboardingLocalNewsService', () => {
     })
 
     it('expires the pending marker (startedAt: 0) when the background fetch fails', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, llm, model } = makeService()
       let claimWritten = false
       campaigns.findFirst.mockImplementation(async () => ({
         id: 1,
@@ -236,7 +244,7 @@ describe('OnboardingLocalNewsService', () => {
         claimWritten = true
         return undefined
       })
-      ai.getChatToolCompletion.mockRejectedValue(new Error('AI exploded'))
+      llm.toolCompletion.mockRejectedValue(new Error('AI exploded'))
 
       await service.getLocalNews({
         state: STATE,

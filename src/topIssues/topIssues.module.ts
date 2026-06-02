@@ -3,9 +3,9 @@ import { TopIssuesController } from './topIssues.controller'
 import { TopIssuesService } from './topIssues.service'
 import { PositionsController } from './positions/positions.controller'
 import { PositionsService } from './positions/positions.service'
-import { AiModule } from '../ai/ai.module'
+import { LlmModule } from '@/llm/llm.module'
 @Module({
-  imports: [AiModule],
+  imports: [LlmModule],
   controllers: [TopIssuesController, PositionsController],
   providers: [TopIssuesService, PositionsService],
 })

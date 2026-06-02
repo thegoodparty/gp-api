@@ -16,6 +16,7 @@ model Campaign {
   isPro                    Boolean?                @default(false) @map("is_pro")
   isDemo                   Boolean                 @default(false) @map("is_demo")
   didWin                   Boolean?                @map("did_win")
+  primaryResult            String?                 @map("primary_result")
   dateVerified             DateTime?               @map("date_verified")
   tier                     CampaignTier?
   formattedAddress         String?                 @map("formatted_address")

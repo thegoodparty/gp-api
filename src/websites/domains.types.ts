@@ -30,6 +30,29 @@ export interface PatternedDomainSearchResult {
   candidates: PatternedDomainCandidate[]
 }
 
+// GoodParty's approved campaign TLD allowlist. Must stay in sync with the
+// compliance_setup agent instruction (runbooks experiments/compliance_setup/
+// instruction.md), which rejects any out-of-allowlist TLD as
+// `unapproved_tld_returned`. .com/.org/.net/.vote are intentionally excluded.
+// Both the search fan-out and the purchase boundary enforce this list, so the
+// `@McpTool` "never offered" promise holds for every code path.
+export const SUPPORTED_TLDS = [
+  'run',
+  'bio',
+  'fyi',
+  'win',
+  'digital',
+  'site',
+] as const
+
+const SUPPORTED_TLD_SET: ReadonlySet<string> = new Set(SUPPORTED_TLDS)
+
+// True when `value`'s TLD (the segment after the last dot) is approved. A bare
+// SLD with no dot returns false — it carries no TLD to approve.
+export const hasSupportedTld = (value: string): boolean =>
+  value.includes('.') &&
+  SUPPORTED_TLD_SET.has(value.slice(value.lastIndexOf('.') + 1))
+
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',

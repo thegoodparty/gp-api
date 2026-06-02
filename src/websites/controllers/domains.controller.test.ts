@@ -214,6 +214,22 @@ describe('DomainsController.purchaseDomain', () => {
     })
     expect(overCeilingResult.success).toBe(false)
   })
+
+  it('PurchaseDomainBodySchema rejects domains outside the TLD allowlist', () => {
+    const approved = PurchaseDomainBodySchema.schema.safeParse({
+      domain: 'voteforjane.site',
+      maxPrice: 50,
+    })
+    expect(approved.success).toBe(true)
+
+    for (const domain of ['voteforjane.com', 'voteforjane.org']) {
+      const result = PurchaseDomainBodySchema.schema.safeParse({
+        domain,
+        maxPrice: 50,
+      })
+      expect(result.success).toBe(false)
+    }
+  })
 })
 
 describe('DomainsController.purchaseDomain MCP discoverability', () => {

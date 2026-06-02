@@ -35,6 +35,7 @@ export const createMockCampaign = (
   isPro: false,
   isDemo: false,
   didWin: null,
+  primaryResult: null,
   dateVerified: null,
   tier: null,
   data: {},
