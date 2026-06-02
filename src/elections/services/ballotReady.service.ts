@@ -124,11 +124,12 @@ export class BallotReadyService {
   async fetchPrimaryRaceId(generalRaceId: string): Promise<string | null> {
     const race = await this.fetchRaceById(generalRaceId)
     const positionId = race?.node?.position?.id
-    const generalDay = race?.node?.election?.electionDay
+    // electionDay is an ISO8601Date GraphQL scalar (typed `any`); coerce.
+    const generalDay = String(race?.node?.election?.electionDay ?? '')
     if (!positionId || !race?.node?.position?.hasPrimary || !generalDay) {
       return null
     }
-    const year = String(generalDay).slice(0, 4)
+    const year = generalDay.slice(0, 4)
     const query = gql`
       query PrimaryRaceForPosition(
         $positionId: ID!
