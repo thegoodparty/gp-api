@@ -932,11 +932,16 @@ export class QueueConsumerService {
         ),
       )
 
-    // Let a persistence failure propagate so handleMessageAndMaybeRequeue
-    // requeues the message (bounded by the SQS redrive policy -> DLQ) instead
-    // of silently acking a COMPLETED run that never got its section persisted.
-    // onExperimentRunCompleted is a no-op for runs that aren't campaign-strategy
-    // runs, so this only throws on a genuine campaign-strategy persist failure.
+    // Let a persistence failure propagate instead of swallowing it, so the
+    // failure surfaces (requeue + DLQ visibility) rather than silently acking
+    // a COMPLETED run that never got its section persisted. This is for
+    // visibility, not retry: onExperimentRunCompleted already calls markFailed
+    // before it rethrows, so on redelivery the status guard above (!= RUNNING)
+    // drops the message. That same guard bounds the requeue, so the raw throw
+    // can't infinite-redrive. The user-facing 'failed' state comes from
+    // markFailed (or, if markFailed itself faults, the isStuck grace-window
+    // backstop), not from the requeue. onExperimentRunCompleted is a no-op for
+    // non-campaign-strategy runs, so this only throws on a real persist failure.
     await this.campaignStrategy.onExperimentRunCompleted(updatedRun)
 
     return true
