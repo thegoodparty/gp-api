@@ -8,10 +8,6 @@ model CampaignStrategyOpponent {
   fullName         String   @map("full_name")
   partyAffiliation String   @map("party_affiliation")
   incumbent        Boolean?
-  politicalSummary String   @map("political_summary")
-
-  keyFacts CampaignStrategyOpponentKeyFact[]
-  websites CampaignStrategyOpponentWebsite[]
 
   @@index([campaignStrategyId])
   @@map("campaign_strategy_opponent")
