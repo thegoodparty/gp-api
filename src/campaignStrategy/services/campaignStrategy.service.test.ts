@@ -58,6 +58,8 @@ describe('CampaignStrategyService', () => {
     campaignId: 99,
     oppositionRunId: null,
     opportunitiesRunId: null,
+    oppositionAttempts: 0,
+    opportunitiesAttempts: 0,
     ...overrides,
   })
 
@@ -78,6 +80,7 @@ describe('CampaignStrategyService', () => {
         upsert: vi.fn().mockResolvedValue(planRow()),
         findUnique: vi.fn(),
         update: vi.fn().mockResolvedValue(undefined),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findFirst: vi.fn().mockResolvedValue(planRow()),
       },
     }
@@ -126,13 +129,20 @@ describe('CampaignStrategyService', () => {
         }),
       )
     }
+    // A from-idle start also stamps generationStartedAt (the duration anchor).
     expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
       where: { id: 42 },
-      data: { oppositionRunId: 'opp-run' },
+      data: {
+        oppositionRunId: 'opp-run',
+        generationStartedAt: expect.any(Date),
+      },
     })
     expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
       where: { id: 42 },
-      data: { opportunitiesRunId: 'oc-run' },
+      data: {
+        opportunitiesRunId: 'oc-run',
+        generationStartedAt: expect.any(Date),
+      },
     })
   })
 
@@ -158,7 +168,10 @@ describe('CampaignStrategyService', () => {
     expect(prisma.campaignStrategy.update).toHaveBeenCalledTimes(1)
     expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
       where: { id: 42 },
-      data: { oppositionRunId: 'opp-run' },
+      data: {
+        oppositionRunId: 'opp-run',
+        generationStartedAt: expect.any(Date),
+      },
     })
   })
 
@@ -246,8 +259,9 @@ describe('CampaignStrategyService', () => {
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
-  it('reports failed when a COMPLETED run is unpersisted past the grace window', async () => {
+  it('re-dispatches a COMPLETED-but-unpersisted section past the grace window', async () => {
     // markFailed + persist both failed: run stuck COMPLETED with no marker.
+    // Instead of terminal-failing, the section re-dispatches on this call.
     const stale = new Date(Date.now() - 30 * 60 * 1000) // 30 min ago
     prisma.campaignStrategy.upsert.mockResolvedValue(
       planRow({
@@ -268,11 +282,24 @@ describe('CampaignStrategyService', () => {
       (args: { where: { runId: string } }) =>
         Promise.resolve(runsById[args.where.runId] ?? null),
     )
+    experimentRuns.dispatchRun.mockResolvedValue({ runId: 'opp-retry' })
 
     const res = await service.getOrGenerateStrategicLandscape(campaign())
 
-    expect(res).toEqual({ status: 'failed' })
-    expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
+    expect(res).toEqual({ status: 'generating' })
+    expect(experimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
+    expect(experimentRuns.dispatchRun).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'opposition_research' }),
+    )
+    // Nothing else was in flight (opportunities already persisted), so this
+    // retry is a fresh start and re-stamps the duration anchor.
+    expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
+      where: { id: 42 },
+      data: {
+        oppositionRunId: 'opp-retry',
+        generationStartedAt: expect.any(Date),
+      },
+    })
   })
 
   it('reports failed (not 502) when an SQS dispatch throws', async () => {
@@ -323,24 +350,77 @@ describe('CampaignStrategyService', () => {
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
-  it('reports failed and does not retry when a run failed', async () => {
+  it('re-dispatches a section whose previous run FAILED', async () => {
     prisma.campaignStrategy.upsert.mockResolvedValue(
       planRow({ oppositionRunId: 'opp-run', opportunitiesRunId: 'oc-run' }),
     )
     const runsById: Record<string, unknown> = {
       'opp-run': run({ runId: 'opp-run', status: ExperimentRunStatus.FAILED }),
-      'oc-run': run({ runId: 'oc-run', status: ExperimentRunStatus.COMPLETED }),
+      'oc-run': run({ runId: 'oc-run', status: ExperimentRunStatus.RUNNING }),
     }
     experimentRuns.findUnique.mockImplementation(
       (args: { where: { runId: string } }) =>
         Promise.resolve(runsById[args.where.runId] ?? null),
     )
+    experimentRuns.dispatchRun.mockResolvedValue({ runId: 'opp-retry' })
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'generating' })
+    expect(experimentRuns.dispatchRun).toHaveBeenCalledTimes(1)
+    expect(experimentRuns.dispatchRun).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'opposition_research' }),
+    )
+    // The opportunities run is still in flight, so this retry joins the
+    // existing generation and must NOT re-stamp the duration anchor.
+    expect(prisma.campaignStrategy.update).toHaveBeenCalledWith({
+      where: { id: 42 },
+      data: { oppositionRunId: 'opp-retry' },
+    })
+  })
+
+  it('claims an attempt slot per re-dispatch via an atomic conditional update', async () => {
+    prisma.campaignStrategy.upsert.mockResolvedValue(
+      planRow({ oppositionRunId: 'opp-run', opportunitiesRunId: 'oc-run' }),
+    )
+    const runsById: Record<string, unknown> = {
+      'opp-run': run({ runId: 'opp-run', status: ExperimentRunStatus.FAILED }),
+      'oc-run': run({ runId: 'oc-run', status: ExperimentRunStatus.RUNNING }),
+    }
+    experimentRuns.findUnique.mockImplementation(
+      (args: { where: { runId: string } }) =>
+        Promise.resolve(runsById[args.where.runId] ?? null),
+    )
+    experimentRuns.dispatchRun.mockResolvedValue({ runId: 'opp-retry' })
+
+    await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(prisma.campaignStrategy.updateMany).toHaveBeenCalledWith({
+      where: { id: 42, oppositionAttempts: { lt: 3 } },
+      data: { oppositionAttempts: { increment: 1 } },
+    })
+  })
+
+  it('reports failed (terminal) once a section hits the attempt cap', async () => {
+    prisma.campaignStrategy.upsert.mockResolvedValue(
+      planRow({ oppositionRunId: 'opp-run', opportunitiesRunId: 'oc-run' }),
+    )
+    const runsById: Record<string, unknown> = {
+      'opp-run': run({ runId: 'opp-run', status: ExperimentRunStatus.FAILED }),
+      'oc-run': run({ runId: 'oc-run', status: ExperimentRunStatus.RUNNING }),
+    }
+    experimentRuns.findUnique.mockImplementation(
+      (args: { where: { runId: string } }) =>
+        Promise.resolve(runsById[args.where.runId] ?? null),
+    )
+    // The atomic claim finds no remaining slots -> cap reached, no new run.
+    prisma.campaignStrategy.updateMany.mockResolvedValue({ count: 0 })
 
     const res = await service.getOrGenerateStrategicLandscape(campaign())
 
     expect(res).toEqual({ status: 'failed' })
     expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
-    expect(params.build).not.toHaveBeenCalled()
+    expect(prisma.campaignStrategy.update).not.toHaveBeenCalled()
   })
 
   it('persists opponents when an opposition run completes', async () => {

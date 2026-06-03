@@ -28,14 +28,35 @@ const OPPOSITION = 'opposition_research'
 const OPPORTUNITIES = 'opportunities_and_challenges'
 
 // A run that's COMPLETED but whose section never persisted past this window is
-// treated as failed. Recovers a stuck run if persistence AND the markFailed
-// fallback both fail (a double DB fault) — otherwise it would poll 'generating'
-// forever.
+// treated as stuck and re-dispatched on the next call (the persist step
+// silently dropped it, e.g. a double DB fault). Within the window it still
+// reads as in-flight so a poll between a run being marked COMPLETED and its
+// rows landing can't trigger a spurious re-dispatch.
 const PERSIST_GRACE_MINUTES = 5
+
+// Max dispatches per section over a plan's lifetime. A failed or stuck section
+// is re-dispatched when the endpoint is called again, so a user who hit a
+// transient error can just retry. The cap stops a deterministic failure — or a
+// client/attacker hammering the endpoint — from spawning unbounded Fargate
+// runs. Enforced with an atomic conditional increment, so even a concurrent
+// burst can claim at most this many slots.
+const MAX_SECTION_ATTEMPTS = 3
+
+// Per-section disposition that drives the endpoint status. 'redispatch' is the
+// only state that starts a new run; the others are read off existing state.
+// 'dead' = attempt cap reached (terminal failed). 'stalled' = a dispatch was
+// attempted this call but its SQS send failed (the next call retries).
+type SectionState = 'persisted' | 'inflight' | 'redispatch' | 'dead' | 'stalled'
 
 // Both CAP experiments share one input contract.
 type StrategicLandscapeParams =
   AgentJobContracts['opposition_research']['Input']
+
+type DispatchBase = {
+  organizationSlug: string
+  clerkUserId: string
+  params: StrategicLandscapeParams
+}
 
 // Defensive Zod parse over Campaign.details (Prisma JSON). raceId is the
 // BallotReady race hash election-api keys on.
@@ -92,22 +113,6 @@ export class CampaignStrategyService extends createPrismaBase(
       this.runFor(plan.opportunitiesRunId),
     ])
 
-    // A failed run is terminal — never retry, just report it. The client
-    // surfaces an error instead of polling forever.
-    if (this.isFailed(opposition) || this.isFailed(opportunities)) {
-      return { status: 'failed' }
-    }
-
-    // Safety net: a run that completed but whose section never persisted (and
-    // stayed that way past the grace window) is stuck — report failed rather
-    // than poll 'generating' forever.
-    if (
-      this.isStuck(opposition, plan.oppositionPersistedAt) ||
-      this.isStuck(opportunities, plan.opportunitiesPersistedAt)
-    ) {
-      return { status: 'failed' }
-    }
-
     // Ready only once BOTH sections are persisted (markers set in the same tx
     // as the rows). Gating on run status instead would race: a run can be
     // COMPLETED a beat before its rows land, yielding a hollow 'ready'.
@@ -118,14 +123,16 @@ export class CampaignStrategyService extends createPrismaBase(
       }
     }
 
-    // If a needed dispatch produced no run (e.g. no dispatch queue configured
-    // in preview), there's no way to make progress — report failed rather than
-    // poll 'generating' forever.
-    const dispatched = await this.dispatchPending(campaign, plan, brHashId, {
-      opposition,
-      opportunities,
+    // A failed or stuck section is re-dispatched (subject to the attempt cap),
+    // not reported terminally — so a transient error is recoverable by calling
+    // the endpoint again.
+    return this.dispatchPending(campaign, plan, brHashId, {
+      opposition: this.sectionState(opposition, plan.oppositionPersistedAt),
+      opportunities: this.sectionState(
+        opportunities,
+        plan.opportunitiesPersistedAt,
+      ),
     })
-    return dispatched ? { status: 'generating' } : { status: 'failed' }
   }
 
   // Queue-consumer hook: when one of the two CAP runs completes, load its
@@ -191,46 +198,40 @@ export class CampaignStrategyService extends createPrismaBase(
     return this.experimentRuns.findUnique({ where: { runId } })
   }
 
-  private isFailed(run: ExperimentRun | null): boolean {
-    return run?.status === ExperimentRunStatus.FAILED
-  }
-
-  // COMPLETED, but its section never persisted, and the completion is older
-  // than the grace window — the persist step silently dropped it.
-  private isStuck(
+  // Classifies a section from its run + persistence marker. Only 'redispatch'
+  // starts a new run (see SectionState).
+  private sectionState(
     run: ExperimentRun | null,
     persistedAt: Date | null,
-  ): boolean {
-    return (
+  ): SectionState {
+    if (persistedAt) return 'persisted'
+    if (run?.status === ExperimentRunStatus.RUNNING) return 'inflight'
+    // COMPLETED but unpersisted: in-flight until the grace window (waiting for
+    // its rows to land), then treated as stuck and re-dispatched.
+    if (
       run?.status === ExperimentRunStatus.COMPLETED &&
-      !persistedAt &&
-      isBefore(run.updatedAt, subMinutes(new Date(), PERSIST_GRACE_MINUTES))
-    )
+      !isBefore(run.updatedAt, subMinutes(new Date(), PERSIST_GRACE_MINUTES))
+    ) {
+      return 'inflight'
+    }
+    // null, FAILED, or stuck-COMPLETED -> (re)dispatch.
+    return 'redispatch'
   }
 
-  // Only dispatch an experiment that was never started. A failed run is NOT
-  // re-dispatched (see getOrGenerateStrategicLandscape) — no retry loop.
-  private needsDispatch(run: ExperimentRun | null): boolean {
-    return run === null
-  }
-
-  // Returns true if at least one needed experiment was dispatched (or nothing
-  // needed dispatching). False only when something needed dispatching and none
-  // succeeded. A partial success returns true (generating): the successful run
-  // is kept and the un-dispatched one retries on the next poll, so 'failed'
-  // never flips back to 'generating'.
+  // Dispatches the sections that need it (subject to the attempt cap) and
+  // resolves the endpoint status. 'ready' is handled by the caller; this only
+  // returns 'generating' or 'failed'.
   private async dispatchPending(
     campaign: CampaignWith<'user'>,
     plan: CampaignStrategy,
     brHashId: string,
-    runs: {
-      opposition: ExperimentRun | null
-      opportunities: ExperimentRun | null
-    },
-  ): Promise<boolean> {
-    const dispatchOpposition = this.needsDispatch(runs.opposition)
-    const dispatchOpportunities = this.needsDispatch(runs.opportunities)
-    if (!dispatchOpposition && !dispatchOpportunities) return true
+    states: { opposition: SectionState; opportunities: SectionState },
+  ): Promise<StrategicLandscapeResponse> {
+    const dispatchOpposition = states.opposition === 'redispatch'
+    const dispatchOpportunities = states.opportunities === 'redispatch'
+    if (!dispatchOpposition && !dispatchOpportunities) {
+      return this.statusFrom(states.opposition, states.opportunities)
+    }
 
     const clerkUserId = campaign.user?.clerkId
     if (!clerkUserId) {
@@ -246,77 +247,128 @@ export class CampaignStrategyService extends createPrismaBase(
       params,
     }
 
-    let dispatchedAny = false
+    // Stamp generationStartedAt only when kicking off work on an otherwise-idle
+    // plan (nothing already in flight). A dispatch that joins an in-flight
+    // generation keeps the original start, so trigger->ready duration is the
+    // later persistedAt minus this. A retry of a failed/stuck section resets it.
+    const freshStart =
+      states.opposition !== 'inflight' && states.opportunities !== 'inflight'
 
-    if (dispatchOpposition) {
-      const runId = await this.tryDispatch(OPPOSITION, base)
-      if (runId) {
-        try {
-          await this.client.campaignStrategy.update({
-            where: { id: plan.id },
-            data: { oppositionRunId: runId },
-          })
-          dispatchedAny = true
-        } catch (error) {
-          // A transient DB fault linking the run must not 500 the poll: the
-          // unlinked RUNNING row is reclaimed by the stale sweep and the next
-          // poll re-dispatches.
-          this.logger.error(
-            { error, planId: plan.id, runId },
-            'Failed to link oppositionRunId to plan',
-          )
-        }
-      }
-    }
+    const opposition = dispatchOpposition
+      ? await this.attemptOpposition(plan, base, freshStart)
+      : states.opposition
+    const opportunities = dispatchOpportunities
+      ? await this.attemptOpportunities(plan, base, freshStart)
+      : states.opportunities
 
-    if (dispatchOpportunities) {
-      const runId = await this.tryDispatch(OPPORTUNITIES, base)
-      if (runId) {
-        try {
-          await this.client.campaignStrategy.update({
-            where: { id: plan.id },
-            data: { opportunitiesRunId: runId },
-          })
-          dispatchedAny = true
-        } catch (error) {
-          // See the opposition branch: don't 500 on a transient link failure.
-          this.logger.error(
-            { error, planId: plan.id, runId },
-            'Failed to link opportunitiesRunId to plan',
-          )
-        }
-      }
-    }
-
-    return dispatchedAny
+    return this.statusFrom(opposition, opportunities)
   }
 
-  // A dispatch failure (no queue, or SQS send error -> BadGateway) yields no
-  // runId. Swallow it here so the caller reports 'failed' instead of letting a
-  // 502 bubble out on the first failure.
+  // Claim a lifetime attempt slot for the opposition section, then dispatch.
+  // The conditional increment is atomic, so a concurrent burst can claim at
+  // most MAX_SECTION_ATTEMPTS slots in total — bounding the Fargate runs a
+  // failing-and-retried (or maliciously hammered) section can spawn.
+  private async attemptOpposition(
+    plan: CampaignStrategy,
+    base: DispatchBase,
+    freshStart: boolean,
+  ): Promise<SectionState> {
+    const claimed = await this.client.campaignStrategy.updateMany({
+      where: { id: plan.id, oppositionAttempts: { lt: MAX_SECTION_ATTEMPTS } },
+      data: { oppositionAttempts: { increment: 1 } },
+    })
+    if (claimed.count === 0) return 'dead'
+
+    const runId = await this.tryDispatch(OPPOSITION, base)
+    if (!runId) return 'stalled'
+
+    try {
+      await this.client.campaignStrategy.update({
+        where: { id: plan.id },
+        data: {
+          oppositionRunId: runId,
+          ...(freshStart ? { generationStartedAt: new Date() } : {}),
+        },
+      })
+    } catch (error) {
+      // A transient DB fault linking the run must not 500 the call: the run is
+      // dispatched and RUNNING, the unlinked row is reclaimed by the stale
+      // sweep, and the next call re-dispatches (a slot was already consumed).
+      this.logger.error(
+        { error, planId: plan.id, runId },
+        'Failed to link oppositionRunId to plan',
+      )
+    }
+    return 'inflight'
+  }
+
+  private async attemptOpportunities(
+    plan: CampaignStrategy,
+    base: DispatchBase,
+    freshStart: boolean,
+  ): Promise<SectionState> {
+    const claimed = await this.client.campaignStrategy.updateMany({
+      where: {
+        id: plan.id,
+        opportunitiesAttempts: { lt: MAX_SECTION_ATTEMPTS },
+      },
+      data: { opportunitiesAttempts: { increment: 1 } },
+    })
+    if (claimed.count === 0) return 'dead'
+
+    const runId = await this.tryDispatch(OPPORTUNITIES, base)
+    if (!runId) return 'stalled'
+
+    try {
+      await this.client.campaignStrategy.update({
+        where: { id: plan.id },
+        data: {
+          opportunitiesRunId: runId,
+          ...(freshStart ? { generationStartedAt: new Date() } : {}),
+        },
+      })
+    } catch (error) {
+      // See attemptOpposition: don't 500 on a transient link failure.
+      this.logger.error(
+        { error, planId: plan.id, runId },
+        'Failed to link opportunitiesRunId to plan',
+      )
+    }
+    return 'inflight'
+  }
+
+  // Map the two post-dispatch section states to an endpoint status. A 'dead'
+  // section (cap reached) means the plan can never complete, so it wins ->
+  // failed. A 'stalled' section (SQS send failed this call) also reports
+  // failed but is retryable next call; 'inflight' wins while nothing is dead.
+  private statusFrom(
+    opposition: SectionState,
+    opportunities: SectionState,
+  ): StrategicLandscapeResponse {
+    if (opposition === 'dead' || opportunities === 'dead') {
+      return { status: 'failed' }
+    }
+    if (opposition === 'inflight' || opportunities === 'inflight') {
+      return { status: 'generating' }
+    }
+    return { status: 'failed' }
+  }
+
+  // A dispatch failure (no queue, or an SQS send error -> BadGateway) yields no
+  // runId. Swallow it so the call reports 'stalled'/'failed' instead of a 502.
+  // The FAILED row dispatchRun left behind stays unlinked: it's a monitoring
+  // breadcrumb of the SQS failure, the RUNNING-only stale sweep ignores it, and
+  // the section re-dispatches on the next call (a slot was already spent, so
+  // it's bounded by MAX_SECTION_ATTEMPTS). We don't touch dispatchRun's throw
+  // contract here because it's shared (meetings/TCR/admin).
   private async tryDispatch(
     type: typeof OPPOSITION | typeof OPPORTUNITIES,
-    base: {
-      organizationSlug: string
-      clerkUserId: string
-      params: StrategicLandscapeParams
-    },
+    base: DispatchBase,
   ): Promise<string | undefined> {
     try {
       const run = await this.experimentRuns.dispatchRun({ type, ...base })
       return run?.runId
     } catch {
-      // dispatchRun already marked the row FAILED before throwing. We swallow
-      // and return undefined (so the caller reports 'failed' rather than a
-      // 502), which leaves that FAILED row UNLINKED from the plan on purpose.
-      // This orphan is intended and benign: a failed dispatch returns 'failed'
-      // (terminal, so polling stops), so it is ~1 orphan row per attempt, not
-      // per poll; the row is FAILED + unlinked, so it never affects campaign
-      // status and the RUNNING-only stale sweep ignores it; and we keep it as
-      // a monitoring breadcrumb of the SQS failure. We deliberately do NOT
-      // link it: dispatchRun is shared (meetings/TCR/admin), and linking a
-      // FAILED run would make needsDispatch treat a transient SQS blip as a
-      // permanent failure with no retry.
       return undefined
     }
   }
