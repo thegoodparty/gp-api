@@ -235,6 +235,27 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
 
     expect(result.status).toBe(400)
   })
+
+  it('returns 400 when the actual S3 size exceeds the declared size', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-size-mismatch')
+    const s3 = mockS3()
+    s3.exists.mockResolvedValueOnce(5_000_000)
+    mockQueue()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-size-mismatch'),
+    )
+
+    const result = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/${presign.data.attachment_id}/complete`,
+      {},
+      orgHeader('eo-size-mismatch'),
+    )
+
+    expect(result.status).toBe(400)
+  })
 })
 
 describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/download-url', () => {
