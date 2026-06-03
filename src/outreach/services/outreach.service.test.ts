@@ -384,8 +384,8 @@ describe('OutreachService', () => {
         service.create(mockUser, mockCampaign, dto, undefined, undefined),
       ).rejects.toThrow(/Voter file filter not found/)
 
+      expect(mockFilterAccessCheck).toHaveBeenCalledWith('org-test')
       expect(mockFindVoterFileFilter).toHaveBeenCalledWith(99, 'org-test')
-      expect(mockFilterAccessCheck).not.toHaveBeenCalled()
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 
@@ -394,10 +394,6 @@ describe('OutreachService', () => {
         ...baseCreateDto,
         voterFileFilterId: 42,
       }
-      mockFindVoterFileFilter.mockResolvedValue({
-        id: 42,
-        organizationSlug: 'org-test',
-      })
       mockFilterAccessCheck.mockRejectedValue(
         new BadRequestException('Campaign is not pro'),
       )
@@ -409,6 +405,7 @@ describe('OutreachService', () => {
         service.create(mockUser, mockCampaign, dto, undefined, undefined),
       ).rejects.toThrow(/Campaign is not pro/)
 
+      expect(mockFindVoterFileFilter).not.toHaveBeenCalled()
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 

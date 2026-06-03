@@ -140,6 +140,9 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     p2pImage?: P2pOutreachImageInput,
   ) {
     if (createOutreachDto.voterFileFilterId) {
+      await this.voterFileFilterService.filterAccessCheck(
+        campaign.organizationSlug,
+      )
       const filter =
         await this.voterFileFilterService.findByIdAndOrganizationSlug(
           createOutreachDto.voterFileFilterId,
@@ -148,9 +151,6 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
       if (!filter) {
         throw new NotFoundException('Voter file filter not found')
       }
-      await this.voterFileFilterService.filterAccessCheck(
-        campaign.organizationSlug,
-      )
     }
 
     const isP2p = createOutreachDto.outreachType === OutreachType.p2p
