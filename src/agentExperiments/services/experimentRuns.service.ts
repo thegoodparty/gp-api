@@ -2,11 +2,12 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { v7 as uuidv7 } from 'uuid'
 import { SQS } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus, Prisma } from '@prisma/client'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import { subMinutes } from 'date-fns'
 import { AgentJobContracts } from '@/generated/agent-job-contracts'
+import { isJsonObject } from '@/shared/util/objects.util'
 
 const sqs = new SQS({})
 
@@ -20,20 +21,69 @@ export type ExperimentRunDispatchInput<
 }
 
 const STALE_THRESHOLD_MINUTES = 45
+export const MAX_RESUME_ATTEMPTS = 48
+// Drain the resumable backlog incrementally across ticks so a post-pause
+// surge can't load an unbounded result set or overrun the 5-minute interval.
+const RESUME_SWEEP_BATCH_SIZE = 100
+
+type ResumeRunInput = {
+  runId: string
+  organizationSlug: string
+  experimentType: string
+  params: unknown
+  stage?: string | null
+  resumeAttempts: number
+}
 
 @Injectable()
 export class ExperimentRunsService extends createPrismaBase(
   MODELS.ExperimentRun,
 ) {
+  private cachedQueueUrl: string | undefined
+
+  // The queue name is static per environment, so resolve the URL once and cache
+  // it on the instance — a sweep re-dispatching N runs would otherwise issue N
+  // GetQueueUrl calls.
   private async resolveQueueUrl(): Promise<string | undefined> {
+    if (this.cachedQueueUrl) {
+      return this.cachedQueueUrl
+    }
+
     const queueName = process.env.AGENT_DISPATCH_QUEUE_NAME
     if (!queueName) {
       return
     }
 
     const { QueueUrl } = await sqs.getQueueUrl({ QueueName: queueName })
+    this.cachedQueueUrl = QueueUrl
 
     return QueueUrl
+  }
+
+  private async enqueueDispatch(
+    queueUrl: string,
+    input: {
+      runId: string
+      organizationSlug: string
+      experimentType: string
+      clerkUserId: string
+      params: unknown
+    },
+  ) {
+    const messageBody = {
+      run_id: input.runId,
+      params: input.params,
+      organization_slug: input.organizationSlug,
+      experiment_type: input.experimentType,
+      clerk_user_id: input.clerkUserId,
+    }
+
+    await sqs.sendMessage({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(messageBody),
+      MessageGroupId: `agent-dispatch-${input.organizationSlug}`,
+      MessageDeduplicationId: randomUUID(),
+    })
   }
 
   async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
@@ -59,22 +109,13 @@ export class ExperimentRunsService extends createPrismaBase(
       },
     })
 
-    const messageBody = {
-      run_id: runId,
-      params: input.params,
-      organization_slug: input.organizationSlug,
-      experiment_type: input.type,
-      clerk_user_id: input.clerkUserId,
-    }
-
-    const deduplicationId = randomUUID()
-
     try {
-      await sqs.sendMessage({
-        QueueUrl,
-        MessageBody: JSON.stringify(messageBody),
-        MessageGroupId: `agent-dispatch-${input.organizationSlug}`,
-        MessageDeduplicationId: deduplicationId,
+      await this.enqueueDispatch(QueueUrl, {
+        runId,
+        organizationSlug: input.organizationSlug,
+        experimentType: input.type,
+        clerkUserId: input.clerkUserId,
+        params: input.params,
       })
     } catch (error) {
       this.logger.error(
@@ -107,13 +148,128 @@ export class ExperimentRunsService extends createPrismaBase(
     return result
   }
 
+  async resumeRun(run: ResumeRunInput) {
+    const QueueUrl = await this.resolveQueueUrl()
+    if (!QueueUrl) {
+      this.logger.warn(
+        { runId: run.runId },
+        'No Queue Url configured — cannot resume run in this environment',
+      )
+      return
+    }
+
+    const clerkUserId =
+      isJsonObject(run.params) &&
+      typeof run.params['clerk_user_id'] === 'string'
+        ? run.params['clerk_user_id']
+        : null
+
+    if (!clerkUserId) {
+      this.logger.error(
+        { runId: run.runId },
+        'run params carry no clerk_user_id; cannot resume without actor identity',
+      )
+      await this.model.updateMany({
+        where: {
+          runId: run.runId,
+          status: ExperimentRunStatus.AWAITING_RESUME,
+        },
+        data: {
+          status: ExperimentRunStatus.FAILED,
+          error: 'Cannot resume: run params carry no clerk_user_id',
+        },
+      })
+      return
+    }
+
+    const claimed = await this.model.updateMany({
+      where: {
+        runId: run.runId,
+        status: ExperimentRunStatus.AWAITING_RESUME,
+      },
+      data: {
+        status: ExperimentRunStatus.RUNNING,
+        resumeAttempts: { increment: 1 },
+        resumeScheduledFor: null,
+      },
+    })
+
+    if (claimed.count === 0) {
+      return
+    }
+
+    const resumeParams =
+      typeof run.params === 'object' && run.params !== null
+        ? { ...run.params, trigger: 'recovery_resume' }
+        : { trigger: 'recovery_resume' }
+
+    try {
+      await this.enqueueDispatch(QueueUrl, {
+        runId: run.runId,
+        organizationSlug: run.organizationSlug,
+        experimentType: run.experimentType,
+        clerkUserId,
+        params: resumeParams,
+      })
+    } catch (error) {
+      this.logger.error(
+        { error, runId: run.runId },
+        'Failed to re-enqueue resumed run — releasing claim',
+      )
+      await this.model.updateMany({
+        where: {
+          runId: run.runId,
+          status: ExperimentRunStatus.RUNNING,
+        },
+        data: {
+          status: ExperimentRunStatus.AWAITING_RESUME,
+          resumeAttempts: { decrement: 1 },
+          resumeScheduledFor: new Date(),
+        },
+      })
+    }
+  }
+
+  @Cron('*/5 * * * *')
+  async sweepResumableRuns() {
+    const now = new Date()
+
+    const due = await this.model.findMany({
+      where: {
+        status: ExperimentRunStatus.AWAITING_RESUME,
+        resumeScheduledFor: { lte: now },
+      },
+      orderBy: { resumeScheduledFor: Prisma.SortOrder.asc },
+      take: RESUME_SWEEP_BATCH_SIZE,
+    })
+
+    for (const run of due) {
+      if (run.resumeAttempts >= MAX_RESUME_ATTEMPTS) {
+        await this.model.updateMany({
+          where: {
+            runId: run.runId,
+            status: ExperimentRunStatus.AWAITING_RESUME,
+          },
+          data: {
+            status: ExperimentRunStatus.FAILED,
+            error:
+              `Exceeded max resume attempts (${run.resumeAttempts}) ` +
+              `at stage: ${run.stage ?? 'unknown'}`,
+          },
+        })
+      } else {
+        await this.resumeRun(run)
+      }
+    }
+  }
+
   @Cron('*/15 * * * *')
   async sweepStaleRuns() {
     const cutoff = subMinutes(new Date(), STALE_THRESHOLD_MINUTES)
     const result = await this.model.updateMany({
       where: {
         status: { in: [ExperimentRunStatus.RUNNING] },
-        createdAt: { lt: cutoff },
+        updatedAt: { lt: cutoff },
       },
       data: {
         status: ExperimentRunStatus.FAILED,

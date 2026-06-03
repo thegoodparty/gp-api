@@ -23,6 +23,10 @@ export const AgentRunListItemSchema = z.object({
   durationSeconds: z.number().nullable(),
   costUsd: z.number().nullable(),
   createdAt: z.coerce.date(),
+  stage: z.string().nullable(),
+  dataQuality: z.string().nullable(),
+  resumeScheduledFor: z.coerce.date().nullable(),
+  resumeAttempts: z.number(),
 })
 
 export type AgentRunListItem = z.infer<typeof AgentRunListItemSchema>
@@ -52,6 +56,10 @@ export const AgentRunSchema = z.object({
   error: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
+  stage: z.string().nullable(),
+  dataQuality: z.string().nullable(),
+  resumeScheduledFor: z.coerce.date().nullable(),
+  resumeAttempts: z.number(),
 })
 
 export type AgentRun = z.infer<typeof AgentRunSchema>
