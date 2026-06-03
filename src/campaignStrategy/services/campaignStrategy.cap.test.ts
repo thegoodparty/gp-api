@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { ExperimentRunStatus } from '@prisma/client'
 import { CampaignStrategyService } from './campaignStrategy.service'
+import { ElectionApiRaceNotFoundError } from './electionApi.service'
 
 const campaign = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -98,7 +99,10 @@ describe('CampaignStrategyService', () => {
       { getZipCodesByRaceId: vi.fn() } as never,
     )
     Object.defineProperty(service, '_prisma', { value: prisma })
-    Object.assign(service, { findFirst: prisma.campaignStrategy.findFirst })
+    Object.assign(service, {
+      findFirst: prisma.campaignStrategy.findFirst,
+      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+    })
   })
 
   it('rejects a campaign with no raceId', async () => {
@@ -316,6 +320,17 @@ describe('CampaignStrategyService', () => {
 
     expect(res).toEqual({ status: 'failed' })
     expect(prisma.campaignStrategy.update).not.toHaveBeenCalled()
+  })
+
+  it('reports failed (not 500) when election-api has no data for the race', async () => {
+    params.build.mockRejectedValue(
+      new ElectionApiRaceNotFoundError('br-general'),
+    )
+
+    const res = await service.getOrGenerateStrategicLandscape(campaign())
+
+    expect(res).toEqual({ status: 'failed' })
+    expect(experimentRuns.dispatchRun).not.toHaveBeenCalled()
   })
 
   it('throws if the strategy row vanishes between upsert and read', async () => {

@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
   InternalServerErrorException,
@@ -519,7 +520,26 @@ export class CampaignStrategyService
       )
     }
 
-    const params = await this.params.build(campaign, brHashId)
+    // Building params calls election-api. If the race isn't found (404) or
+    // election-api is otherwise unavailable, there's nothing to dispatch —
+    // report a terminal 'failed' so the client stops polling instead of
+    // re-hammering election-api with a 500/502 on every poll.
+    let params: StrategicLandscapeParams
+    try {
+      params = await this.params.build(campaign, brHashId)
+    } catch (error) {
+      if (
+        error instanceof ElectionApiRaceNotFoundError ||
+        error instanceof BadGatewayException
+      ) {
+        this.logger.warn(
+          { error, campaignId: campaign.id, raceId: brHashId },
+          'election-api unavailable while building strategy params; reporting failed',
+        )
+        return { status: 'failed' }
+      }
+      throw error
+    }
     const base = {
       organizationSlug: campaign.organizationSlug,
       clerkUserId,
