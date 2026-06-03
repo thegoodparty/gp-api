@@ -263,6 +263,16 @@ export class ExperimentRunsService extends createPrismaBase(
     }
   }
 
+  // Flip a run to FAILED after the fact, e.g. when a result arrived but the
+  // caller couldn't load/persist its artifact. Truncate the error to match the
+  // queue-consumer's column bound.
+  markFailed(runId: string, error: string) {
+    return this.model.update({
+      where: { runId },
+      data: { status: ExperimentRunStatus.FAILED, error: error.slice(0, 1000) },
+    })
+  }
+
   @Cron('*/15 * * * *')
   async sweepStaleRuns() {
     const cutoff = subMinutes(new Date(), STALE_THRESHOLD_MINUTES)

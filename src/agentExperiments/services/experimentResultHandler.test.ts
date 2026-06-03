@@ -115,6 +115,9 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
       {} as never,
       experimentRunsService as never,
       meetingBriefings as never,
+      {
+        onExperimentRunCompleted: vi.fn().mockResolvedValue(undefined),
+      } as never,
       {} as never,
       logger,
     )
