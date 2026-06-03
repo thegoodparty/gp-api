@@ -1,5 +1,6 @@
 enum ExperimentRunStatus {
   RUNNING
+  AWAITING_RESUME
   COMPLETED
   FAILED
 }
@@ -22,6 +23,10 @@ model ExperimentRun {
   durationSeconds Float?  @map("duration_seconds")
   costUsd         Float?  @map("cost_usd")
   error           String?
+  stage              String?   @map("stage")
+  dataQuality        String?   @map("data_quality")
+  resumeScheduledFor DateTime? @map("resume_scheduled_for")
+  resumeAttempts     Int       @default(0) @map("resume_attempts")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -29,5 +34,6 @@ model ExperimentRun {
   meetingBriefings MeetingBriefing[]
 
   @@index([organizationSlug, experimentType])
+  @@index([status, resumeScheduledFor])
   @@map("experiment_run")
 }

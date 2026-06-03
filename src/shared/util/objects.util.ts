@@ -46,3 +46,10 @@ export function pickKeys<
 
 export const objectNotEmpty = (obj: object | null | undefined) =>
   Boolean(obj && Object.values(obj).length > 0)
+
+// Type guard for a plain JSON object (not null, not an array) — narrows an
+// `unknown` (parsed JSON, a JsonB column) before reading its keys.
+export const isJsonObject = (
+  value: unknown,
+): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)

@@ -22,6 +22,9 @@ export const ElectionApiRoutes = {
     findById: {
       path: 'positions',
     },
+    zipCodes: {
+      path: 'positions/by-ballotready-id',
+    },
   },
   races: {
     filingFeeByBrHashId: {
@@ -34,5 +37,12 @@ export const ElectionApiRoutes = {
       path: 'races/by-br-hash-id',
       filingFeeSuffix: 'filing-fee',
     },
+  },
+  campaignStrategyContext: {
+    // POST /campaign-strategy-context — looks up a Race by br_hash_id and
+    // returns voter counts, candidate roster, win-number variants, and
+    // election dates. The single source for raceTargetMetrics now that
+    // election-api PR #176 widened District with L2-derived voter stats.
+    path: 'campaign-strategy-context',
   },
 }

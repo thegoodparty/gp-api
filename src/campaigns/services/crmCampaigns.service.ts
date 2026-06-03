@@ -405,6 +405,13 @@ export class CrmCampaignsService {
   }
 
   async trackCampaign(campaignId: number) {
+    if (!this.hubspot.isConfigured) {
+      this.logger.debug(
+        `HubSpot not configured — skipping trackCampaign for ${campaignId}`,
+      )
+      return
+    }
+
     const campaign = await this.campaigns.findUniqueOrThrow({
       where: { id: campaignId },
     })

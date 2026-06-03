@@ -1,4 +1,8 @@
-import { RaceListItem, RaceListItemArraySchema } from '@goodparty_org/contracts'
+import {
+  RaceListItem,
+  RaceListItemArraySchema,
+  ZipCodesArraySchema,
+} from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -14,6 +18,7 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
+  CampaignStrategyContextResponse,
   District,
   DistrictNameItem,
   DistrictTypeItem,
@@ -95,6 +100,39 @@ export class ElectionsService {
       }
       const finalMessage = `${baseMessage}: ${String(error)}`
       this.logger.error(`Election API GET ${fullUrl} failed: ${String(error)}`)
+      throw new BadGatewayException(finalMessage)
+    }
+  }
+
+  private async electionApiPost<Res, Body extends object>(
+    path: string,
+    body: Body,
+  ): Promise<Res | null> {
+    const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
+    this.logger.debug({ body }, `Election API POST ${path} body: `)
+    try {
+      const { data, status } = (await lastValueFrom(
+        this.httpService.post(fullUrl, body),
+      )) as { data: Res; status: number }
+      if (status >= 200 && status < 300) return data
+      this.logger.warn(`Election API POST ${path} responded ${status}`)
+      return null
+    } catch (error: unknown) {
+      const baseMessage = `Election API POST ${path} failed`
+      if (isAxiosError(error)) {
+        // Axios error response is untyped — AxiosError.response.data is unknown
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const data = error.response?.data as Record<string, unknown> | undefined
+        const apiMessage =
+          typeof data?.message === 'string' ? data.message : undefined
+        const finalMessage = apiMessage
+          ? `${baseMessage}: ${apiMessage}`
+          : `${baseMessage}: ${error.message}`
+        this.logger.error(finalMessage)
+        throw new BadGatewayException(finalMessage)
+      }
+      const finalMessage = `${baseMessage}: ${String(error)}`
+      this.logger.error(`Election API POST ${fullUrl} failed: ${String(error)}`)
       throw new BadGatewayException(finalMessage)
     }
   }
@@ -199,6 +237,14 @@ export class ElectionsService {
       query,
     )
     return RaceListItemArraySchema.parse(result ?? [])
+  }
+
+  async getZipCodesByBrPositionId(brPositionId: string): Promise<string[]> {
+    const result = await this.electionApiGet<string[], object>(
+      `${ElectionApiRoutes.positions.zipCodes.path}/${brPositionId}/zip-codes`,
+      {},
+    )
+    return ZipCodesArraySchema.parse(result ?? [])
   }
 
   async getVoterIssues(params: {
@@ -427,6 +473,32 @@ export class ElectionsService {
       this.logger.warn(
         { error, brHashId },
         'Election API GET races/by-br-hash-id filing-fee failed',
+      )
+      return null
+    }
+  }
+
+  /**
+   * Fetch per-race civics context from election-api by BR race hash. The
+   * upstream `/campaign-strategy-context` endpoint returns voter counts,
+   * candidate roster, win-number variants, and election dates joined
+   * through Race → Position → District. Returns null when the hash doesn't
+   * resolve to a Race or election-api is unreachable — caller falls back
+   * to whatever data it had before.
+   */
+  async fetchCampaignStrategyContext(
+    brHashId: string,
+  ): Promise<CampaignStrategyContextResponse | null> {
+    if (!brHashId) return null
+    try {
+      return await this.electionApiPost<
+        CampaignStrategyContextResponse,
+        { brHashId: string }
+      >(ElectionApiRoutes.campaignStrategyContext.path, { brHashId })
+    } catch (error) {
+      this.logger.warn(
+        { error, brHashId },
+        'Election API POST campaign-strategy-context failed',
       )
       return null
     }

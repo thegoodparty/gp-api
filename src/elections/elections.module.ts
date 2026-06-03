@@ -17,7 +17,7 @@ import { RacesService } from './services/races.service'
     BallotReadyService,
     ElectionsService,
   ],
-  exports: [RacesService, ElectionsService],
+  exports: [RacesService, ElectionsService, BallotReadyService],
   imports: [LlmModule, EmailModule, HttpModule, SlackModule],
 })
 export class ElectionsModule {}

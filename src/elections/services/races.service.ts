@@ -56,6 +56,17 @@ export class RacesService {
     return null
   }
 
+  // Note: results >50 zip codes likely indicate a statewide race;
+  // callers may want to skip or handle that case separately.
+  async getZipCodesByRaceId(raceId: string): Promise<string[]> {
+    const race = await this.getRaceById(raceId)
+    const brPositionId = race?.position?.id
+    if (!brPositionId) {
+      throw new NotFoundException(`No position found for race ${raceId}`)
+    }
+    return this.elections.getZipCodesByBrPositionId(brPositionId)
+  }
+
   async getNormalizedPosition(raceId: string) {
     return await this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
