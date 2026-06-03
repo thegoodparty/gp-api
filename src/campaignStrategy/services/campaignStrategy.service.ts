@@ -306,6 +306,17 @@ export class CampaignStrategyService extends createPrismaBase(
       const run = await this.experimentRuns.dispatchRun({ type, ...base })
       return run?.runId
     } catch {
+      // dispatchRun already marked the row FAILED before throwing. We swallow
+      // and return undefined (so the caller reports 'failed' rather than a
+      // 502), which leaves that FAILED row UNLINKED from the plan on purpose.
+      // This orphan is intended and benign: a failed dispatch returns 'failed'
+      // (terminal, so polling stops), so it is ~1 orphan row per attempt, not
+      // per poll; the row is FAILED + unlinked, so it never affects campaign
+      // status and the RUNNING-only stale sweep ignores it; and we keep it as
+      // a monitoring breadcrumb of the SQS failure. We deliberately do NOT
+      // link it: dispatchRun is shared (meetings/TCR/admin), and linking a
+      // FAILED run would make needsDispatch treat a transient SQS blip as a
+      // permanent failure with no retry.
       return undefined
     }
   }
