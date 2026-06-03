@@ -2,7 +2,7 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { v7 as uuidv7 } from 'uuid'
 import { SQS } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus, Prisma } from '@prisma/client'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import { subMinutes } from 'date-fns'
@@ -22,6 +22,9 @@ export type ExperimentRunDispatchInput<
 
 const STALE_THRESHOLD_MINUTES = 45
 export const MAX_RESUME_ATTEMPTS = 48
+// Drain the resumable backlog incrementally across ticks so a post-pause
+// surge can't load an unbounded result set or overrun the 5-minute interval.
+const RESUME_SWEEP_BATCH_SIZE = 100
 
 type ResumeRunInput = {
   runId: string
@@ -236,6 +239,8 @@ export class ExperimentRunsService extends createPrismaBase(
         status: ExperimentRunStatus.AWAITING_RESUME,
         resumeScheduledFor: { lte: now },
       },
+      orderBy: { resumeScheduledFor: Prisma.SortOrder.asc },
+      take: RESUME_SWEEP_BATCH_SIZE,
     })
 
     for (const run of due) {

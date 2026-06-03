@@ -497,6 +497,8 @@ describe('ExperimentRunsService', () => {
               lte: expect.any(Date),
             }),
           }),
+          orderBy: { resumeScheduledFor: 'asc' },
+          take: 100,
         }),
       )
 
