@@ -10,3 +10,19 @@ export type AiChatMessage = {
   id?: string
   usage?: number
 }
+
+export type CampaignChatErrorCode =
+  | 'upstream_unavailable'
+  | 'rate_limited'
+  | 'aborted'
+  | 'internal'
+
+export type CampaignChatChunk =
+  | { type: 'text'; delta: string }
+  | { type: 'done'; threadId: string; message: AiChatMessage }
+  | {
+      type: 'error'
+      code: CampaignChatErrorCode
+      message: string
+      retryable: boolean
+    }
