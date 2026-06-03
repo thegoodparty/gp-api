@@ -932,14 +932,12 @@ export class QueueConsumerService {
         ),
       )
 
-    await this.campaignStrategy
-      .onExperimentRunCompleted(updatedRun)
-      .catch((err: unknown) =>
-        this.logger.error(
-          { err, runId: updatedRun.runId },
-          'campaignStrategy.onExperimentRunCompleted failed after run update',
-        ),
-      )
+    // Let a persistence failure propagate so handleMessageAndMaybeRequeue
+    // requeues the message (bounded by the SQS redrive policy -> DLQ) instead
+    // of silently acking a COMPLETED run that never got its section persisted.
+    // onExperimentRunCompleted is a no-op for runs that aren't campaign-strategy
+    // runs, so this only throws on a genuine campaign-strategy persist failure.
+    await this.campaignStrategy.onExperimentRunCompleted(updatedRun)
 
     return true
   }

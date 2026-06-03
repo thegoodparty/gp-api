@@ -251,22 +251,40 @@ export class CampaignStrategyService extends createPrismaBase(
     if (dispatchOpposition) {
       const runId = await this.tryDispatch(OPPOSITION, base)
       if (runId) {
-        await this.client.campaignStrategy.update({
-          where: { id: plan.id },
-          data: { oppositionRunId: runId },
-        })
-        dispatchedAny = true
+        try {
+          await this.client.campaignStrategy.update({
+            where: { id: plan.id },
+            data: { oppositionRunId: runId },
+          })
+          dispatchedAny = true
+        } catch (error) {
+          // A transient DB fault linking the run must not 500 the poll: the
+          // unlinked RUNNING row is reclaimed by the stale sweep and the next
+          // poll re-dispatches.
+          this.logger.error(
+            { error, planId: plan.id, runId },
+            'Failed to link oppositionRunId to plan',
+          )
+        }
       }
     }
 
     if (dispatchOpportunities) {
       const runId = await this.tryDispatch(OPPORTUNITIES, base)
       if (runId) {
-        await this.client.campaignStrategy.update({
-          where: { id: plan.id },
-          data: { opportunitiesRunId: runId },
-        })
-        dispatchedAny = true
+        try {
+          await this.client.campaignStrategy.update({
+            where: { id: plan.id },
+            data: { opportunitiesRunId: runId },
+          })
+          dispatchedAny = true
+        } catch (error) {
+          // See the opposition branch: don't 500 on a transient link failure.
+          this.logger.error(
+            { error, planId: plan.id, runId },
+            'Failed to link opportunitiesRunId to plan',
+          )
+        }
       }
     }
 
