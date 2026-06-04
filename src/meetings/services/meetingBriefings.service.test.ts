@@ -179,6 +179,31 @@ describe('POST /v1/elected-office dispatches schedule only (briefing chains via 
     expect(res.status).toBe(200)
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
+
+  it('skips schedule dispatch when a schedule run already exists for the org', async () => {
+    const suffix = Date.now()
+    const owner = await service.prisma.user.create({
+      data: { email: `dedup-${suffix}@example.com` },
+    })
+    const orgSlug = `eo-dedup-${suffix}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: owner.id },
+    })
+    const electedOffice = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: owner.id },
+    })
+    await seedScheduleForOrg(orgSlug)
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onElectedOfficeCreated(electedOffice)
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
