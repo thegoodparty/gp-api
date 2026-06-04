@@ -150,8 +150,8 @@ export class WebsitesController {
     this.logger.setContext(WebsitesController.name)
   }
 
-  private uploadWebsiteImage(file: FileUpload) {
-    const key = this.s3.buildKey('uploads', file.filename)
+  private uploadWebsiteImage(campaignId: number, file: FileUpload) {
+    const key = this.s3.buildKey(`uploads/${campaignId}`, file.filename)
     return this.s3.uploadFile(ASSET_DOMAIN, file.data, key, {
       contentType: file.mimetype,
       cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
@@ -332,8 +332,8 @@ export class WebsitesController {
       body.status === WebsiteStatus.published && !hasEverBeenPublished
 
     const [logo, hero] = await Promise.all([
-      logoFile ? this.uploadWebsiteImage(logoFile) : null,
-      heroFile ? this.uploadWebsiteImage(heroFile) : null,
+      logoFile ? this.uploadWebsiteImage(campaignId, logoFile) : null,
+      heroFile ? this.uploadWebsiteImage(campaignId, heroFile) : null,
     ])
 
     if (logo) {

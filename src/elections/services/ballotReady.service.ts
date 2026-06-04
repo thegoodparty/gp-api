@@ -127,6 +127,80 @@ export class BallotReadyService {
     }
   }
 
+  // Hop from a general-election race to its sibling primary race, returning
+  // the primary's brHashId (the id election-api keys campaign-strategy-context
+  // on). Returns null when the position has no primary or none can be found.
+  async fetchPrimaryRaceId(generalRaceId: string): Promise<string | null> {
+    const race = await this.fetchRaceById(generalRaceId)
+    const positionId = race?.node?.position?.id
+    // electionDay is an ISO8601Date GraphQL scalar (typed `any`); coerce.
+    const generalDay = String(race?.node?.election?.electionDay ?? '')
+    if (!positionId || !race?.node?.position?.hasPrimary || !generalDay) {
+      return null
+    }
+    const year = generalDay.slice(0, 4)
+    const query = gql`
+      query PrimaryRaceForPosition(
+        $positionId: ID!
+        $rangeStart: ISO8601Date!
+        $rangeEnd: ISO8601Date!
+      ) {
+        node(id: $positionId) {
+          ... on Position {
+            races(
+              filterBy: { electionDay: { gte: $rangeStart, lte: $rangeEnd } }
+              first: 50
+            ) {
+              edges {
+                node {
+                  id
+                  isPrimary
+                  election {
+                    electionDay
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<
+        {
+          node: {
+            races?: {
+              edges: {
+                node: {
+                  id: string
+                  isPrimary: boolean
+                  election: { electionDay: string }
+                }
+              }[]
+            }
+          } | null
+        },
+        { positionId: string; rangeStart: string; rangeEnd: string }
+      >(query, {
+        positionId,
+        rangeStart: `${year}-01-01`,
+        rangeEnd: `${year}-12-31`,
+      })
+      const primary = (result?.node?.races?.edges ?? [])
+        .map((e) => e.node)
+        .filter((n) => n.isPrimary && n.election.electionDay !== generalDay)
+        .sort((a, b) =>
+          String(a.election.electionDay).localeCompare(
+            String(b.election.electionDay),
+          ),
+        )[0]
+      return primary?.id ?? null
+    } catch (error) {
+      this.logger.error({ error }, 'Error at fetchPrimaryRaceId:')
+      return null
+    }
+  }
+
   async fetchRaceByPositionAndDate(params: {
     brPositionId: string
     electionDate: string

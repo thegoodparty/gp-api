@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { Domain, DomainStatus, WebsiteStatus } from '@prisma/client'
+import {
+  Domain,
+  DomainSource,
+  DomainStatus,
+  WebsiteStatus,
+} from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -37,6 +42,7 @@ const mockDomain: Domain = {
   price: new Decimal(11.25),
   paymentId: 'pi_123',
   status: DomainStatus.pending,
+  source: DomainSource.manual,
   operationId: null,
   emailForwardingDomainId: null,
   registrantVerifiedAt: null,
@@ -601,6 +607,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           domainName,
           maxPrice,
+          DomainSource.manual,
         ),
       ).rejects.toBeInstanceOf(NotFoundException)
 
@@ -614,7 +621,12 @@ describe('DomainsService', () => {
       }
 
       await expect(
-        service.purchaseDomainForCampaign(nonProCampaign, domainName, maxPrice),
+        service.purchaseDomainForCampaign(
+          nonProCampaign,
+          domainName,
+          maxPrice,
+          DomainSource.manual,
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException)
 
       expect(mockPrisma.website.findUnique).not.toHaveBeenCalled()
@@ -638,6 +650,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           mockDomain.name,
           maxPrice,
+          DomainSource.manual,
         )
 
         expect(result.alreadyExisted).toBe(true)
@@ -672,6 +685,7 @@ describe('DomainsService', () => {
             campaignWithUser,
             domainName,
             maxPrice,
+            DomainSource.manual,
           ),
         ).rejects.toBeInstanceOf(ConflictException)
 
@@ -713,6 +727,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
@@ -754,6 +769,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       const route53Order =
@@ -808,6 +824,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       expect(mockPrisma.domain.delete).toHaveBeenCalledWith({
@@ -840,6 +857,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           domainName,
           maxPrice,
+          DomainSource.manual,
         ),
       ).rejects.toBeInstanceOf(ConflictException)
 
@@ -857,6 +875,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           domainName,
           maxPrice,
+          DomainSource.manual,
         ),
       ).rejects.toBeInstanceOf(ConflictException)
 
@@ -893,6 +912,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       expect(result.alreadyExisted).toBe(false)
@@ -908,6 +928,48 @@ describe('DomainsService', () => {
         }),
       })
     })
+
+    it.each([DomainSource.manual, DomainSource.agentic])(
+      'stamps the reserved Domain row with the caller-supplied source=%s',
+      async (source) => {
+        mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
+        mockPrisma.website.findUniqueOrThrow.mockResolvedValue({
+          content: { contact: {} },
+        })
+        mockRoute53.checkDomainAvailability.mockResolvedValue({
+          Availability: DomainAvailability.AVAILABLE,
+        })
+        mockVercel.checkDomainPrice.mockResolvedValue({ price: 12 })
+        const created = {
+          ...mockDomain,
+          name: domainName,
+          paymentId: null,
+          price: new Decimal(12),
+          source,
+        }
+        mockPrisma.domain.create.mockResolvedValue(created)
+        mockPrisma.domain.findUniqueOrThrow.mockResolvedValue({
+          ...created,
+          status: DomainStatus.submitted,
+        })
+        vi.spyOn(service, 'completeDomainRegistration').mockResolvedValue({
+          vercelResult: null,
+          projectResult: null,
+          message: 'Disabled',
+        })
+
+        await service.purchaseDomainForCampaign(
+          campaignWithUser,
+          domainName,
+          maxPrice,
+          source,
+        )
+
+        expect(mockPrisma.domain.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ source }),
+        })
+      },
+    )
 
     it('invokes completeDomainRegistration with skipPaymentVerification after reservation', async () => {
       mockPrisma.website.findUnique.mockResolvedValue(baseWebsite)
@@ -941,6 +1003,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       expect(completeSpy).toHaveBeenCalledTimes(1)
@@ -984,6 +1047,7 @@ describe('DomainsService', () => {
         campaignWithUser,
         domainName,
         maxPrice,
+        DomainSource.manual,
       )
 
       const [, contactArg] = completeSpy.mock.calls[0]
@@ -1012,6 +1076,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           domainName,
           maxPrice,
+          DomainSource.manual,
         ),
       ).rejects.toBeInstanceOf(ConflictException)
 
@@ -1049,6 +1114,7 @@ describe('DomainsService', () => {
           campaignWithUser,
           domainName,
           maxPrice,
+          DomainSource.manual,
         ),
       ).rejects.toBe(registrationError)
 
