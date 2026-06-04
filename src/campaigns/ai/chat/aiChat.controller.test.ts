@@ -56,7 +56,7 @@ const makeController = (streamImpl: StreamImpl) => {
     slack as never,
     createMockLogger(),
   )
-  return { controller, streamChat }
+  return { controller, streamChat, campaigns }
 }
 
 describe('AiChatController.stream', () => {
@@ -185,6 +185,31 @@ describe('AiChatController.stream', () => {
     expect(req.raw.off).toHaveBeenCalledWith('close', expect.any(Function))
     expect(streamChat).not.toHaveBeenCalled()
     expect(reply.raw.end).not.toHaveBeenCalled()
+  })
+
+  it('keeps the resolved L2 district even when live-metrics lookup fails', async () => {
+    let captured: unknown[] = []
+    const { controller, campaigns } = makeController((...args: unknown[]) => {
+      captured = args
+      return gen([
+        {
+          type: 'done',
+          threadId: 't1',
+          message: { role: 'assistant', content: 'a' },
+        },
+      ])
+    })
+    // Metrics lookup rejects, district lookup succeeds — the district must survive.
+    campaigns.fetchLiveRaceTargetMetrics.mockRejectedValue(new Error('boom'))
+    campaigns.resolveL2DistrictName.mockResolvedValue('State House District 5')
+    const reply = makeReply()
+    const req = makeReq()
+
+    await controller.stream(CAMPAIGN, BODY, req as never, reply as never)
+
+    // streamChat(campaign, body, liveMetrics, l2DistrictName, signal)
+    expect(captured[2]).toBeNull()
+    expect(captured[3]).toBe('State House District 5')
   })
 
   it('writes a timeout error chunk when the stream exceeds the deadline', async () => {

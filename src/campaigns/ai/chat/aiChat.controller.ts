@@ -116,6 +116,42 @@ export class AiChatController {
     this.logger.setContext(AiChatController.name)
   }
 
+  /**
+   * Resolves the optional chat-enrichment context (live race metrics + the L2
+   * district name) independently. Uses `allSettled` so a failure in one lookup
+   * never discards the other's value — both are best-effort personalization and
+   * must never break (or degrade) the chat.
+   */
+  private async resolveChatEnrichment(campaign: PromptReplaceCampaign): Promise<{
+    liveMetrics: RaceTargetMetrics | null
+    l2DistrictName: string | null
+  }> {
+    const [metricsResult, districtResult] = await Promise.allSettled([
+      this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+      this.campaigns.resolveL2DistrictName(campaign),
+    ])
+
+    if (metricsResult.status === 'rejected') {
+      this.logger.error(
+        { e: metricsResult.reason },
+        'failed to fetch live race metrics for chat',
+      )
+    }
+    if (districtResult.status === 'rejected') {
+      this.logger.error(
+        { e: districtResult.reason },
+        'failed to resolve L2 district name for chat',
+      )
+    }
+
+    return {
+      liveMetrics:
+        metricsResult.status === 'fulfilled' ? metricsResult.value : null,
+      l2DistrictName:
+        districtResult.status === 'fulfilled' ? districtResult.value : null,
+    }
+  }
+
   @Get()
   async list(@ReqUser() { id: userId }: User) {
     const aiChats = await this.aiChatService.findMany({ where: { userId } })
@@ -170,10 +206,8 @@ export class AiChatController {
     @Body() body: CreateAiChatSchema,
   ) {
     try {
-      const [liveMetrics, l2DistrictName] = await Promise.all([
-        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
-        this.campaigns.resolveL2DistrictName(campaign),
-      ])
+      const { liveMetrics, l2DistrictName } =
+        await this.resolveChatEnrichment(campaign)
       return await this.aiChatService.create(
         campaign,
         body,
@@ -210,10 +244,8 @@ export class AiChatController {
     @Body() body: UpdateAiChatSchema,
   ) {
     try {
-      const [liveMetrics, l2DistrictName] = await Promise.all([
-        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
-        this.campaigns.resolveL2DistrictName(campaign),
-      ])
+      const { liveMetrics, l2DistrictName } =
+        await this.resolveChatEnrichment(campaign)
       return await this.aiChatService.update(
         threadId,
         campaign,
@@ -273,21 +305,8 @@ export class AiChatController {
       return
     }
 
-    let liveMetrics: RaceTargetMetrics | null = null
-    let l2DistrictName: string | null = null
-    try {
-      ;[liveMetrics, l2DistrictName] = await Promise.all([
-        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
-        this.campaigns.resolveL2DistrictName(campaign),
-      ])
-    } catch (err) {
-      this.logger.error(
-        { e: err },
-        'failed to fetch live race metrics for chat stream',
-      )
-      liveMetrics = null
-      l2DistrictName = null
-    }
+    const { liveMetrics, l2DistrictName } =
+      await this.resolveChatEnrichment(campaign)
 
     const iterable = this.aiChatService.streamChat(
       campaign,
