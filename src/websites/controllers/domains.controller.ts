@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Post,
   Query,
+  Req,
   UsePipes,
 } from '@nestjs/common'
 import { DomainsService } from '../services/domains.service'
@@ -25,7 +26,14 @@ import {
 } from '../schemas/PurchaseDomain.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign, DomainStatus, User, UserRole } from '@prisma/client'
+import {
+  Campaign,
+  DomainSource,
+  DomainStatus,
+  User,
+  UserRole,
+} from '@prisma/client'
+import { IncomingRequest } from '@/authentication/authentication.types'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { WebsitesService } from '../services/websites.service'
 import {
@@ -107,11 +115,14 @@ export class DomainsController {
   async purchaseDomain(
     @ReqCampaign() campaign: Campaign & { user: User },
     @Body() { domain, maxPrice }: PurchaseDomainBodySchema,
+    @Req() req: IncomingRequest,
   ) {
+    const source = req.agentToken ? DomainSource.agentic : DomainSource.manual
     const result = await this.domains.purchaseDomainForCampaign(
       campaign,
       domain,
       maxPrice,
+      source,
     )
     return {
       domain: result.domain,
