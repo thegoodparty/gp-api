@@ -1,5 +1,8 @@
 import type { Annotation, MeetingBriefing } from '../../../../generated/prisma'
-import { AnnotationKind, AnnotationResourceType } from '../../../../generated/prisma'
+import {
+  AnnotationKind,
+  AnnotationResourceType,
+} from '../../../../generated/prisma'
 import { buildSystemPrompt } from '../../services/systemPromptBuilder'
 
 // systemPromptBuilder.ts does not export its argument interface, so we

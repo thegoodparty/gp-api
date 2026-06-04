@@ -4,7 +4,11 @@ import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiGenerationService } from './aiGeneration.service'
-import { Campaign, CampaignUpdateHistoryType, Prisma } from '../../../generated/prisma'
+import {
+  Campaign,
+  CampaignUpdateHistoryType,
+  Prisma,
+} from '../../../generated/prisma'
 import { startOfDay } from 'date-fns'
 import { parseIsoDateString } from '@/shared/util/date.util'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

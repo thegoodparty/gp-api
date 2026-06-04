@@ -1,5 +1,10 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common'
-import { Campaign, OutreachStatus, OutreachType, User } from '../generated/prisma'
+import {
+  Campaign,
+  OutreachStatus,
+  OutreachType,
+  User,
+} from '../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OutreachController } from './outreach.controller'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

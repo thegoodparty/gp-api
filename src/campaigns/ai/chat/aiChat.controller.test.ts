@@ -10,7 +10,6 @@ const CAMPAIGN = { id: 1, user: { id: 7 } } as unknown as PromptReplaceCampaign
 const BODY = { message: 'hi', initial: true } as StreamAiChatSchema
 
 const gen = (chunks: CampaignChatChunk[]) =>
-  // eslint-disable-next-line @typescript-eslint/require-await
   (async function* () {
     for (const c of chunks) yield c
   })()
@@ -97,7 +96,6 @@ describe('AiChatController.stream', () => {
 
   it('writes a non-retryable internal error chunk when the iterator throws', async () => {
     const { controller } = makeController(() =>
-      // eslint-disable-next-line @typescript-eslint/require-await
       (async function* () {
         yield { type: 'text', delta: 'a' } as CampaignChatChunk
         throw new Error('boom')
@@ -191,18 +189,15 @@ describe('AiChatController.stream', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    const { controller } = makeController(
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async function* () {
-        yield { type: 'text', delta: 'a' } as CampaignChatChunk
-        await gate
-        yield {
-          type: 'done',
-          threadId: 't1',
-          message: { role: 'assistant', content: 'a' },
-        } as CampaignChatChunk
-      },
-    )
+    const { controller } = makeController(async function* () {
+      yield { type: 'text', delta: 'a' } as CampaignChatChunk
+      await gate
+      yield {
+        type: 'done',
+        threadId: 't1',
+        message: { role: 'assistant', content: 'a' },
+      } as CampaignChatChunk
+    })
     const reply = makeReply()
     const req = makeReq()
 

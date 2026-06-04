@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Campaign, OutreachStatus, OutreachType, User } from '../../generated/prisma'
+import {
+  Campaign,
+  OutreachStatus,
+  OutreachType,
+  User,
+} from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'

@@ -1,5 +1,9 @@
 import { BadGatewayException, ConflictException } from '@nestjs/common'
-import { ExperimentRun, ExperimentRunStatus, Prisma } from '../../../generated/prisma'
+import {
+  ExperimentRun,
+  ExperimentRunStatus,
+  Prisma,
+} from '../../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'

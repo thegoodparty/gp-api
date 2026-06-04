@@ -7,7 +7,12 @@
     "typeCheck": true,
     "deleteOutDir": true,
     "assets": [
-      { "include": "meetings/assets/**/*", "outDir": "dist" }
+      { "include": "meetings/assets/**/*", "outDir": "dist" },
+      { "include": "generated/prisma/**/*.node", "outDir": "dist", "watchAssets": false },
+      { "include": "generated/prisma/**/*.wasm", "outDir": "dist", "watchAssets": false },
+      { "include": "generated/prisma/**/*.mjs", "outDir": "dist", "watchAssets": false },
+      { "include": "generated/prisma/**/*.prisma", "outDir": "dist", "watchAssets": false },
+      { "include": "generated/prisma/package.json", "outDir": "dist", "watchAssets": false }
     ],
     "watchAssets": true
   },

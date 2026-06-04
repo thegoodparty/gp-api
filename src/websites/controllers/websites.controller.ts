@@ -15,7 +15,12 @@ import {
   Query,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
-import { Campaign, DomainStatus, User, WebsiteStatus } from '../../generated/prisma'
+import {
+  Campaign,
+  DomainStatus,
+  User,
+  WebsiteStatus,
+} from '../../generated/prisma'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
