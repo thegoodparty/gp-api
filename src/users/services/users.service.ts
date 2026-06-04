@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
 import { Campaign, Prisma, User } from '../../generated/prisma'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { isPrismaError } from 'src/prisma/util/prismaErrors.util'
 import { subHours } from 'date-fns'
 import ms from 'ms'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -254,10 +254,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       )
       return user
     } catch (err) {
-      if (
-        err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isPrismaError(err, 'P2002')) {
         return this.resolveAfterP2002(data)
       }
       throw err

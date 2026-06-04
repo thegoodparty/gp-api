@@ -23,7 +23,7 @@ import {
   UpdatePasswordSchema,
 } from '@goodparty_org/contracts'
 import { User } from '../generated/prisma'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { isPrismaError } from '../prisma/util/prismaErrors.util'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
@@ -171,11 +171,8 @@ export class UsersController {
   async delete(@Param() { id }: UserIdParamSchema, @ReqUser() reqUser: User) {
     try {
       return await this.usersService.deleteUser(id, reqUser.id)
-    } catch (error: unknown | PrismaClientKnownRequestError) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+    } catch (error: unknown) {
+      if (isPrismaError(error, 'P2025')) {
         this.logger.warn(
           `request to delete user that does not exist, w/ id: ${id}`,
         )

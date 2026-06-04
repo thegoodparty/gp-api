@@ -16,8 +16,8 @@ import {
   TcrComplianceStatus,
   User,
 } from '../../../generated/prisma'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { isPrismaError } from 'src/prisma/util/prismaErrors.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
   MessageGroup,
@@ -656,10 +656,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
     } catch (err) {
-      if (
-        err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isPrismaError(err, 'P2002')) {
         const raced = await this.fetchByCampaignId(campaign.id)
         if (raced) {
           this.logger.info(
