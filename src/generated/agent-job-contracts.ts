@@ -87,6 +87,10 @@ export interface AgentJobContracts {
   meeting_briefing: {
     Input: {
       /**
+       * Optional hint from a prior run describing where the agenda packet was last found. (Manually added ahead of S3 publish; will be regenerated from the v6 manifest on next sync.)
+       */
+      knownAgendaLocation?: string
+      /**
        * L2 district value to match (e.g. "25"). Required if l2DistrictType is set.
        */
       l2DistrictName?: string
@@ -1557,6 +1561,10 @@ export interface MeetingScheduleInput {
    * Opaque gp-api ElectedOffice.id; passed through to the callback. Not used during research.
    */
   elected_office_id?: string
+  /**
+   * Optional hint from a prior run describing where the meeting schedule was last found. (Manually added ahead of S3 publish; will be regenerated from the v2 manifest on next sync.)
+   */
+  known_schedule_location?: string
   /**
    * Full position/office name as it appears to the candidate (e.g. 'Burnsville City Council Member', 'Mayor of Cheyenne'). Usually contains the jurisdiction verbatim; when generic (e.g. just 'City Council'), the agent must infer the city from the position + state via WebSearch.
    */

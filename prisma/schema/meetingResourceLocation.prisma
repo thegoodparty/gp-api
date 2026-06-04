@@ -1,0 +1,23 @@
+enum MeetingResourceLocationType {
+  AGENDA
+  SCHEDULE
+}
+
+model MeetingResourceLocation {
+  id String @id @default(uuid(7))
+
+  electedOfficeId String        @map("elected_office_id")
+  electedOffice   ElectedOffice @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
+
+  type        MeetingResourceLocationType
+  description String                      @db.Text
+
+  experimentRunId String?        @map("experiment_run_id")
+  experimentRun   ExperimentRun? @relation(fields: [experimentRunId], references: [runId], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([electedOfficeId, type])
+  @@map("meeting_resource_location")
+}

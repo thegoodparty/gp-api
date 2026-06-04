@@ -1,28 +1,29 @@
+import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { CronLockService } from '@/cron/services/cronLock.service'
+import { MeetingSchedule } from '@/generated/agent-job-contracts'
+import { LlmService } from '@/llm/services/llm.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+import { getUserFullName } from '@/users/util/users.util'
+import { S3Service } from '@/vendors/aws/services/s3.service'
+import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
+import { SegmentService } from '@/vendors/segment/segment.service'
 import { Injectable } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import {
   ElectedOffice,
   ExperimentRun,
   ExperimentRunStatus,
+  MeetingResourceLocationType,
   Prisma,
 } from '@prisma/client'
-import { rrulestr } from 'rrule'
-import { formatInTimeZone } from 'date-fns-tz'
 import { addDays } from 'date-fns'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { OrganizationsService } from '@/organizations/services/organizations.service'
-import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
-import { S3Service } from '@/vendors/aws/services/s3.service'
-import { SegmentService } from '@/vendors/segment/segment.service'
-import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
-import { LlmService } from '@/llm/services/llm.service'
-import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
-import { parseIsoDateAsUTC } from '@/shared/util/date.util'
-import { MeetingSchedule } from '@/generated/agent-job-contracts'
-import { getUserFullName } from '@/users/util/users.util'
-import { CronLockService } from '@/cron/services/cronLock.service'
+import { formatInTimeZone } from 'date-fns-tz'
 import { chunk } from 'es-toolkit'
 import ms from 'ms'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+import { rrulestr } from 'rrule'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const parseBriefingArtifact = (
   raw: string,
@@ -54,6 +55,44 @@ const extractElectedOfficeId = (params: unknown): string | null => {
   }
   const value: unknown = params.elected_office_id
   return typeof value === 'string' ? value : null
+}
+
+// Maximum prose length we persist for a discovered location hint. Mirrors the
+// runbooks manifests so the DB row matches what the schema validator allows.
+const DISCOVERED_LOCATION_MAX = 2000
+
+const readStringField = (obj: unknown, key: string): string | null => {
+  if (
+    typeof obj !== 'object' ||
+    obj === null ||
+    Array.isArray(obj) ||
+    !(key in obj)
+  ) {
+    return null
+  }
+  const value: unknown = Reflect.get(obj, key)
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, DISCOVERED_LOCATION_MAX)
+}
+
+const extractDiscoveredScheduleLocation = (schedule: unknown): string | null =>
+  readStringField(schedule, 'discovered_schedule_location')
+
+const extractDiscoveredAgendaLocation = (artifact: unknown): string | null => {
+  if (
+    typeof artifact !== 'object' ||
+    artifact === null ||
+    Array.isArray(artifact) ||
+    !('run_metadata' in artifact)
+  ) {
+    return null
+  }
+  return readStringField(
+    Reflect.get(artifact, 'run_metadata'),
+    'discovered_agenda_location',
+  )
 }
 
 // Identifies the daily-briefing cron in the cron_run lease table.
@@ -208,7 +247,22 @@ export class MeetingBriefingsService extends createPrismaBase(
     await this.dispatchSchedule(ctx)
   }
 
+  private async loadLocationHint(
+    electedOfficeId: string,
+    type: MeetingResourceLocationType,
+  ): Promise<string | null> {
+    const row = await this.client.meetingResourceLocation.findUnique({
+      where: { electedOfficeId_type: { electedOfficeId, type } },
+      select: { description: true },
+    })
+    return row?.description ?? null
+  }
+
   private async dispatchSchedule(ctx: DispatchContext): Promise<void> {
+    const hint = await this.loadLocationHint(
+      ctx.electedOfficeId,
+      MeetingResourceLocationType.SCHEDULE,
+    )
     await this.experimentRuns.dispatchRun({
       type: SCHEDULE_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
@@ -217,6 +271,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         elected_office_id: ctx.electedOfficeId,
         state: ctx.state,
         office: ctx.positionName,
+        ...(hint ? { known_schedule_location: hint } : {}),
       },
     })
   }
@@ -225,6 +280,10 @@ export class MeetingBriefingsService extends createPrismaBase(
     ctx: DispatchContext,
     meeting: TargetMeeting,
   ): Promise<void> {
+    const hint = await this.loadLocationHint(
+      ctx.electedOfficeId,
+      MeetingResourceLocationType.AGENDA,
+    )
     await this.experimentRuns.dispatchRun({
       type: BRIEFING_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
@@ -238,6 +297,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         meetingTimezone: meeting.meetingTimezone,
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
         ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
+        ...(hint ? { knownAgendaLocation: hint } : {}),
       },
     })
   }
@@ -329,13 +389,87 @@ export class MeetingBriefingsService extends createPrismaBase(
     if (run.status !== ExperimentRunStatus.COMPLETED) return
 
     if (run.experimentType === BRIEFING_EXPERIMENT_TYPE) {
-      await this.upsertBriefingRow(run)
+      await this.handleBriefingCompletion(run)
       return
     }
 
     if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
+      // Critical work first (cron chain). Hint persistence is a best-effort
+      // optimization and must not gate the briefing dispatch — the queue
+      // consumer swallows throws from this handler without retry.
       await this.maybeDispatchBriefingAfterSchedule(run)
+      await this.persistScheduleLocationFromRun(run)
     }
+  }
+
+  private async handleBriefingCompletion(run: ExperimentRun): Promise<void> {
+    const loaded = await this.loadBriefingArtifact(run)
+    if (!loaded) return
+    // Critical work first (the briefing row). Location persistence comes
+    // after so a hint-upsert failure can't block the row write — the queue
+    // consumer swallows throws from this handler without retry. Location
+    // persists regardless of briefing_status (writeBriefingRowFromArtifact
+    // early-returns on placeholder statuses), so placeholder runs still
+    // capture the hint.
+    await this.writeBriefingRowFromArtifact(
+      run,
+      loaded.electedOffice,
+      loaded.artifact,
+    )
+    await this.persistAgendaLocationFromArtifact(
+      run,
+      loaded.electedOffice.id,
+      loaded.artifact,
+    )
+  }
+
+  private async upsertResourceLocation(args: {
+    electedOfficeId: string
+    type: MeetingResourceLocationType
+    description: string
+    experimentRunId: string
+  }): Promise<void> {
+    const { electedOfficeId, type, description, experimentRunId } = args
+    await this.client.meetingResourceLocation.upsert({
+      where: { electedOfficeId_type: { electedOfficeId, type } },
+      create: { electedOfficeId, type, description, experimentRunId },
+      update: { description, experimentRunId },
+    })
+  }
+
+  private async persistScheduleLocationFromRun(
+    run: ExperimentRun,
+  ): Promise<void> {
+    if (!run.artifactBucket || !run.artifactKey) return
+
+    const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
+    if (!raw) return
+
+    let schedule: unknown
+    try {
+      schedule = JSON.parse(raw)
+    } catch {
+      return
+    }
+
+    const description = extractDiscoveredScheduleLocation(schedule)
+    if (!description) return
+
+    const electedOfficeId = extractElectedOfficeId(run.params)
+    if (!electedOfficeId) {
+      this.logger.warn(
+        { runId: run.runId },
+        'schedule run completed without elected_office_id in params; cannot persist location hint',
+      )
+      return
+    }
+
+    await this.upsertResourceLocation({
+      electedOfficeId,
+      type: MeetingResourceLocationType.SCHEDULE,
+      description,
+      experimentRunId: run.runId,
+    })
   }
 
   /**
@@ -511,13 +645,16 @@ export class MeetingBriefingsService extends createPrismaBase(
     }
   }
 
-  private async upsertBriefingRow(run: ExperimentRun): Promise<void> {
+  private async loadBriefingArtifact(run: ExperimentRun): Promise<{
+    artifact: PrismaJson.MeetingBriefingArtifact
+    electedOffice: { id: string; userId: number }
+  } | null> {
     if (!run.artifactBucket || !run.artifactKey) {
       this.logger.error(
         { runId: run.runId },
         'meeting_briefing completed without artifact pointers',
       )
-      return
+      return null
     }
 
     const electedOffice = await this.client.electedOffice.findUnique({
@@ -529,9 +666,8 @@ export class MeetingBriefingsService extends createPrismaBase(
         { runId: run.runId, organizationSlug: run.organizationSlug },
         'meeting_briefing completed but no ElectedOffice for the org',
       )
-      return
+      return null
     }
-    const electedOfficeId = electedOffice.id
 
     const raw = await this.s3.getFile(run.artifactBucket, run.artifactKey)
     if (!raw) {
@@ -539,19 +675,41 @@ export class MeetingBriefingsService extends createPrismaBase(
         { runId: run.runId },
         'meeting_briefing artifact missing from S3',
       )
-      return
+      return null
     }
 
-    let artifact: PrismaJson.MeetingBriefingArtifact
     try {
-      artifact = parseBriefingArtifact(raw)
+      return { artifact: parseBriefingArtifact(raw), electedOffice }
     } catch {
       this.logger.error(
         { runId: run.runId },
         'meeting_briefing artifact is not valid JSON',
       )
-      return
+      return null
     }
+  }
+
+  private async persistAgendaLocationFromArtifact(
+    run: ExperimentRun,
+    electedOfficeId: string,
+    artifact: PrismaJson.MeetingBriefingArtifact,
+  ): Promise<void> {
+    const description = extractDiscoveredAgendaLocation(artifact)
+    if (!description) return
+    await this.upsertResourceLocation({
+      electedOfficeId,
+      type: MeetingResourceLocationType.AGENDA,
+      description,
+      experimentRunId: run.runId,
+    })
+  }
+
+  private async writeBriefingRowFromArtifact(
+    run: ExperimentRun,
+    electedOffice: { id: string; userId: number },
+    artifact: PrismaJson.MeetingBriefingArtifact,
+  ): Promise<void> {
+    if (!run.artifactBucket || !run.artifactKey) return
 
     const briefingStatus = artifact.briefing_status
     if (briefingStatus === undefined) {
@@ -611,6 +769,7 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
+    const electedOfficeId = electedOffice.id
     await this.model.upsert({
       where: {
         electedOfficeId_meetingDate: {
