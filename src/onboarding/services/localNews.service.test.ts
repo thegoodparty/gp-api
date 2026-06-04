@@ -24,6 +24,11 @@ const cacheKey = (
 
 function makeService() {
   const gemini = {
+    generateWithSearch: vi.fn().mockResolvedValue({
+      text: 'mock search results',
+      searchQueries: [],
+      sources: [],
+    }),
     generateStructured: vi.fn(),
   }
   // Pass-through tracedNested: invoke the wrapped fn unchanged so the test
