@@ -49,27 +49,46 @@ export class ElectedOfficeService extends createPrismaBase(
       overrideDistrictId: null,
     }
 
-    const created = await this.client.$transaction(async (tx) => {
-      const id = uuidv7()
+    let created: ElectedOffice
+    try {
+      created = await this.client.$transaction(async (tx) => {
+        const id = uuidv7()
 
-      await tx.organization.create({
-        data: {
-          slug: OrganizationsService.electedOfficeOrgSlug(id),
-          ownerId: args.userId,
-          ...orgData,
-        },
-      })
+        await tx.organization.create({
+          data: {
+            slug: OrganizationsService.electedOfficeOrgSlug(id),
+            ownerId: args.userId,
+            ...orgData,
+          },
+        })
 
-      return tx.electedOffice.create({
-        data: {
-          id,
-          swornInDate: args.swornInDate,
-          userId: args.userId,
-          campaignId: args.campaignId,
-          organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
-        },
+        return tx.electedOffice.create({
+          data: {
+            id,
+            swornInDate: args.swornInDate,
+            userId: args.userId,
+            campaignId: args.campaignId,
+            organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
+          },
+        })
       })
-    })
+    } catch (err) {
+      // A concurrent create that wins the race trips the userId unique
+      // constraint; the transaction rolls back (no orphan org) and we return
+      // the row the other caller committed, keeping the endpoint idempotent.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const concurrent = await this.model.findFirst({
+          where: { userId: args.userId },
+        })
+        if (concurrent) {
+          return concurrent
+        }
+      }
+      throw err
+    }
 
     await this.meetingBriefings
       .onElectedOfficeCreated(created)

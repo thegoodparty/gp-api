@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import {
   beforeEach,
   describe,
@@ -96,6 +96,33 @@ describe('ElectedOfficeService', () => {
       })
       expect(mockOrgCreate).not.toHaveBeenCalled()
       expect(mockEoCreate).not.toHaveBeenCalled()
+    })
+
+    it('returns the concurrently-created office when the insert hits the unique constraint', async () => {
+      const createArgs: CreateElectedOfficeArgs = {
+        userId: 1,
+        campaignId: 1,
+      }
+      const concurrent = {
+        id: 'concurrent',
+        userId: 1,
+        campaignId: 1,
+        organizationSlug: 'eo-concurrent',
+      }
+
+      mockModel.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(concurrent)
+      mockEoCreate.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )
+
+      const result = await service.create(createArgs)
+
+      expect(result).toBe(concurrent)
     })
 
     it('creates organization with default org data and elected office in transaction', async () => {

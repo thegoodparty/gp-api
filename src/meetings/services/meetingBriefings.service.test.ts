@@ -123,7 +123,7 @@ describe('POST /v1/elected-office dispatches schedule only (briefing chains via 
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(200)
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
 
@@ -145,7 +145,7 @@ describe('POST /v1/elected-office dispatches schedule only (briefing chains via 
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(200)
     // Only the schedule fires on creation. The briefing is chained later
     // in onExperimentRunCompleted once the schedule lands and the
     // imminence gate confirms a meeting inside the 5-day window.
@@ -176,7 +176,7 @@ describe('POST /v1/elected-office dispatches schedule only (briefing chains via 
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(200)
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
 })

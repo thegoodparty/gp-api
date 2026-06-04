@@ -37,7 +37,7 @@ describe('ElectedOfficeController', () => {
       const created = await createElectedOffice({
         swornInDate: '2024-01-15',
       })
-      expect(created.status).toBe(201)
+      expect(created.status).toBe(200)
 
       const eoOrgSlug = `eo-${created.data.id}`
       const result = await service.client.get('/v1/elected-office/current', {
@@ -63,7 +63,7 @@ describe('ElectedOfficeController', () => {
       const created = await createElectedOffice({
         swornInDate: '2024-01-15',
       })
-      expect(created.status).toBe(201)
+      expect(created.status).toBe(200)
 
       const eoOrgSlug = `eo-${created.data.id}`
       const result = await service.client.get('/v1/elected-office/current', {
@@ -187,7 +187,7 @@ describe('ElectedOfficeController', () => {
         swornInDate: '2024-01-15',
       })
 
-      expect(result.status).toBe(201)
+      expect(result.status).toBe(200)
       expect(result.data).toEqual({
         id: expect.any(String),
         swornInDate: '2024-01-15',
@@ -209,7 +209,7 @@ describe('ElectedOfficeController', () => {
     it('creates elected office with only required fields', async () => {
       const result = await createElectedOffice()
 
-      expect(result.status).toBe(201)
+      expect(result.status).toBe(200)
       expect(result.data).toMatchObject({
         id: expect.any(String),
       })
@@ -235,19 +235,20 @@ describe('ElectedOfficeController', () => {
 
       const result = await createElectedOffice()
 
-      expect(result.status).toBe(201)
+      expect(result.status).toBe(200)
       expect(result.data).toMatchObject({
         id: expect.any(String),
       })
     })
 
-    it('returns the existing elected office instead of erroring when one already exists', async () => {
-      const first = await createElectedOffice()
-      expect(first.status).toBe(201)
+    it('returns the existing elected office, ignoring the new input, when one already exists', async () => {
+      const first = await createElectedOffice({ swornInDate: '2024-01-15' })
+      expect(first.status).toBe(200)
 
-      const second = await createElectedOffice()
-      expect(second.status).toBe(201)
+      const second = await createElectedOffice({ swornInDate: '2025-06-01' })
+      expect(second.status).toBe(200)
       expect(second.data.id).toBe(first.data.id)
+      expect(second.data.swornInDate).toBe('2024-01-15')
 
       const offices = await service.prisma.electedOffice.findMany({
         where: { userId: service.user.id },
