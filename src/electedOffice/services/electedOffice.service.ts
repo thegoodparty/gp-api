@@ -1,10 +1,5 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  forwardRef,
-} from '@nestjs/common'
+import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -45,7 +40,7 @@ export class ElectedOfficeService extends createPrismaBase(
       where: { userId: args.userId },
     })
     if (existing) {
-      throw new ConflictException('User already has an active elected office')
+      return existing
     }
 
     const orgData = args.orgData ?? {

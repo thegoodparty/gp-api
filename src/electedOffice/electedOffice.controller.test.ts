@@ -241,6 +241,20 @@ describe('ElectedOfficeController', () => {
       })
     })
 
+    it('returns the existing elected office instead of erroring when one already exists', async () => {
+      const first = await createElectedOffice()
+      expect(first.status).toBe(201)
+
+      const second = await createElectedOffice()
+      expect(second.status).toBe(201)
+      expect(second.data.id).toBe(first.data.id)
+
+      const offices = await service.prisma.electedOffice.findMany({
+        where: { userId: service.user.id },
+      })
+      expect(offices).toHaveLength(1)
+    })
+
     it('returns 403 when user has no campaign', async () => {
       await service.prisma.campaign.deleteMany({
         where: { userId: service.user.id },

@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import {
   beforeEach,
@@ -75,21 +74,23 @@ describe('ElectedOfficeService', () => {
   })
 
   describe('create', () => {
-    it('throws ConflictException when user already has an elected office', async () => {
+    it('returns the existing elected office without creating a new one', async () => {
       const createArgs: CreateElectedOfficeArgs = {
         userId: 1,
         campaignId: 1,
       }
+      const existing = {
+        id: 'existing',
+        userId: 1,
+        campaignId: 1,
+        organizationSlug: 'eo-existing',
+      }
 
-      mockModel.findFirst.mockResolvedValue({ id: 'existing', userId: 1 })
+      mockModel.findFirst.mockResolvedValue(existing)
 
-      await expect(service.create(createArgs)).rejects.toThrow(
-        ConflictException,
-      )
-      await expect(service.create(createArgs)).rejects.toThrow(
-        'User already has an active elected office',
-      )
+      const result = await service.create(createArgs)
 
+      expect(result).toBe(existing)
       expect(mockModel.findFirst).toHaveBeenCalledWith({
         where: { userId: 1 },
       })
