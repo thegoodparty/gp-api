@@ -179,6 +179,7 @@ export const defaultAnthropicProviderFactory: AnthropicProviderFactory = ({
 @Injectable()
 export class LlmService {
   private readonly defaultModels: string[]
+  private readonly chatFallbackModel?: string
   private readonly defaultRetries = 3
   private readonly defaultMaxSteps = 5
   private readonly defaultTimeout = 300000
@@ -205,7 +206,7 @@ export class LlmService {
     anthropicProviderFactory?: AnthropicProviderFactory,
   ) {
     this.logger.setContext(LlmService.name)
-    const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
+    const { TOGETHER_AI_KEY, AI_MODELS = '', AI_FALLBACK_MODEL } = process.env
 
     if (!TOGETHER_AI_KEY) {
       throw new Error('Please set TOGETHER_AI_KEY in your .env')
@@ -240,7 +241,34 @@ export class LlmService {
       anthropicProviderFactory ?? defaultAnthropicProviderFactory
     this.anthropicApiKey = process.env.ANTHROPIC_API_KEY
 
+    // Optional cross-provider fallback for streaming chat. A Claude model only
+    // counts when ANTHROPIC_API_KEY is set (otherwise resolveChatModel would
+    // throw); a non-Claude id (e.g. another Together model) is always usable.
+    const fallback = AI_FALLBACK_MODEL?.trim()
+    if (fallback && (!fallback.startsWith('claude') || this.anthropicApiKey)) {
+      this.chatFallbackModel = fallback
+    } else if (fallback) {
+      this.logger.warn(
+        `AI_FALLBACK_MODEL "${fallback}" ignored: requires ANTHROPIC_API_KEY`,
+      )
+    }
+
     this.streamTextFn = streamTextFn ?? realStreamText
+  }
+
+  /**
+   * Model chain for streaming chat: the default Together models plus an optional
+   * cross-provider fallback (AI_FALLBACK_MODEL). The fallback lets a streamed
+   * chat survive a full Together outage at connect-time, since streaming routes
+   * Claude models to Anthropic via resolveChatModel. (Non-streaming completions
+   * always use the Together client, so they intentionally don't get this.)
+   */
+  getChatModelChain(): string[] {
+    const chain = [...this.defaultModels]
+    if (this.chatFallbackModel && !chain.includes(this.chatFallbackModel)) {
+      chain.push(this.chatFallbackModel)
+    }
+    return chain
   }
 
   private resolveChatModel(model: string): LanguageModel {

@@ -17,6 +17,7 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { RaceTargetMetrics } from 'src/elections/types/elections.types'
+import { formatL2DistrictName } from 'src/campaigns/ai/chat/util/formatDistrictName.util'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -841,6 +842,49 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFeeFromRaceHash !== null
           ? filingFeeFromRaceHash.filingRequirementsText
           : (filingRequirementsText ?? null),
+    }
+  }
+
+  /**
+   * Resolves the candidate's real voter-file (L2) district name for prompt
+   * personalization (e.g. "STATE HOUSE 005", "Clarkdale Town"). Prefers the
+   * org's overridden district, falling back to the matched position's district.
+   * Returns null when no district is resolvable so callers can fall back to the
+   * self-reported `details.district`.
+   */
+  async resolveL2DistrictName(campaign: Campaign): Promise<string | null> {
+    try {
+      const { organizationSlug } = campaign
+      const org = organizationSlug
+        ? await this.organizations.findUnique({
+            where: { slug: organizationSlug },
+          })
+        : null
+
+      if (org?.overrideDistrictId) {
+        const district = await this.elections.getDistrict(
+          org.overrideDistrictId,
+        )
+        return formatL2DistrictName(
+          district?.L2DistrictName,
+          district?.L2DistrictType,
+        )
+      }
+
+      if (org?.positionId) {
+        const position = await this.elections.getPositionById(org.positionId, {
+          includeDistrict: true,
+        })
+        return formatL2DistrictName(
+          position?.district?.L2DistrictName,
+          position?.district?.L2DistrictType,
+        )
+      }
+
+      return null
+    } catch (e) {
+      this.logger.error({ e }, 'failed to resolve L2 district name')
+      return null
     }
   }
 }

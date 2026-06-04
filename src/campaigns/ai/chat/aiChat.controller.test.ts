@@ -47,6 +47,7 @@ const makeController = (streamImpl: StreamImpl) => {
   const aiChatService = { streamChat }
   const campaigns = {
     fetchLiveRaceTargetMetrics: vi.fn().mockResolvedValue(null),
+    resolveL2DistrictName: vi.fn().mockResolvedValue(null),
   }
   const slack = {}
   const controller = new AiChatController(
@@ -120,7 +121,8 @@ describe('AiChatController.stream', () => {
   it('aborts the stream signal when the client disconnects, and cleans up the listener', async () => {
     let captured: AbortSignal | undefined
     const { controller } = makeController((...args: unknown[]) => {
-      captured = args[3] as AbortSignal
+      // streamChat(campaign, body, liveMetrics, l2DistrictName, signal)
+      captured = args[4] as AbortSignal
       return gen([
         { type: 'text', delta: 'a' },
         {

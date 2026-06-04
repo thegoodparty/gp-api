@@ -7,6 +7,7 @@ import type {
   PriorityIssue,
 } from '@/chats/briefing-chats/types/briefing.types'
 import { DateFormats } from '@/shared/util/date.util'
+import { sanitizeUntrustedContent as sharedSanitizeUntrustedContent } from '@/ai/util/sanitizePromptInput.util'
 import type { HighlightSnippet } from './extractHighlight'
 
 type ParsedBriefing = z.infer<typeof BriefingSchema>
@@ -28,24 +29,11 @@ export const GUARDRAIL_DECLINE =
   "I'm a helpful GoodParty assistant — please ask " +
   'me something related to your briefing or your role.'
 
-const DELIMITER_REMOVED = '[delimiter-removed]'
 const DASH = '—'
 
-const DELIMITER_PATTERNS: RegExp[] = [
-  /<\/?briefing_content\s*>?/gi,
-  /<\/?briefing\s*>?/gi,
-  /<\/?user_data\s*>?/gi,
-  /<\/?system\s*>?/gi,
-  /<\/?instructions\s*>?/gi,
-  /<\|im_start\|>/gi,
-  /<\|im_end\|>/gi,
-  /<\|system\|>/gi,
-  /<\|user\|>/gi,
-  /<\|assistant\|>/gi,
-]
-
-export const sanitizeUntrustedContent = (s: string): string =>
-  DELIMITER_PATTERNS.reduce((acc, re) => acc.replace(re, DELIMITER_REMOVED), s)
+// Re-exported from the shared util so existing briefing imports keep working,
+// while also providing a local binding for the helpers below.
+export const sanitizeUntrustedContent = sharedSanitizeUntrustedContent
 
 const ROLE_CLARIFIERS_BLOCK = `ROLE CLARIFIERS (do not violate)
 - You are the chief of staff. The user is the elected official you serve, NOT you.

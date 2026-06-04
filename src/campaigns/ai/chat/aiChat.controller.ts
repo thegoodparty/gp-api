@@ -127,7 +127,9 @@ export class AiChatController {
       chats.push({
         threadId: chat.threadId,
         updatedAt: chat.updatedAt,
-        name: chatData.messages?.length > 0 ? chatData.messages[0].content : '',
+        name:
+          chatData.title ||
+          (chatData.messages?.length > 0 ? chatData.messages[0].content : ''),
       })
     }
 
@@ -168,9 +170,16 @@ export class AiChatController {
     @Body() body: CreateAiChatSchema,
   ) {
     try {
-      const liveMetrics =
-        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-      return await this.aiChatService.create(campaign, body, liveMetrics)
+      const [liveMetrics, l2DistrictName] = await Promise.all([
+        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+        this.campaigns.resolveL2DistrictName(campaign),
+      ])
+      return await this.aiChatService.create(
+        campaign,
+        body,
+        liveMetrics,
+        l2DistrictName,
+      )
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
@@ -201,13 +210,16 @@ export class AiChatController {
     @Body() body: UpdateAiChatSchema,
   ) {
     try {
-      const liveMetrics =
-        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+      const [liveMetrics, l2DistrictName] = await Promise.all([
+        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+        this.campaigns.resolveL2DistrictName(campaign),
+      ])
       return await this.aiChatService.update(
         threadId,
         campaign,
         body,
         liveMetrics,
+        l2DistrictName,
       )
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
@@ -262,20 +274,26 @@ export class AiChatController {
     }
 
     let liveMetrics: RaceTargetMetrics | null = null
+    let l2DistrictName: string | null = null
     try {
-      liveMetrics = await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+      ;[liveMetrics, l2DistrictName] = await Promise.all([
+        this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+        this.campaigns.resolveL2DistrictName(campaign),
+      ])
     } catch (err) {
       this.logger.error(
         { e: err },
         'failed to fetch live race metrics for chat stream',
       )
       liveMetrics = null
+      l2DistrictName = null
     }
 
     const iterable = this.aiChatService.streamChat(
       campaign,
       body,
       liveMetrics,
+      l2DistrictName,
       abortController.signal,
     )
 
