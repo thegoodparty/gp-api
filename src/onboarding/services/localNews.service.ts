@@ -42,7 +42,7 @@ For each outlet, look up its newsroom email, newsroom/main phone number, and str
 DESCRIPTION:
 For each outlet, return ONE concise sentence (maximum 20 words) identifying the outlet's coverage area and focus. No compound sentences, no semicolons, no lists.
 
-Do not fabricate outlets.`
+Return at least 1 outlet. Do not fabricate outlets.`
 
 // Stage 2 — extract structured JSON from the search-stage text. Required
 // because Gemini disallows googleSearch + responseJsonSchema in a single
