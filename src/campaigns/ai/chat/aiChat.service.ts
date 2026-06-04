@@ -26,11 +26,36 @@ import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { requireEnv } from 'src/shared/util/env.util'
+import { z } from 'zod'
+import {
+  isInternalChatLink,
+  sanitizeChatLinks,
+  validateChatLinks,
+} from './util/sanitizeChatLinks.util'
+import { sanitizeUntrustedContent } from '@/ai/util/sanitizePromptInput.util'
 
 const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 const AI_CHAT_MAX_TOKENS = 2000
 const AI_CHAT_TEMPERATURE = 0.7
 const AI_CHAT_TOP_P = 0.9
+
+// Cap how many prior turns we replay to the model. Bounds latency, cost, and
+// context-window risk on long threads. We still persist the full history — only
+// the messages SENT to the model are trimmed (most recent kept).
+const MAX_HISTORY_MESSAGES = 20
+
+// Budget for the post-answer metadata call (follow-up questions + thread
+// title). Kept small and best-effort: failures never block the reply.
+const METADATA_MAX_TOKENS = 200
+
+// Timeout for the per-link reachability check (HEAD request). Kept short so a
+// slow/hanging host can't stall the final answer; checks run in parallel.
+const LINK_CHECK_TIMEOUT_MS = 2500
+
+const ChatMetadataSchema = z.object({
+  followups: z.array(z.string().min(1)).max(3).default([]),
+  title: z.string().max(80).optional(),
+})
 
 // The CMS-managed prompt historically asks the model to emit HTML (for the
 // shared content-generation/Quill path). The chat now renders Markdown via
@@ -40,6 +65,15 @@ const AI_CHAT_TOP_P = 0.9
 const MARKDOWN_FORMAT_DIRECTIVE = `Formatting requirements (these override any earlier or conflicting formatting instructions):
 - Respond using GitHub-flavored Markdown ONLY. Do not output raw HTML tags (no <p>, <ul>, <li>, <a>, <br>, <strong>, etc.).
 - Use **bold**, *italics*, \`inline code\`, fenced code blocks, bullet and numbered lists, ## headings, tables, and Markdown links in the form [label](https://example.com).`
+
+// Code-side length directive. Complements the CMS prompt (and the 2000-token
+// cap) so answers are thorough and actionable without being padded. Placed
+// after the formatting directive so both take precedence over CMS brevity
+// guidance.
+const RESPONSE_LENGTH_DIRECTIVE = `Response depth:
+- Give a complete, useful answer: explain the why, then concrete, specific next steps the candidate can act on.
+- Prefer a short intro followed by structured detail (lists, steps, or a brief table) over a one-line reply.
+- Be thorough but not padded — no filler, repetition, or restating the question.`
 
 // Threads created before this PR stored assistant content as HTML
 // (formatHtmlLlmResponse turned \n into <br/><br/>). Strip those artifacts
@@ -85,6 +119,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     campaign: PromptReplaceCampaign,
     { message, initial }: CreateAiChatSchema,
     liveMetrics?: RaceTargetMetrics | null,
+    l2DistrictName?: string | null,
   ) {
     // Create a new chat
     const { candidateJson, systemPrompt } =
@@ -94,6 +129,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       candidateJson,
       campaign,
       liveMetrics,
+      l2DistrictName,
     )
 
     const chatMessage: AiChatMessage = {
@@ -140,6 +176,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     campaign: PromptReplaceCampaign,
     { regenerate, message }: UpdateAiChatSchema,
     liveMetrics?: RaceTargetMetrics | null,
+    l2DistrictName?: string | null,
   ) {
     if (regenerate && !threadId) {
       throw new Error('Cannot regenerate without threadId')
@@ -162,6 +199,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       candidateJson,
       campaign,
       liveMetrics,
+      l2DistrictName,
     )
 
     let messageId: string | undefined
@@ -255,7 +293,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     // here and continued via streamChat, or vice versa).
     return {
       role: 'assistant',
-      content: result.content,
+      content: await this.sanitizeAndValidateLinks(result.content),
       id: crypto.randomUUID(),
       createdAt: new Date().valueOf(),
       usage: result.tokens,
@@ -276,20 +314,26 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     if (!systemPrompt) {
       throw new Error('Missing required param: systemPrompt')
     }
+    // Only replay the most recent turns to the model (full history is still
+    // persisted elsewhere). Slicing the tail keeps the latest context.
+    const recentHistory = priorMessages.slice(-MAX_HISTORY_MESSAGES)
+
     return [
       {
         role: 'system',
-        content: `${systemPrompt}\n${candidateContext}\n\n${MARKDOWN_FORMAT_DIRECTIVE}`,
+        // candidateContext is built from user-entered campaign details, so it's
+        // untrusted — strip role/template delimiters before embedding it.
+        content: `${systemPrompt}\n${sanitizeUntrustedContent(candidateContext)}\n\n${MARKDOWN_FORMAT_DIRECTIVE}\n\n${RESPONSE_LENGTH_DIRECTIVE}`,
       },
-      ...priorMessages
+      ...recentHistory
         .map((m) =>
           m.role === 'assistant' && typeof m.content === 'string'
             ? { ...m, content: stripLegacyHtml(m.content) }
-            : m,
+            : { ...m, content: sanitizeUntrustedContent(m.content) },
         )
         .map(toChatCompletionMessage)
         .filter(isChatCompletionMessage),
-      { role: 'user', content: userContent },
+      { role: 'user', content: sanitizeUntrustedContent(userContent) },
     ]
   }
 
@@ -306,6 +350,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     campaign: PromptReplaceCampaign,
     body: StreamAiChatSchema,
     liveMetrics?: RaceTargetMetrics | null,
+    l2DistrictName?: string | null,
     signal?: AbortSignal,
   ): AsyncGenerator<CampaignChatChunk, void, void> {
     const userId = campaign.user?.id
@@ -342,6 +387,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         candidateJson,
         campaign,
         liveMetrics,
+        l2DistrictName,
       )
 
       messages = this.buildMessages({
@@ -366,6 +412,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     try {
       result = await this.llm.streamChatCompletion({
         messages,
+        models: this.llm.getChatModelChain(),
         temperature: AI_CHAT_TEMPERATURE,
         topP: AI_CHAT_TOP_P,
         maxOutputTokens: AI_CHAT_MAX_TOKENS,
@@ -401,19 +448,52 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       return
     }
 
+    // Empty-answer guard: a blank/whitespace completion should surface a
+    // retryable error rather than persisting an empty assistant bubble.
+    const rawAnswer = parts.join('')
+    if (!rawAnswer.trim()) {
+      this.logger.warn(
+        { threadId: resolved.threadId },
+        'campaign chat produced an empty answer',
+      )
+      yield this.streamError(
+        'upstream_unavailable',
+        'No response was generated. Please try again.',
+      )
+      return
+    }
+
+    // Link safety net: downgrade unsafe links + strip tracking params, then
+    // drop internal links that 404 (the model sometimes fabricates plausible
+    // goodparty.org URLs). Streamed deltas were raw; the client commits
+    // `done.message.content`, so the final rendered + stored answer is clean.
+    const answer = await this.sanitizeAndValidateLinks(rawAnswer)
+    const usage = await result.usage.catch(() => null)
+
+    const { followups, title } = await this.generateChatMetadata({
+      userContent: resolved.userMessage.content,
+      assistantContent: answer,
+      isNewThread: resolved.isNewThread,
+      signal,
+    })
+
     const assistantMessage: AiChatMessage = {
       role: 'assistant',
-      content: parts.join(''),
+      content: answer,
       id: crypto.randomUUID(),
       createdAt: new Date().valueOf(),
+      ...(usage?.totalTokens ? { usage: usage.totalTokens } : {}),
+      ...(followups.length ? { followups } : {}),
     }
 
     try {
-      await this.persistStreamedExchange(campaign, userId, resolved, [
-        ...resolved.priorMessages,
-        resolved.userMessage,
-        assistantMessage,
-      ])
+      await this.persistStreamedExchange(
+        campaign,
+        userId,
+        resolved,
+        [...resolved.priorMessages, resolved.userMessage, assistantMessage],
+        title,
+      )
     } catch (err) {
       this.logger.error(
         { err, threadId: resolved.threadId },
@@ -427,6 +507,113 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       type: 'done',
       threadId: resolved.threadId,
       message: assistantMessage,
+    }
+  }
+
+  /**
+   * Best-effort post-answer metadata: 2-3 suggested follow-up questions (phrased
+   * from the user's perspective) and, for new threads, a short title for the
+   * history sidebar. Runs as a small JSON completion; any failure degrades
+   * gracefully to no follow-ups / no title and never blocks the reply.
+   */
+  private async generateChatMetadata({
+    userContent,
+    assistantContent,
+    isNewThread,
+    signal,
+  }: {
+    userContent: string
+    assistantContent: string
+    isNewThread: boolean
+    signal?: AbortSignal
+  }): Promise<{ followups: string[]; title?: string }> {
+    if (signal?.aborted) return { followups: [] }
+    try {
+      const titleInstruction = isNewThread
+        ? '\n- "title": a concise (<= 6 word) title summarizing this conversation topic.'
+        : ''
+      const { object } = await this.llm.jsonCompletion({
+        schema: ChatMetadataSchema,
+        maxTokens: METADATA_MAX_TOKENS,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You generate UI metadata for a political campaign assistant. ' +
+              'Return ONLY a JSON object with:\n' +
+              '- "followups": an array of 2-3 short, natural follow-up questions ' +
+              'the user (a candidate) might ask next, phrased in first person ' +
+              '(e.g. "How do I find volunteers?"). Keep each under 12 words.' +
+              titleInstruction,
+          },
+          {
+            role: 'user',
+            content: `User asked:\n${userContent}\n\nAssistant answered:\n${assistantContent}`,
+          },
+        ],
+      })
+      return {
+        followups: object.followups ?? [],
+        ...(isNewThread && object.title?.trim()
+          ? { title: object.title.trim() }
+          : {}),
+      }
+    } catch (err) {
+      this.logger.warn({ err }, 'failed to generate chat metadata')
+      return { followups: [] }
+    }
+  }
+
+  /**
+   * Final link pass for an assistant answer: sanitize unsafe links + strip
+   * tracking params, then downgrade internal (goodparty.org) links that don't
+   * resolve to plain text. Validation is scoped to internal hosts to bound
+   * latency and avoid an SSRF surface for arbitrary external URLs.
+   */
+  private async sanitizeAndValidateLinks(raw: string): Promise<string> {
+    const sanitized = sanitizeChatLinks(raw)
+    try {
+      return await validateChatLinks(sanitized, (url) =>
+        this.isLinkReachable(url),
+      )
+    } catch (err) {
+      // Never let link validation break the answer — fall back to the
+      // sanitized (but unvalidated) text.
+      this.logger.warn({ err }, 'chat link validation failed')
+      return sanitized
+    }
+  }
+
+  /**
+   * Reachability check used by link validation. Only internal goodparty.org
+   * links are actually fetched (HEAD, short timeout); external links are
+   * assumed reachable so we don't add latency or probe arbitrary hosts.
+   */
+  private async isLinkReachable(url: string): Promise<boolean> {
+    if (!isInternalChatLink(url)) return true
+    try {
+      const res = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(LINK_CHECK_TIMEOUT_MS),
+      })
+      // Some hosts reject HEAD (405) — confirm with a lightweight GET before
+      // declaring the link dead.
+      if (res.status === 405) {
+        const getRes = await fetch(url, {
+          method: 'GET',
+          redirect: 'follow',
+          signal: AbortSignal.timeout(LINK_CHECK_TIMEOUT_MS),
+        })
+        return getRes.status < 400
+      }
+      return res.status < 400
+    } catch (err) {
+      // Network error / timeout: don't strip on uncertainty (avoid false
+      // positives from transient failures).
+      this.logger.debug({ err, url }, 'link reachability check failed')
+      return true
     }
   }
 
@@ -508,6 +695,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       existingData?: object
     },
     messages: AiChatMessage[],
+    title?: string,
   ): Promise<void> {
     if (resolved.isNewThread) {
       await this.model.create({
@@ -516,7 +704,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
           threadId: resolved.threadId,
           userId,
           campaignId: campaign.id,
-          data: { messages },
+          data: { messages, ...(title ? { title } : {}) },
         },
       })
       return
@@ -524,7 +712,13 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     await this.model.update({
       where: { id: resolved.existingId },
       data: {
-        data: { ...(resolved.existingData ?? {}), messages },
+        // Preserve an existing title; only set one when generated for a thread
+        // that doesn't have one yet.
+        data: {
+          ...(resolved.existingData ?? {}),
+          messages,
+          ...(title ? { title } : {}),
+        },
       },
     })
   }

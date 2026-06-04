@@ -161,7 +161,7 @@ export class AiContentService {
       prompt,
       // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      existingChat: (chat as AiChatMessage[]) || [],
+      existingChat: (chat as unknown as AiChatMessage[]) || [],
       inputValues,
       createdAt: new Date().valueOf(),
     }
