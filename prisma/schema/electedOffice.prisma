@@ -18,7 +18,7 @@ model ElectedOffice {
   pollIndividualMessages PollIndividualMessage[]
   meetingBriefings       MeetingBriefing[]
 
-  @@index([userId])
+  @@unique([userId])
   @@index([campaignId])
   @@map("elected_office")
 }
