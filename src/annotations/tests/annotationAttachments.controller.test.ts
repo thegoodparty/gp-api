@@ -315,6 +315,43 @@ describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/downl
 
     expect(result.status).toBe(403)
   })
+
+  it('rejects callers who did not author the annotation', async () => {
+    // Annotation is authored by another user; the caller owns their own
+    // elected office but is not the author, so the author check 403s
+    // before the briefing-access check is reached.
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: 'other_download_author',
+        email: 'other-download-author@goodparty.org',
+        firstName: 'A',
+        lastName: 'B',
+      },
+    })
+    const { annotation, noteId } = await seedBriefingAndNote(
+      'eo-download-foreign-author',
+      otherUser.id,
+    )
+    const attachment = await service.prisma.annotationNoteAttachment.create({
+      data: {
+        noteId,
+        fileName: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1_500_000,
+        storageKey: `annotations/${annotation.id}/seed`,
+        ocrStatus: OcrStatus.pending,
+      },
+    })
+    mockS3()
+
+    await seedElectedOffice('eo-download-mine-author')
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
+      orgHeader('eo-download-mine-author'),
+    )
+
+    expect(result.status).toBe(403)
+  })
 })
 
 describe('DELETE /v1/annotations/:annotationId/note/attachments/:attachmentId', () => {
