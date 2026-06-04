@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { UsersService } from '../../users/services/users.service'
 import { Experiment } from '@amplitude/experiment-node-server'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 
 const AMPLITUDE_PROJECT_API_KEY = process.env.AMPLITUDE_PROJECT_API_KEY

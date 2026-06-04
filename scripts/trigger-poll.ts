@@ -20,7 +20,7 @@
  *   - Slack message to Tevyn
  */
 import { readFileSync } from 'fs'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '../src/generated/prisma'
 import { v5 as uuidv5 } from 'uuid'
 import { PollClusterAnalysisJsonSchema } from '../src/queue/queue.types'
 import { normalizePhoneNumber } from '../src/shared/util/strings.util'

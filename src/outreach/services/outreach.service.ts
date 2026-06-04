@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '../../generated/prisma'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'

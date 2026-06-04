@@ -11,7 +11,7 @@ import {
   Put,
   UsePipes,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../../generated/prisma'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from '@/authentication/decorators/Roles.decorator'
 import { PositionsService } from './positions.service'

@@ -15,7 +15,7 @@ import {
   TcrCompliance,
   TcrComplianceStatus,
   User,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
@@ -44,7 +44,7 @@ import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
 import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
 import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
 import { AgenticComplianceKickoffMessage } from '../../../queue/queue.types'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../../generated/prisma'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)

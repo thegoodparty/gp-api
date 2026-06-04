@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { getUserFullName } from '@/users/util/users.util'

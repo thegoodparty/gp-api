@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 
 const googleServiceEmail =
   'good-party-service@thegoodparty-1562658240463.iam.gserviceaccount.com'

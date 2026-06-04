@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import {
   REQUIRE_ELECTED_OFFICE_META_KEY,

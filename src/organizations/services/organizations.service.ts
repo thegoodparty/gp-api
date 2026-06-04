@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, ElectedOffice, Organization, Prisma } from '@prisma/client'
+import { Campaign, ElectedOffice, Organization, Prisma } from '../../generated/prisma'
 import pmap from 'p-map'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {

@@ -1,4 +1,4 @@
-import { User } from '@prisma/client'
+import { User } from '../generated/prisma'
 import { VerifiedM2MToken } from '@/authentication/interfaces/auth-provider.interface'
 
 export interface IncomingRequest extends Request {

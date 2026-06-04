@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import { websiteContactFactory } from './factories/websiteContact.factory'
 import { websiteViewFactory } from './factories/websiteView.factory'
 

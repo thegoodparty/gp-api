@@ -22,7 +22,7 @@ import {
   ReadUserOutputSchema,
   UpdatePasswordSchema,
 } from '@goodparty_org/contracts'
-import { User } from '@prisma/client'
+import { User } from '../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'

@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ContentfulService } from '../../vendors/contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { Content, ContentType } from '../../generated/prisma'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,

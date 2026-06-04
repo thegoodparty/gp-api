@@ -5,7 +5,7 @@ import {
   ExperimentRun,
   ExperimentRunStatus,
   Prisma,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { rrulestr } from 'rrule'
 import { formatInTimeZone } from 'date-fns-tz'
 import { addDays } from 'date-fns'

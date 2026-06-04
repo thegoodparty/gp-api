@@ -1,4 +1,4 @@
-import type { Annotation } from '@prisma/client'
+import type { Annotation } from '../../../generated/prisma'
 import { isRecord } from '@/llm/tools/util/isRecord.util'
 
 export interface HighlightSnippet {

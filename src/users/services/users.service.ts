@@ -18,7 +18,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '../../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { subHours } from 'date-fns'
 import ms from 'ms'

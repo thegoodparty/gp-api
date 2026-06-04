@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../../generated/prisma'
 
 export const ReqElectedOffice = createParamDecorator(
   (_: undefined, ctx: ExecutionContext): ElectedOffice | undefined => {

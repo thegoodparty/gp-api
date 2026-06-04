@@ -1,5 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz'
-import type { Annotation, MeetingBriefing } from '@prisma/client'
+import type { Annotation, MeetingBriefing } from '../../../generated/prisma'
 import { z } from 'zod'
 import { BriefingSchema } from '@/chats/briefing-chats/types/briefing.schema'
 import type {

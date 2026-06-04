@@ -12,7 +12,7 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'

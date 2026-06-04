@@ -5,7 +5,7 @@ import {
   Injectable,
   forwardRef,
 } from '@nestjs/common'
-import { ElectedOffice, Prisma } from '@prisma/client'
+import { ElectedOffice, Prisma } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   DEFAULT_PAGINATION_LIMIT,

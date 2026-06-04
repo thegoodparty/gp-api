@@ -12,7 +12,7 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '../../generated/prisma'
 import { differenceInMilliseconds, formatISO } from 'date-fns'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'

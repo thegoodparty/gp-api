@@ -23,7 +23,7 @@ import { CreateAgenticTcrComplianceDto } from './schemas/createAgenticTcrComplia
 import { SubmitToPeerlyDto } from './schemas/submitToPeerlyDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
+import { Campaign, TcrComplianceStatus, User } from '../../generated/prisma'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'

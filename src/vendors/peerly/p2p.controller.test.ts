@@ -1,7 +1,7 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadGatewayException, ConflictException } from '@nestjs/common'
 import { FastifyReply } from 'fastify'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { P2pController } from './p2p.controller'
 import { PhoneListState } from './peerly.types'

@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { describe, expect, it, vi } from 'vitest'
 import { AiContentController } from './aiContent.controller'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
-import { ChatMessage } from '@prisma/client'
+import { ChatMessage } from '../../../generated/prisma'
 import { ChatStoreService } from '@/chats/services/chatStore.prisma'
 import {
   ChatStreamChunk,

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../generated/prisma'
 
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 

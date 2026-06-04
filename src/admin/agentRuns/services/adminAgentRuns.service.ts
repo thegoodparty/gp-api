@@ -4,7 +4,7 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common'
-import { ExperimentRun, ExperimentRunStatus, Prisma } from '@prisma/client'
+import { ExperimentRun, ExperimentRunStatus, Prisma } from '../../../generated/prisma'
 import {
   AgentRunCandidateSummary,
   AgentRunListItem,

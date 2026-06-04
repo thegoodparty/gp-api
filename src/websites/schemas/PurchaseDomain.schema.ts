@@ -1,4 +1,4 @@
-import { DomainStatus } from '@prisma/client'
+import { DomainStatus } from '../../generated/prisma'
 import { createZodDto } from 'nestjs-zod'
 import { isFQDN } from 'validator'
 import { z } from 'zod'

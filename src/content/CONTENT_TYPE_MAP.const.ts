@@ -1,4 +1,4 @@
-import { ContentType } from '@prisma/client'
+import { ContentType } from '../generated/prisma'
 import { noOpTransformer } from './transformers/no-op-transformer'
 import { candidateContentPromptsTransformer } from './transformers/candidateContentPromptsTransformer'
 import { contentPromptsQuestionsTransformer } from './transformers/contentPromptsQuestionsTransformer'

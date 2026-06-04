@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../src/generated/prisma'
 import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 

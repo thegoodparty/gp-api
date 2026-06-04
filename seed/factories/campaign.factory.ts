@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker'
-import { Campaign, CampaignTier } from '@prisma/client'
+import { Campaign, CampaignTier } from '../../src/generated/prisma'
 import { GenerationStatus } from '../../src/campaigns/ai/content/aiContent.types'
 import { CampaignLaunchStatus, OnboardingStep } from '@goodparty_org/contracts'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'

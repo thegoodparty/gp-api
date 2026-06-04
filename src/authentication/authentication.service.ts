@@ -6,7 +6,7 @@ import {
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/services/users.service'
 import { compare } from 'bcrypt'
-import { User } from '@prisma/client'
+import { User } from '../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { nanoid } from 'nanoid'
 import { PinoLogger } from 'nestjs-pino'

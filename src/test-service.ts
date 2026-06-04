@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common'
 import { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { User } from '@prisma/client'
+import { User } from './generated/prisma'
 import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,

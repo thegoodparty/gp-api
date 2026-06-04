@@ -4,7 +4,7 @@ import {
   SQSClient,
 } from '@aws-sdk/client-sqs'
 import { BadGatewayException } from '@nestjs/common'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { mockClient } from 'aws-sdk-client-mock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

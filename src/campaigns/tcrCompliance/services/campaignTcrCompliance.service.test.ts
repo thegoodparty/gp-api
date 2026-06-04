@@ -5,7 +5,7 @@ import {
   ExperimentRunStatus,
   OfficeLevel,
   TcrComplianceStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

@@ -1,7 +1,7 @@
 import { ExecutionContext } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { IS_PUBLIC_KEY } from '@/authentication/decorators/PublicAccess.decorator'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../../generated/prisma'
 import { ROLES_KEY } from '@/authentication/decorators/Roles.decorator'
 
 export const routeIsPublicAndNoRoles = (

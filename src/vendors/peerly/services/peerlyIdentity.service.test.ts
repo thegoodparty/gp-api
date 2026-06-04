@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Campaign, CommitteeType, OfficeLevel, User } from '@prisma/client'
+import { Campaign, CommitteeType, OfficeLevel, User } from '../../../generated/prisma'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'

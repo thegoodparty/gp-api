@@ -10,7 +10,7 @@ import {
   PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
@@ -77,7 +77,7 @@ import { OrgDistrict } from '@/organizations/organizations.types'
 
 import type { AgentExperimentResultData } from '../queue.types'
 
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { isJsonObject } from '@/shared/util/objects.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]

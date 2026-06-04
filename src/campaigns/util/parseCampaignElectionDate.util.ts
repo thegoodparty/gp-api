@@ -1,4 +1,4 @@
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { parseIsoDateString } from '../../shared/util/date.util'
 
 // TODO: We should figure out how to convert these to Date objects in Prisma instead of needing a util method here.

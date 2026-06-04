@@ -1,5 +1,5 @@
 // TODO: move this to a secrets store somewhere
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../../src/generated/prisma'
 import { ADMIN_USER } from '../users'
 import { ecanvasserFactory } from '../factories/ecanvasser.factory'
 

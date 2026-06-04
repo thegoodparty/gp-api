@@ -1,5 +1,5 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import {
   CustomCheckoutSessionPayload,
