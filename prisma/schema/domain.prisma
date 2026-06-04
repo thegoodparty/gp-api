@@ -6,6 +6,11 @@ enum DomainStatus {
   inactive
 }
 
+enum DomainSource {
+  manual
+  agentic
+}
+
 model Domain {
   id                      Int          @id @default(autoincrement())
   createdAt               DateTime     @default(now()) @map("created_at")
@@ -14,6 +19,7 @@ model Domain {
   websiteId               Int          @unique @map("website_id")
   website                 Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   status                  DomainStatus @default(pending)
+  source                  DomainSource @default(manual)
   operationId             String?      @map("operation_id")
   price                   Decimal?
   paymentId               String?      @map("payment_id")
