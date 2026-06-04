@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ContentfulService } from '../../vendors/contentful/contentful.service'
-import { Content, ContentType } from '../../generated/prisma'
+import { Content, ContentType, Prisma } from '../../generated/prisma'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
@@ -9,7 +9,6 @@ import {
 import { AIChatPromptContents, FindByTypeOptions } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
-import { InputJsonObject } from '@prisma/client/runtime/client'
 import { PinoLogger } from 'nestjs-pino'
 import { getEnv } from 'src/shared/util/env.util'
 
@@ -211,7 +210,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
                 updateDate: new Date(entry.sys.updatedAt)
                   .toISOString()
                   .split('T')[0],
-              } as InputJsonObject,
+              } as Prisma.InputJsonObject,
             },
           })
         }
@@ -233,7 +232,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
                 updateDate: new Date(entry.sys.updatedAt)
                   .toISOString()
                   .split('T')[0],
-              } as InputJsonObject,
+              } as Prisma.InputJsonObject,
             },
           })
         }
