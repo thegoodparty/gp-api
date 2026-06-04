@@ -125,6 +125,14 @@ export interface AgentJobContracts {
     Input: MeetingScheduleInput
     Output: MeetingSchedule
   }
+  opportunities_and_challenges: {
+    Input: OpportunitiesAndChallengesInputParams
+    Output: OpportunitiesAndChallengesArtifact
+  }
+  opposition_research: {
+    Input: OppositionResearchInputParams
+    Output: OppositionResearchArtifact
+  }
 }
 export interface DistrictIssuePulse {
   city: string
@@ -3370,4 +3378,200 @@ export interface MeetingScheduleNotFound {
   status: 'not_found'
   time: string
   timezone: string
+}
+export interface OpportunitiesAndChallengesInputParams {
+  /**
+   * The PRIMARY election stage's candidate roster only (candidate_count + candidates), or null when the race has no primary. We deliberately omit the race-level numbers here (win number, projected turnout, contacts goal, voter-file counts) because they are stage-specific and differ from the general-election numbers the plan is built on, and the office metadata / dates / partisan_type because they are identical to campaign_strategy_context. For offices that hold a primary, this is the real filed field; the general roster is often empty.
+   */
+  campaign_primary_strategy_context?: {
+    candidate_count: number
+    /**
+     * The filed candidate roster for the primary stage of this race.
+     */
+    candidates: {
+      email?: string | null
+      first_name: string
+      full_name: string
+      gp_candidate_id?: string | null
+      is_incumbent?: boolean | null
+      last_name: string
+      party?: string | null
+      website_url?: string | null
+    }[]
+  } | null
+  /**
+   * The election-api campaign-strategy-context result, hydrated by gp-api before dispatch. The agent does NOT call election-api; this is the source of the race numbers the opportunities/challenges are derived from. This object reflects the GENERAL election stage; the primary stage (when one exists) is in campaign_primary_strategy_context.
+   */
+  campaign_strategy_context: {
+    candidate_count: number
+    candidate_office: string | null
+    /**
+     * Provisional seed roster — incomplete and lagging (the real field is owned by opposition_research). Do NOT derive opportunities/challenges from candidate_count, this roster, or is_incumbent; base bullets on the race numbers + web search.
+     */
+    candidates: {
+      email?: string | null
+      first_name: string
+      full_name: string
+      gp_candidate_id?: string | null
+      is_incumbent?: boolean | null
+      last_name: string
+      party?: string | null
+      website_url?: string | null
+    }[]
+    contacts_needed_estimate?: number | null
+    filing_date_end?: string | null
+    general_election_date?: string | null
+    number_of_seats?: number | null
+    office_level?: string | null
+    office_type?: string | null
+    official_office_name?: string | null
+    /**
+     * Race partisan type from election-api (e.g. 'partisan' / 'nonpartisan'). 'nonpartisan' means party labels are voter-registration noise, not the contest. May be null until election-api populates it.
+     */
+    partisan_type?: string | null
+    primary_election_date?: string | null
+    projected_turnout?: number | null
+    registered_voters?: number | null
+    relevant_election_date?: string | null
+    state?: string | null
+    unique_cellphones?: number | null
+    unique_landlines?: number | null
+    win_number_effective?: number | null
+  }
+  /**
+   * The candidate's party when user_party_affiliation == 'Other'.
+   */
+  other_party?: string | null
+  /**
+   * BallotReady brHashId. Trace / idempotency identifier only — the agent does NOT reason over it or look anything up with it.
+   */
+  race_id: string
+  /**
+   * The candidate's email. Used to mark is_user against the roster (exact match, case-insensitive + trimmed).
+   */
+  user_email: string
+  user_first_name?: string | null
+  /**
+   * The candidate we write FOR. Referred to as 'you' in output, never by name.
+   */
+  user_full_name: string
+  user_last_name?: string | null
+  /**
+   * Party label, or null. 'Other' means the real value is in other_party.
+   */
+  user_party_affiliation?: string | null
+}
+export interface OpportunitiesAndChallengesArtifact {
+  /**
+   * Up to 3 structural risks for this race, each a finished 1-3 sentence bullet with its citation inlined as '... ([source](url))'. At least 1.
+   *
+   * @minItems 1
+   * @maxItems 3
+   */
+  challenges: [string] | [string, string] | [string, string, string]
+  /**
+   * Up to 3 structural advantages for this race, each a finished 1-3 sentence bullet with its citation inlined as '... ([source](url))'. At least 1.
+   *
+   * @minItems 1
+   * @maxItems 3
+   */
+  opportunities: [string] | [string, string] | [string, string, string]
+}
+export interface OppositionResearchInputParams {
+  /**
+   * The PRIMARY election stage's candidate roster only (candidate_count + candidates), or null when the race has no primary. We deliberately omit the race-level numbers here (win number, projected turnout, contacts goal, voter-file counts) because they are stage-specific and differ from the general-election numbers the plan is built on, and the office metadata / dates / partisan_type because they are identical to campaign_strategy_context. For offices that hold a primary, this is the real filed field; the general roster is often empty.
+   */
+  campaign_primary_strategy_context?: {
+    candidate_count: number
+    /**
+     * The filed candidate roster for the primary stage of this race.
+     */
+    candidates: {
+      email?: string | null
+      first_name: string
+      full_name: string
+      gp_candidate_id?: string | null
+      is_incumbent?: boolean | null
+      last_name: string
+      party?: string | null
+      website_url?: string | null
+    }[]
+  } | null
+  /**
+   * The election-api campaign-strategy-context result, hydrated by gp-api before dispatch. The agent does NOT call election-api; this is its only roster source besides web search. This object reflects the GENERAL election stage; the primary stage (when one exists) is in campaign_primary_strategy_context.
+   */
+  campaign_strategy_context: {
+    candidate_count: number
+    candidate_office: string | null
+    /**
+     * Full seed roster (NOT pre-filtered). The agent marks the candidate via is_user and excludes them; it does not receive a pre-trimmed opponent list.
+     */
+    candidates: {
+      email?: string | null
+      first_name: string
+      full_name: string
+      gp_candidate_id?: string | null
+      is_incumbent?: boolean | null
+      last_name: string
+      party?: string | null
+      website_url?: string | null
+    }[]
+    contacts_needed_estimate?: number | null
+    filing_date_end?: string | null
+    general_election_date?: string | null
+    number_of_seats?: number | null
+    office_level?: string | null
+    office_type?: string | null
+    official_office_name?: string | null
+    /**
+     * Race partisan type from election-api (e.g. 'partisan' / 'nonpartisan'). 'nonpartisan' means the party labels are voter-registration noise, not the contest. May be null until election-api populates it. Not enum-constrained — election-api is the source of truth for the value.
+     */
+    partisan_type?: string | null
+    primary_election_date?: string | null
+    projected_turnout?: number | null
+    registered_voters?: number | null
+    relevant_election_date?: string | null
+    state?: string | null
+    unique_cellphones?: number | null
+    unique_landlines?: number | null
+    win_number_effective?: number | null
+  }
+  /**
+   * The candidate's party when user_party_affiliation == 'Other'.
+   */
+  other_party?: string | null
+  /**
+   * BallotReady brHashId. Trace / idempotency identifier only — the agent does NOT reason over it or look anything up with it.
+   */
+  race_id: string
+  /**
+   * The candidate's email. Used to mark is_user against the roster (exact match, case-insensitive + trimmed).
+   */
+  user_email: string
+  user_first_name?: string | null
+  /**
+   * The candidate we write FOR. Referred to as 'you' in output, never by name. Fallback for is_user when the email doesn't match a roster row.
+   */
+  user_full_name: string
+  user_last_name?: string | null
+  /**
+   * Party label, or null. 'Other' means the real value is in other_party.
+   */
+  user_party_affiliation?: string | null
+}
+export interface OppositionResearchArtifact {
+  /**
+   * Confirmed opponents running in this race (seed roster plus any web-confirmed late filers, candidate excluded). Empty array if uncontested. gp-api renders the campaign-plan Opposition Research section from this structured data.
+   */
+  opponents: {
+    full_name: string
+    /**
+     * true if known to be the incumbent, false if known not to be, null if unknown.
+     */
+    incumbent: boolean | null
+    /**
+     * Party name, 'Nonpartisan', or 'Unknown'.
+     */
+    party_affiliation: string
+  }[]
 }

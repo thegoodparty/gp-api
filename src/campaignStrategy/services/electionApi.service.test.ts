@@ -5,7 +5,10 @@ import { PinoLogger } from 'nestjs-pino'
 import { of, throwError } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { ElectionApiService } from './electionApi.service'
+import {
+  ElectionApiRaceNotFoundError,
+  ElectionApiService,
+} from './electionApi.service'
 
 const BR_HASH = 'hash-abc'
 
@@ -125,6 +128,26 @@ describe('ElectionApiService', () => {
 
     await expect(service.getRaceContext(BR_HASH)).rejects.toThrow(
       BadGatewayException,
+    )
+  })
+
+  it('throws ElectionApiRaceNotFoundError on a 404 (separate from generic BadGateway)', async () => {
+    // 404 means "no Race row with this brHashId" — a distinguishable
+    // condition the caller uses to break the poll loop. Other failures
+    // are still BadGateway since they may be transient.
+    const axiosError = Object.assign(
+      new Error('Request failed with status code 404'),
+      {
+        isAxiosError: true,
+        response: { status: 404, data: { message: 'Race not found' } },
+        config: {},
+        toJSON: () => ({}),
+      },
+    )
+    mockHttpPost.mockReturnValue(throwError(() => axiosError))
+
+    await expect(service.getRaceContext(BR_HASH)).rejects.toBeInstanceOf(
+      ElectionApiRaceNotFoundError,
     )
   })
 

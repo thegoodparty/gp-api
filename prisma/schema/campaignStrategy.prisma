@@ -6,9 +6,39 @@ model CampaignStrategy {
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId Int      @unique @map("campaign_id")
 
+  oppositionRunId    String? @map("opposition_run_id")
+  opportunitiesRunId String? @map("opportunities_run_id")
+
+  // Lifetime dispatch count per section. A failed/stuck section re-dispatches on
+  // the next call (so a user can just retry), capped by MAX_SECTION_ATTEMPTS in
+  // the service to bound runaway Fargate spend from a deterministic failure or a
+  // client hammering the endpoint.
+  oppositionAttempts    Int @default(0) @map("opposition_attempts")
+  opportunitiesAttempts Int @default(0) @map("opportunities_attempts")
+
+  // Set in the same transaction that writes each section's rows. The endpoint
+  // gates 'ready' on these (not on run status) so a poll between a run being
+  // marked COMPLETED and its rows landing can't return a hollow 'ready'.
+  oppositionPersistedAt    DateTime? @map("opposition_persisted_at")
+  opportunitiesPersistedAt DateTime? @map("opportunities_persisted_at")
+
+  // Stamped when a generation kicks off on an otherwise-idle plan (and reset on
+  // each fresh attempt/retry), so the user-perceived duration is the later of
+  // the two persistedAt markers minus this. Unlike createdAt (set once on first
+  // endpoint hit), this tracks the trigger that produced the current result.
+  generationStartedAt DateTime? @map("generation_started_at")
+
   opportunities CampaignStrategyOpportunity[]
   challenges    CampaignStrategyChallenge[]
   opponents     CampaignStrategyOpponent[]
 
+  // Section 7 community events — populated by CommunityEventsService via
+  // Gemini search + structured + Braintrust. JSON over a relational table
+  // because events are read whole and don't need indexed sub-queries.
+  // Sidecar type: PrismaJson.CommunityEventsResult.
+  communityEvents Json? @map("community_events")
+
+  @@index([oppositionRunId])
+  @@index([opportunitiesRunId])
   @@map("campaign_strategy")
 }

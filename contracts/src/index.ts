@@ -166,9 +166,26 @@ export {
 } from './campaigns/SetDistrictOutput.schema'
 
 export {
+  MilestoneWindowSchema,
+  RaceCandidateSchema,
+  RaceMilestonesSchema,
   RaceTargetMetricsSchema,
+  type MilestoneWindow,
+  type RaceCandidate,
+  type RaceMilestones,
   type RaceTargetMetrics,
 } from './campaigns/RaceTargetMetrics.schema'
+
+export {
+  CommunityEventSchema,
+  CommunityEventsResultSchema,
+  CommunityEventsReadySchema,
+  CommunityEventsGeneratingSchema,
+  CommunityEventsResponseSchema,
+  type CommunityEvent,
+  type CommunityEventsResult,
+  type CommunityEventsResponse,
+} from './campaigns/CommunityEvents.schema'
 
 export {
   CampaignWithPositionNameSchema,

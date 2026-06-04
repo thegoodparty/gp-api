@@ -9,7 +9,14 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Campaign, Domain, DomainStatus, User, Website } from '@prisma/client'
+import {
+  Campaign,
+  Domain,
+  DomainSource,
+  DomainStatus,
+  User,
+  Website,
+} from '@prisma/client'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -521,6 +528,7 @@ export class DomainsService
     campaignId: number,
     domainName: string,
     price: number,
+    source: DomainSource,
   ): Promise<
     | {
         kind: typeof DOMAIN_RESERVATION_KIND.IDEMPOTENT
@@ -589,6 +597,7 @@ export class DomainsService
           price,
           paymentId: null,
           status: DomainStatus.pending,
+          source,
         },
       })
 
@@ -659,6 +668,7 @@ export class DomainsService
     campaign: Campaign & { user: User },
     domainName: string,
     maxPrice: number,
+    source: DomainSource,
   ): Promise<{
     website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
     domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
@@ -716,6 +726,7 @@ export class DomainsService
       campaign.id,
       domainName,
       price,
+      source,
     )
 
     if (locked.kind === DOMAIN_RESERVATION_KIND.IDEMPOTENT) {
