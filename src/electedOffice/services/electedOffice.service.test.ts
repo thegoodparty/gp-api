@@ -16,6 +16,7 @@ describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
   let mockOrgCreate: ReturnType<typeof vi.fn>
   let mockEoCreate: ReturnType<typeof vi.fn>
+  let mockOnElectedOfficeCreated: ReturnType<typeof vi.fn>
   let mockModel: {
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
@@ -59,8 +60,9 @@ describe('ElectedOfficeService', () => {
       findMany: vi.fn(),
     }
 
+    mockOnElectedOfficeCreated = vi.fn().mockResolvedValue(undefined)
     service = new ElectedOfficeService({
-      onElectedOfficeCreated: vi.fn().mockResolvedValue(undefined),
+      onElectedOfficeCreated: mockOnElectedOfficeCreated,
     } as never)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
@@ -96,6 +98,9 @@ describe('ElectedOfficeService', () => {
       })
       expect(mockOrgCreate).not.toHaveBeenCalled()
       expect(mockEoCreate).not.toHaveBeenCalled()
+      // The schedule dispatch is the only recovery path for an office whose
+      // earlier create committed but never dispatched, so it must still fire.
+      expect(mockOnElectedOfficeCreated).toHaveBeenCalledWith(existing)
     })
 
     it('returns the concurrently-created office when the insert hits the unique constraint', async () => {
@@ -123,6 +128,7 @@ describe('ElectedOfficeService', () => {
       const result = await service.create(createArgs)
 
       expect(result).toBe(concurrent)
+      expect(mockOnElectedOfficeCreated).toHaveBeenCalledWith(concurrent)
     })
 
     it('creates organization with default org data and elected office in transaction', async () => {

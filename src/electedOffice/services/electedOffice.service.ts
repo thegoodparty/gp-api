@@ -41,6 +41,11 @@ export class ElectedOfficeService extends createPrismaBase(
       where: { userId: args.userId },
     })
     if (existing) {
+      // A prior call may have committed the row but crashed before dispatching
+      // the schedule; the schedule dispatch is the only recovery path (the
+      // daily cron dispatches briefings, not the initial schedule), so re-run
+      // it here. onElectedOfficeCreated tolerates re-dispatch.
+      await this.dispatchScheduleAfterCreate(existing)
       return existing
     }
 
@@ -82,22 +87,29 @@ export class ElectedOfficeService extends createPrismaBase(
           where: { userId: args.userId },
         })
         if (concurrent) {
+          await this.dispatchScheduleAfterCreate(concurrent)
           return concurrent
         }
       }
       throw err
     }
 
+    await this.dispatchScheduleAfterCreate(created)
+
+    return created
+  }
+
+  private async dispatchScheduleAfterCreate(
+    electedOffice: ElectedOffice,
+  ): Promise<void> {
     await this.meetingBriefings
-      .onElectedOfficeCreated(created)
+      .onElectedOfficeCreated(electedOffice)
       .catch((err: Error) => {
         this.logger.error(
-          { err, electedOfficeId: created.id },
+          { err, electedOfficeId: electedOffice.id },
           'meeting schedule dispatch failed after EO created',
         )
       })
-
-    return created
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {
