@@ -14,9 +14,10 @@ model ElectedOffice {
   campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: NoAction)
   campaignId Int?      @map("campaign_id")
 
-  polls                  Poll[]
-  pollIndividualMessages PollIndividualMessage[]
-  meetingBriefings       MeetingBriefing[]
+  polls                    Poll[]
+  pollIndividualMessages   PollIndividualMessage[]
+  meetingBriefings         MeetingBriefing[]
+  meetingResourceLocations MeetingResourceLocation[]
 
   @@index([userId])
   @@index([campaignId])
