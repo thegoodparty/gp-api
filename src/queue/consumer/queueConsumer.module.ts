@@ -17,6 +17,7 @@ import { AgentExperimentsModule } from 'src/agentExperiments/agentExperiments.mo
 import { MeetingsModule } from 'src/meetings/meetings.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { AnnotationsModule } from 'src/annotations/annotations.module'
+import { CampaignStrategyModule } from 'src/campaignStrategy/campaignStrategy.module'
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AnnotationsModule } from 'src/annotations/annotations.module'
     AgentExperimentsModule,
     MeetingsModule,
     AnnotationsModule,
+    CampaignStrategyModule,
   ],
   providers: [QueueConsumerService],
 })

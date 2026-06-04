@@ -29,6 +29,7 @@ import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { MeetingBriefingsService } from 'src/meetings/services/meetingBriefings.service'
+import { CampaignStrategyService } from 'src/campaignStrategy/services/campaignStrategy.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import {
@@ -125,6 +126,7 @@ export class QueueConsumerService {
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly experimentRunsService: ExperimentRunsService,
     private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly campaignStrategy: CampaignStrategyService,
     private readonly annotationAttachments: AnnotationAttachmentService,
     private readonly logger: PinoLogger,
   ) {
@@ -1008,6 +1010,18 @@ export class QueueConsumerService {
           ),
         )
     }
+
+    // Let a persistence failure propagate instead of swallowing it, so the
+    // failure surfaces (requeue + DLQ visibility) rather than silently acking
+    // a COMPLETED run that never got its section persisted. This is for
+    // visibility, not retry: onExperimentRunCompleted already calls markFailed
+    // before it rethrows, so on redelivery the status guard above (!= RUNNING)
+    // drops the message. That same guard bounds the requeue, so the raw throw
+    // can't infinite-redrive. The user-facing 'failed' state comes from
+    // markFailed (or, if markFailed itself faults, the isStuck grace-window
+    // backstop), not from the requeue. onExperimentRunCompleted is a no-op for
+    // non-campaign-strategy runs, so this only throws on a real persist failure.
+    await this.campaignStrategy.onExperimentRunCompleted(updatedRun)
 
     return true
   }

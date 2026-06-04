@@ -6,7 +6,8 @@ import {
   ModuleMetadata,
   RequestMethod,
 } from '@nestjs/common'
-import { DomainStatus } from '@prisma/client'
+import { DomainSource, DomainStatus } from '@prisma/client'
+import { IncomingRequest } from '@/authentication/authentication.types'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DomainsController } from './domains.controller'
@@ -134,15 +135,20 @@ describe('DomainsController.purchaseDomain', () => {
       user: createMockUser({ firstName: 'Jane', lastName: 'Doe' }),
     }
 
-    const result = await controller.purchaseDomain(campaign, {
-      domain: 'voteforjane.run',
-      maxPrice: 50,
-    })
+    const result = await controller.purchaseDomain(
+      campaign,
+      {
+        domain: 'voteforjane.run',
+        maxPrice: 50,
+      },
+      {} as IncomingRequest,
+    )
 
     expect(mockDomains.purchaseDomainForCampaign).toHaveBeenCalledWith(
       campaign,
       'voteforjane.run',
       50,
+      DomainSource.manual,
     )
     expect(result).toEqual({
       domain: {
@@ -168,12 +174,42 @@ describe('DomainsController.purchaseDomain', () => {
     }
 
     await expect(
-      controller.purchaseDomain(campaign, {
-        domain: 'voteforjane.run',
-        maxPrice: 50,
-      }),
+      controller.purchaseDomain(
+        campaign,
+        {
+          domain: 'voteforjane.run',
+          maxPrice: 50,
+        },
+        {} as IncomingRequest,
+      ),
     ).rejects.toBeInstanceOf(ConflictException)
   })
+
+  it.each([
+    { agentToken: true, expected: DomainSource.agentic },
+    { agentToken: false, expected: DomainSource.manual },
+  ])(
+    'derives source from req.agentToken=$agentToken and passes it to the service',
+    async ({ agentToken, expected }) => {
+      const campaign = {
+        ...createMockCampaign({ details: { electionDate: '2026-11-03' } }),
+        user: createMockUser({ firstName: 'Jane', lastName: 'Doe' }),
+      }
+
+      await controller.purchaseDomain(
+        campaign,
+        { domain: 'voteforjane.run', maxPrice: 50 },
+        { agentToken } as IncomingRequest,
+      )
+
+      expect(mockDomains.purchaseDomainForCampaign).toHaveBeenCalledWith(
+        campaign,
+        'voteforjane.run',
+        50,
+        expected,
+      )
+    },
+  )
 
   it('handler is registered for POST /purchase with @UseCampaign() including user, @HttpCode(202), and @McpTool description', () => {
     const reflector = new Reflector()

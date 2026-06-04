@@ -71,6 +71,10 @@ export class RacesService {
     return await this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
+  getPrimaryRaceId(generalRaceId: string): Promise<string | null> {
+    return this.ballotReadyService.fetchPrimaryRaceId(generalRaceId)
+  }
+
   async getRacesByZip({
     zipcode,
     level,
