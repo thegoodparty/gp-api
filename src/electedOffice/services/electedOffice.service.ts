@@ -2,6 +2,7 @@ import { OrganizationsService } from '@/organizations/services/organizations.ser
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -76,10 +77,7 @@ export class ElectedOfficeService extends createPrismaBase(
       // A concurrent create that wins the race trips the userId unique
       // constraint; the transaction rolls back (no orphan org) and we return
       // the row the other caller committed, keeping the endpoint idempotent.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isUniqueConstraintError(err)) {
         const concurrent = await this.model.findFirst({
           where: { userId: args.userId },
         })
