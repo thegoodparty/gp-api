@@ -75,9 +75,7 @@ const titleCasePart = (part: string): string => {
 const titleCaseToken = (token: string): string =>
   token
     .split('-')
-    .map((hyphenPart) =>
-      hyphenPart.split('/').map(titleCasePart).join('/'),
-    )
+    .map((hyphenPart) => hyphenPart.split('/').map(titleCasePart).join('/'))
     .join('-')
 
 const titleCaseDistrict = (name: string): string =>
@@ -92,11 +90,7 @@ const titleCaseDistrict = (name: string): string =>
     .trim()
 
 const humanizeDistrictType = (type: string): string =>
-  type
-    .split('_')
-    .filter(Boolean)
-    .map(titleCaseToken)
-    .join(' ')
+  type.split('_').filter(Boolean).map(titleCaseToken).join(' ')
 
 /**
  * Formats a raw L2 district name (and optional type) into a human-readable

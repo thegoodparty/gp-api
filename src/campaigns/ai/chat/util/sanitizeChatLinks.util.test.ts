@@ -111,9 +111,7 @@ describe('validateChatLinks', () => {
     const input =
       'Try [good](https://goodparty.org/good) and [dead](https://goodparty.org/dead).'
     const out = await validateChatLinks(input, reachable)
-    expect(out).toBe(
-      'Try [good](https://goodparty.org/good) and dead.',
-    )
+    expect(out).toBe('Try [good](https://goodparty.org/good) and dead.')
   })
 
   it('keeps links when the validator returns true and only checks each url once', async () => {

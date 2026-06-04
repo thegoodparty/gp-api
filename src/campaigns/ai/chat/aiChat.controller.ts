@@ -122,7 +122,9 @@ export class AiChatController {
    * never discards the other's value — both are best-effort personalization and
    * must never break (or degrade) the chat.
    */
-  private async resolveChatEnrichment(campaign: PromptReplaceCampaign): Promise<{
+  private async resolveChatEnrichment(
+    campaign: PromptReplaceCampaign,
+  ): Promise<{
     liveMetrics: RaceTargetMetrics | null
     l2DistrictName: string | null
   }> {
@@ -132,16 +134,13 @@ export class AiChatController {
     ])
 
     if (metricsResult.status === 'rejected') {
-      this.logger.error(
-        { e: metricsResult.reason },
-        'failed to fetch live race metrics for chat',
-      )
+      // PromiseSettledResult.reason is typed `any`; funnel through `unknown`.
+      const e: unknown = metricsResult.reason
+      this.logger.error({ e }, 'failed to fetch live race metrics for chat')
     }
     if (districtResult.status === 'rejected') {
-      this.logger.error(
-        { e: districtResult.reason },
-        'failed to resolve L2 district name for chat',
-      )
+      const e: unknown = districtResult.reason
+      this.logger.error({ e }, 'failed to resolve L2 district name for chat')
     }
 
     return {

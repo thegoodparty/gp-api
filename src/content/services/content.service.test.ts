@@ -29,7 +29,9 @@ describe('ContentService.getChatSystemPrompt prompt selection', () => {
       {} as unknown as ConstructorParameters<typeof ContentService>[1],
     )
     // Inject mocks for the Prisma model getter + logger from the base class.
-    ;(service as unknown as { _prisma: unknown })._prisma = { content: { findMany } }
+    ;(service as unknown as { _prisma: unknown })._prisma = {
+      content: { findMany },
+    }
     ;(service as unknown as { logger: unknown }).logger = { warn }
   })
 
@@ -39,7 +41,10 @@ describe('ContentService.getChatSystemPrompt prompt selection', () => {
 
   it('defaults to the "General" entry when CONTENTFUL_CHAT_PROMPT_NAME is unset', async () => {
     vi.stubEnv('CONTENTFUL_CHAT_PROMPT_NAME', '')
-    setRows([makePrompt('Dev', 'dev-prompt'), makePrompt('General', 'general-prompt')])
+    setRows([
+      makePrompt('Dev', 'dev-prompt'),
+      makePrompt('General', 'general-prompt'),
+    ])
 
     const { systemPrompt } = await service.getChatSystemPrompt()
 
@@ -49,7 +54,10 @@ describe('ContentService.getChatSystemPrompt prompt selection', () => {
 
   it('selects the configured entry by name (case-insensitive)', async () => {
     vi.stubEnv('CONTENTFUL_CHAT_PROMPT_NAME', 'dev')
-    setRows([makePrompt('Dev', 'dev-prompt'), makePrompt('General', 'general-prompt')])
+    setRows([
+      makePrompt('Dev', 'dev-prompt'),
+      makePrompt('General', 'general-prompt'),
+    ])
 
     const { systemPrompt } = await service.getChatSystemPrompt()
 
@@ -68,7 +76,10 @@ describe('ContentService.getChatSystemPrompt prompt selection', () => {
 
   it('falls back to "General" and warns when the configured entry is missing', async () => {
     vi.stubEnv('CONTENTFUL_CHAT_PROMPT_NAME', 'Staging')
-    setRows([makePrompt('Dev', 'dev-prompt'), makePrompt('General', 'general-prompt')])
+    setRows([
+      makePrompt('Dev', 'dev-prompt'),
+      makePrompt('General', 'general-prompt'),
+    ])
 
     const { systemPrompt } = await service.getChatSystemPrompt()
 
@@ -78,7 +89,10 @@ describe('ContentService.getChatSystemPrompt prompt selection', () => {
 
   it('falls back to the first entry when neither configured nor "General" exist', async () => {
     vi.stubEnv('CONTENTFUL_CHAT_PROMPT_NAME', 'Staging')
-    setRows([makePrompt('Dev', 'dev-prompt'), makePrompt('Other', 'other-prompt')])
+    setRows([
+      makePrompt('Dev', 'dev-prompt'),
+      makePrompt('Other', 'other-prompt'),
+    ])
 
     const { systemPrompt } = await service.getChatSystemPrompt()
 

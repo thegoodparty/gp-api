@@ -25,10 +25,16 @@ describe('formatL2DistrictName', () => {
 
   it('expands common L2 abbreviations in county/commissioner names', () => {
     expect(
-      formatL2DistrictName('BAILEY CNTY COMM DIST 1', 'County_Commissioner_District'),
+      formatL2DistrictName(
+        'BAILEY CNTY COMM DIST 1',
+        'County_Commissioner_District',
+      ),
     ).toBe('Bailey County Commissioner District 1')
     expect(
-      formatL2DistrictName('ALBANY CNTY LEG DIST 23', 'County_Legislative_District'),
+      formatL2DistrictName(
+        'ALBANY CNTY LEG DIST 23',
+        'County_Legislative_District',
+      ),
     ).toBe('Albany County Legislative District 23')
     expect(
       formatL2DistrictName(
@@ -46,23 +52,29 @@ describe('formatL2DistrictName', () => {
       'Bailey Lakes Village',
     )
     expect(
-      formatL2DistrictName('BERKELEY CITY CNCL 4', 'City_Council_Commissioner_District'),
+      formatL2DistrictName(
+        'BERKELEY CITY CNCL 4',
+        'City_Council_Commissioner_District',
+      ),
     ).toBe('Berkeley City Council 4')
     expect(
-      formatL2DistrictName('ALACHUA CNTY SCHL BD DIST 4', 'School_Board_District'),
+      formatL2DistrictName(
+        'ALACHUA CNTY SCHL BD DIST 4',
+        'School_Board_District',
+      ),
     ).toBe('Alachua County School Board District 4')
   })
 
   it('keeps acronyms upper-cased instead of mangling them', () => {
-    expect(formatL2DistrictName('HALL HS DIST 502', 'High_School_District')).toBe(
-      'Hall HS District 502',
-    )
+    expect(
+      formatL2DistrictName('HALL HS DIST 502', 'High_School_District'),
+    ).toBe('Hall HS District 502')
     expect(formatL2DistrictName('SAN FELIPE FD', 'Fire_District')).toBe(
       'San Felipe FD',
     )
-    expect(formatL2DistrictName('AMADOR CNTY USD', 'Unified_School_District')).toBe(
-      'Amador County USD',
-    )
+    expect(
+      formatL2DistrictName('AMADOR CNTY USD', 'Unified_School_District'),
+    ).toBe('Amador County USD')
   })
 
   it('strips leading zeros on trailing numbers', () => {
@@ -79,7 +91,10 @@ describe('formatL2DistrictName', () => {
       ),
     ).toBe('Albany County-East Albany CCD')
     expect(
-      formatL2DistrictName('BOLIVAR-RICHBURG CENTRAL SD (EST.)', 'Unified_School_District'),
+      formatL2DistrictName(
+        'BOLIVAR-RICHBURG CENTRAL SD (EST.)',
+        'Unified_School_District',
+      ),
     ).toBe('Bolivar-Richburg Central SD')
   })
 

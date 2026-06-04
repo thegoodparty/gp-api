@@ -118,7 +118,9 @@ export const sanitizeChatLinks = (content: string): string => {
     MARKDOWN_LINK_REGEX,
     (_match, label: string, target: string) => {
       const trimmed = target.trim()
-      return isSafeLinkTarget(trimmed) ? `[${label}](${stripTrackingParams(trimmed)})` : label
+      return isSafeLinkTarget(trimmed)
+        ? `[${label}](${stripTrackingParams(trimmed)})`
+        : label
     },
   )
 }
@@ -184,7 +186,9 @@ export const validateChatLinks = async (
       // Only http(s) links were candidates for a reachability check; anything
       // else (mailto/tel) is left as-is.
       if (!httpHost(trimmed)) return `[${label}](${trimmed})`
-      return reachability.get(trimmed) === false ? label : `[${label}](${trimmed})`
+      return reachability.get(trimmed) === false
+        ? label
+        : `[${label}](${trimmed})`
     },
   )
 }

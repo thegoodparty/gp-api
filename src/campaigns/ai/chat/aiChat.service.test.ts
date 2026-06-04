@@ -499,7 +499,9 @@ describe('AiChatService.streamChat', () => {
       vi.fn().mockResolvedValue({ status: 404 } as Response),
     )
     streamChatCompletion.mockResolvedValue(
-      makeStreamResult(['Read [the post](https://goodparty.org/blog/missing).']),
+      makeStreamResult([
+        'Read [the post](https://goodparty.org/blog/missing).',
+      ]),
     )
 
     const chunks = await collect(

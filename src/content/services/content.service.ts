@@ -122,7 +122,9 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       // CMS JSON payload — `data.name` is the Contentful entry name
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const data = prompt.data as AIChatPromptContents
-      return typeof data?.name === 'string' ? data.name.trim().toLowerCase() : ''
+      return typeof data?.name === 'string'
+        ? data.name.trim().toLowerCase()
+        : ''
     }
 
     const exact = prompts.find((p) => nameOf(p) === normalized)
