@@ -170,6 +170,34 @@ export class MeetingBriefingsService extends createPrismaBase(
       )
       return
     }
+
+    // The elected-office create returns the existing row on retry / concurrent
+    // race and re-invokes this hook. dispatchRun is not idempotent, so skip
+    // when an active or successful schedule run already exists — otherwise a
+    // retry spawns a duplicate live run and SQS message. A FAILED-only run is
+    // not blocking: the first attempt did not succeed and nothing else
+    // re-dispatches it (sweepStaleRuns only marks stale runs FAILED).
+    const existingScheduleRun = await this.client.experimentRun.findFirst({
+      where: {
+        organizationSlug: electedOffice.organizationSlug,
+        experimentType: SCHEDULE_EXPERIMENT_TYPE,
+        status: {
+          in: [
+            ExperimentRunStatus.RUNNING,
+            ExperimentRunStatus.AWAITING_RESUME,
+            ExperimentRunStatus.COMPLETED,
+          ],
+        },
+      },
+    })
+    if (existingScheduleRun) {
+      this.logger.info(
+        { electedOfficeId: electedOffice.id },
+        'schedule run already exists for org; skipping re-dispatch',
+      )
+      return
+    }
+
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return
 

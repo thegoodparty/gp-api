@@ -6,6 +6,8 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
   Post,
@@ -73,6 +75,7 @@ export class ElectedOfficeController {
   }
 
   @Post('/')
+  @HttpCode(HttpStatus.OK)
   @UseOrganization()
   async create(
     @ReqUser() user: User,
