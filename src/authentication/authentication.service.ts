@@ -41,7 +41,7 @@ export class AuthenticationService {
         e instanceof TokenExpiredError || // token expired
         e instanceof SyntaxError || // token parse failed
         e instanceof JsonWebTokenError || // malformed token
-        isPrismaError(e) // token doesn't match a user
+        isPrismaError(e, 'P2025') // token doesn't match a user (findFirstOrThrow)
       ) {
         throw new ForbiddenException(
           e instanceof TokenExpiredError

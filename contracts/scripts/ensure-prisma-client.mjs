@@ -11,8 +11,12 @@ import { fileURLToPath } from 'node:url'
 
 const contractsDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 const clientDir = join(contractsDir, '..', 'src', 'generated', 'prisma')
+// Check the sentinel entrypoint Node must resolve for the import to succeed,
+// not just the directory — an interrupted `prisma generate` can leave an
+// existing-but-incomplete dir that would still throw MODULE_NOT_FOUND.
+const clientEntry = join(clientDir, 'index.js')
 
-if (existsSync(clientDir)) {
+if (existsSync(clientEntry)) {
   process.exit(0)
 }
 
