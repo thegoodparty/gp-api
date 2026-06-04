@@ -366,24 +366,31 @@ export class MeetingBriefingsService extends createPrismaBase(
     }
 
     if (run.experimentType === SCHEDULE_EXPERIMENT_TYPE) {
-      await this.persistScheduleLocationFromRun(run)
+      // Critical work first (cron chain). Hint persistence is a best-effort
+      // optimization and must not gate the briefing dispatch — the queue
+      // consumer swallows throws from this handler without retry.
       await this.maybeDispatchBriefingAfterSchedule(run)
+      await this.persistScheduleLocationFromRun(run)
     }
   }
 
   private async handleBriefingCompletion(run: ExperimentRun): Promise<void> {
     const loaded = await this.loadBriefingArtifact(run)
     if (!loaded) return
-    // Location persists regardless of briefing_status — placeholder runs
-    // still produce a hint when the parent page was reachable.
-    await this.persistAgendaLocationFromArtifact(
-      run,
-      loaded.electedOffice.id,
-      loaded.artifact,
-    )
+    // Critical work first (the briefing row). Location persistence comes
+    // after so a hint-upsert failure can't block the row write — the queue
+    // consumer swallows throws from this handler without retry. Location
+    // persists regardless of briefing_status (writeBriefingRowFromArtifact
+    // early-returns on placeholder statuses), so placeholder runs still
+    // capture the hint.
     await this.writeBriefingRowFromArtifact(
       run,
       loaded.electedOffice,
+      loaded.artifact,
+    )
+    await this.persistAgendaLocationFromArtifact(
+      run,
+      loaded.electedOffice.id,
       loaded.artifact,
     )
   }
