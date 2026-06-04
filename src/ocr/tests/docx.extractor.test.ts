@@ -73,6 +73,33 @@ const buildZipBuffer = (uncompressedSize: number): Buffer => {
   return Buffer.concat([lfh, cd, eocd])
 }
 
+const buildZip64EocdBuffer = (): Buffer => {
+  const fileName = Buffer.from('a.xml')
+  const nameLen = fileName.length
+
+  const lfh = Buffer.alloc(30 + nameLen)
+  lfh.writeUInt32LE(0x04034b50, 0)
+  lfh.writeUInt16LE(45, 4)
+  fileName.copy(lfh, 30)
+
+  const cd = Buffer.alloc(46 + nameLen)
+  cd.writeUInt32LE(0x02014b50, 0)
+  cd.writeUInt16LE(45, 4)
+  cd.writeUInt16LE(45, 6)
+  cd.writeUInt32LE(0xffffffff, 24)
+  cd.writeUInt16LE(nameLen, 28)
+  fileName.copy(cd, 46)
+
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(1, 8)
+  eocd.writeUInt16LE(1, 10)
+  eocd.writeUInt32LE(0xffffffff, 12)
+  eocd.writeUInt32LE(0xffffffff, 16)
+
+  return Buffer.concat([lfh, cd, eocd])
+}
+
 const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const input = (
@@ -116,6 +143,15 @@ describe('DocxOcrExtractor', () => {
     await expect(extractor.extract(input())).rejects.toThrow(
       'attachment_decompressed_size_exceeded',
     )
+  })
+
+  it('skips decompression check for ZIP64 archives', async () => {
+    const zip64 = buildZip64EocdBuffer()
+    const { extractor } = buildExtractor(zip64)
+
+    const result = await extractor.extract(input())
+
+    expect(result.text).toBe('hello')
   })
 
   it('passes through to mammoth for a valid small archive', async () => {

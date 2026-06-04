@@ -13,6 +13,7 @@ const MAX_DECOMPRESSED_BYTES = 100 * 1024 * 1024
 const EOCD_SIGNATURE = 0x06054b50
 const CD_ENTRY_SIGNATURE = 0x02014b50
 const EOCD_MIN_SIZE = 22
+const ZIP64_SENTINEL = 0xffffffff
 
 const findEocdOffset = (buf: Buffer): number => {
   for (
@@ -33,6 +34,9 @@ const totalUncompressedSize = (buf: Buffer): number => {
 
   const cdOffset = buf.readUInt32LE(eocd + 16)
   const cdSize = buf.readUInt32LE(eocd + 12)
+  if (cdOffset === ZIP64_SENTINEL || cdSize === ZIP64_SENTINEL) {
+    return 0
+  }
   if (cdOffset + cdSize > buf.length || cdOffset > buf.length) {
     throw new BadRequestException('attachment_invalid_archive')
   }
@@ -43,8 +47,10 @@ const totalUncompressedSize = (buf: Buffer): number => {
   while (pos + 46 <= cdEnd) {
     if (buf.readUInt32LE(pos) !== CD_ENTRY_SIGNATURE) break
     const uncompressed = buf.readUInt32LE(pos + 24)
-    total += uncompressed
-    if (total > MAX_DECOMPRESSED_BYTES) return total
+    if (uncompressed !== ZIP64_SENTINEL) {
+      total += uncompressed
+      if (total > MAX_DECOMPRESSED_BYTES) return total
+    }
 
     const nameLen = buf.readUInt16LE(pos + 28)
     const extraLen = buf.readUInt16LE(pos + 30)
