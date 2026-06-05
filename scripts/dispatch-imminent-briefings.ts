@@ -105,8 +105,7 @@ async function main() {
       `Prod offices:  ${pool.length} (shuffled)`,
       `Goal:          ${target} briefings dispatched (5-day imminence gate)`,
       `Concurrency:   ${concurrency}`,
-      `Max est. cost: ~$${maxEstimate.toFixed(2)} ` +
-        `(may overshoot by up to ${concurrency - 1} in-flight calls)`,
+      `Max est. cost: ~$${maxEstimate.toFixed(2)} (hard cap at the target)`,
       '',
       'Proceed? (y/N) ',
     ].join('\n'),
@@ -128,9 +127,13 @@ async function main() {
   const token = await mintToken()
   const records: DispatchRecord[] = []
   let dispatched = 0
+  // Slots claimed by in-flight or completed dispatches. Workers claim a slot
+  // synchronously before each call so the concurrent pool can never push
+  // `dispatched` past `target` and blow the cost cap. A skip releases its slot.
+  let reserved = 0
   let index = 0
 
-  const callDispatch = async (office: Office): Promise<void> => {
+  const callDispatch = async (office: Office): Promise<boolean> => {
     let httpStatus = 0
     let didDispatch = false
     try {
@@ -168,12 +171,7 @@ async function main() {
     }
     records.push(record)
     appendFileSync(logPath, `${JSON.stringify(record)}\n`)
-    if (didDispatch) {
-      dispatched++
-      if (dispatched % 10 === 0) {
-        console.log(`  dispatched ${dispatched}/${target}`)
-      }
-    }
+    return didDispatch
   }
 
   const runStart = new Date().toISOString()
@@ -182,8 +180,23 @@ async function main() {
     () =>
       (async () => {
         while (dispatched < target && index < pool.length) {
-          const current = index++
-          await callDispatch(pool[current])
+          // Claim a slot synchronously — no await between the check and the
+          // increment — so two workers can never both take the last one.
+          if (reserved >= target) {
+            await new Promise((resolve) => setTimeout(resolve, 25))
+            continue
+          }
+          reserved++
+          const did = await callDispatch(pool[index++])
+          if (did) {
+            dispatched++
+            if (dispatched % 10 === 0) {
+              console.log(`  dispatched ${dispatched}/${target}`)
+            }
+          } else {
+            // A skip consumed no briefing; free the slot for another office.
+            reserved--
+          }
         }
       })(),
   )
