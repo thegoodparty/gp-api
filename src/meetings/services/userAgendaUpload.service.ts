@@ -16,10 +16,12 @@ import {
 import { MeetingBriefingsService } from './meetingBriefings.service'
 
 const PRESIGN_PUT_EXPIRES_IN = 60 * 15 // 15 min — upload itself
-const PRESIGN_GET_EXPIRES_IN = 60 * 60 * 6 // 6 hours — agent fetch
-// Agent runs typically finish in <50 min, so a 6h window covers retries + run
-// time with plenty of slack. After expiry the upload row still exists; a
-// re-run regenerates a fresh GET URL.
+
+// Canonical workspace path the agent reads. The runner pre-fetches each
+// authorized input file under /workspace/input/<dest>; instruction.md tells
+// the agent to read from that path. Hardcoded because meeting_briefing has
+// exactly one user-supplied input (the agenda).
+const AGENDA_WORKSPACE_DEST = 'agenda.pdf'
 
 const URL_HEAD_TIMEOUT_MS = 5000
 const PDF_CONTENT_TYPES = new Set([
@@ -105,9 +107,13 @@ export class UserAgendaUploadService extends createPrismaBase(
 
   /**
    * Persists the upload metadata (URL paste or completed S3 upload) and
-   * dispatches a fresh briefing run with `agendaPacketUrl` set. The previous
-   * run's MeetingBriefing row (if any) is left in place and gets overwritten
-   * by the existing upsert path when the new run completes.
+   * dispatches a fresh briefing run. The dispatch carries either
+   * `agendaPacketUrl` (URL paste; agent fetches the user's own URL via the
+   * broker proxy) or `_input_files` envelope refs (UPLOAD; the runner
+   * pre-fetches via broker /inputs/read and writes to /workspace/input/
+   * before the agent boots). The previous run's MeetingBriefing row (if any)
+   * is left in place and gets overwritten by the existing upsert path when
+   * the new run completes.
    *
    * Idempotent on (electedOfficeId, meetingDate) — re-finalizing replaces
    * the prior upload row and dispatches a new run.
@@ -153,14 +159,6 @@ export class UserAgendaUploadService extends createPrismaBase(
       contentType = 'application/pdf'
     }
 
-    // Resolve the URL the agent will fetch. For URL source we pass the
-    // user-provided URL through. For UPLOAD we presign a long-TTL GET.
-    const agendaPacketUrl = await this.resolveAgendaPacketUrl({
-      source,
-      sourceUrl,
-      uploadKey,
-    })
-
     // Persist the upload row BEFORE dispatching the run. If we dispatched
     // first and then the upsert threw, the run would be live with no
     // tracking row — invisible to GET /meetings and impossible to clean up
@@ -201,7 +199,20 @@ export class UserAgendaUploadService extends createPrismaBase(
     const { runId } = await this.meetings.dispatchBriefingWithUserAgenda({
       electedOfficeId: electedOffice.id,
       meetingDate,
-      agendaPacketUrl,
+      ...(source === UserAgendaSource.URL && sourceUrl
+        ? { agendaPacketUrl: sourceUrl }
+        : {}),
+      ...(source === UserAgendaSource.UPLOAD && uploadBucket && uploadKey
+        ? {
+            inputFiles: [
+              {
+                bucket: uploadBucket,
+                key: uploadKey,
+                dest: AGENDA_WORKSPACE_DEST,
+              },
+            ],
+          }
+        : {}),
     })
 
     await this.client.userAgendaUpload.update({
@@ -249,37 +260,6 @@ export class UserAgendaUploadService extends createPrismaBase(
       }
     }
     return out
-  }
-
-  private async resolveAgendaPacketUrl(args: {
-    source: UserAgendaSource
-    sourceUrl: string | null
-    uploadKey: string | null
-  }): Promise<string> {
-    if (args.source === UserAgendaSource.URL) {
-      if (!args.sourceUrl) {
-        throw new InternalServerErrorException(
-          'URL source missing sourceUrl in resolveAgendaPacketUrl',
-        )
-      }
-      return args.sourceUrl
-    }
-    if (!args.uploadKey) {
-      throw new InternalServerErrorException(
-        'UPLOAD source missing uploadKey in resolveAgendaPacketUrl',
-      )
-    }
-    const signedUrl = await this.s3.getSignedUrlForViewing(
-      this.bucket,
-      args.uploadKey,
-      { expiresIn: PRESIGN_GET_EXPIRES_IN },
-    )
-    if (!signedUrl) {
-      throw new InternalServerErrorException(
-        'failed_to_presign_agenda_packet_get_url',
-      )
-    }
-    return signedUrl
   }
 
   /**

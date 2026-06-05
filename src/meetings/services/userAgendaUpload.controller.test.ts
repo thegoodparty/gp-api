@@ -201,15 +201,26 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
       uploadKey: `agendas/${eo.id}/2026-07-15/${uploadId}.pdf`,
       experimentRunId: result.data.experimentRunId,
     })
+    // UPLOAD path sends `_input_files` envelope refs (stripped from params
+    // by the dispatch handler before agent boot) — never `agendaPacketUrl`,
+    // which would otherwise be a presigned URL vulnerable to IAM rotation.
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'meeting_briefing',
         params: expect.objectContaining({
           meetingDate: '2026-07-15',
-          agendaPacketUrl: 'https://s3.example/view-url',
+          _input_files: [
+            {
+              bucket: 'gp-agent-run-inputs-test',
+              key: `agendas/${eo.id}/2026-07-15/${uploadId}.pdf`,
+              dest: 'agenda.pdf',
+            },
+          ],
         }),
       }),
     )
+    const params = dispatchSpy.mock.calls[0][0].params as Record<string, unknown>
+    expect(params).not.toHaveProperty('agendaPacketUrl')
   })
 
   it('rejects a non-UUID uploadId', async () => {
@@ -344,6 +355,10 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
         }),
       }),
     )
+    // URL paste path passes the user's own URL through; the envelope-strip
+    // `_input_files` key belongs to the UPLOAD path and must not appear here.
+    const params = dispatchSpy.mock.calls[0][0].params as Record<string, unknown>
+    expect(params).not.toHaveProperty('_input_files')
   })
 
   it('returns 400 when HEAD returns 404', async () => {

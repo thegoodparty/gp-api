@@ -283,7 +283,16 @@ export class MeetingBriefingsService extends createPrismaBase(
   private async dispatchBriefing(
     ctx: DispatchContext,
     meeting: TargetMeeting,
-    options: { agendaPacketUrl?: string } = {},
+    options: {
+      // URL-paste path: user gave us a URL to an agenda. Travels in params as
+      // an ordinary string the agent reads + cites.
+      agendaPacketUrl?: string
+      // UPLOAD path: user uploaded a file. Travels in params under the
+      // reserved `_input_files` envelope key; the dispatch handler strips it
+      // out of params before agent validation/PARAMS_JSON and uses it to
+      // tell the runner to pre-fetch via the broker into /workspace/input/.
+      inputFiles?: Array<{ bucket: string; key: string; dest: string }>
+    } = {},
   ): Promise<{ runId: string } | undefined> {
     const hint = await this.loadLocationHint(
       ctx.electedOfficeId,
@@ -308,6 +317,9 @@ export class MeetingBriefingsService extends createPrismaBase(
         ...(options.agendaPacketUrl
           ? { agendaPacketUrl: options.agendaPacketUrl }
           : {}),
+        ...(options.inputFiles && options.inputFiles.length > 0
+          ? { _input_files: options.inputFiles }
+          : {}),
       },
     })
     return run ? { runId: run.runId } : undefined
@@ -318,14 +330,20 @@ export class MeetingBriefingsService extends createPrismaBase(
    * gate and the schedule lookup — the user is telling us "brief THIS meeting
    * with THIS agenda." We still resolve the dispatch context (officialName,
    * state, etc.) the normal way; the only PARAMS differences are
-   * `agendaPacketUrl` set and `meetingTime`/`meetingTimezone` left to the
-   * agent to discover from the platform (we don't reliably know them for
-   * arbitrary user-supplied dates).
+   * `agendaPacketUrl` or `_input_files` set and `meetingTime`/`meetingTimezone`
+   * left to the agent to discover from the platform (we don't reliably know
+   * them for arbitrary user-supplied dates).
+   *
+   * Caller supplies exactly one of `agendaPacketUrl` (URL-paste path; user's
+   * own URL — never a presigned one) or `inputFiles` (UPLOAD path; runner
+   * pre-fetches via the broker before the agent boots). Not validated here:
+   * the caller is the upload service, which always sets exactly one.
    */
   async dispatchBriefingWithUserAgenda(args: {
     electedOfficeId: string
     meetingDate: string
-    agendaPacketUrl: string
+    agendaPacketUrl?: string
+    inputFiles?: Array<{ bucket: string; key: string; dest: string }>
   }): Promise<{ runId: string }> {
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { id: args.electedOfficeId },
@@ -344,7 +362,12 @@ export class MeetingBriefingsService extends createPrismaBase(
     const result = await this.dispatchBriefing(
       ctx,
       { meetingDate: args.meetingDate },
-      { agendaPacketUrl: args.agendaPacketUrl },
+      {
+        ...(args.agendaPacketUrl
+          ? { agendaPacketUrl: args.agendaPacketUrl }
+          : {}),
+        ...(args.inputFiles ? { inputFiles: args.inputFiles } : {}),
+      },
     )
     if (!result) {
       throw new BadGatewayException(
