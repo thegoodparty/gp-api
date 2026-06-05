@@ -24,6 +24,11 @@ const cacheKey = (
 
 function makeService() {
   const gemini = {
+    generateWithSearch: vi.fn().mockResolvedValue({
+      text: 'mock search results',
+      searchQueries: [],
+      sources: [],
+    }),
     generateStructured: vi.fn(),
   }
   // Pass-through tracedNested: invoke the wrapped fn unchanged so the test
@@ -109,7 +114,7 @@ describe('OnboardingLocalNewsService', () => {
         id: 1,
         data: { onboarding: { localMediaOutlets: denverCached } },
       })
-      gemini.generateStructured.mockResolvedValue({ outlets: [] })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -174,7 +179,7 @@ describe('OnboardingLocalNewsService', () => {
         },
       }
       campaigns.findFirst.mockResolvedValue(expiredCampaign)
-      gemini.generateStructured.mockResolvedValue({ outlets: [] })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -298,6 +303,22 @@ describe('OnboardingLocalNewsService', () => {
         status: 'ready',
         outlets: aiOutlets,
       })
+
+      // The search stage must run with jurisdiction + office embedded in
+      // the prompt (the XML-wrapped prompt-injection defense lives in
+      // buildSearchPrompt), and its text must flow into the structured
+      // stage. A regression that calls generateWithSearch('') would
+      // silently strip the candidate context otherwise.
+      expect(gemini.generateWithSearch).toHaveBeenCalledTimes(1)
+      const searchPrompt = gemini.generateWithSearch.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(searchPrompt).toContain(STATE)
+      expect(searchPrompt).toContain(OFFICE)
+      const structuredPrompt = gemini.generateStructured.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(structuredPrompt).toContain('mock search results')
     })
   })
 })
