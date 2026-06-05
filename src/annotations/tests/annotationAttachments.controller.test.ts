@@ -326,23 +326,37 @@ describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/downl
   })
 
   it('rejects callers who do not own the annotation', async () => {
-    const { annotation } = await seedBriefingAndNote('eo-download-owner')
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: 'other_download',
+        email: 'other-download@goodparty.org',
+        firstName: 'A',
+        lastName: 'B',
+      },
+    })
+    const { annotation, noteId } = await seedBriefingAndNote(
+      'eo-download-owner',
+      otherUser.id,
+    )
     mockS3()
 
-    const presign = await service.client.post(
-      `/v1/annotations/${annotation.id}/note/attachments/presign`,
-      validPresign,
-      orgHeader('eo-download-owner'),
-    )
-    expect(presign.status).toBe(201)
-    const attachmentId = presign.data.attachment_id
+    const attachment = await service.prisma.annotationNoteAttachment.create({
+      data: {
+        noteId,
+        fileName: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1_500_000,
+        storageKey: 'annotations/download/other',
+        ocrStatus: OcrStatus.pending,
+      },
+    })
 
-    // Seed a second elected office and use its header — that user does
-    // not own the annotation, so the briefing-access check should 403.
-    await seedElectedOffice('eo-download-other')
+    // service.user owns a different elected office; the annotation belongs
+    // to otherUser, so the author check 403s before the row is read.
+    await seedElectedOffice('eo-mine-download')
     const result = await service.client.get(
-      `/v1/annotations/${annotation.id}/note/attachments/${attachmentId}/download-url`,
-      orgHeader('eo-download-other'),
+      `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
+      orgHeader('eo-mine-download'),
     )
 
     expect(result.status).toBe(403)
