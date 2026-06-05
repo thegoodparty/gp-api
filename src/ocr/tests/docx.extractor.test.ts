@@ -145,13 +145,13 @@ describe('DocxOcrExtractor', () => {
     )
   })
 
-  it('skips decompression check for ZIP64 archives', async () => {
+  it('rejects ZIP64 archives as unsupported', async () => {
     const zip64 = buildZip64EocdBuffer()
     const { extractor } = buildExtractor(zip64)
 
-    const result = await extractor.extract(input())
-
-    expect(result.text).toBe('hello')
+    await expect(extractor.extract(input())).rejects.toThrow(
+      'attachment_unsupported_format',
+    )
   })
 
   it('passes through to mammoth for a valid small archive', async () => {

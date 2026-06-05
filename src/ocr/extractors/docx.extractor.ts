@@ -35,7 +35,7 @@ const totalUncompressedSize = (buf: Buffer): number => {
   const cdOffset = buf.readUInt32LE(eocd + 16)
   const cdSize = buf.readUInt32LE(eocd + 12)
   if (cdOffset === ZIP64_SENTINEL || cdSize === ZIP64_SENTINEL) {
-    return 0
+    throw new BadRequestException('attachment_unsupported_format')
   }
   if (cdOffset + cdSize > buf.length || cdOffset > buf.length) {
     throw new BadRequestException('attachment_invalid_archive')
@@ -47,10 +47,11 @@ const totalUncompressedSize = (buf: Buffer): number => {
   while (pos + 46 <= cdEnd) {
     if (buf.readUInt32LE(pos) !== CD_ENTRY_SIGNATURE) break
     const uncompressed = buf.readUInt32LE(pos + 24)
-    if (uncompressed !== ZIP64_SENTINEL) {
-      total += uncompressed
-      if (total > MAX_DECOMPRESSED_BYTES) return total
+    if (uncompressed === ZIP64_SENTINEL) {
+      throw new BadRequestException('attachment_unsupported_format')
     }
+    total += uncompressed
+    if (total > MAX_DECOMPRESSED_BYTES) return total
 
     const nameLen = buf.readUInt16LE(pos + 28)
     const extraLen = buf.readUInt16LE(pos + 30)

@@ -219,7 +219,10 @@ export class AnnotationAttachmentService extends createPrismaBase(
         data: { attachmentId },
       },
       MessageGroup.default,
-      { deduplicationId: `ocr-${attachmentId}` },
+      {
+        deduplicationId: `ocr-${attachmentId}`,
+        throwOnError: true,
+      },
     )
   }
 
