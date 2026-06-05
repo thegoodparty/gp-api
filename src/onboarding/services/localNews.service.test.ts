@@ -114,7 +114,7 @@ describe('OnboardingLocalNewsService', () => {
         id: 1,
         data: { onboarding: { localMediaOutlets: denverCached } },
       })
-      gemini.generateStructured.mockResolvedValue({ outlets: [] })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -179,7 +179,7 @@ describe('OnboardingLocalNewsService', () => {
         },
       }
       campaigns.findFirst.mockResolvedValue(expiredCampaign)
-      gemini.generateStructured.mockResolvedValue({ outlets: [] })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
