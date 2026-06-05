@@ -1,0 +1,18 @@
+// Reviewer identity lives here, not on the parent Annotation row.
+// Annotation.authorUserId stays = the impersonated (reviewed) user;
+// reviewerClerkSub (from the impersonation actor) is the real reviewer.
+model AnnotationReview {
+  id String @id @default(cuid())
+
+  body String @db.Text
+
+  reviewerClerkSub String  @map("reviewer_clerk_sub")
+  reviewerEmail    String? @map("reviewer_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  annotation Annotation?
+
+  @@map("annotation_review")
+}
