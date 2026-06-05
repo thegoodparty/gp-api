@@ -23,6 +23,7 @@ const seedElectedOffice = async (orgSlug: string, userId?: number) => {
 const seedBriefingAndNote = async (
   orgSlug: string,
   userId: number = service.user.id,
+  authorUserId: number = userId,
 ) => {
   const eo = await seedElectedOffice(orgSlug, userId)
   const briefingRun = await service.prisma.experimentRun.create({
@@ -45,7 +46,7 @@ const seedBriefingAndNote = async (
   })
   const annotation = await service.prisma.annotation.create({
     data: {
-      author: { connect: { id: userId } },
+      author: { connect: { id: authorUserId } },
       kind: 'note',
       resourceType: 'briefing',
       resourceId: briefing.id,
@@ -276,24 +277,78 @@ describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/downl
     expect(result.status).toBe(404)
   })
 
-  it('rejects callers who do not own the annotation', async () => {
-    const { annotation } = await seedBriefingAndNote('eo-download-owner')
+  it('rejects access through an elected office that does not own the briefing', async () => {
+    // The briefing lives under another user's elected office, but the
+    // calling (default) user authored the annotation. Since a user owns at
+    // most one elected office, the caller reaches the annotation through
+    // their own office header and the briefing-access check must 403.
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: 'other_download',
+        email: 'other-download@goodparty.org',
+        firstName: 'A',
+        lastName: 'B',
+      },
+    })
+    const { annotation, noteId } = await seedBriefingAndNote(
+      'eo-download-foreign',
+      otherUser.id,
+      service.user.id,
+    )
+    const attachment = await service.prisma.annotationNoteAttachment.create({
+      data: {
+        noteId,
+        fileName: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1_500_000,
+        storageKey: `annotations/${annotation.id}/seed`,
+        ocrStatus: OcrStatus.pending,
+      },
+    })
     mockS3()
 
-    const presign = await service.client.post(
-      `/v1/annotations/${annotation.id}/note/attachments/presign`,
-      validPresign,
-      orgHeader('eo-download-owner'),
-    )
-    expect(presign.status).toBe(201)
-    const attachmentId = presign.data.attachment_id
-
-    // Seed a second elected office and use its header — that user does
-    // not own the annotation, so the briefing-access check should 403.
-    await seedElectedOffice('eo-download-other')
+    await seedElectedOffice('eo-download-mine')
     const result = await service.client.get(
-      `/v1/annotations/${annotation.id}/note/attachments/${attachmentId}/download-url`,
-      orgHeader('eo-download-other'),
+      `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
+      orgHeader('eo-download-mine'),
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('rejects callers who did not author the annotation', async () => {
+    // Annotation is authored by another user, but the briefing lives under
+    // the requesting user's own elected office. Only the author check should
+    // fire; if it were removed the briefing-access check would pass and the
+    // request would succeed, making this a true regression guard.
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: 'other_download_author',
+        email: 'other-download-author@goodparty.org',
+        firstName: 'A',
+        lastName: 'B',
+      },
+    })
+    const { annotation, noteId } = await seedBriefingAndNote(
+      'eo-download-mine-author',
+      service.user.id,
+      otherUser.id,
+    )
+    const attachment = await service.prisma.annotationNoteAttachment.create({
+      data: {
+        noteId,
+        fileName: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1_500_000,
+        storageKey: `annotations/${annotation.id}/seed`,
+        ocrStatus: OcrStatus.pending,
+      },
+    })
+    mockS3()
+
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
+      orgHeader('eo-download-mine-author'),
     )
 
     expect(result.status).toBe(403)
