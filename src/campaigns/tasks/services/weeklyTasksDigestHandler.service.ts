@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { CampaignTaskType, Prisma } from '@prisma/client'
+import { CampaignTaskType, Prisma } from '../../../generated/prisma'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { toDateOnlyString } from 'src/shared/util/date.util'

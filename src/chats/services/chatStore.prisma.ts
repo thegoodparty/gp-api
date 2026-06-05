@@ -1,5 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common'
-import { ChatMessage, ChatMessageRole, Prisma } from '@prisma/client'
+import { ChatMessage, ChatMessageRole, Prisma } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { isUniqueConstraintError } from '@/prisma/util/prismaErrors.util'
 

@@ -1,4 +1,4 @@
-import { Domain } from '@prisma/client'
+import { Domain } from '../../generated/prisma'
 
 type WithMaybeDomain<W> = W & Partial<{ domain: Domain | null }>
 type SerializedDomain = Omit<Domain, 'price'> & { price: number | null }

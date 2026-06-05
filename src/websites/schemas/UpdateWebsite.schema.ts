@@ -1,4 +1,4 @@
-import { WebsiteStatus } from '@prisma/client'
+import { WebsiteStatus } from '../../generated/prisma'
 import { VanityPathSchema } from './VanityPath.schema'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'

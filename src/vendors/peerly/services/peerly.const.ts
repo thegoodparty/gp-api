@@ -1,4 +1,4 @@
-import { CommitteeType, OfficeLevel } from '@prisma/client'
+import { CommitteeType, OfficeLevel } from '../../../generated/prisma'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { PeerlyCommitteeType } from '../peerly.types'
 

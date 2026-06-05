@@ -99,6 +99,9 @@ isolate-*.log
 isolate-*.json
 flamegraph.html
 
+# Generated Prisma client
+src/generated/
+
 # AI Tooling
 .ai
 repomix.config.json

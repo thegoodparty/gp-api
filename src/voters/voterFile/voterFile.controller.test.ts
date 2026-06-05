@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common'
-import { Organization, VoterFileFilter } from '@prisma/client'
+import { Organization, VoterFileFilter } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { VoterFileController } from './voterFile.controller'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

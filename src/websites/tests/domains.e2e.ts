@@ -8,7 +8,7 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 import { DomainSearchResult } from '../domains.types'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 
 type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
   include: {

@@ -8,7 +8,7 @@ import {
   Put,
   Sse,
 } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { Observable } from 'rxjs'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'

@@ -23,7 +23,7 @@ import { PeerlyP2pJobService } from '@/vendors/peerly/services/peerlyP2pJob.serv
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { AreaCodeFromZipService } from '@/ai/util/areaCodeFromZip.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
-import { Campaign, OutreachType } from '@prisma/client'
+import { Campaign, OutreachType } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mirror the production env gate. Tests don't set OTEL_SERVICE_ENVIRONMENT so

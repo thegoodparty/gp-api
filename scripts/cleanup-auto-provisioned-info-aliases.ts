@@ -59,7 +59,7 @@
 import '../dist/configrc'
 
 import { HttpStatus } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import axios, { AxiosInstance, AxiosResponse, isAxiosError } from 'axios'
 import { formatISO } from 'date-fns'
 import { createWriteStream, mkdirSync, WriteStream } from 'fs'

@@ -3,7 +3,7 @@ import {
   CampaignLaunchStatus,
   OnboardingStep,
 } from '@goodparty_org/contracts'
-import { Campaign, CampaignTier } from '@prisma/client'
+import { Campaign, CampaignTier } from '../../../generated/prisma'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 import { generateFactory } from './generate'
 

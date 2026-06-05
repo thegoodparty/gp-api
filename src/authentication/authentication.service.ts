@@ -6,8 +6,8 @@ import {
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/services/users.service'
 import { compare } from 'bcrypt'
-import { User } from '@prisma/client'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { User } from '../generated/prisma'
+import { isPrismaError } from '../prisma/util/prismaErrors.util'
 import { nanoid } from 'nanoid'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -41,7 +41,7 @@ export class AuthenticationService {
         e instanceof TokenExpiredError || // token expired
         e instanceof SyntaxError || // token parse failed
         e instanceof JsonWebTokenError || // malformed token
-        e instanceof PrismaClientKnownRequestError // token doesn't match a user
+        isPrismaError(e, 'P2025') // token doesn't match a user (findFirstOrThrow)
       ) {
         throw new ForbiddenException(
           e instanceof TokenExpiredError

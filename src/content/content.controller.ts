@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
 import { ContentService } from './services/content.service'
-import { ContentType } from '@prisma/client'
+import { ContentType } from '../generated/prisma'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,

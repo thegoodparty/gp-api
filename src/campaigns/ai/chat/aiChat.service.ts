@@ -20,7 +20,7 @@ import {
 } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'

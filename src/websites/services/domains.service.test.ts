@@ -4,7 +4,7 @@ import {
   DomainSource,
   DomainStatus,
   WebsiteStatus,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PrismaService } from 'src/prisma/prisma.service'

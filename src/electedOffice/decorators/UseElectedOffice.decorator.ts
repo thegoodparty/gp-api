@@ -1,5 +1,5 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { UseElectedOfficeGuard } from '../guards/UseElectedOffice.guard'
 
 export const REQUIRE_ELECTED_OFFICE_META_KEY = 'require_elected_office'

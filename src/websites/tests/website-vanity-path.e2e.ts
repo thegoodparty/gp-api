@@ -8,7 +8,7 @@ import {
   authHeaders,
   campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 
 type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
   include: {

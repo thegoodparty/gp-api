@@ -2,7 +2,7 @@ import { createMockClerkEnricher } from '@/shared/test-utils/mockClerkEnricher.u
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RequireCampaignMetadata } from '../decorators/UseCampaign.decorator'
 import { CampaignsService } from '../services/campaigns.service'

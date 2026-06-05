@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common'
 import { CommunityIssuesService } from '../services/communityIssues.service'
 import { CommunityIssueStatusLogService } from '../services/communityIssueStatusLog.service'
-import { Campaign, IssueStatus } from '@prisma/client'
+import { Campaign, IssueStatus } from '../../generated/prisma'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ZodValidationPipe } from 'nestjs-zod'

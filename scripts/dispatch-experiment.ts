@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import { SQS } from '@aws-sdk/client-sqs'
 import { v7 as uuidv7 } from 'uuid'
 import { randomUUID } from 'crypto'

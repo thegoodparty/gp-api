@@ -32,7 +32,7 @@ import {
   DomainStatus,
   User,
   UserRole,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { WebsitesService } from '../services/websites.service'

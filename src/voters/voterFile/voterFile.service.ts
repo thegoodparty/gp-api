@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
-import { Campaign, OutreachType, User } from '@prisma/client'
+import { Campaign, OutreachType, User } from '../../generated/prisma'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'

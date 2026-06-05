@@ -1,4 +1,4 @@
-import { DomainStatus, WebsiteStatus } from '@prisma/client'
+import { DomainStatus, WebsiteStatus } from '../../generated/prisma'
 import { z } from 'zod'
 import { GooglePlacesApiResponseSchema } from 'src/shared/schemas'
 

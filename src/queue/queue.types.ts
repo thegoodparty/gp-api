@@ -1,4 +1,4 @@
-import { TcrCompliance } from '@prisma/client'
+import { TcrCompliance } from '../generated/prisma'
 import z from 'zod'
 
 export enum QueueType {

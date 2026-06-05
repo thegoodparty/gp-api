@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { AnnotationKind, ElectedOffice, Prisma } from '@prisma/client'
+import { AnnotationKind, ElectedOffice, Prisma } from '../../generated/prisma'
 import {
   Annotation as AnnotationDTO,
   CreateAnnotationRequest,

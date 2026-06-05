@@ -1,4 +1,4 @@
-import { User, UserRole } from '@prisma/client'
+import { User, UserRole } from '../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersController } from './users.controller'
 import { UsersService } from './services/users.service'

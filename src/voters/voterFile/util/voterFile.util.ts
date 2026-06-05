@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { STATE_CODES } from '@/shared/constants/states'
 import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'

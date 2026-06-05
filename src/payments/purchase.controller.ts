@@ -1,7 +1,7 @@
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { Campaign, Organization, User } from '@prisma/client'
+import { Campaign, Organization, User } from '../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'

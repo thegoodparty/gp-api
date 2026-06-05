@@ -95,6 +95,7 @@ jobs:
             contracts/dist
             contracts/src/generated
             src/generated/route-types.ts
+            src/generated/prisma
 
   lint:
     name: Lint

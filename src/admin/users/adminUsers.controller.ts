@@ -17,7 +17,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { Prisma, UserRole } from '@prisma/client'
+import { Prisma, UserRole } from '../../generated/prisma'
 import { subDays, subMonths } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'

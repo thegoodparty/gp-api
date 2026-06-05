@@ -16,7 +16,7 @@ import {
   ExperimentRunStatus,
   MeetingResourceLocationType,
   Prisma,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { addDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { chunk } from 'es-toolkit'

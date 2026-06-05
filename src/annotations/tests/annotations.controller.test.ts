@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 

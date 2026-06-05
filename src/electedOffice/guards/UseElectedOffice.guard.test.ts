@@ -1,7 +1,7 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RequireElectedOfficeMetadata } from '../decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from '../services/electedOffice.service'
