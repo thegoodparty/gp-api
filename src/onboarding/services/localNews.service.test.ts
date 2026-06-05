@@ -303,6 +303,15 @@ describe('OnboardingLocalNewsService', () => {
         status: 'ready',
         outlets: aiOutlets,
       })
+
+      // The search stage must run and its text must flow into the
+      // structured stage's prompt, otherwise the search grounding does
+      // nothing and we're back to recall-from-training-data.
+      expect(gemini.generateWithSearch).toHaveBeenCalledTimes(1)
+      const structuredPrompt = gemini.generateStructured.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(structuredPrompt).toContain('mock search results')
     })
   })
 })

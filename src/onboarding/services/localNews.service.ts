@@ -29,7 +29,7 @@ Given a candidate's race location, return up to 9 local news outlets the candida
 REQUIREMENTS:
 1. Each outlet must primarily serve the local jurisdiction specified. Do NOT include national outlets (NYT, CNN, Fox, NPR national, AP, Reuters, etc.) or outlets whose coverage area is significantly broader than the race jurisdiction.
 2. Prioritize outlets known for straight news reporting over opinion or advocacy outlets. Avoid outlets with a clear partisan lean (left or right).
-3. Format diversity is required. Across the full result list, return between 3 and 4 outlets PER format from {TV, print, radio} whenever that many qualifying outlets exist locally. Never return more than 4 of any single format. If a format has fewer than 3 qualifying outlets locally, return as many as exist for that format and do not pad with low-quality outlets.
+3. Format diversity is required. Return 3 outlets PER format from {TV, print, radio} whenever 3 qualifying outlets exist locally for that format. If a format has fewer than 3 qualifying outlets locally, return as many as exist and do not pad with low-quality outlets.
 4. Prefer outlets that actively cover local government, elections, and civic affairs.
 5. Order the outlets within each format from most to least relevant for the candidate to monitor.
 
