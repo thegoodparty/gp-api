@@ -1,6 +1,6 @@
 import { forwardRef, Inject } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { UsersService } from 'src/users/services/users.service'
 import { PinoLogger } from 'nestjs-pino'

@@ -1,7 +1,7 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { CampaignsService } from '../services/campaigns.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { VOTER_GOALS_ADVISORY_LOCK_KEY } from '../campaigns.consts'

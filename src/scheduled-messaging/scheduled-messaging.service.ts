@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
-import { ScheduledMessage } from '@prisma/client'
+import { ScheduledMessage } from '../generated/prisma'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'

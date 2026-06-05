@@ -12,7 +12,7 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
@@ -116,6 +116,41 @@ export class AiChatController {
     this.logger.setContext(AiChatController.name)
   }
 
+  /**
+   * Resolves the optional chat-enrichment context (live race metrics + the L2
+   * district name) independently. Uses `allSettled` so a failure in one lookup
+   * never discards the other's value — both are best-effort personalization and
+   * must never break (or degrade) the chat.
+   */
+  private async resolveChatEnrichment(
+    campaign: PromptReplaceCampaign,
+  ): Promise<{
+    liveMetrics: RaceTargetMetrics | null
+    l2DistrictName: string | null
+  }> {
+    const [metricsResult, districtResult] = await Promise.allSettled([
+      this.campaigns.fetchLiveRaceTargetMetrics(campaign),
+      this.campaigns.resolveL2DistrictName(campaign),
+    ])
+
+    if (metricsResult.status === 'rejected') {
+      // PromiseSettledResult.reason is typed `any`; funnel through `unknown`.
+      const e: unknown = metricsResult.reason
+      this.logger.error({ e }, 'failed to fetch live race metrics for chat')
+    }
+    if (districtResult.status === 'rejected') {
+      const e: unknown = districtResult.reason
+      this.logger.error({ e }, 'failed to resolve L2 district name for chat')
+    }
+
+    return {
+      liveMetrics:
+        metricsResult.status === 'fulfilled' ? metricsResult.value : null,
+      l2DistrictName:
+        districtResult.status === 'fulfilled' ? districtResult.value : null,
+    }
+  }
+
   @Get()
   async list(@ReqUser() { id: userId }: User) {
     const aiChats = await this.aiChatService.findMany({ where: { userId } })
@@ -127,7 +162,9 @@ export class AiChatController {
       chats.push({
         threadId: chat.threadId,
         updatedAt: chat.updatedAt,
-        name: chatData.messages?.length > 0 ? chatData.messages[0].content : '',
+        name:
+          chatData.title ||
+          (chatData.messages?.length > 0 ? chatData.messages[0].content : ''),
       })
     }
 
@@ -168,9 +205,14 @@ export class AiChatController {
     @Body() body: CreateAiChatSchema,
   ) {
     try {
-      const liveMetrics =
-        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-      return await this.aiChatService.create(campaign, body, liveMetrics)
+      const { liveMetrics, l2DistrictName } =
+        await this.resolveChatEnrichment(campaign)
+      return await this.aiChatService.create(
+        campaign,
+        body,
+        liveMetrics,
+        l2DistrictName,
+      )
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
@@ -201,13 +243,14 @@ export class AiChatController {
     @Body() body: UpdateAiChatSchema,
   ) {
     try {
-      const liveMetrics =
-        await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
+      const { liveMetrics, l2DistrictName } =
+        await this.resolveChatEnrichment(campaign)
       return await this.aiChatService.update(
         threadId,
         campaign,
         body,
         liveMetrics,
+        l2DistrictName,
       )
     } catch (error) {
       this.logger.error({ e: error }, 'Error generating AI chat')
@@ -261,21 +304,14 @@ export class AiChatController {
       return
     }
 
-    let liveMetrics: RaceTargetMetrics | null = null
-    try {
-      liveMetrics = await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    } catch (err) {
-      this.logger.error(
-        { e: err },
-        'failed to fetch live race metrics for chat stream',
-      )
-      liveMetrics = null
-    }
+    const { liveMetrics, l2DistrictName } =
+      await this.resolveChatEnrichment(campaign)
 
     const iterable = this.aiChatService.streamChat(
       campaign,
       body,
       liveMetrics,
+      l2DistrictName,
       abortController.signal,
     )
 

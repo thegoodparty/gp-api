@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import { topIssueFactory } from './factories/topIssue.factory'
 import { positionFactory } from './factories/position.factory'
 import { campaignPositionFactory } from './factories/campaignPosition.factory'

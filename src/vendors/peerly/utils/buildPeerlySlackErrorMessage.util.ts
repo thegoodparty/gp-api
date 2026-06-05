@@ -1,4 +1,4 @@
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import { getUserFullName } from '../../../users/util/users.util'
 import { SlackMessageType } from '../../slack/slackService.types'
 

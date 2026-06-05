@@ -1,7 +1,7 @@
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../generated/prisma'
 import { ZodValidationPipe } from 'nestjs-zod'
 import {
   ConstituentIssuesParamsDTO,

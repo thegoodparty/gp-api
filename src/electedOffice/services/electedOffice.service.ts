@@ -1,12 +1,8 @@
 import { OrganizationsService } from '@/organizations/services/organizations.service'
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  forwardRef,
-} from '@nestjs/common'
-import { ElectedOffice, Prisma } from '@prisma/client'
+import { Inject, Injectable, forwardRef } from '@nestjs/common'
+import { ElectedOffice, Prisma } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { isUniqueConstraintError } from 'src/prisma/util/prismaErrors.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -45,7 +41,12 @@ export class ElectedOfficeService extends createPrismaBase(
       where: { userId: args.userId },
     })
     if (existing) {
-      throw new ConflictException('User already has an active elected office')
+      // A prior call may have committed the row but crashed before dispatching
+      // the schedule; the schedule dispatch is the only recovery path (the
+      // daily cron dispatches briefings, not the initial schedule), so re-run
+      // it here. onElectedOfficeCreated tolerates re-dispatch.
+      await this.dispatchScheduleAfterCreate(existing)
+      return existing
     }
 
     const orgData = args.orgData ?? {
@@ -54,38 +55,61 @@ export class ElectedOfficeService extends createPrismaBase(
       overrideDistrictId: null,
     }
 
-    const created = await this.client.$transaction(async (tx) => {
-      const id = uuidv7()
+    let created: ElectedOffice
+    try {
+      created = await this.client.$transaction(async (tx) => {
+        const id = uuidv7()
 
-      await tx.organization.create({
-        data: {
-          slug: OrganizationsService.electedOfficeOrgSlug(id),
-          ownerId: args.userId,
-          ...orgData,
-        },
+        await tx.organization.create({
+          data: {
+            slug: OrganizationsService.electedOfficeOrgSlug(id),
+            ownerId: args.userId,
+            ...orgData,
+          },
+        })
+
+        return tx.electedOffice.create({
+          data: {
+            id,
+            swornInDate: args.swornInDate,
+            userId: args.userId,
+            campaignId: args.campaignId,
+            organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
+          },
+        })
       })
+    } catch (err) {
+      // A concurrent create that wins the race trips the userId unique
+      // constraint; the transaction rolls back (no orphan org) and we return
+      // the row the other caller committed, keeping the endpoint idempotent.
+      if (isUniqueConstraintError(err)) {
+        const concurrent = await this.model.findFirst({
+          where: { userId: args.userId },
+        })
+        if (concurrent) {
+          await this.dispatchScheduleAfterCreate(concurrent)
+          return concurrent
+        }
+      }
+      throw err
+    }
 
-      return tx.electedOffice.create({
-        data: {
-          id,
-          swornInDate: args.swornInDate,
-          userId: args.userId,
-          campaignId: args.campaignId,
-          organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
-        },
-      })
-    })
+    await this.dispatchScheduleAfterCreate(created)
 
+    return created
+  }
+
+  private async dispatchScheduleAfterCreate(
+    electedOffice: ElectedOffice,
+  ): Promise<void> {
     await this.meetingBriefings
-      .onElectedOfficeCreated(created)
+      .onElectedOfficeCreated(electedOffice)
       .catch((err: Error) => {
         this.logger.error(
-          { err, electedOfficeId: created.id },
+          { err, electedOfficeId: electedOffice.id },
           'meeting schedule dispatch failed after EO created',
         )
       })
-
-    return created
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {

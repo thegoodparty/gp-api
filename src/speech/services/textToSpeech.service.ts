@@ -5,7 +5,7 @@ import {
   Injectable,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { createHash } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 import {

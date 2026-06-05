@@ -5,7 +5,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { FastifyRequest } from 'fastify'
 import { Observable, catchError, throwError } from 'rxjs'
 import { recordBlockedStateEvent } from '@/observability/grafana/otel.client'

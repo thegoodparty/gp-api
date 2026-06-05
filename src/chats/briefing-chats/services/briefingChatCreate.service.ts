@@ -7,7 +7,7 @@ import {
   Annotation,
   AnnotationKind,
   AnnotationResourceType,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { isUniqueConstraintError } from '@/prisma/util/prismaErrors.util'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'

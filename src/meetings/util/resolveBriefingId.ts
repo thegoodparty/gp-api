@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common'
-import { ElectedOffice, PrismaClient } from '@prisma/client'
+import { ElectedOffice, PrismaClient } from '../../generated/prisma'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 export async function resolveBriefingId(

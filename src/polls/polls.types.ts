@@ -1,4 +1,4 @@
-import { Poll } from '@prisma/client'
+import { Poll } from '../generated/prisma'
 import { isAfter } from 'date-fns'
 
 export enum APIPollStatus {

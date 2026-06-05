@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, User } from '@prisma/client'
+import { ElectedOffice, User } from '../../generated/prisma'
 import {
   AnnotationResponseSchema,
   AnnotationsListResponseSchema,

@@ -1,4 +1,4 @@
-import { WebsiteView } from '@prisma/client'
+import { WebsiteView } from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 

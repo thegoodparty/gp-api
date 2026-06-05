@@ -6,7 +6,7 @@ import {
   ModuleMetadata,
   RequestMethod,
 } from '@nestjs/common'
-import { DomainSource, DomainStatus } from '@prisma/client'
+import { DomainSource, DomainStatus } from '../../generated/prisma'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

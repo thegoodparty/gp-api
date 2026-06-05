@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { subDays } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
@@ -43,6 +43,7 @@ export class PromptReplaceService {
     prompt: string,
     campaign: PromptReplaceCampaign,
     liveMetrics?: RaceTargetMetrics | null,
+    l2DistrictName?: string | null,
   ) {
     try {
       if (!campaign.user) {
@@ -55,6 +56,7 @@ export class PromptReplaceService {
         ...this.buildLiveMetricsReplacements(liveMetrics),
         ...this.buildUpdateHistoryReplacement(prompt, campaign),
         ...this.buildAiContentReplacements(campaign),
+        ...this.buildDistrictReplacements(campaign, l2DistrictName),
       ]
 
       let result = prompt
@@ -139,6 +141,20 @@ export class PromptReplaceService {
         : positionName || ''
 
     return [{ find: 'office', replace: office }]
+  }
+
+  /**
+   * Resolves the `[[l2DistrictName]]` token to the candidate's real voter-file
+   * district name, falling back to the self-reported `details.district` so the
+   * prompt never personalizes with a bare "unknown" when L2 data is missing.
+   */
+  private buildDistrictReplacements(
+    campaign: PromptReplaceCampaign,
+    l2DistrictName?: string | null,
+  ): PromptReplacement[] {
+    const resolved =
+      l2DistrictName?.trim() || campaign.details?.district || undefined
+    return [{ find: 'l2DistrictName', replace: resolved }]
   }
 
   private buildLiveMetricsReplacements(

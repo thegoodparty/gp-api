@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import { electedOfficeFactory } from './factories/electedOffice.factory'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 

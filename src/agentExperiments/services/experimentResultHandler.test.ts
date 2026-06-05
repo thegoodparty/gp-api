@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { QueueType } from '@/queue/queue.types'
 import { QueueConsumerService } from '@/queue/consumer/queueConsumer.service'

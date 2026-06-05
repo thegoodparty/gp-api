@@ -11,7 +11,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, OutreachType, User } from '@prisma/client'
+import { Campaign, OutreachType, User } from '../generated/prisma'
 import { CacheControls, MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'

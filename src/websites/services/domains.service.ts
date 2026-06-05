@@ -16,7 +16,7 @@ import {
   DomainStatus,
   User,
   Website,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'

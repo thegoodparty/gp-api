@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
-import { OutreachType } from '@prisma/client'
+import { OutreachType } from '../../generated/prisma'
 import {
   authHeaders,
   campaignOrgSlug,

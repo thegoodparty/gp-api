@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CampaignTaskType } from '@prisma/client'
+import { CampaignTaskType } from '../../../generated/prisma'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'

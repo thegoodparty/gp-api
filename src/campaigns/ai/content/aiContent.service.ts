@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { differenceInMilliseconds } from 'date-fns'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
@@ -161,7 +161,7 @@ export class AiContentService {
       prompt,
       // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      existingChat: (chat as AiChatMessage[]) || [],
+      existingChat: (chat as unknown as AiChatMessage[]) || [],
       inputValues,
       createdAt: new Date().valueOf(),
     }

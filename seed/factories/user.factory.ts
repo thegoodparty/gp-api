@@ -1,4 +1,4 @@
-import { User, UserRole } from '@prisma/client'
+import { User, UserRole } from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 import {

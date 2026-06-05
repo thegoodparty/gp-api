@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { HttpStatus, NotFoundException } from '@nestjs/common'
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants'
-import { CommitteeType, TcrComplianceStatus } from '@prisma/client'
+import { CommitteeType, TcrComplianceStatus } from '../../generated/prisma'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { PinoLogger } from 'nestjs-pino'

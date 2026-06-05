@@ -1,7 +1,7 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
 import { Readable } from 'stream'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'

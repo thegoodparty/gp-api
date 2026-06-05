@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../../generated/prisma'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { effectiveUser } from '@/authentication/util/effectiveUser.util'
 

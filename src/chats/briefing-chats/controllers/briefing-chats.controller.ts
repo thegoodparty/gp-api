@@ -10,7 +10,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'

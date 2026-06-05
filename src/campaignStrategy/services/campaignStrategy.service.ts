@@ -10,7 +10,7 @@ import {
   CampaignStrategy,
   ExperimentRun,
   ExperimentRunStatus,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { format, isBefore, subMinutes } from 'date-fns'
 import { z } from 'zod'
 import { CampaignWith } from '@/campaigns/campaigns.types'

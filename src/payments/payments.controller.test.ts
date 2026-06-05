@@ -1,6 +1,6 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../generated/prisma'
 import Stripe from 'stripe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IS_PUBLIC_KEY } from '../authentication/decorators/PublicAccess.decorator'

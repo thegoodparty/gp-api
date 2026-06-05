@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { FastifyReply } from 'fastify'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
 import { OrganizationsService } from '../../organizations/services/organizations.service'

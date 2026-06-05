@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ExperimentRunStatus, MeetingBriefing } from '@prisma/client'
+import { ExperimentRunStatus, MeetingBriefing } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
 
 const service = useTestService()

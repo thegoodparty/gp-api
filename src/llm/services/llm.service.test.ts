@@ -41,6 +41,52 @@ describe('LlmService', () => {
     vi.useRealTimers()
   })
 
+  describe('getChatModelChain - cross-provider fallback', () => {
+    it('returns just the default models when no fallback is configured', () => {
+      delete process.env.AI_FALLBACK_MODEL
+      const service = createServiceWithMockLogger()
+      expect(service.getChatModelChain()).toEqual([
+        'model1',
+        'model2',
+        'model3',
+      ])
+    })
+
+    it('appends a non-Claude fallback without requiring an Anthropic key', () => {
+      delete process.env.ANTHROPIC_API_KEY
+      process.env.AI_FALLBACK_MODEL = 'some/other-model'
+      const service = createServiceWithMockLogger()
+      expect(service.getChatModelChain()).toEqual([
+        'model1',
+        'model2',
+        'model3',
+        'some/other-model',
+      ])
+    })
+
+    it('appends a Claude fallback only when ANTHROPIC_API_KEY is set', () => {
+      process.env.AI_FALLBACK_MODEL = 'claude-3-5-sonnet-latest'
+
+      process.env.ANTHROPIC_API_KEY = 'anthropic-key'
+      const withKey = createServiceWithMockLogger()
+      expect(withKey.getChatModelChain()).toContain('claude-3-5-sonnet-latest')
+
+      delete process.env.ANTHROPIC_API_KEY
+      const withoutKey = createServiceWithMockLogger()
+      expect(withoutKey.getChatModelChain()).not.toContain(
+        'claude-3-5-sonnet-latest',
+      )
+    })
+
+    it('does not duplicate a fallback already present in AI_MODELS', () => {
+      process.env.AI_MODELS = 'model1,claude-x'
+      process.env.ANTHROPIC_API_KEY = 'anthropic-key'
+      process.env.AI_FALLBACK_MODEL = 'claude-x'
+      const service = createServiceWithMockLogger()
+      expect(service.getChatModelChain()).toEqual(['model1', 'claude-x'])
+    })
+  })
+
   describe('chatCompletion - model fallback behavior', () => {
     let service: LlmService
 

@@ -18,7 +18,7 @@ import {
 import { AiContentService } from './aiContent.service'
 import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '../../../generated/prisma'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'

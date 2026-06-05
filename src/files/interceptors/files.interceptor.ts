@@ -10,7 +10,7 @@ import { FileUpload } from '../files.types'
 import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
 import { Headers, MimeTypes } from 'http-constants-ts'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { FORBIDDEN_KEYS } from '@/shared/constants/forbiddenKeys'
 
 type FilesInterceptorOpts = {

@@ -3,7 +3,7 @@ import {
   CallHandler,
   ExecutionContext,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { firstValueFrom, of, throwError } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

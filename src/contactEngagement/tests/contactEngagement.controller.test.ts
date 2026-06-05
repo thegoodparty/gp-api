@@ -1,4 +1,4 @@
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContactEngagementController } from '../contactEngagement.controller'
 import { ContactEngagementService } from '../contactEngagement.service'

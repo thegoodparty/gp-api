@@ -1,4 +1,4 @@
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../generated/prisma'
 import { HttpStatus } from '@nestjs/common'
 import { FastifyReply } from 'fastify'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

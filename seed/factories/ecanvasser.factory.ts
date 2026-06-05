@@ -1,4 +1,4 @@
-import { Ecanvasser } from '@prisma/client'
+import { Ecanvasser } from '../../src/generated/prisma'
 import { generateFactory } from './generate'
 import { faker } from '@faker-js/faker'
 

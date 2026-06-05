@@ -1,4 +1,4 @@
-import { OutreachType } from '@prisma/client'
+import { OutreachType } from '../../generated/prisma'
 import { describe, expect, it } from 'vitest'
 import { SlackMessageType } from 'src/vendors/slack/slackService.types'
 import { buildSlackBlocks } from './voterOutreach.util'

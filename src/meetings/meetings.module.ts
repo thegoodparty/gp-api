@@ -4,7 +4,6 @@ import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { ElectionsModule } from '@/elections/elections.module'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { AwsModule } from '@/vendors/aws/aws.module'
-import { SegmentModule } from '@/vendors/segment/segment.module'
 import { LlmModule } from '@/llm/llm.module'
 import { CronModule } from '@/cron/cron.module'
 import { BriefingsPdfController } from './controllers/briefingsPdf.controller'
@@ -20,7 +19,6 @@ import { MeetingBriefingsService } from './services/meetingBriefings.service'
     ElectionsModule,
     OrganizationsModule,
     AwsModule,
-    SegmentModule,
     LlmModule,
     CronModule,
   ],

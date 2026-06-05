@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 
 type CampaignPositionWithRelations = Prisma.CampaignPositionGetPayload<{
   include: { topIssue: true; position: true }
