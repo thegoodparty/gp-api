@@ -5,7 +5,7 @@ import {
   MessageEvent,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Prisma } from '@prisma/client'
+import { Campaign, Prisma } from '../../../generated/prisma'
 import {
   addDays,
   compareAsc,

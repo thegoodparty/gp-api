@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { addDays, getDay, parseISO } from 'date-fns'

@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
 import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../generated/prisma'
 import { ZodValidationPipe } from 'nestjs-zod'
 import {
   MassRefreshCompanySchema,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { GEMINI_MODEL } from '@/vendors/google/gemini.types'
 import { GeminiService } from '@/vendors/google/services/gemini.service'

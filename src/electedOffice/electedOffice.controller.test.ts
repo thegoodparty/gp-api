@@ -1,5 +1,5 @@
 import { useTestService } from '@/test-service'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../generated/prisma'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 const service = useTestService()

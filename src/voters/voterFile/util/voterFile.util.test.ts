@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { describe, expect, it, vi } from 'vitest'
 import { VoterFileType } from '../voterFile.types'

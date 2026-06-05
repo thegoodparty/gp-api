@@ -9,7 +9,7 @@ import {
   VoterCounts,
   VoterHistoryColumn,
 } from '../voters.types'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { AxiosResponse } from 'axios'
 import { cloneDeep } from 'es-toolkit'
 import { SlackService } from 'src/vendors/slack/services/slack.service'

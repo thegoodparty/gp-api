@@ -3,7 +3,7 @@ import {
   CreateTopIssueDto,
   TopIssueOutputDto,
 } from './schemas/topIssues.schema'
-import { TopIssue } from '@prisma/client'
+import { TopIssue } from '../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import { LlmService } from '@/llm/services/llm.service'

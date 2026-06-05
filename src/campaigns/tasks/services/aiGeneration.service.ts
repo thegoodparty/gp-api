@@ -3,7 +3,7 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { z } from 'zod'
 import { PinoLogger } from 'nestjs-pino'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'

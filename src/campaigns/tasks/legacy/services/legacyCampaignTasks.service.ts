@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../../generated/prisma'
 import { parse, differenceInWeeks } from 'date-fns'
 import { DateFormats } from '@/shared/util/date.util'
 import { STATIC_CAMPAIGN_TASKS } from '../fixtures/legacyCampaignTasks.consts'

@@ -1,4 +1,4 @@
-import { TopIssue } from '@prisma/client'
+import { TopIssue } from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 

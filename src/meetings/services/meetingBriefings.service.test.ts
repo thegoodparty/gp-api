@@ -1,7 +1,7 @@
 import {
   ExperimentRunStatus,
   MeetingResourceLocationType,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'

@@ -1,6 +1,6 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import Stripe from 'stripe'

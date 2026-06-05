@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Organization, User, UserRole } from '@prisma/client'
+import { Campaign, Organization, User, UserRole } from '../generated/prisma'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

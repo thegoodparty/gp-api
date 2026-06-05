@@ -1,6 +1,6 @@
 import { P2P_JOB_DEFAULTS } from '@/vendors/peerly/constants/p2pJob.constants'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import type { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 import zipcodes from 'zipcodes'
 import {

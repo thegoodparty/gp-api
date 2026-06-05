@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { Campaign, TcrCompliance, User } from '@prisma/client'
+import { Campaign, TcrCompliance, User } from '../../../generated/prisma'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'

@@ -6,7 +6,7 @@ import {
   NotFoundException,
   RequestMethod,
 } from '@nestjs/common'
-import { DomainStatus, WebsiteStatus } from '@prisma/client'
+import { DomainStatus, WebsiteStatus } from '../../generated/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'

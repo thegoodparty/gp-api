@@ -9,7 +9,7 @@ import {
 import { ALLOWED_COLUMNS } from '../../constants/allowedColumns.const'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { parseJsonString } from 'src/shared/util/zod.util'
-import { OutreachType } from '@prisma/client'
+import { OutreachType } from '../../../generated/prisma'
 
 const LOWER_CASE_TYPE_MAP = {
   doorknocking: VoterFileType.doorKnocking,

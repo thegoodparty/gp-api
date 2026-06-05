@@ -10,7 +10,7 @@ import {
   registerUser,
   RegisterResponse,
 } from '../../../../e2e-tests/utils/auth.util'
-import { CampaignUpdateHistory } from '@prisma/client'
+import { CampaignUpdateHistory } from '../../../generated/prisma'
 
 test.describe('Campaigns - Update History', () => {
   let reg: RegisterResponse

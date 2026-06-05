@@ -1,4 +1,4 @@
-import { CampaignUpdateHistoryType } from '@prisma/client'
+import { CampaignUpdateHistoryType } from '../../../generated/prisma'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 

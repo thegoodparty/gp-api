@@ -4,7 +4,7 @@ import {
   ExceptionFilter,
   HttpStatus,
 } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 
 const prismaErrorClasses = [

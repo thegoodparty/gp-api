@@ -1,7 +1,7 @@
 import { StatsResponse } from '@/contacts/contacts.types'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { useTestService } from '@/test-service'
-import { Poll } from '@prisma/client'
+import { Poll } from '../generated/prisma'
 import { v7 as uuidv7 } from 'uuid'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'

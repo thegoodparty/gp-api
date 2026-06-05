@@ -4,7 +4,7 @@ import {
   ArtifactFeedbackKind,
   ArtifactResourceType,
   ElectedOffice,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { ArtifactFeedback as ArtifactFeedbackDTO } from '@goodparty_org/contracts'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { resolveBriefingId } from '@/meetings/util/resolveBriefingId'

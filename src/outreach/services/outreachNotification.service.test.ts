@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { Campaign, OutreachType, User, VoterFileFilter } from '@prisma/client'
+import {
+  Campaign,
+  OutreachType,
+  User,
+  VoterFileFilter,
+} from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'

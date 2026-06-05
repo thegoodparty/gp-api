@@ -1,6 +1,6 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
-import { Campaign, Organization, User, UserRole } from '@prisma/client'
+import { Campaign, Organization, User, UserRole } from '../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'

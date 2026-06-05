@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { OcrStatus } from '@prisma/client'
+import { OcrStatus } from '../generated/prisma'
 import { ImageOcrExtractor } from './extractors/image.extractor'
 import { PdfOcrExtractor } from './extractors/pdf.extractor'
 import { DocxOcrExtractor } from './extractors/docx.extractor'

@@ -4,7 +4,7 @@ import {
   Prisma,
   PrismaClient,
   User,
-} from '@prisma/client'
+} from '../src/generated/prisma'
 import pmap from 'p-map'
 import { buildSlug } from '../src/shared/util/slug.util'
 import { getUserFullName } from '../src/users/util/users.util'

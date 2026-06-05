@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { IssueStatus } from '@prisma/client'
+import { IssueStatus } from '../../generated/prisma'
 
 @Injectable()
 export class CommunityIssueStatusLogService extends createPrismaBase(

@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 
 const PRISMA_LOG_LEVELS = [

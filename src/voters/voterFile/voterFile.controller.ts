@@ -15,7 +15,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, Organization, User, UserRole } from '@prisma/client'
+import { Campaign, Organization, User, UserRole } from '../../generated/prisma'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'

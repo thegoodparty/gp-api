@@ -1,4 +1,4 @@
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice } from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { randomUUID } from 'crypto'
 import { generateFactory } from './generate'

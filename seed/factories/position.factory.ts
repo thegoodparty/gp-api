@@ -1,4 +1,4 @@
-import { Position } from '@prisma/client'
+import { Position } from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 
