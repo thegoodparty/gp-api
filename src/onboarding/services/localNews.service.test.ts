@@ -304,10 +304,17 @@ describe('OnboardingLocalNewsService', () => {
         outlets: aiOutlets,
       })
 
-      // The search stage must run and its text must flow into the
-      // structured stage's prompt, otherwise the search grounding does
-      // nothing and we're back to recall-from-training-data.
+      // The search stage must run with jurisdiction + office embedded in
+      // the prompt (the XML-wrapped prompt-injection defense lives in
+      // buildSearchPrompt), and its text must flow into the structured
+      // stage. A regression that calls generateWithSearch('') would
+      // silently strip the candidate context otherwise.
       expect(gemini.generateWithSearch).toHaveBeenCalledTimes(1)
+      const searchPrompt = gemini.generateWithSearch.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(searchPrompt).toContain(STATE)
+      expect(searchPrompt).toContain(OFFICE)
       const structuredPrompt = gemini.generateStructured.mock.calls[0]?.[0] as
         | string
         | undefined
