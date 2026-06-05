@@ -233,13 +233,18 @@ export class MeetingsBriefingsController {
     const result = await this.meetingBriefings.dispatchManual(
       body.electedOfficeId,
       body.kind,
+      body.useImminenceGate,
     )
-    if (!result.dispatched) {
+    // With the imminence gate on, a non-dispatch is an expected skip (no meeting
+    // inside the window, or one already briefed), so return it as a 200 and let
+    // the bulk caller tell "skipped" from a hard failure. Without the gate (the
+    // UI button), a non-dispatch means context resolution failed → 404.
+    if (!result.dispatched && !body.useImminenceGate) {
       throw new NotFoundException(
         'Could not resolve dispatch context for that elected office',
       )
     }
-    return { dispatched: true, kind: body.kind }
+    return { dispatched: result.dispatched, kind: body.kind }
   }
 
   /**
