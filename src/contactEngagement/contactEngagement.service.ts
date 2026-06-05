@@ -5,7 +5,7 @@ import {
   PollIndividualMessage,
   PollIndividualMessageSender,
   Prisma,
-} from '@prisma/client'
+} from '../generated/prisma'
 import { compareDesc, parseISO } from 'date-fns'
 import { IndividualActivityInput } from './contactEngagement.schema'
 import {

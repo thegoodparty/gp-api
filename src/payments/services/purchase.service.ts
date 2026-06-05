@@ -4,7 +4,7 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import {
   CheckoutSessionPostPurchaseHandler,
   CompleteCheckoutSessionDto,

@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import {
   AUTH_PROVIDER_TOKEN,

@@ -1,4 +1,4 @@
-import { User, UserRole } from '@prisma/client'
+import { User, UserRole } from '../../generated/prisma'
 
 export const getUserFullName = (user: User) =>
   !user

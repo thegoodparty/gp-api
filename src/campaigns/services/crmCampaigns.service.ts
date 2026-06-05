@@ -9,7 +9,7 @@ import {
 import { HubspotService } from '../../crm/hubspot.service'
 import { CampaignsService } from './campaigns.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '../../generated/prisma'
 import { getUserFullName } from '../../users/util/users.util'
 import { formatDateForCRM } from '../../crm/util/cms.util'
 import { CrmUsersService } from '../../users/services/crmUsers.service'

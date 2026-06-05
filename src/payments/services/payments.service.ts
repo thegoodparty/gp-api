@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Prisma, User } from '@prisma/client'
+import { Prisma, User } from '../../generated/prisma'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { UsersService } from '../../users/services/users.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'

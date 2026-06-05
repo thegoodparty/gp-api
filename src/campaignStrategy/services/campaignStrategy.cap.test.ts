@@ -3,7 +3,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { CampaignStrategyService } from './campaignStrategy.service'
 import { ElectionApiRaceNotFoundError } from './electionApi.service'
 

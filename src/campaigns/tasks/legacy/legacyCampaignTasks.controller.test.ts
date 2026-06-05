@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LegacyCampaignTasksController } from './legacyCampaignTasks.controller'
 import { LegacyCampaignTasksService } from './services/legacyCampaignTasks.service'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { CampaignTaskType } from '../campaignTasks.types'
 
 const makeCampaign = (): Campaign =>

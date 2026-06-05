@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { TranscribeSessionResponse } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 import { UserRequestBudget } from '../util/userRequestBudget'

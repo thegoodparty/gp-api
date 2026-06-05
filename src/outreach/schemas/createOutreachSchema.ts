@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { OutreachStatus, OutreachType } from '@prisma/client'
+import { OutreachStatus, OutreachType } from '../../generated/prisma'
 import { isValid, parseISO } from 'date-fns'
 
 export class CreateOutreachSchema extends createZodDto(

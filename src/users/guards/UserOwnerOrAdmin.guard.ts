@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../../generated/prisma'
 import { VerifiedM2MToken } from '@/authentication/interfaces/auth-provider.interface'
 
 // TODO: I'm not a fan of this. But I've spent way too much time on it for now.

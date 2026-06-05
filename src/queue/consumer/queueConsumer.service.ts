@@ -10,8 +10,8 @@ import {
   PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
-} from '@prisma/client'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+} from '../../generated/prisma'
+import { isPrismaError } from 'src/prisma/util/prismaErrors.util'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { addMinutes, format, isBefore, isValid, parseISO } from 'date-fns'
@@ -77,7 +77,7 @@ import { OrgDistrict } from '@/organizations/organizations.types'
 
 import type { AgentExperimentResultData } from '../queue.types'
 
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { isJsonObject } from '@/shared/util/objects.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
@@ -204,15 +204,9 @@ export class QueueConsumerService {
 
   private legacyShouldRequeueError(error: Error): boolean {
     // Don't retry Prisma errors for missing records - these are permanent failures
-    if (error instanceof PrismaClientKnownRequestError) {
-      // P2025: Record not found
-      if (error.code === 'P2025') {
-        return false
-      }
-      // P2002: Unique constraint violation
-      if (error.code === 'P2002') {
-        return false
-      }
+    // P2025: Record not found; P2002: Unique constraint violation
+    if (isPrismaError(error, 'P2025') || isPrismaError(error, 'P2002')) {
+      return false
     }
 
     // Don't retry validation errors or other client errors

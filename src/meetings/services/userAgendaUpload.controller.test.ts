@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus, UserAgendaSource } from '@prisma/client'
+import { ExperimentRunStatus, UserAgendaSource } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'

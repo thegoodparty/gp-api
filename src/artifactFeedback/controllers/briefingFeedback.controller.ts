@@ -1,6 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, User } from '@prisma/client'
+import { ElectedOffice, User } from '../../generated/prisma'
 import { BriefingFeedbackListResponseSchema } from '@goodparty_org/contracts'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import { SortablePaginationSchema } from '@goodparty_org/contracts'

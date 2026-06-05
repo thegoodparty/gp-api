@@ -1,4 +1,4 @@
-import { PollIndividualMessageSender } from '@prisma/client'
+import { PollIndividualMessageSender } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ConstituentActivityEventType,

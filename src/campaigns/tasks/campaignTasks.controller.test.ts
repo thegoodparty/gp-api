@@ -5,7 +5,7 @@ import {
   Campaign,
   CampaignTaskType,
   CampaignUpdateHistoryType,
-} from '@prisma/client'
+} from '../../generated/prisma'
 
 const makeCampaign = (): Campaign =>
   ({

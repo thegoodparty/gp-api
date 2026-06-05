@@ -14,7 +14,7 @@ import {
   FriendlyOrganization,
 } from './services/organizations.service'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
+import { User } from '../generated/prisma'
 import {
   AdminListOrganizationsDto,
   PatchOrganizationDto,

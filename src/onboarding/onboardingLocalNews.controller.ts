@@ -6,7 +6,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../generated/prisma'
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'

@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ClerkClient } from '@clerk/backend'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from '@/prisma/prisma.service'
+import { isPrismaError } from '@/prisma/util/prismaErrors.util'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { clerkThrottle } from '@/vendors/clerk/util/clerkThrottle.util'
 
@@ -262,10 +262,7 @@ export class ClerkUserEnricherService {
       })
       return clerkUser.id
     } catch (err) {
-      if (
-        err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isPrismaError(err, 'P2002')) {
         this.logger.warn(
           { email, userId: id },
           'Lazy Clerk link skipped: clerkId already taken',

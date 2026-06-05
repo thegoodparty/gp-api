@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Test, type TestingModule } from '@nestjs/testing'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { BadRequestException } from '@nestjs/common'

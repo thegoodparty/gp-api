@@ -1,5 +1,5 @@
 import { HttpException, HttpExceptionOptions } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 
 export type PeerlyIdentity = {
   identity_id: string

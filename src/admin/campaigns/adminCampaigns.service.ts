@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { EmailService } from 'src/email/email.service'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'

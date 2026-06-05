@@ -5,7 +5,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { FastifyRequest } from 'fastify'
 import { PinoLogger } from 'nestjs-pino'
 import { from, Observable, throwError } from 'rxjs'

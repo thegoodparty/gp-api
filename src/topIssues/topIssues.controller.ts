@@ -12,7 +12,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../generated/prisma'
 import { TopIssuesService } from './topIssues.service'
 import { CreateTopIssueDto } from './schemas/topIssues.schema'
 import { ZodValidationPipe } from 'nestjs-zod'

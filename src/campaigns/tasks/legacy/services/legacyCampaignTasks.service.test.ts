@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LegacyCampaignTasksService } from './legacyCampaignTasks.service'
 import { CampaignsService } from '../../../services/campaigns.service'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../../generated/prisma'
 import { STATIC_CAMPAIGN_TASKS } from '../fixtures/legacyCampaignTasks.consts'
 
 const makeCampaign = (overrides = {}): Campaign =>

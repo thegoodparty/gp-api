@@ -1,4 +1,5 @@
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { AnalyticsService } from '@/analytics/analytics.service'
 import { CronLockService } from '@/cron/services/cronLock.service'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { LlmService } from '@/llm/services/llm.service'
@@ -7,7 +8,6 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { getUserFullName } from '@/users/util/users.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
-import { SegmentService } from '@/vendors/segment/segment.service'
 import {
   BadGatewayException,
   Injectable,
@@ -20,7 +20,7 @@ import {
   ExperimentRunStatus,
   MeetingResourceLocationType,
   Prisma,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import { addDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { chunk } from 'es-toolkit'
@@ -149,7 +149,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     private readonly s3: S3Service,
     private readonly organizations: OrganizationsService,
     private readonly experimentRuns: ExperimentRunsService,
-    private readonly segment: SegmentService,
+    private readonly analytics: AnalyticsService,
     private readonly llm: LlmService,
     private readonly braintrust: BraintrustService,
     private readonly cronLock: CronLockService,
@@ -905,7 +905,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
 
     try {
-      await this.segment.trackEvent(
+      await this.analytics.track(
         userId,
         'Briefing Assistant - Agenda Created',
         {
@@ -967,7 +967,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         () =>
           this.llm.chatCompletion({
             messages,
-            models: ['claude-haiku-4-5', 'claude-sonnet-4-6'],
+            models: ['deepseek-ai/DeepSeek-V4-Pro'],
             temperature: 0.4,
             maxTokens: 200,
             userId: String(userId),

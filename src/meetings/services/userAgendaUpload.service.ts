@@ -4,7 +4,7 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { ElectedOffice, UserAgendaSource } from '@prisma/client'
+import { ElectedOffice, UserAgendaSource } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'

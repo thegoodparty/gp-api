@@ -12,7 +12,6 @@ COPY contracts/package.json ./contracts/package.json
 COPY contracts/dist ./contracts/dist
 RUN npm ci --omit=dev --legacy-peer-deps
 
-COPY node_modules/.prisma ./node_modules/.prisma
 COPY dist ./dist
 COPY prisma ./prisma
 

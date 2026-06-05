@@ -1,6 +1,6 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { User, UserRole } from '@prisma/client'
+import { User, UserRole } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/authentication/interfaces/auth-provider.interface'
 import { IncomingRequest } from '@/authentication/authentication.types'

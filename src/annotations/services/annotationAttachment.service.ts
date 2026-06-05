@@ -10,7 +10,7 @@ import {
   ElectedOffice,
   OcrStatus,
   Prisma,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import {
   AttachmentDownloadUrlResponse,
   AttachmentPresignRequest,

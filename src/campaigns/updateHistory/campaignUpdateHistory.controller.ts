@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { getUserFullName, isAdmin } from 'src/users/util/users.util'
 import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'

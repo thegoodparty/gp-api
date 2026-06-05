@@ -4,7 +4,7 @@ import {
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
 } from './util/content.util'
-import { User } from '@prisma/client'
+import { User } from '../generated/prisma'
 import {
   EmailTemplateName,
   SendEmailInput,

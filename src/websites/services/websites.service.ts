@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { Prisma, User } from '@prisma/client'
+import { Prisma, User } from '../../generated/prisma'
 import axios from 'axios'
 import * as dns from 'node:dns'
 import { promisify } from 'node:util'

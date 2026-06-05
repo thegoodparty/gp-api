@@ -7,7 +7,7 @@ import {
   Post,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, User } from '@prisma/client'
+import { ElectedOffice, User } from '../../generated/prisma'
 import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'

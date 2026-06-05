@@ -1,4 +1,4 @@
-import { IssueChannel, IssueStatus } from '@prisma/client'
+import { IssueChannel, IssueStatus } from '../../generated/prisma'
 import { z } from 'zod'
 
 export const CommunityIssueSchema = z.object({

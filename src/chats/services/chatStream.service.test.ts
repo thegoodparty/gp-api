@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChatConversation, ChatMessage, ChatMessageRole } from '@prisma/client'
+import {
+  ChatConversation,
+  ChatMessage,
+  ChatMessageRole,
+} from '../../generated/prisma'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import type {
   LlmStreamOptions,

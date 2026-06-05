@@ -1,7 +1,7 @@
 import {
   CampaignUpdateHistory,
   CampaignUpdateHistoryType,
-} from '@prisma/client'
+} from '../../src/generated/prisma'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 

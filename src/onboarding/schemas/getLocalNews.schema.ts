@@ -20,8 +20,12 @@ export const localNewsOutletSchema = z.object({
   address: z.string().nullable().optional(),
 })
 
+// `.min(1)` enforces an outlet floor at validation time. If Gemini returns
+// zero outlets for an obscure jurisdiction the structured stage throws, the
+// catch in `runFetch` calls `expirePending`, and the next request retries
+// instead of permanently caching `{ status: 'ready', outlets: [] }`.
 export const aiOutletsToolResultSchema = z.object({
-  outlets: z.array(localNewsOutletSchema),
+  outlets: z.array(localNewsOutletSchema).min(1),
 })
 
 export const localNewsPendingResponseSchema = z.object({

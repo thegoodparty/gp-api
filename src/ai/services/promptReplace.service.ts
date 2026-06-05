@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { subDays } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { OrganizationsService } from '@/organizations/services/organizations.service'

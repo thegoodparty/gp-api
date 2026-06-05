@@ -25,7 +25,7 @@ import {
   PollIndividualMessageSender,
   Prisma,
   PrismaClient,
-} from '@prisma/client'
+} from '../src/generated/prisma'
 import { groupBy } from 'es-toolkit'
 import { v5 as uuidv5 } from 'uuid'
 import {

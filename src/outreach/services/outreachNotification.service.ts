@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Campaign, OutreachType, User } from '@prisma/client'
+import { Campaign, OutreachType, User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import sanitizeHtml from 'sanitize-html'
 import TurndownService from 'turndown'
