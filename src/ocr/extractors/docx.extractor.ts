@@ -62,6 +62,9 @@ const totalUncompressedSize = (buf: Buffer): number => {
   return total
 }
 
+/**
+ * DOCX extraction via mammoth. No OCR needed — the bytes are the text.
+ */
 @Injectable()
 export class DocxOcrExtractor {
   constructor(private readonly s3: S3Service) {}
