@@ -7,11 +7,12 @@ import {
   Post,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice, User } from '@prisma/client'
 import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import {
@@ -22,7 +23,16 @@ import {
   DispatchMeetingAgentDto,
   DispatchMeetingAgentSchema,
 } from '../schemas/dispatchMeetingAgent.schema'
+import {
+  UserAgendaFinalizeRequest,
+  UserAgendaFinalizeRequestSchema,
+  UserAgendaPresignRequest,
+  UserAgendaPresignRequestSchema,
+} from '../schemas/userAgendaUpload.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
+import { UserAgendaUploadService } from '../services/userAgendaUpload.service'
+
+type UserAgendaStatus = 'processing' | 'failed' | 'completed' | 'unknown'
 
 type MeetingListItem = {
   meetingDate: string
@@ -32,12 +42,14 @@ type MeetingListItem = {
   meetingName: string
   location: string
   hasBriefing: boolean
+  userAgendaStatus: UserAgendaStatus | null
 }
 
 @Controller('meetings')
 export class MeetingsBriefingsController {
   constructor(
     private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly userAgendaUploads: UserAgendaUploadService,
     private readonly s3: S3Service,
   ) {}
 
@@ -90,6 +102,7 @@ export class MeetingsBriefingsController {
           meetingName: knownSchedule.meeting_name,
           location: knownSchedule.location,
           hasBriefing: false,
+          userAgendaStatus: null,
         })
       }
     }
@@ -116,7 +129,21 @@ export class MeetingsBriefingsController {
           knownSchedule?.location ||
           '',
         hasBriefing: true,
+        userAgendaStatus: existing?.userAgendaStatus ?? null,
       })
+    }
+
+    // Layer in user-agenda statuses last so the GET row reflects the latest
+    // user-upload state regardless of whether a briefing row exists yet
+    // (the briefing row appears only AFTER the dispatched run completes).
+    const userAgendaStatuses =
+      await this.userAgendaUploads.getStatusForMeetings(electedOffice.id, [
+        ...byDate.keys(),
+      ])
+    for (const [date, status] of userAgendaStatuses) {
+      const existing = byDate.get(date)
+      if (!existing) continue
+      byDate.set(date, { ...existing, userAgendaStatus: status })
     }
 
     const meetings = [...byDate.values()].sort((a, b) =>
@@ -187,5 +214,48 @@ export class MeetingsBriefingsController {
       )
     }
     return { dispatched: true, kind: body.kind }
+  }
+
+  /**
+   * Step 1 of user-supplied agenda upload: returns a presigned S3 PUT URL
+   * the browser uses to upload the PDF directly to the agent-run-inputs
+   * bucket. No DB row is created here — finalizeUserAgenda creates the row
+   * after the upload completes.
+   */
+  @UseElectedOffice()
+  @Post(':date/briefing/agenda/presign')
+  async presignUserAgenda(
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
+    @Body(new ZodValidationPipe(UserAgendaPresignRequestSchema))
+    body: UserAgendaPresignRequest,
+  ) {
+    return this.userAgendaUploads.createUploadPresign(electedOffice, date, body)
+  }
+
+  /**
+   * Step 2 of user-supplied agenda upload (or sole step for URL paste):
+   * persists the upload metadata and dispatches a fresh briefing run with
+   * `agendaPacketUrl` set.
+   */
+  @UseElectedOffice()
+  @Post(':date/briefing/agenda')
+  async finalizeUserAgenda(
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqUser() user: User,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
+    @Body(new ZodValidationPipe(UserAgendaFinalizeRequestSchema))
+    body: UserAgendaFinalizeRequest,
+  ) {
+    const { experimentRunId } =
+      await this.userAgendaUploads.finalizeAndDispatch(
+        electedOffice,
+        user.id,
+        date,
+        body,
+      )
+    return { experimentRunId, status: 'processing' as const }
   }
 }

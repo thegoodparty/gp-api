@@ -133,8 +133,8 @@ const IMMINENCE_WINDOW_DAYS = 5
 
 type TargetMeeting = {
   meetingDate: string // YYYY-MM-DD
-  meetingTime: string // HH:MM
-  meetingTimezone: string // IANA
+  meetingTime?: string // HH:MM (optional — user-supplied agenda path leaves it to the agent)
+  meetingTimezone?: string // IANA (optional — same reason)
 }
 
 @Injectable()
@@ -279,12 +279,13 @@ export class MeetingBriefingsService extends createPrismaBase(
   private async dispatchBriefing(
     ctx: DispatchContext,
     meeting: TargetMeeting,
-  ): Promise<void> {
+    options: { agendaPacketUrl?: string } = {},
+  ): Promise<{ runId: string } | undefined> {
     const hint = await this.loadLocationHint(
       ctx.electedOfficeId,
       MeetingResourceLocationType.AGENDA,
     )
-    await this.experimentRuns.dispatchRun({
+    const run = await this.experimentRuns.dispatchRun({
       type: BRIEFING_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
       clerkUserId: ctx.clerkUserId,
@@ -293,13 +294,58 @@ export class MeetingBriefingsService extends createPrismaBase(
         state: ctx.state,
         positionName: ctx.positionName,
         meetingDate: meeting.meetingDate,
-        meetingTime: meeting.meetingTime,
-        meetingTimezone: meeting.meetingTimezone,
+        ...(meeting.meetingTime ? { meetingTime: meeting.meetingTime } : {}),
+        ...(meeting.meetingTimezone
+          ? { meetingTimezone: meeting.meetingTimezone }
+          : {}),
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
         ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
         ...(hint ? { knownAgendaLocation: hint } : {}),
+        ...(options.agendaPacketUrl
+          ? { agendaPacketUrl: options.agendaPacketUrl }
+          : {}),
       },
     })
+    return run ? { runId: run.runId } : undefined
+  }
+
+  /**
+   * Public entry point for user-supplied agenda runs. Bypasses the imminence
+   * gate and the schedule lookup — the user is telling us "brief THIS meeting
+   * with THIS agenda." We still resolve the dispatch context (officialName,
+   * state, etc.) the normal way; the only PARAMS differences are
+   * `agendaPacketUrl` set and `meetingTime`/`meetingTimezone` left to the
+   * agent to discover from the platform (we don't reliably know them for
+   * arbitrary user-supplied dates).
+   */
+  async dispatchBriefingWithUserAgenda(args: {
+    electedOfficeId: string
+    meetingDate: string
+    agendaPacketUrl: string
+  }): Promise<{ runId: string }> {
+    const electedOffice = await this.client.electedOffice.findUnique({
+      where: { id: args.electedOfficeId },
+    })
+    if (!electedOffice) {
+      throw new Error(`electedOffice not found: ${args.electedOfficeId}`)
+    }
+    const ctx = await this.resolveDispatchContext(electedOffice)
+    if (!ctx) {
+      throw new Error(
+        `could not resolve dispatch context for electedOffice ${args.electedOfficeId}`,
+      )
+    }
+    const result = await this.dispatchBriefing(
+      ctx,
+      { meetingDate: args.meetingDate },
+      { agendaPacketUrl: args.agendaPacketUrl },
+    )
+    if (!result) {
+      throw new Error(
+        'dispatch queue not configured; briefing run was not enqueued',
+      )
+    }
+    return result
   }
 
   /**

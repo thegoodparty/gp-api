@@ -1,5 +1,6 @@
 import * as aws from '@pulumi/aws'
 import * as pulumi from '@pulumi/pulumi'
+import { createAgentRunInputsBucket } from './components/agent-run-inputs-bucket'
 import { createAnnotationAttachmentsBucket } from './components/annotation-attachments-bucket'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
@@ -129,6 +130,15 @@ export = async () => {
     environment === 'preview'
       ? 'annotation-attachments-dev'
       : createAnnotationAttachmentsBucket({ environment }).bucket.bucket
+
+  // Private bucket for user-supplied inputs to agent experiment runs (first
+  // use: agenda packets uploaded from /briefings). Browser PUTs via presigned
+  // URL; gp-api server-side presigns GETs handed to the agent at dispatch.
+  // Preview environments share the dev bucket — no per-PR bucket.
+  const agentRunInputsBucketName =
+    environment === 'preview'
+      ? 'gp-agent-run-inputs-dev'
+      : createAgentRunInputsBucket({ environment }).bucket.bucket
 
   // Shared bucket between the external meeting_pipeline (writes briefings)
   // and gp-api TextToSpeechService (caches Polly audio under speech/synth/,
@@ -414,6 +424,7 @@ export = async () => {
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ANNOTATION_ATTACHMENTS_BUCKET: annotationAttachmentsBucketName,
+      AGENT_RUN_INPUTS_BUCKET: agentRunInputsBucketName,
       DB_HOST: rdsCluster.endpoint,
       DB_USER: rdsCluster.masterUsername,
       DB_NAME: rdsCluster.databaseName,
