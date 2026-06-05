@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { Prisma, VoterFileFilter } from '@prisma/client'
+import { Prisma, VoterFileFilter } from '../../generated/prisma'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 
 @Injectable()

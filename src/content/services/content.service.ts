@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ContentfulService } from '../../vendors/contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { Content, ContentType, Prisma } from '../../generated/prisma'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
@@ -9,11 +9,16 @@ import {
 import { AIChatPromptContents, FindByTypeOptions } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
-import { InputJsonObject } from '@prisma/client/runtime/client'
 import { PinoLogger } from 'nestjs-pino'
+import { getEnv } from 'src/shared/util/env.util'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
+  // Which named "AI Chat Prompt" Contentful entry to use. Lets non-prod
+  // environments point at a separate entry (e.g. "Dev") for safe prompt
+  // iteration while prod stays on the default. Configurable via
+  // CONTENTFUL_CHAT_PROMPT_NAME.
+  private static readonly DEFAULT_CHAT_PROMPT_NAME = 'General'
   constructor(
     private contentfulService: ContentfulService,
     private timers: ProcessTimersService,
@@ -71,17 +76,19 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     const date = new Date()
     const today = date.toISOString().split('T')[0]
 
-    const aiChatPrompts = await this.findFirst({
+    const aiChatPrompts = await this.model.findMany({
       where: {
         type: ContentType.aiChatPrompt,
       },
     })
 
-    if (aiChatPrompts == null) throw Error('Failed to load system prompt')
+    if (aiChatPrompts.length === 0) throw Error('Failed to load system prompt')
+
+    const selected = this.selectChatPrompt(aiChatPrompts)
 
     // CMS content types use dynamic string keys — indexing by runtime key returns broad union
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const promptData = aiChatPrompts.data as AIChatPromptContents
+    const promptData = selected.data as AIChatPromptContents
 
     const initialPrompt = promptData.initialPrompt
     const systemPrompt = promptData.systemPrompt
@@ -93,6 +100,46 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       systemPrompt: initial ? initialPrompt : systemPrompt,
       candidateJson,
     }
+  }
+
+  /**
+   * Picks the AI Chat Prompt entry to use by its Contentful `name`, controlled
+   * by CONTENTFUL_CHAT_PROMPT_NAME (default "General"). Selection is resilient:
+   * if the configured entry is missing it falls back to the default, then to any
+   * available entry, so the assistant is never left without a prompt. Note that
+   * only *published* Contentful entries sync into the DB, so the target entry
+   * must be published to be selectable.
+   */
+  private selectChatPrompt(prompts: Content[]): Content {
+    // Treat empty/whitespace as unset so a blank env var falls back to default.
+    const configuredName =
+      getEnv('CONTENTFUL_CHAT_PROMPT_NAME')?.trim() ||
+      ContentService.DEFAULT_CHAT_PROMPT_NAME
+    const normalized = configuredName.toLowerCase()
+
+    const nameOf = (prompt: Content): string => {
+      // CMS JSON payload — `data.name` is the Contentful entry name
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const data = prompt.data as AIChatPromptContents
+      return typeof data?.name === 'string'
+        ? data.name.trim().toLowerCase()
+        : ''
+    }
+
+    const exact = prompts.find((p) => nameOf(p) === normalized)
+    if (exact) return exact
+
+    const fallback =
+      prompts.find(
+        (p) =>
+          nameOf(p) === ContentService.DEFAULT_CHAT_PROMPT_NAME.toLowerCase(),
+      ) ?? prompts[0]
+
+    this.logger.warn(
+      { configuredName, available: prompts.map(nameOf) },
+      'Configured AI chat prompt not found; falling back',
+    )
+    return fallback
   }
 
   private async getExistingContentIds() {
@@ -163,7 +210,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
                 updateDate: new Date(entry.sys.updatedAt)
                   .toISOString()
                   .split('T')[0],
-              } as InputJsonObject,
+              } as Prisma.InputJsonObject,
             },
           })
         }
@@ -185,7 +232,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
                 updateDate: new Date(entry.sys.updatedAt)
                   .toISOString()
                   .split('T')[0],
-              } as InputJsonObject,
+              } as Prisma.InputJsonObject,
             },
           })
         }

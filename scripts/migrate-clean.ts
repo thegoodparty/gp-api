@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma'
 import { createClerkClient } from '@clerk/backend'
 import { SingleBar, Presets } from 'cli-progress'
 import pmap from 'p-map'

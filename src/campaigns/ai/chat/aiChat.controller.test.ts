@@ -10,7 +10,6 @@ const CAMPAIGN = { id: 1, user: { id: 7 } } as unknown as PromptReplaceCampaign
 const BODY = { message: 'hi', initial: true } as StreamAiChatSchema
 
 const gen = (chunks: CampaignChatChunk[]) =>
-  // eslint-disable-next-line @typescript-eslint/require-await
   (async function* () {
     for (const c of chunks) yield c
   })()
@@ -47,6 +46,7 @@ const makeController = (streamImpl: StreamImpl) => {
   const aiChatService = { streamChat }
   const campaigns = {
     fetchLiveRaceTargetMetrics: vi.fn().mockResolvedValue(null),
+    resolveL2DistrictName: vi.fn().mockResolvedValue(null),
   }
   const slack = {}
   const controller = new AiChatController(
@@ -55,7 +55,7 @@ const makeController = (streamImpl: StreamImpl) => {
     slack as never,
     createMockLogger(),
   )
-  return { controller, streamChat }
+  return { controller, streamChat, campaigns }
 }
 
 describe('AiChatController.stream', () => {
@@ -97,7 +97,6 @@ describe('AiChatController.stream', () => {
 
   it('writes a non-retryable internal error chunk when the iterator throws', async () => {
     const { controller } = makeController(() =>
-      // eslint-disable-next-line @typescript-eslint/require-await
       (async function* () {
         yield { type: 'text', delta: 'a' } as CampaignChatChunk
         throw new Error('boom')
@@ -120,7 +119,8 @@ describe('AiChatController.stream', () => {
   it('aborts the stream signal when the client disconnects, and cleans up the listener', async () => {
     let captured: AbortSignal | undefined
     const { controller } = makeController((...args: unknown[]) => {
-      captured = args[3] as AbortSignal
+      // streamChat(campaign, body, liveMetrics, l2DistrictName, signal)
+      captured = args[4] as AbortSignal
       return gen([
         { type: 'text', delta: 'a' },
         {
@@ -185,24 +185,46 @@ describe('AiChatController.stream', () => {
     expect(reply.raw.end).not.toHaveBeenCalled()
   })
 
+  it('keeps the resolved L2 district even when live-metrics lookup fails', async () => {
+    let captured: unknown[] = []
+    const { controller, campaigns } = makeController((...args: unknown[]) => {
+      captured = args
+      return gen([
+        {
+          type: 'done',
+          threadId: 't1',
+          message: { role: 'assistant', content: 'a' },
+        },
+      ])
+    })
+    // Metrics lookup rejects, district lookup succeeds — the district must survive.
+    campaigns.fetchLiveRaceTargetMetrics.mockRejectedValue(new Error('boom'))
+    campaigns.resolveL2DistrictName.mockResolvedValue('State House District 5')
+    const reply = makeReply()
+    const req = makeReq()
+
+    await controller.stream(CAMPAIGN, BODY, req as never, reply as never)
+
+    // streamChat(campaign, body, liveMetrics, l2DistrictName, signal)
+    expect(captured[2]).toBeNull()
+    expect(captured[3]).toBe('State House District 5')
+  })
+
   it('writes a timeout error chunk when the stream exceeds the deadline', async () => {
     vi.useFakeTimers()
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    const { controller } = makeController(
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async function* () {
-        yield { type: 'text', delta: 'a' } as CampaignChatChunk
-        await gate
-        yield {
-          type: 'done',
-          threadId: 't1',
-          message: { role: 'assistant', content: 'a' },
-        } as CampaignChatChunk
-      },
-    )
+    const { controller } = makeController(async function* () {
+      yield { type: 'text', delta: 'a' } as CampaignChatChunk
+      await gate
+      yield {
+        type: 'done',
+        threadId: 't1',
+        message: { role: 'assistant', content: 'a' },
+      } as CampaignChatChunk
+    })
     const reply = makeReply()
     const req = makeReq()
 

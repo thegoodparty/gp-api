@@ -15,9 +15,9 @@ import {
   TcrCompliance,
   TcrComplianceStatus,
   User,
-} from '@prisma/client'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+} from '../../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { isPrismaError } from 'src/prisma/util/prismaErrors.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
   MessageGroup,
@@ -44,7 +44,7 @@ import { SubmitToPeerlyDto } from '../schemas/submitToPeerlyDto.schema'
 import { ComplianceStage, SubmitToPeerlyOutput } from '@goodparty_org/contracts'
 import { ExperimentRunsService } from '../../../agentExperiments/services/experimentRuns.service'
 import { AgenticComplianceKickoffMessage } from '../../../queue/queue.types'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../../generated/prisma'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -656,10 +656,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
     } catch (err) {
-      if (
-        err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isPrismaError(err, 'P2002')) {
         const raced = await this.fetchByCampaignId(campaign.id)
         if (raced) {
           this.logger.info(

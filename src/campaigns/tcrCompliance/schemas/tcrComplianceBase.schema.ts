@@ -5,7 +5,7 @@ import {
   UrlOrDomainSchema,
   WriteEmailSchema,
 } from '../../../shared/schemas'
-import { CommitteeType, OfficeLevel } from '@prisma/client'
+import { CommitteeType, OfficeLevel } from '../../../generated/prisma'
 import { urlIncludesPath } from '../../../shared/util/strings.util'
 import { Logger } from '@nestjs/common'
 

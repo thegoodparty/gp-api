@@ -3,7 +3,7 @@ import {
   AnnotationKind,
   AnnotationResourceType,
   OcrStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import type { Note } from '@/llm/tools/getMyNotes.tool'
 import { extractHighlight } from './extractHighlight'

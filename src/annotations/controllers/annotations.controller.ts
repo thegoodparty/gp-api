@@ -9,7 +9,7 @@ import {
   Put,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, User } from '@prisma/client'
+import { ElectedOffice, User } from '../../generated/prisma'
 import {
   AnnotationResponseSchema,
   AttachmentDownloadUrlResponseSchema,

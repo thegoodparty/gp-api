@@ -1,5 +1,5 @@
 import { ROLES_KEY } from '@/authentication/decorators/Roles.decorator'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../generated/prisma'
 import { describe, expect, it, vi } from 'vitest'
 import { TopIssuesController } from './topIssues.controller'
 import { TopIssuesService } from './topIssues.service'

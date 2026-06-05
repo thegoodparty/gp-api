@@ -4,7 +4,7 @@ import {
   AnnotationResourceType,
   ExperimentRunStatus,
   User,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useTestService } from '@/test-service'
 import { BriefingChatCreateService } from './briefingChatCreate.service'

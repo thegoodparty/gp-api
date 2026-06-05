@@ -31,7 +31,8 @@ model ExperimentRun {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  meetingBriefings MeetingBriefing[]
+  meetingBriefings         MeetingBriefing[]
+  meetingResourceLocations MeetingResourceLocation[]
 
   @@index([organizationSlug, experimentType])
   @@index([status, resumeScheduledFor])

@@ -1,4 +1,4 @@
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '../../generated/prisma'
 
 export const createMockUser = (overrides?: Partial<User>): User =>
   ({

@@ -1,5 +1,5 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import Stripe from 'stripe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENTS } from 'src/vendors/segment/segment.types'

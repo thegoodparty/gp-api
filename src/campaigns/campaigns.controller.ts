@@ -30,7 +30,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'

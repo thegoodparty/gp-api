@@ -7,7 +7,7 @@ import {
   AnnotationKind,
   AnnotationResourceType,
   ExperimentRunStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'

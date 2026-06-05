@@ -1,6 +1,6 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Organization } from '../../generated/prisma'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContactsService } from './contacts.service'

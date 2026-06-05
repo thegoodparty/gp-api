@@ -6,7 +6,7 @@
  *   npx tsx seed/scenarios.ts demo
  *   npx tsx seed/scenarios.ts freeTexts
  */
-import { Prisma, PrismaClient, UserRole } from '@prisma/client'
+import { Prisma, PrismaClient, UserRole } from '../src/generated/prisma'
 import { buildSlug } from '../src/shared/util/slug.util'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
 import { getUserFullName } from '../src/users/util/users.util'

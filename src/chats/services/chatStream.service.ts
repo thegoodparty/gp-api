@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common'
-import { ChatMessage, ChatMessageRole } from '@prisma/client'
+import { ChatMessage, ChatMessageRole } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import { z } from 'zod'

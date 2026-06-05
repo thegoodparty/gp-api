@@ -3,7 +3,7 @@ import {
   Annotation,
   AnnotationKind,
   AnnotationResourceType,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { extractHighlight } from './extractHighlight'
 
 const baseAnnotation = (overrides: Partial<Annotation> = {}): Annotation =>

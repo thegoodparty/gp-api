@@ -1,6 +1,6 @@
 import { ROLES_KEY } from '@/authentication/decorators/Roles.decorator'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../../generated/prisma'
 import { describe, expect, it, vi } from 'vitest'
 import { PositionsController } from './positions.controller'
 import { PositionsService } from './positions.service'

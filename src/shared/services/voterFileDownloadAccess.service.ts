@@ -3,7 +3,7 @@ import { IS_PROD_DEPLOY } from '@/shared/util/appEnvironment.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
 import { Inject, OnModuleInit } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 
 export class VoterFileDownloadAccessService implements OnModuleInit {

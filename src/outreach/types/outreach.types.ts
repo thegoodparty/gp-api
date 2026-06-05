@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { BasePurchaseMetadata } from '../../payments/purchase.types'
 
 export type OutreachWithVoterFileFilter = Prisma.OutreachGetPayload<{

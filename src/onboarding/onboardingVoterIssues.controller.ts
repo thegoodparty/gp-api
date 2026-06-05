@@ -5,7 +5,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Organization } from '../generated/prisma'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { ReqOrganization } from '@/organizations/decorators/ReqOrganization.decorator'

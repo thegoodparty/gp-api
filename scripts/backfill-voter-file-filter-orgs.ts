@@ -20,7 +20,7 @@
  */
 import '../dist/configrc'
 
-import { PrismaClient, VoterFileFilter } from '@prisma/client'
+import { PrismaClient, VoterFileFilter } from '../src/generated/prisma'
 
 type TransactionClient = Omit<
   PrismaClient,

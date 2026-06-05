@@ -1,4 +1,4 @@
-import { CampaignTier } from '@prisma/client'
+import { CampaignTier } from '../../../generated/prisma'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 

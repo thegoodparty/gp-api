@@ -1,6 +1,6 @@
 import { useTestService } from '@/test-service'
 import { HttpStatus } from '@nestjs/common'
-import { CampaignTask as PrismaCampaignTask } from '@prisma/client'
+import { CampaignTask as PrismaCampaignTask } from '../../../generated/prisma'
 import { describe, expect, it } from 'vitest'
 import { CampaignTaskType } from '../campaignTasks.types'
 

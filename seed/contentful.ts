@@ -1,4 +1,4 @@
-import { ContentType, Prisma, PrismaClient } from '@prisma/client'
+import { ContentType, Prisma, PrismaClient } from '../src/generated/prisma'
 import { createClient, Entry, EntrySkeletonType } from 'contentful'
 
 const CONTENTFUL_SPACE_ID = process.env.CONTENTFUL_SPACE_ID

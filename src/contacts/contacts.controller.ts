@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Organization } from '../generated/prisma'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'

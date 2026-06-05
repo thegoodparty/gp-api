@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { Organization } from '@prisma/client'
+import { Organization } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import {
   REQUIRE_ORGANIZATION_META_KEY,

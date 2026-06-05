@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common'
-import { ChatMessage, ChatMessageRole, User } from '@prisma/client'
+import { ChatMessage, ChatMessageRole, User } from '../../../generated/prisma'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { EventEmitter } from 'events'
 import { PinoLogger } from 'nestjs-pino'

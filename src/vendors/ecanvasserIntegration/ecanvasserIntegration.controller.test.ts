@@ -1,4 +1,4 @@
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EcanvasserIntegrationController } from './ecanvasserIntegration.controller'
 import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'

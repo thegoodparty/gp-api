@@ -3,7 +3,7 @@ import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ConflictException } from '@nestjs/common'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { ChatMessageRole } from '@prisma/client'
+import { ChatMessageRole } from '../../generated/prisma'
 import { ChatStoreService } from './chatStore.prisma'
 
 const service = useTestService()
