@@ -1,4 +1,5 @@
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
+import { AnalyticsService } from '@/analytics/analytics.service'
 import { CronLockService } from '@/cron/services/cronLock.service'
 import { MeetingSchedule } from '@/generated/agent-job-contracts'
 import { LlmService } from '@/llm/services/llm.service'
@@ -7,7 +8,6 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { getUserFullName } from '@/users/util/users.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
-import { SegmentService } from '@/vendors/segment/segment.service'
 import { Injectable } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import {
@@ -145,7 +145,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     private readonly s3: S3Service,
     private readonly organizations: OrganizationsService,
     private readonly experimentRuns: ExperimentRunsService,
-    private readonly segment: SegmentService,
+    private readonly analytics: AnalyticsService,
     private readonly llm: LlmService,
     private readonly braintrust: BraintrustService,
     private readonly cronLock: CronLockService,
@@ -830,7 +830,7 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
 
     try {
-      await this.segment.trackEvent(
+      await this.analytics.track(
         userId,
         'Briefing Assistant - Agenda Created',
         {
