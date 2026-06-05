@@ -38,15 +38,23 @@ export const UserAgendaPresignResponseSchema = z.object({
  * Controllers consume this via `@Body(new ZodValidationPipe(Schema)) body: Type`.
  */
 export const UserAgendaFinalizeRequestSchema = z.discriminatedUnion('source', [
-  z.object({
-    source: z.literal('URL'),
-    sourceUrl: z.string().url().max(2048),
-  }),
-  z.object({
-    source: z.literal('UPLOAD'),
-    uploadId: z.string().min(1),
-    uploadKey: z.string().min(1),
-  }),
+  z
+    .object({
+      source: z.literal('URL'),
+      sourceUrl: z.string().url().max(2048),
+    })
+    .strict(),
+  z
+    .object({
+      source: z.literal('UPLOAD'),
+      // uploadId is the UUID returned by the presign endpoint. The server
+      // reconstructs the full S3 key from electedOffice.id + meetingDate +
+      // uploadId — never trust a client-supplied key, that's an IDOR vector.
+      // .strict() below rejects any extra field (e.g. a smuggled uploadKey)
+      // at the validation layer for fail-fast feedback.
+      uploadId: z.string().uuid(),
+    })
+    .strict(),
 ])
 export type UserAgendaFinalizeRequest = z.infer<
   typeof UserAgendaFinalizeRequestSchema

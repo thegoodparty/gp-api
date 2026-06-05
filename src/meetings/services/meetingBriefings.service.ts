@@ -8,7 +8,11 @@ import { getUserFullName } from '@/users/util/users.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
-import { Injectable } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import {
   ElectedOffice,
@@ -327,11 +331,13 @@ export class MeetingBriefingsService extends createPrismaBase(
       where: { id: args.electedOfficeId },
     })
     if (!electedOffice) {
-      throw new Error(`electedOffice not found: ${args.electedOfficeId}`)
+      throw new NotFoundException(
+        `electedOffice not found: ${args.electedOfficeId}`,
+      )
     }
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) {
-      throw new Error(
+      throw new NotFoundException(
         `could not resolve dispatch context for electedOffice ${args.electedOfficeId}`,
       )
     }
@@ -341,7 +347,7 @@ export class MeetingBriefingsService extends createPrismaBase(
       { agendaPacketUrl: args.agendaPacketUrl },
     )
     if (!result) {
-      throw new Error(
+      throw new BadGatewayException(
         'dispatch queue not configured; briefing run was not enqueued',
       )
     }

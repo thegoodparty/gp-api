@@ -134,14 +134,22 @@ export class UserAgendaUploadService extends createPrismaBase(
       contentType = headResult.contentType
       byteSize = headResult.byteSize
     } else {
-      // UPLOAD — verify the object actually landed in S3 before we dispatch.
-      const exists = await this.s3.objectExists(this.bucket, input.uploadKey)
+      // UPLOAD — reconstruct the key server-side from trusted parts. Never
+      // accept a client-supplied key: doing so would let one office claim
+      // another office's S3 object (IDOR). The uploadId is the only piece
+      // the client controls, and it's a UUID the server minted at presign.
+      const reconstructedKey = this.buildUploadKey(
+        electedOffice.id,
+        meetingDate,
+        input.uploadId,
+      )
+      const exists = await this.s3.objectExists(this.bucket, reconstructedKey)
       if (!exists) {
         throw new BadRequestException('upload_not_received')
       }
       source = UserAgendaSource.UPLOAD
       uploadBucket = this.bucket
-      uploadKey = input.uploadKey
+      uploadKey = reconstructedKey
       contentType = 'application/pdf'
     }
 
@@ -153,13 +161,12 @@ export class UserAgendaUploadService extends createPrismaBase(
       uploadKey,
     })
 
-    const { runId } = await this.meetings.dispatchBriefingWithUserAgenda({
-      electedOfficeId: electedOffice.id,
-      meetingDate,
-      agendaPacketUrl,
-    })
-
-    await this.client.userAgendaUpload.upsert({
+    // Persist the upload row BEFORE dispatching the run. If we dispatched
+    // first and then the upsert threw, the run would be live with no
+    // tracking row — invisible to GET /meetings and impossible to clean up
+    // on re-finalize. Upsert with a null run-id, dispatch, then patch the
+    // run-id back in.
+    const upload = await this.client.userAgendaUpload.upsert({
       where: {
         electedOfficeId_meetingDate: {
           electedOfficeId: electedOffice.id,
@@ -176,7 +183,7 @@ export class UserAgendaUploadService extends createPrismaBase(
         contentType,
         byteSize,
         uploadedByUserId: userId,
-        experimentRunId: runId,
+        experimentRunId: null,
       },
       update: {
         source,
@@ -186,8 +193,20 @@ export class UserAgendaUploadService extends createPrismaBase(
         contentType,
         byteSize,
         uploadedByUserId: userId,
-        experimentRunId: runId,
+        experimentRunId: null,
       },
+      select: { id: true },
+    })
+
+    const { runId } = await this.meetings.dispatchBriefingWithUserAgenda({
+      electedOfficeId: electedOffice.id,
+      meetingDate,
+      agendaPacketUrl,
+    })
+
+    await this.client.userAgendaUpload.update({
+      where: { id: upload.id },
+      data: { experimentRunId: runId },
     })
 
     return { experimentRunId: runId }

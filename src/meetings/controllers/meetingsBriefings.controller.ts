@@ -13,6 +13,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import {
@@ -26,8 +27,10 @@ import {
 import {
   UserAgendaFinalizeRequest,
   UserAgendaFinalizeRequestSchema,
+  UserAgendaFinalizeResponseSchema,
   UserAgendaPresignRequest,
   UserAgendaPresignRequestSchema,
+  UserAgendaPresignResponseSchema,
 } from '../schemas/userAgendaUpload.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
 import { UserAgendaUploadService } from '../services/userAgendaUpload.service'
@@ -224,6 +227,7 @@ export class MeetingsBriefingsController {
    */
   @UseElectedOffice()
   @Post(':date/briefing/agenda/presign')
+  @ResponseSchema(UserAgendaPresignResponseSchema)
   async presignUserAgenda(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @Param(new ZodValidationPipe(MeetingDateParamSchema))
@@ -241,6 +245,7 @@ export class MeetingsBriefingsController {
    */
   @UseElectedOffice()
   @Post(':date/briefing/agenda')
+  @ResponseSchema(UserAgendaFinalizeResponseSchema)
   async finalizeUserAgenda(
     @ReqElectedOffice() electedOffice: ElectedOffice,
     @ReqUser() user: User,

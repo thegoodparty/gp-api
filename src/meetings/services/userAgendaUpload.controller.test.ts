@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus, UserAgendaSource } from '@prisma/client'
 import { useTestService } from '@/test-service'
@@ -173,14 +174,11 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
     mockResolveServeContext()
     mockS3({ objectExists: true })
     const dispatchSpy = mockDispatchRun()
+    const uploadId = randomUUID()
 
     const result = await service.client.post(
       '/v1/meetings/2026-07-15/briefing/agenda',
-      {
-        source: 'UPLOAD',
-        uploadId: 'fake-upload-id',
-        uploadKey: `agendas/${eo.id}/2026-07-15/fake-upload-id.pdf`,
-      },
+      { source: 'UPLOAD', uploadId },
       orgHeader(orgSlug),
     )
 
@@ -198,7 +196,9 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
     })
     expect(row).toMatchObject({
       source: UserAgendaSource.UPLOAD,
-      uploadKey: `agendas/${eo.id}/2026-07-15/fake-upload-id.pdf`,
+      // Server reconstructs the key from electedOffice.id + meetingDate +
+      // uploadId — the client never supplies it.
+      uploadKey: `agendas/${eo.id}/2026-07-15/${uploadId}.pdf`,
       experimentRunId: result.data.experimentRunId,
     })
     expect(dispatchSpy).toHaveBeenCalledWith(
@@ -212,20 +212,52 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
     )
   })
 
+  it('rejects a non-UUID uploadId', async () => {
+    const orgSlug = `finalize-bad-uuid-${Date.now()}`
+    await seedOrgAndElectedOffice(orgSlug)
+    mockS3()
+
+    const result = await service.client.post(
+      '/v1/meetings/2026-07-15/briefing/agenda',
+      { source: 'UPLOAD', uploadId: 'not-a-uuid' },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(400)
+  })
+
+  it('rejects a client-supplied uploadKey (IDOR defense)', async () => {
+    // additionalProperties on the discriminated union schema means any extra
+    // fields the caller appends (including a cross-office uploadKey) are
+    // rejected at the validation layer. Locks the contract: the server is
+    // the only producer of the S3 key.
+    const orgSlug = `finalize-extra-key-${Date.now()}`
+    await seedOrgAndElectedOffice(orgSlug)
+    mockS3()
+
+    const result = await service.client.post(
+      '/v1/meetings/2026-07-15/briefing/agenda',
+      {
+        source: 'UPLOAD',
+        uploadId: randomUUID(),
+        uploadKey: 'agendas/victim-office/2026-07-15/leaked.pdf',
+      },
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(400)
+  })
+
   it('returns 400 when the S3 object does not exist', async () => {
     const orgSlug = `finalize-no-s3-${Date.now()}`
-    const eo = await seedOrgAndElectedOffice(orgSlug)
+    await seedOrgAndElectedOffice(orgSlug)
     mockResolveServeContext()
     mockS3({ objectExists: false })
     mockDispatchRun()
 
     const result = await service.client.post(
       '/v1/meetings/2026-07-15/briefing/agenda',
-      {
-        source: 'UPLOAD',
-        uploadId: 'missing-upload-id',
-        uploadKey: `agendas/${eo.id}/2026-07-15/missing-upload-id.pdf`,
-      },
+      { source: 'UPLOAD', uploadId: randomUUID() },
       orgHeader(orgSlug),
     )
 
@@ -238,25 +270,19 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
     mockResolveServeContext()
     mockS3({ objectExists: true })
     mockDispatchRun()
+    const firstId = randomUUID()
+    const secondId = randomUUID()
 
     const first = await service.client.post(
       '/v1/meetings/2026-07-15/briefing/agenda',
-      {
-        source: 'UPLOAD',
-        uploadId: 'first',
-        uploadKey: `agendas/${eo.id}/2026-07-15/first.pdf`,
-      },
+      { source: 'UPLOAD', uploadId: firstId },
       orgHeader(orgSlug),
     )
     expect(first.status).toBe(201)
 
     const second = await service.client.post(
       '/v1/meetings/2026-07-15/briefing/agenda',
-      {
-        source: 'UPLOAD',
-        uploadId: 'second',
-        uploadKey: `agendas/${eo.id}/2026-07-15/second.pdf`,
-      },
+      { source: 'UPLOAD', uploadId: secondId },
       orgHeader(orgSlug),
     )
     expect(second.status).toBe(201)
@@ -267,7 +293,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
     })
     expect(rows).toHaveLength(1)
     expect(rows[0].uploadKey).toBe(
-      `agendas/${eo.id}/2026-07-15/second.pdf`,
+      `agendas/${eo.id}/2026-07-15/${secondId}.pdf`,
     )
     expect(rows[0].experimentRunId).toBe(second.data.experimentRunId)
   })
@@ -314,8 +340,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         params: expect.objectContaining({
-          agendaPacketUrl:
-            'https://example.gov/agendas/2026-07-15-packet.pdf',
+          agendaPacketUrl: 'https://example.gov/agendas/2026-07-15-packet.pdf',
         }),
       }),
     )
