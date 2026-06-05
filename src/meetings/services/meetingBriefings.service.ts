@@ -892,7 +892,7 @@ export class MeetingBriefingsService extends createPrismaBase(
         () =>
           this.llm.chatCompletion({
             messages,
-            models: ['claude-haiku-4-5', 'claude-sonnet-4-6'],
+            models: ['deepseek-ai/DeepSeek-V4-Pro'],
             temperature: 0.4,
             maxTokens: 200,
             userId: String(userId),
