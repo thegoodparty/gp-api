@@ -339,6 +339,7 @@ describe('ExperimentRunsService', () => {
         expect(createCall.data.resumeAttempts).toBe(
           awaitingRun.resumeAttempts + 1,
         )
+        expect(createCall.data.stage).toBe(awaitingRun.stage)
 
         const [call] = sqsMock.commandCalls(SendMessageCommand)
         expect(call).toBeDefined()
@@ -482,15 +483,28 @@ describe('ExperimentRunsService', () => {
 
         await expect(service.resumeRun(awaitingRun)).resolves.toBeUndefined()
 
+        // The successor row was created then flipped to FAILED inside
+        // createAndEnqueueRun's catch before the throw bubbled up.
+        expect(mockModel.create).toHaveBeenCalledOnce()
+        expect(mockModel.update).toHaveBeenCalledWith({
+          where: { runId: expect.any(String) },
+          data: {
+            status: ExperimentRunStatus.FAILED,
+            error: 'SQS dispatch failed',
+          },
+        })
+        // The original row is released AND its attempt counter advanced so
+        // MAX_RESUME_ATTEMPTS can eventually terminate a persistent failure.
         expect(mockModel.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               runId: awaitingRun.runId,
               status: ExperimentRunStatus.AWAITING_RESUME,
             }),
-            data: expect.objectContaining({
+            data: {
               resumeScheduledFor: expect.any(Date),
-            }),
+              resumeAttempts: { increment: 1 },
+            },
           }),
         )
       },
@@ -511,7 +525,9 @@ describe('ExperimentRunsService', () => {
         // claim succeeded but no successor was created → release, not supersede
         expect(mockModel.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: { resumeScheduledFor: expect.any(Date) },
+            data: expect.objectContaining({
+              resumeScheduledFor: expect.any(Date),
+            }),
           }),
         )
         expect(mockModel.updateMany).not.toHaveBeenCalledWith(

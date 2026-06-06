@@ -96,6 +96,7 @@ export class ExperimentRunsService extends createPrismaBase(
     clerkUserId: string
     params: Prisma.InputJsonValue
     resumeAttempts?: number
+    stage?: string | null
   }): Promise<ExperimentRun | undefined> {
     const queueUrl = await this.resolveQueueUrl()
     if (!queueUrl) {
@@ -113,6 +114,7 @@ export class ExperimentRunsService extends createPrismaBase(
         status: ExperimentRunStatus.RUNNING,
         params: input.params,
         resumeAttempts: input.resumeAttempts ?? 0,
+        stage: input.stage ?? null,
       },
     })
     try {
@@ -221,6 +223,7 @@ export class ExperimentRunsService extends createPrismaBase(
         clerkUserId,
         params: resumeParams,
         resumeAttempts: run.resumeAttempts + 1,
+        stage: run.stage,
       })
     } catch (error) {
       this.logger.error(
@@ -233,15 +236,20 @@ export class ExperimentRunsService extends createPrismaBase(
     if (!dispatched) {
       // Dispatch threw, or no queue is configured (preview env) so no successor
       // was created. Release the claim so the row returns to the sweep instead
-      // of being orphaned or falsely marked superseded. Wrap the release so a
-      // transient DB error here is logged rather than left silently stuck.
+      // of being orphaned or falsely marked superseded — but still increment
+      // resumeAttempts so MAX_RESUME_ATTEMPTS eventually terminates it (e.g. a
+      // prolonged SQS outage would otherwise re-dispatch forever). Wrap the
+      // release so a transient DB error here is logged rather than left stuck.
       try {
         await this.model.updateMany({
           where: {
             runId: run.runId,
             status: ExperimentRunStatus.AWAITING_RESUME,
           },
-          data: { resumeScheduledFor: new Date() },
+          data: {
+            resumeScheduledFor: new Date(),
+            resumeAttempts: { increment: 1 },
+          },
         })
       } catch (releaseError) {
         this.logger.error(
