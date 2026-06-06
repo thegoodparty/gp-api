@@ -2,7 +2,11 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { v7 as uuidv7 } from 'uuid'
 import { SQS } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus, Prisma } from '../../generated/prisma'
+import {
+  ExperimentRun,
+  ExperimentRunStatus,
+  Prisma,
+} from '../../generated/prisma'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import { subMinutes } from 'date-fns'
@@ -86,34 +90,38 @@ export class ExperimentRunsService extends createPrismaBase(
     })
   }
 
-  async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
-    input: ExperimentRunDispatchInput<ExperimentType>,
-  ) {
-    const QueueUrl = await this.resolveQueueUrl()
-    if (!QueueUrl) {
+  private async createAndEnqueueRun(input: {
+    experimentType: string
+    organizationSlug: string
+    clerkUserId: string
+    params: Prisma.InputJsonValue
+    resumeAttempts?: number
+    stage?: string | null
+  }): Promise<ExperimentRun | undefined> {
+    const queueUrl = await this.resolveQueueUrl()
+    if (!queueUrl) {
       this.logger.warn(
         'No Queue Url found for agent dispatch, not configured for this environment',
       )
       return
     }
-
     const runId = uuidv7()
-
     const result = await this.model.create({
       data: {
         runId,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         organizationSlug: input.organizationSlug,
         status: ExperimentRunStatus.RUNNING,
         params: input.params,
+        resumeAttempts: input.resumeAttempts ?? 0,
+        stage: input.stage ?? null,
       },
     })
-
     try {
-      await this.enqueueDispatch(QueueUrl, {
+      await this.enqueueDispatch(queueUrl, {
         runId,
         organizationSlug: input.organizationSlug,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         clerkUserId: input.clerkUserId,
         params: input.params,
       })
@@ -122,42 +130,49 @@ export class ExperimentRunsService extends createPrismaBase(
         {
           error,
           runId,
-          experimentType: input.type,
+          experimentType: input.experimentType,
           organizationSlug: input.organizationSlug,
         },
         'Failed to send dispatch message to SQS',
       )
       await this.model.update({
         where: { runId },
-        data: { status: 'FAILED', error: 'SQS dispatch failed' },
+        data: {
+          status: ExperimentRunStatus.FAILED,
+          error: 'SQS dispatch failed',
+        },
       })
       throw new BadGatewayException(
         'Failed to dispatch experiment. Please try again.',
       )
     }
-
     this.logger.info(
       {
         runId,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         organizationSlug: input.organizationSlug,
       },
       'Experiment dispatched',
     )
-
     return result
   }
 
-  async resumeRun(run: ResumeRunInput) {
-    const QueueUrl = await this.resolveQueueUrl()
-    if (!QueueUrl) {
-      this.logger.warn(
-        { runId: run.runId },
-        'No Queue Url configured — cannot resume run in this environment',
-      )
-      return
-    }
+  async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
+    input: ExperimentRunDispatchInput<ExperimentType>,
+  ) {
+    return this.createAndEnqueueRun({
+      experimentType: input.type,
+      organizationSlug: input.organizationSlug,
+      clerkUserId: input.clerkUserId,
+      // AgentJobContracts inputs are JSON-serializable objects validated by Zod;
+      // the assertion bridges the structural index-signature gap that InputJsonObject
+      // requires but the generated contract types don't declare.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      params: input.params as Prisma.InputJsonObject,
+    })
+  }
 
+  async resumeRun(run: ResumeRunInput) {
     const clerkUserId =
       isJsonObject(run.params) &&
       typeof run.params['clerk_user_id'] === 'string'
@@ -186,47 +201,84 @@ export class ExperimentRunsService extends createPrismaBase(
       where: {
         runId: run.runId,
         status: ExperimentRunStatus.AWAITING_RESUME,
+        resumeScheduledFor: { not: null },
       },
-      data: {
-        status: ExperimentRunStatus.RUNNING,
-        resumeAttempts: { increment: 1 },
-        resumeScheduledFor: null,
-      },
+      data: { resumeScheduledFor: null },
     })
 
     if (claimed.count === 0) {
       return
     }
 
-    const resumeParams =
-      typeof run.params === 'object' && run.params !== null
-        ? { ...run.params, trigger: 'recovery_resume' }
-        : { trigger: 'recovery_resume' }
+    const resumeParams = {
+      ...(isJsonObject(run.params) ? run.params : {}),
+      trigger: 'recovery_resume',
+    } as Prisma.InputJsonObject
 
+    let dispatched: ExperimentRun | undefined
     try {
-      await this.enqueueDispatch(QueueUrl, {
-        runId: run.runId,
-        organizationSlug: run.organizationSlug,
+      dispatched = await this.createAndEnqueueRun({
         experimentType: run.experimentType,
+        organizationSlug: run.organizationSlug,
         clerkUserId,
         params: resumeParams,
+        resumeAttempts: run.resumeAttempts + 1,
+        stage: run.stage,
       })
     } catch (error) {
       this.logger.error(
         { error, runId: run.runId },
-        'Failed to re-enqueue resumed run — releasing claim',
+        'Failed to dispatch resumed run',
       )
+      dispatched = undefined
+    }
+
+    if (!dispatched) {
+      // Dispatch threw, or no queue is configured (preview env) so no successor
+      // was created. Release the claim so the row returns to the sweep instead
+      // of being orphaned or falsely marked superseded — but still increment
+      // resumeAttempts so MAX_RESUME_ATTEMPTS eventually terminates it (e.g. a
+      // prolonged SQS outage would otherwise re-dispatch forever). Wrap the
+      // release so a transient DB error here is logged rather than left stuck.
+      try {
+        await this.model.updateMany({
+          where: {
+            runId: run.runId,
+            status: ExperimentRunStatus.AWAITING_RESUME,
+          },
+          data: {
+            resumeScheduledFor: new Date(),
+            resumeAttempts: { increment: 1 },
+          },
+        })
+      } catch (releaseError) {
+        this.logger.error(
+          { releaseError, runId: run.runId },
+          'Failed to release resume claim — row stuck AWAITING_RESUME with no schedule',
+        )
+      }
+      return
+    }
+
+    // A successor run was created; terminalize the old row so it can't linger
+    // forever as a non-terminal orphan (the resume sweep ignores a null
+    // resumeScheduledFor, and the stale sweep only touches RUNNING).
+    try {
       await this.model.updateMany({
         where: {
           runId: run.runId,
-          status: ExperimentRunStatus.RUNNING,
+          status: ExperimentRunStatus.AWAITING_RESUME,
         },
         data: {
-          status: ExperimentRunStatus.AWAITING_RESUME,
-          resumeAttempts: { decrement: 1 },
-          resumeScheduledFor: new Date(),
+          status: ExperimentRunStatus.FAILED,
+          error: 'Superseded by resumed run',
         },
       })
+    } catch (supersedeError) {
+      this.logger.error(
+        { supersedeError, runId: run.runId },
+        'Failed to terminalize superseded run — left as AWAITING_RESUME orphan',
+      )
     }
   }
 
@@ -258,7 +310,16 @@ export class ExperimentRunsService extends createPrismaBase(
           },
         })
       } else {
-        await this.resumeRun(run)
+        // Isolate each run: a throw from one resume must not abort the rest of
+        // the batch (the remaining due runs would be skipped until next tick).
+        try {
+          await this.resumeRun(run)
+        } catch (error) {
+          this.logger.error(
+            { error, runId: run.runId },
+            'resumeRun threw during sweep — continuing with remaining runs',
+          )
+        }
       }
     }
   }
