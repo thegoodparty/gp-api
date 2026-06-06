@@ -281,27 +281,20 @@ export class UserAgendaUploadService extends createPrismaBase(
    * obviously-broken URLs (404, redirects to login walls, non-PDF content).
    *
    * SSRF defense: HTTPS-only, and the hostname is resolved + checked against
-   * private/loopback/link-local ranges (incl. AWS IMDS) before the fetch.
+   * private/loopback/link-local ranges (incl. AWS IMDS) BEFORE every fetch,
+   * including each redirect hop. Auto-follow is disabled (`redirect: 'manual'`)
+   * so a malicious server can't 3xx us into IMDS or a private host that would
+   * pass the initial check but resolve differently after the redirect.
    */
   private async headCheckUrl(
     url: string,
   ): Promise<{ contentType: string; byteSize: number | null }> {
-    await assertUrlSafeForExternalFetch(url)
-
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), URL_HEAD_TIMEOUT_MS)
+
     let response: Response
     try {
-      response = await fetch(url, {
-        method: 'HEAD',
-        redirect: 'follow',
-        signal: controller.signal,
-      })
-    } catch (err) {
-      throw new BadRequestException({
-        error: 'url_unreachable',
-        message: err instanceof Error ? err.message : 'fetch_failed',
-      })
+      response = await this.headFollowingRedirects(url, controller.signal)
     } finally {
       clearTimeout(timer)
     }
@@ -353,5 +346,54 @@ export class UserAgendaUploadService extends createPrismaBase(
     }
 
     return { contentType, byteSize }
+  }
+
+  /**
+   * Issue a HEAD with manual redirect handling. Validates each hop's URL
+   * against the SSRF guard so a 3xx pointing at IMDS / a private host / an
+   * http:// downgrade is rejected before the next fetch. Caps the chain at
+   * 5 hops to bound time and rule out redirect loops.
+   */
+  private async headFollowingRedirects(
+    initialUrl: string,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    const MAX_REDIRECTS = 5
+    let currentUrl = initialUrl
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      await assertUrlSafeForExternalFetch(currentUrl)
+      let response: Response
+      try {
+        response = await fetch(currentUrl, {
+          method: 'HEAD',
+          redirect: 'manual',
+          signal,
+        })
+      } catch (err) {
+        throw new BadRequestException({
+          error: 'url_unreachable',
+          message: err instanceof Error ? err.message : 'fetch_failed',
+        })
+      }
+      if (response.status < 300 || response.status >= 400) {
+        return response
+      }
+      const location = response.headers.get('location')
+      if (!location) {
+        throw new BadRequestException({
+          error: 'url_unreachable',
+          message: `HEAD returned ${response.status} without a Location header`,
+        })
+      }
+      // Resolve relative Location against the current URL. The next
+      // iteration's assertUrlSafeForExternalFetch will reject if this
+      // resolved URL is non-HTTPS, points at a private/loopback host, or
+      // fails to resolve.
+      currentUrl = new URL(location, currentUrl).toString()
+    }
+    throw new BadRequestException({
+      error: 'url_unreachable',
+      message: `URL exceeded the ${MAX_REDIRECTS}-hop redirect cap`,
+    })
   }
 }

@@ -141,14 +141,17 @@ export class MeetingsBriefingsController {
     // (the briefing row appears only AFTER the dispatched run completes).
     // The query is scoped to the same window as the meeting projection so
     // upload rows for off-list dates (no projected schedule entry, no
-    // briefing row yet) still appear as their own list rows.
+    // briefing row yet) still appear as their own list rows. Past-date
+    // uploads within the window are also surfaced — the presign/finalize
+    // endpoints accept any meetingDate, so a user who uploaded for a
+    // recent meeting must still see its status (otherwise their submission
+    // silently disappears from the list).
     const userAgendaStatuses =
       await this.userAgendaUploads.getStatusForMeetings(electedOffice.id, {
         from: windowFrom,
         to: windowTo,
       })
     for (const [date, status] of userAgendaStatuses) {
-      if (date < today) continue
       const existing = byDate.get(date)
       if (existing) {
         byDate.set(date, { ...existing, userAgendaStatus: status })
