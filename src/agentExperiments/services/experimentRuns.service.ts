@@ -213,8 +213,9 @@ export class ExperimentRunsService extends createPrismaBase(
       trigger: 'recovery_resume',
     } as Prisma.InputJsonObject
 
+    let dispatched: ExperimentRun | undefined
     try {
-      await this.createAndEnqueueRun({
+      dispatched = await this.createAndEnqueueRun({
         experimentType: run.experimentType,
         organizationSlug: run.organizationSlug,
         clerkUserId,
@@ -224,15 +225,52 @@ export class ExperimentRunsService extends createPrismaBase(
     } catch (error) {
       this.logger.error(
         { error, runId: run.runId },
-        'Failed to dispatch resumed run — releasing claim',
+        'Failed to dispatch resumed run',
       )
+      dispatched = undefined
+    }
+
+    if (!dispatched) {
+      // Dispatch threw, or no queue is configured (preview env) so no successor
+      // was created. Release the claim so the row returns to the sweep instead
+      // of being orphaned or falsely marked superseded. Wrap the release so a
+      // transient DB error here is logged rather than left silently stuck.
+      try {
+        await this.model.updateMany({
+          where: {
+            runId: run.runId,
+            status: ExperimentRunStatus.AWAITING_RESUME,
+          },
+          data: { resumeScheduledFor: new Date() },
+        })
+      } catch (releaseError) {
+        this.logger.error(
+          { releaseError, runId: run.runId },
+          'Failed to release resume claim — row stuck AWAITING_RESUME with no schedule',
+        )
+      }
+      return
+    }
+
+    // A successor run was created; terminalize the old row so it can't linger
+    // forever as a non-terminal orphan (the resume sweep ignores a null
+    // resumeScheduledFor, and the stale sweep only touches RUNNING).
+    try {
       await this.model.updateMany({
         where: {
           runId: run.runId,
           status: ExperimentRunStatus.AWAITING_RESUME,
         },
-        data: { resumeScheduledFor: new Date() },
+        data: {
+          status: ExperimentRunStatus.FAILED,
+          error: 'Superseded by resumed run',
+        },
       })
+    } catch (supersedeError) {
+      this.logger.error(
+        { supersedeError, runId: run.runId },
+        'Failed to terminalize superseded run — left as AWAITING_RESUME orphan',
+      )
     }
   }
 
@@ -264,7 +302,16 @@ export class ExperimentRunsService extends createPrismaBase(
           },
         })
       } else {
-        await this.resumeRun(run)
+        // Isolate each run: a throw from one resume must not abort the rest of
+        // the batch (the remaining due runs would be skipped until next tick).
+        try {
+          await this.resumeRun(run)
+        } catch (error) {
+          this.logger.error(
+            { error, runId: run.runId },
+            'resumeRun threw during sweep — continuing with remaining runs',
+          )
+        }
       }
     }
   }

@@ -358,6 +358,28 @@ describe('ExperimentRunsService', () => {
     )
 
     it(
+      'terminalizes the old row as FAILED (superseded) after a ' +
+        'successful resume dispatch',
+      async () => {
+        sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-1' })
+        mockModel.updateMany.mockResolvedValue({ count: 1 })
+
+        await service.resumeRun(awaitingRun)
+
+        expect(mockModel.updateMany).toHaveBeenCalledWith({
+          where: {
+            runId: awaitingRun.runId,
+            status: ExperimentRunStatus.AWAITING_RESUME,
+          },
+          data: {
+            status: ExperimentRunStatus.FAILED,
+            error: 'Superseded by resumed run',
+          },
+        })
+      },
+    )
+
+    it(
       'claims the old row by nulling resumeScheduledFor (guarded on ' +
         'AWAITING_RESUME and resumeScheduledFor not null)',
       async () => {
@@ -474,15 +496,33 @@ describe('ExperimentRunsService', () => {
       },
     )
 
-    it('does not send SQS when AGENT_DISPATCH_QUEUE_NAME is unset', async () => {
-      delete process.env.AGENT_DISPATCH_QUEUE_NAME
-      sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
+    it(
+      'releases the claim (does not supersede) when ' +
+        'AGENT_DISPATCH_QUEUE_NAME is unset',
+      async () => {
+        delete process.env.AGENT_DISPATCH_QUEUE_NAME
+        sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
+        mockModel.updateMany.mockResolvedValue({ count: 1 })
 
-      await service.resumeRun(awaitingRun)
+        await service.resumeRun(awaitingRun)
 
-      expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
-      expect(mockModel.create).not.toHaveBeenCalled()
-    })
+        expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
+        expect(mockModel.create).not.toHaveBeenCalled()
+        // claim succeeded but no successor was created → release, not supersede
+        expect(mockModel.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { resumeScheduledFor: expect.any(Date) },
+          }),
+        )
+        expect(mockModel.updateMany).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              error: 'Superseded by resumed run',
+            }),
+          }),
+        )
+      },
+    )
 
     it('resolves the queue url once and caches it across resumes', async () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-1' })
@@ -608,5 +648,19 @@ describe('ExperimentRunsService', () => {
         expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
       },
     )
+
+    it('isolates a throwing resumeRun so the rest of the batch still runs', async () => {
+      const run1 = makeRun({ runId: 'run-sweep-throw', resumeAttempts: 1 })
+      const run2 = makeRun({ runId: 'run-sweep-ok', resumeAttempts: 1 })
+      mockModel.findMany.mockResolvedValue([run1, run2])
+      const resumeSpy = vi
+        .spyOn(service, 'resumeRun')
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(undefined)
+
+      await expect(service.sweepResumableRuns()).resolves.toBeUndefined()
+
+      expect(resumeSpy).toHaveBeenCalledTimes(2)
+    })
   })
 })
