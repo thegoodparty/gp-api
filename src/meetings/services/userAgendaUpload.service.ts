@@ -359,9 +359,9 @@ export class UserAgendaUploadService extends createPrismaBase(
     signal: AbortSignal,
   ): Promise<Response> {
     const MAX_REDIRECTS = 5
-    let currentUrl = initialUrl
+    let currentUrl = new URL(initialUrl)
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      await assertUrlSafeForExternalFetch(currentUrl)
+      await assertUrlSafeForExternalFetch(currentUrl.toString())
       let response: Response
       try {
         response = await fetch(currentUrl, {
@@ -389,7 +389,7 @@ export class UserAgendaUploadService extends createPrismaBase(
       // iteration's assertUrlSafeForExternalFetch will reject if this
       // resolved URL is non-HTTPS, points at a private/loopback host, or
       // fails to resolve.
-      currentUrl = new URL(location, currentUrl).toString()
+      currentUrl = new URL(location, currentUrl)
     }
     throw new BadRequestException({
       error: 'url_unreachable',
