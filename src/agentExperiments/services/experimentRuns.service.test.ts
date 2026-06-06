@@ -319,8 +319,47 @@ describe('ExperimentRunsService', () => {
     }
 
     it(
-      'atomically claims the row and sends SQS with the same run_id ' +
-        'and trigger=recovery_resume',
+      'mints a NEW run_id, creates a RUNNING row with incremented ' +
+        'resumeAttempts, and sends SQS with the new run_id and ' +
+        'trigger=recovery_resume',
+      async () => {
+        sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-1' })
+        mockModel.updateMany.mockResolvedValue({ count: 1 })
+
+        await service.resumeRun(awaitingRun)
+
+        expect(mockModel.create).toHaveBeenCalledOnce()
+        const createCall = mockModel.create.mock.calls[0][0] as {
+          data: Record<string, unknown>
+        }
+        expect(createCall.data.runId).toBeDefined()
+        expect(createCall.data.runId).not.toBe(awaitingRun.runId)
+        expect(createCall.data.status).toBe(ExperimentRunStatus.RUNNING)
+        expect(createCall.data.experimentType).toBe(awaitingRun.experimentType)
+        expect(createCall.data.resumeAttempts).toBe(
+          awaitingRun.resumeAttempts + 1,
+        )
+
+        const [call] = sqsMock.commandCalls(SendMessageCommand)
+        expect(call).toBeDefined()
+        const body = JSON.parse(
+          call.args[0].input.MessageBody as string,
+        ) as Record<string, unknown>
+        expect(body.run_id).toBe(createCall.data.runId)
+        expect(body.run_id).not.toBe(awaitingRun.runId)
+        expect((body.params as Record<string, unknown>).trigger).toBe(
+          'recovery_resume',
+        )
+        expect((body.params as Record<string, unknown>).clerk_user_id).toBe(
+          'user_clerk_123',
+        )
+        expect(body.clerk_user_id).toBe('user_clerk_123')
+      },
+    )
+
+    it(
+      'claims the old row by nulling resumeScheduledFor (guarded on ' +
+        'AWAITING_RESUME and resumeScheduledFor not null)',
       async () => {
         sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-1' })
         mockModel.updateMany.mockResolvedValue({ count: 1 })
@@ -331,29 +370,15 @@ describe('ExperimentRunsService', () => {
           where: {
             runId: awaitingRun.runId,
             status: ExperimentRunStatus.AWAITING_RESUME,
+            resumeScheduledFor: { not: null },
           },
-          data: {
-            status: ExperimentRunStatus.RUNNING,
-            resumeAttempts: { increment: 1 },
-            resumeScheduledFor: null,
-          },
+          data: { resumeScheduledFor: null },
         })
-
-        const [call] = sqsMock.commandCalls(SendMessageCommand)
-        expect(call).toBeDefined()
-        const body = JSON.parse(
-          call.args[0].input.MessageBody as string,
-        ) as Record<string, unknown>
-        expect(body.run_id).toBe(awaitingRun.runId)
-        expect((body.params as Record<string, unknown>).trigger).toBe(
-          'recovery_resume',
-        )
-        expect(body.clerk_user_id).toBe('user_clerk_123')
       },
     )
 
     it(
-      'sends the clerk_user_id from params.clerk_user_id in the SQS body, ' +
+      'sends the clerk_user_id from params in the new run SQS body, ' +
         'not an empty string',
       async () => {
         sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-2' })
@@ -383,7 +408,6 @@ describe('ExperimentRunsService', () => {
         'message when params has no clerk_user_id',
       async () => {
         sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-3' })
-        mockModel.updateMany.mockResolvedValue({ count: 1 })
 
         await service.resumeRun({
           runId: 'run-missing-user',
@@ -404,13 +428,7 @@ describe('ExperimentRunsService', () => {
             error: expect.stringContaining('clerk_user_id'),
           },
         })
-        expect(mockModel.updateMany).not.toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              status: ExperimentRunStatus.RUNNING,
-            }),
-          }),
-        )
+        expect(mockModel.create).not.toHaveBeenCalled()
         expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
         expect(logger.error).toHaveBeenCalledWith(
           expect.objectContaining({ runId: 'run-missing-user' }),
@@ -419,33 +437,42 @@ describe('ExperimentRunsService', () => {
       },
     )
 
-    it('does not send SQS when the atomic claim is lost (count 0)', async () => {
-      sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-1' })
-      mockModel.updateMany.mockResolvedValue({ count: 0 })
+    it(
+      'does not create a new run or send SQS when the claim is lost ' +
+        '(updateMany returns count 0)',
+      async () => {
+        sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm-resume-1' })
+        mockModel.updateMany.mockResolvedValue({ count: 0 })
 
-      await service.resumeRun(awaitingRun)
+        await service.resumeRun(awaitingRun)
 
-      expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
-    })
+        expect(mockModel.create).not.toHaveBeenCalled()
+        expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
+      },
+    )
 
-    it('releases the claim back to AWAITING_RESUME when SQS send throws', async () => {
-      sqsMock.on(SendMessageCommand).rejects(new Error('SQS down'))
-      mockModel.updateMany.mockResolvedValue({ count: 1 })
+    it(
+      'releases the claim (restores resumeScheduledFor on old row) ' +
+        'when SQS send throws, and does not rethrow',
+      async () => {
+        sqsMock.on(SendMessageCommand).rejects(new Error('SQS down'))
+        mockModel.updateMany.mockResolvedValue({ count: 1 })
 
-      await service.resumeRun(awaitingRun)
+        await expect(service.resumeRun(awaitingRun)).resolves.toBeUndefined()
 
-      expect(mockModel.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            runId: awaitingRun.runId,
-            status: ExperimentRunStatus.RUNNING,
-          },
-          data: expect.objectContaining({
-            status: ExperimentRunStatus.AWAITING_RESUME,
+        expect(mockModel.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              runId: awaitingRun.runId,
+              status: ExperimentRunStatus.AWAITING_RESUME,
+            }),
+            data: expect.objectContaining({
+              resumeScheduledFor: expect.any(Date),
+            }),
           }),
-        }),
-      )
-    })
+        )
+      },
+    )
 
     it('does not send SQS when AGENT_DISPATCH_QUEUE_NAME is unset', async () => {
       delete process.env.AGENT_DISPATCH_QUEUE_NAME
@@ -454,7 +481,7 @@ describe('ExperimentRunsService', () => {
       await service.resumeRun(awaitingRun)
 
       expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0)
-      expect(mockModel.updateMany).not.toHaveBeenCalled()
+      expect(mockModel.create).not.toHaveBeenCalled()
     })
 
     it('resolves the queue url once and caches it across resumes', async () => {

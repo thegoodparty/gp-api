@@ -2,7 +2,11 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { v7 as uuidv7 } from 'uuid'
 import { SQS } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus, Prisma } from '../../generated/prisma'
+import {
+  ExperimentRun,
+  ExperimentRunStatus,
+  Prisma,
+} from '../../generated/prisma'
 import { Cron } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import { subMinutes } from 'date-fns'
@@ -86,34 +90,36 @@ export class ExperimentRunsService extends createPrismaBase(
     })
   }
 
-  async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
-    input: ExperimentRunDispatchInput<ExperimentType>,
-  ) {
-    const QueueUrl = await this.resolveQueueUrl()
-    if (!QueueUrl) {
+  private async createAndEnqueueRun(input: {
+    experimentType: string
+    organizationSlug: string
+    clerkUserId: string
+    params: Prisma.InputJsonValue
+    resumeAttempts?: number
+  }): Promise<ExperimentRun | undefined> {
+    const queueUrl = await this.resolveQueueUrl()
+    if (!queueUrl) {
       this.logger.warn(
         'No Queue Url found for agent dispatch, not configured for this environment',
       )
       return
     }
-
     const runId = uuidv7()
-
     const result = await this.model.create({
       data: {
         runId,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         organizationSlug: input.organizationSlug,
         status: ExperimentRunStatus.RUNNING,
         params: input.params,
+        resumeAttempts: input.resumeAttempts ?? 0,
       },
     })
-
     try {
-      await this.enqueueDispatch(QueueUrl, {
+      await this.enqueueDispatch(queueUrl, {
         runId,
         organizationSlug: input.organizationSlug,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         clerkUserId: input.clerkUserId,
         params: input.params,
       })
@@ -122,42 +128,49 @@ export class ExperimentRunsService extends createPrismaBase(
         {
           error,
           runId,
-          experimentType: input.type,
+          experimentType: input.experimentType,
           organizationSlug: input.organizationSlug,
         },
         'Failed to send dispatch message to SQS',
       )
       await this.model.update({
         where: { runId },
-        data: { status: 'FAILED', error: 'SQS dispatch failed' },
+        data: {
+          status: ExperimentRunStatus.FAILED,
+          error: 'SQS dispatch failed',
+        },
       })
       throw new BadGatewayException(
         'Failed to dispatch experiment. Please try again.',
       )
     }
-
     this.logger.info(
       {
         runId,
-        experimentType: input.type,
+        experimentType: input.experimentType,
         organizationSlug: input.organizationSlug,
       },
       'Experiment dispatched',
     )
-
     return result
   }
 
-  async resumeRun(run: ResumeRunInput) {
-    const QueueUrl = await this.resolveQueueUrl()
-    if (!QueueUrl) {
-      this.logger.warn(
-        { runId: run.runId },
-        'No Queue Url configured — cannot resume run in this environment',
-      )
-      return
-    }
+  async dispatchRun<ExperimentType extends keyof AgentJobContracts>(
+    input: ExperimentRunDispatchInput<ExperimentType>,
+  ) {
+    return this.createAndEnqueueRun({
+      experimentType: input.type,
+      organizationSlug: input.organizationSlug,
+      clerkUserId: input.clerkUserId,
+      // AgentJobContracts inputs are JSON-serializable objects validated by Zod;
+      // the assertion bridges the structural index-signature gap that InputJsonObject
+      // requires but the generated contract types don't declare.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      params: input.params as Prisma.InputJsonObject,
+    })
+  }
 
+  async resumeRun(run: ResumeRunInput) {
     const clerkUserId =
       isJsonObject(run.params) &&
       typeof run.params['clerk_user_id'] === 'string'
@@ -186,46 +199,39 @@ export class ExperimentRunsService extends createPrismaBase(
       where: {
         runId: run.runId,
         status: ExperimentRunStatus.AWAITING_RESUME,
+        resumeScheduledFor: { not: null },
       },
-      data: {
-        status: ExperimentRunStatus.RUNNING,
-        resumeAttempts: { increment: 1 },
-        resumeScheduledFor: null,
-      },
+      data: { resumeScheduledFor: null },
     })
 
     if (claimed.count === 0) {
       return
     }
 
-    const resumeParams =
-      typeof run.params === 'object' && run.params !== null
-        ? { ...run.params, trigger: 'recovery_resume' }
-        : { trigger: 'recovery_resume' }
+    const resumeParams = {
+      ...(isJsonObject(run.params) ? run.params : {}),
+      trigger: 'recovery_resume',
+    } as Prisma.InputJsonObject
 
     try {
-      await this.enqueueDispatch(QueueUrl, {
-        runId: run.runId,
-        organizationSlug: run.organizationSlug,
+      await this.createAndEnqueueRun({
         experimentType: run.experimentType,
+        organizationSlug: run.organizationSlug,
         clerkUserId,
         params: resumeParams,
+        resumeAttempts: run.resumeAttempts + 1,
       })
     } catch (error) {
       this.logger.error(
         { error, runId: run.runId },
-        'Failed to re-enqueue resumed run — releasing claim',
+        'Failed to dispatch resumed run — releasing claim',
       )
       await this.model.updateMany({
         where: {
           runId: run.runId,
-          status: ExperimentRunStatus.RUNNING,
-        },
-        data: {
           status: ExperimentRunStatus.AWAITING_RESUME,
-          resumeAttempts: { decrement: 1 },
-          resumeScheduledFor: new Date(),
         },
+        data: { resumeScheduledFor: new Date() },
       })
     }
   }
