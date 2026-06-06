@@ -71,7 +71,8 @@ const isPrivateOrLoopbackIp = (ip: string, family: number): boolean => {
 const isPrivateIPv4 = (ip: string): boolean => {
   const parts = ip.split('.').map(Number)
   if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return true
-  const [a, b] = parts as [number, number, number, number]
+  const a = parts[0]
+  const b = parts[1]
   return (
     a === 0 || // "this network" — 0.0.0.0/8
     a === 10 || // RFC1918

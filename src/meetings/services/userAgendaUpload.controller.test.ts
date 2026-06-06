@@ -232,7 +232,10 @@ describe('POST /v1/meetings/:date/briefing/agenda — UPLOAD source', () => {
         }),
       }),
     )
-    const params = dispatchSpy.mock.calls[0][0].params as Record<string, unknown>
+    const params = dispatchSpy.mock.calls[0][0].params as Record<
+      string,
+      unknown
+    >
     expect(params).not.toHaveProperty('agendaPacketUrl')
   })
 
@@ -371,7 +374,10 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
     )
     // URL paste path passes the user's own URL through; the envelope-strip
     // `_input_files` key belongs to the UPLOAD path and must not appear here.
-    const params = dispatchSpy.mock.calls[0][0].params as Record<string, unknown>
+    const params = dispatchSpy.mock.calls[0][0].params as Record<
+      string,
+      unknown
+    >
     expect(params).not.toHaveProperty('_input_files')
   })
 
