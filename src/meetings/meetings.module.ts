@@ -11,6 +11,7 @@ import { BriefingsPdfRateLimitGuard } from './controllers/briefingsPdfRateLimit.
 import { MeetingsBriefingsController } from './controllers/meetingsBriefings.controller'
 import { BriefingPdfService } from './services/briefingPdf.service'
 import { MeetingBriefingsService } from './services/meetingBriefings.service'
+import { UserAgendaUploadService } from './services/userAgendaUpload.service'
 
 @Module({
   imports: [
@@ -25,9 +26,10 @@ import { MeetingBriefingsService } from './services/meetingBriefings.service'
   controllers: [MeetingsBriefingsController, BriefingsPdfController],
   providers: [
     MeetingBriefingsService,
+    UserAgendaUploadService,
     BriefingPdfService,
     BriefingsPdfRateLimitGuard,
   ],
-  exports: [MeetingBriefingsService],
+  exports: [MeetingBriefingsService, UserAgendaUploadService],
 })
 export class MeetingsModule {}
