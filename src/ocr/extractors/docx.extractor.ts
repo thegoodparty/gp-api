@@ -56,7 +56,11 @@ const totalUncompressedSize = (buf: Buffer): number => {
     const nameLen = buf.readUInt16LE(pos + 28)
     const extraLen = buf.readUInt16LE(pos + 30)
     const commentLen = buf.readUInt16LE(pos + 32)
-    pos += 46 + nameLen + extraLen + commentLen
+    const next = pos + 46 + nameLen + extraLen + commentLen
+    if (next > cdEnd) {
+      throw new BadRequestException('attachment_invalid_archive')
+    }
+    pos = next
   }
 
   return total

@@ -73,6 +73,39 @@ const buildZipBuffer = (uncompressedSize: number): Buffer => {
   return Buffer.concat([lfh, cd, eocd])
 }
 
+const buildOverflowFieldLenBuffer = (): Buffer => {
+  const fileName = Buffer.from('a.xml')
+  const nameLen = fileName.length
+
+  const lfh = Buffer.alloc(30 + nameLen)
+  lfh.writeUInt32LE(0x04034b50, 0)
+  lfh.writeUInt16LE(20, 4)
+  fileName.copy(lfh, 30)
+
+  const cd = Buffer.alloc(46 + nameLen)
+  cd.writeUInt32LE(0x02014b50, 0)
+  cd.writeUInt16LE(20, 4)
+  cd.writeUInt16LE(20, 6)
+  cd.writeUInt32LE(1024, 24)
+  cd.writeUInt16LE(nameLen, 28)
+  // extra field length inflated past CD boundary
+  cd.writeUInt16LE(0xffff, 30)
+  cd.writeUInt16LE(0, 32)
+  fileName.copy(cd, 46)
+
+  const cdSize = cd.length
+  const cdOffset = lfh.length
+
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(1, 8)
+  eocd.writeUInt16LE(1, 10)
+  eocd.writeUInt32LE(cdSize, 12)
+  eocd.writeUInt32LE(cdOffset, 16)
+
+  return Buffer.concat([lfh, cd, eocd])
+}
+
 const buildZip64EocdBuffer = (): Buffer => {
   const fileName = Buffer.from('a.xml')
   const nameLen = fileName.length
@@ -142,6 +175,15 @@ describe('DocxOcrExtractor', () => {
 
     await expect(extractor.extract(input())).rejects.toThrow(
       'attachment_decompressed_size_exceeded',
+    )
+  })
+
+  it('rejects archives with inflated CD field lengths', async () => {
+    const overflow = buildOverflowFieldLenBuffer()
+    const { extractor } = buildExtractor(overflow)
+
+    await expect(extractor.extract(input())).rejects.toThrow(
+      'attachment_invalid_archive',
     )
   })
 
