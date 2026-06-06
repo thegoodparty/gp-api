@@ -139,14 +139,34 @@ export class MeetingsBriefingsController {
     // Layer in user-agenda statuses last so the GET row reflects the latest
     // user-upload state regardless of whether a briefing row exists yet
     // (the briefing row appears only AFTER the dispatched run completes).
+    // The query is scoped to the same window as the meeting projection so
+    // upload rows for off-list dates (no projected schedule entry, no
+    // briefing row yet) still appear as their own list rows.
     const userAgendaStatuses =
-      await this.userAgendaUploads.getStatusForMeetings(electedOffice.id, [
-        ...byDate.keys(),
-      ])
+      await this.userAgendaUploads.getStatusForMeetings(electedOffice.id, {
+        from: windowFrom,
+        to: windowTo,
+      })
     for (const [date, status] of userAgendaStatuses) {
+      if (date < today) continue
       const existing = byDate.get(date)
-      if (!existing) continue
-      byDate.set(date, { ...existing, userAgendaStatus: status })
+      if (existing) {
+        byDate.set(date, { ...existing, userAgendaStatus: status })
+        continue
+      }
+      // Off-list date: user uploaded an agenda for a meeting we don't have a
+      // schedule entry or briefing row for. Surface as a row so the agenda is
+      // visible — fill the schedule-only fields with placeholders.
+      byDate.set(date, {
+        meetingDate: date,
+        meetingTime: '',
+        meetingTimezone: '',
+        durationMinutes: 0,
+        meetingName: '',
+        location: '',
+        hasBriefing: false,
+        userAgendaStatus: status,
+      })
     }
 
     const meetings = [...byDate.values()].sort((a, b) =>

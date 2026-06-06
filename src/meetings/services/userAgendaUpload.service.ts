@@ -8,6 +8,7 @@ import { ElectedOffice, UserAgendaSource } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
+import { assertUrlSafeForExternalFetch } from '@/shared/util/ssrf.util'
 import {
   USER_AGENDA_MAX_BYTES,
   UserAgendaFinalizeRequest,
@@ -224,21 +225,24 @@ export class UserAgendaUploadService extends createPrismaBase(
   }
 
   /**
-   * Surfaces a row-status string for GET /meetings consumers. Returns null
-   * when there's no user-supplied agenda for this (office, date).
+   * Surfaces a row-status string for GET /meetings consumers. Returns the
+   * map keyed by meeting date (YYYY-MM-DD) for every upload row in the window
+   * — including upload rows for meeting dates the caller didn't pre-list
+   * (off-list dates the user uploaded an agenda for despite there being no
+   * scheduled meeting / briefing row yet).
    */
   async getStatusForMeetings(
     electedOfficeId: string,
-    meetingDates: string[],
+    window: { from: Date; to: Date },
   ): Promise<Map<string, 'processing' | 'failed' | 'completed' | 'unknown'>> {
-    if (meetingDates.length === 0) return new Map()
     const rows = await this.client.userAgendaUpload.findMany({
       where: {
         electedOfficeId,
-        meetingDate: { in: meetingDates.map(parseIsoDateAsUTC) },
+        meetingDate: { gte: window.from, lte: window.to },
       },
       select: {
         meetingDate: true,
+        experimentRunId: true,
         experimentRun: { select: { status: true } },
       },
     })
@@ -255,6 +259,15 @@ export class UserAgendaUploadService extends createPrismaBase(
         out.set(date, 'failed')
       } else if (runStatus === 'COMPLETED') {
         out.set(date, 'completed')
+      } else if (row.experimentRunId === null) {
+        // Upload row exists with no run linked: dispatch failed (or is racing
+        // mid-finalize). From the user's POV the upload didn't kick off a
+        // briefing, so surface as `failed` rather than `unknown` — the modal
+        // re-opens for a retry. The brief window between row upsert and run
+        // linkage during a successful finalize is short; users seeing a
+        // momentary `failed` that flips to `processing` on next refresh is
+        // acceptable.
+        out.set(date, 'failed')
       } else {
         out.set(date, 'unknown')
       }
@@ -266,10 +279,15 @@ export class UserAgendaUploadService extends createPrismaBase(
    * HEAD-check a pasted URL. Returns the resolved content-type and size when
    * acceptable; throws otherwise. Avoids dispatching an agent run for
    * obviously-broken URLs (404, redirects to login walls, non-PDF content).
+   *
+   * SSRF defense: HTTPS-only, and the hostname is resolved + checked against
+   * private/loopback/link-local ranges (incl. AWS IMDS) before the fetch.
    */
   private async headCheckUrl(
     url: string,
   ): Promise<{ contentType: string; byteSize: number | null }> {
+    await assertUrlSafeForExternalFetch(url)
+
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), URL_HEAD_TIMEOUT_MS)
     let response: Response
@@ -295,14 +313,30 @@ export class UserAgendaUploadService extends createPrismaBase(
       })
     }
 
+    // Many otherwise-valid PDF hosts return 200 on HEAD without Content-Type
+    // (CDNs that only set the header on GET, misconfigured static servers).
+    // Fall back to URL-path extension in that case rather than rejecting:
+    // we'd rather let a real download attempt 4xx than block the user on a
+    // missing header.
     const rawType = (response.headers.get('content-type') ?? '')
       .split(';')[0]
       .trim()
       .toLowerCase()
-    if (!PDF_CONTENT_TYPES.has(rawType)) {
+    let contentType: string
+    if (rawType) {
+      if (!PDF_CONTENT_TYPES.has(rawType)) {
+        throw new BadRequestException({
+          error: 'url_not_pdf',
+          message: `Content-Type ${rawType} is not a PDF`,
+        })
+      }
+      contentType = rawType
+    } else if (new URL(url).pathname.toLowerCase().endsWith('.pdf')) {
+      contentType = 'application/pdf'
+    } else {
       throw new BadRequestException({
         error: 'url_not_pdf',
-        message: `Content-Type ${rawType || '(missing)'} is not a PDF`,
+        message: 'Content-Type is missing and URL path does not end in .pdf',
       })
     }
 
@@ -318,6 +352,6 @@ export class UserAgendaUploadService extends createPrismaBase(
       }
     }
 
-    return { contentType: rawType, byteSize }
+    return { contentType, byteSize }
   }
 }

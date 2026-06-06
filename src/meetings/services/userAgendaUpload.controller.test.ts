@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { promises as dns } from 'node:dns'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus, UserAgendaSource } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
@@ -89,6 +90,18 @@ const mockHeadFetch = (
     }),
   )
 }
+
+// SSRF guard in the URL path calls dns.lookup before any fetch — stub it to
+// a public-looking IP so the URL test path doesn't depend on real DNS.
+const mockSafeDns = () =>
+  vi
+    .spyOn(dns, 'lookup')
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    .mockResolvedValue([
+      { address: '93.184.216.34', family: 4 },
+    ] as unknown as ReturnType<typeof dns.lookup> extends Promise<infer T>
+      ? T
+      : never)
 
 beforeEach(() => {
   vi.stubEnv('AGENT_RUN_INPUTS_BUCKET', 'gp-agent-run-inputs-test')
@@ -316,6 +329,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
     const eo = await seedOrgAndElectedOffice(orgSlug)
     mockResolveServeContext()
     mockS3()
+    mockSafeDns()
     const dispatchSpy = mockDispatchRun()
     const fetchSpy = mockHeadFetch(200, 'application/pdf', '524288')
 
@@ -364,6 +378,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
   it('returns 400 when HEAD returns 404', async () => {
     const orgSlug = `finalize-url-404-${Date.now()}`
     await seedOrgAndElectedOffice(orgSlug)
+    mockSafeDns()
     mockHeadFetch(404)
 
     const result = await service.client.post(
@@ -381,6 +396,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
   it('returns 400 when HEAD returns a non-PDF content type', async () => {
     const orgSlug = `finalize-url-html-${Date.now()}`
     await seedOrgAndElectedOffice(orgSlug)
+    mockSafeDns()
     mockHeadFetch(200, 'text/html')
 
     const result = await service.client.post(
@@ -398,6 +414,7 @@ describe('POST /v1/meetings/:date/briefing/agenda — URL source', () => {
   it('returns 400 when content-length exceeds 75 MB', async () => {
     const orgSlug = `finalize-url-toobig-${Date.now()}`
     await seedOrgAndElectedOffice(orgSlug)
+    mockSafeDns()
     mockHeadFetch(200, 'application/pdf', String(80 * 1024 * 1024))
 
     const result = await service.client.post(
