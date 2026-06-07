@@ -104,6 +104,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         peerlyIdentityId: null,
         kickoffSentAt: null,
         createdAt: { lt: cutoff },
+        // Pre-payment (pro-upgrade3) submissions intentionally sit with
+        // kickoffSentAt null until payment; only sweep campaigns that are
+        // already Pro so the agent never runs before the candidate pays.
+        campaign: { isPro: true },
       },
       include: {
         campaign: { include: { user: true } },
@@ -675,41 +679,28 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw err
     }
 
-    try {
-      await this.queueService.sendMessage(
-        {
-          type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
-          data: {
-            campaignId: campaign.id,
-            tcrComplianceId: record.id,
-            clerkUserId: user.clerkId,
-          },
-        },
-        `${MessageGroup.agenticComplianceKickoff}-${campaign.id}`,
-        {
-          deduplicationId: `agentic-compliance-${record.id}`,
-          throwOnError: true,
-        },
-      )
-    } catch (err) {
+    // Pre-payment (pro-upgrade3) submissions defer dispatch to the payment
+    // webhook so the agent never provisions a domain/site for an unpaid
+    // candidate. Already-Pro submissions (pro-upgrade1, post-payment
+    // resubmission) enqueue immediately, as before.
+    if (campaign.isPro) {
       try {
-        await this.model.update({
-          where: { id: record.id },
-          data: { status: TcrComplianceStatus.error },
-        })
-      } catch (updateErr) {
-        this.logger.error(
-          { updateErr, tcrComplianceId: record.id },
-          '[TCR Compliance] Failed to mark record as error after SQS send failure; sweep will recover',
-        )
+        await this.claimAndEnqueueKickoff(record, user.clerkId)
+      } catch (err) {
+        try {
+          await this.model.update({
+            where: { id: record.id },
+            data: { status: TcrComplianceStatus.error },
+          })
+        } catch (updateErr) {
+          this.logger.error(
+            { updateErr, tcrComplianceId: record.id },
+            '[TCR Compliance] Failed to mark record as error after SQS send failure; sweep will recover',
+          )
+        }
+        throw err
       }
-      throw err
     }
-
-    await this.model.update({
-      where: { id: record.id },
-      data: { kickoffSentAt: new Date() },
-    })
 
     try {
       await this.crmCampaignsService.trackCampaign(campaign.id)
@@ -725,6 +716,82 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
 
     return { record, created: true }
+  }
+
+  // Webhook entry point: enqueue the compliance_setup kickoff for a campaign
+  // that has already submitted its TCR record but deferred dispatch until
+  // payment (pro-upgrade3). No-ops when no record exists yet (candidate paid
+  // before filing) — the eventual createAgentic submit will enqueue because
+  // the campaign is now Pro.
+  async enqueueAgenticKickoffIfNeeded(campaignId: number) {
+    const record = await this.fetchByCampaignId(campaignId)
+    if (!record) {
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: campaignId },
+      include: { user: true },
+    })
+    const clerkUserId = campaign?.user?.clerkId
+    if (!clerkUserId) {
+      this.logger.error(
+        { campaignId, tcrComplianceId: record.id },
+        '[TCR Compliance] Cannot enqueue agentic kickoff: ' +
+          'campaign has no Clerk user',
+      )
+      return
+    }
+
+    await this.claimAndEnqueueKickoff(record, clerkUserId)
+  }
+
+  // Single source of the kickoff SQS message shape, shared by createAgentic
+  // (already-Pro submit) and the payment webhook. The atomic claim on
+  // kickoffSentAt is the idempotency guard: a webhook replay or a
+  // submit->pay->submit race finds it already set and short-circuits, so the
+  // agent is dispatched exactly once.
+  private async claimAndEnqueueKickoff(
+    record: TcrCompliance,
+    clerkUserId: string,
+  ) {
+    // Claim before the send so concurrent callers can't both enqueue. Only the
+    // caller that flips kickoffSentAt from null wins the claim.
+    const claimTimestamp = new Date()
+    const claim = await this.model.updateMany({
+      where: { id: record.id, kickoffSentAt: null },
+      data: { kickoffSentAt: claimTimestamp },
+    })
+    if (claim.count === 0) {
+      return
+    }
+
+    try {
+      await this.queueService.sendMessage(
+        {
+          type: QueueType.AGENTIC_COMPLIANCE_KICKOFF,
+          data: {
+            campaignId: record.campaignId,
+            tcrComplianceId: record.id,
+            clerkUserId,
+          },
+        },
+        `${MessageGroup.agenticComplianceKickoff}-${record.campaignId}`,
+        {
+          deduplicationId: `agentic-compliance-${record.id}`,
+          throwOnError: true,
+        },
+      )
+    } catch (err) {
+      // Roll back only this caller's claim by matching the exact timestamp we
+      // wrote, leaving kickoffSentAt null so the stranded-kickoff sweep can
+      // re-enqueue it.
+      await this.model.updateMany({
+        where: { id: record.id, kickoffSentAt: claimTimestamp },
+        data: { kickoffSentAt: null },
+      })
+      throw err
+    }
   }
 
   async handleAgenticKickoff(message: AgenticComplianceKickoffMessage) {

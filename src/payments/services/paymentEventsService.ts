@@ -27,6 +27,7 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { WrapperType } from 'src/shared/types/utility.types'
 import { PurchaseService } from './purchase.service'
 import { PinoLogger } from 'nestjs-pino'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -47,6 +48,7 @@ export class PaymentEventsService {
     private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => PurchaseService))
     private readonly purchaseService: WrapperType<PurchaseService>,
+    private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(PaymentEventsService.name)
@@ -255,6 +257,19 @@ export class PaymentEventsService {
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
+
+    // Pre-payment (pro-upgrade3) submissions defer the compliance_setup agent
+    // kickoff to here. No-ops when the candidate has no TCR record yet or the
+    // kickoff was already enqueued. Best-effort: a failure here must not fail
+    // the webhook (the stranded-kickoff sweep recovers a rolled-back claim).
+    try {
+      await this.tcrComplianceService.enqueueAgenticKickoffIfNeeded(campaignId)
+    } catch (error) {
+      this.logger.error(
+        { error },
+        `[WEBHOOK] Failed to enqueue agentic compliance kickoff - Campaign: ${campaignId}`,
+      )
+    }
 
     // Track analytics with proper error handling
     try {
