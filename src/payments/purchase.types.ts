@@ -21,6 +21,14 @@ export interface CompleteCheckoutSessionDto {
   checkoutSessionId: string
 }
 
+export interface CreateProCheckoutSessionDto {
+  // When true, returns a client_secret for an in-wizard embedded checkout
+  //  instead of a redirect url (pro-upgrade3 cohort). isPro is still flipped
+  //  only by the checkout.session.completed webhook regardless of this flag.
+  embedded?: boolean
+  returnUrl?: string
+}
+
 export type FreePurchaseMetadata =
   | OutreachPurchaseMetadata
   | DomainPurchaseMetadata

@@ -41,6 +41,7 @@ describe('PurchaseController', () => {
   let controller: PurchaseController
   let stripeService: {
     createCheckoutSession: ReturnType<typeof vi.fn>
+    createEmbeddedProSubscriptionCheckoutSession: ReturnType<typeof vi.fn>
     createPortalSession: ReturnType<typeof vi.fn>
   }
   let usersService: { patchUserMetaData: ReturnType<typeof vi.fn> }
@@ -53,6 +54,7 @@ describe('PurchaseController', () => {
   beforeEach(() => {
     stripeService = {
       createCheckoutSession: vi.fn(),
+      createEmbeddedProSubscriptionCheckoutSession: vi.fn(),
       createPortalSession: vi.fn(),
     }
     usersService = { patchUserMetaData: vi.fn() }
@@ -71,9 +73,11 @@ describe('PurchaseController', () => {
   })
 
   describe('createProCheckoutSession', () => {
+    const redirectUrl = 'https://stripe.test/checkout'
+
     it('creates the session and persists checkoutSessionId on the user', async () => {
       stripeService.createCheckoutSession.mockResolvedValue({
-        redirectUrl: 'https://stripe.test/checkout',
+        redirectUrl,
         checkoutSessionId: 'cs_test_123',
       })
 
@@ -86,7 +90,48 @@ describe('PurchaseController', () => {
       expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, {
         checkoutSessionId: 'cs_test_123',
       })
-      expect(result).toEqual({ redirectUrl: 'https://stripe.test/checkout' })
+      expect(result).toEqual({ redirectUrl })
+    })
+
+    it('returns a client_secret and persists checkoutSessionId for the embedded path', async () => {
+      stripeService.createEmbeddedProSubscriptionCheckoutSession.mockResolvedValue(
+        {
+          clientSecret: 'cs_test_secret_abc',
+          checkoutSessionId: 'cs_test_embedded',
+        },
+      )
+
+      const result = await controller.createProCheckoutSession(mockUser, {
+        embedded: true,
+        returnUrl: 'https://app.test/dashboard/pro-upgrade',
+      })
+
+      expect(
+        stripeService.createEmbeddedProSubscriptionCheckoutSession,
+      ).toHaveBeenCalledWith(
+        userId,
+        mockUser.email,
+        'https://app.test/dashboard/pro-upgrade',
+      )
+      expect(stripeService.createCheckoutSession).not.toHaveBeenCalled()
+      expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, {
+        checkoutSessionId: 'cs_test_embedded',
+      })
+      expect(result).toEqual({ clientSecret: 'cs_test_secret_abc' })
+    })
+
+    it('falls back to the redirect path when no body is supplied', async () => {
+      stripeService.createCheckoutSession.mockResolvedValue({
+        redirectUrl,
+        checkoutSessionId: 'cs_test_123',
+      })
+
+      const result = await controller.createProCheckoutSession(mockUser)
+
+      expect(
+        stripeService.createEmbeddedProSubscriptionCheckoutSession,
+      ).not.toHaveBeenCalled()
+      expect(result).toEqual({ redirectUrl })
     })
   })
 
