@@ -48,6 +48,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { FilingInstructionsService } from './filingInstructions/filingInstructions.service'
 import { CampaignWith } from './campaigns.types'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -66,6 +67,7 @@ export class CampaignsController {
     private readonly slack: SlackService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
+    private readonly filingInstructions: FilingInstructionsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -131,6 +133,17 @@ export class CampaignsController {
     if (!version) throw new NotFoundException('No plan version found')
 
     return version.data
+  }
+
+  @Post('mine/filing-instructions/email')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async emailFilingInstructions(
+    @ReqCampaign() campaign: Campaign,
+    @ReqUser() user: User,
+  ) {
+    await this.filingInstructions.emailToCandidate(campaign, user)
+    return { success: true }
   }
 
   @Get('slug/:slug')

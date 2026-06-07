@@ -831,6 +831,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFee: filingFeeFromRaceHash?.filingFee ?? null,
         filingRequirementsText:
           filingFeeFromRaceHash?.filingRequirementsText ?? null,
+        filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+        filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+        paperworkInstructions:
+          filingFeeFromRaceHash?.paperworkInstructions ?? null,
         milestones,
       }
     }
@@ -869,6 +873,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFeeFromRaceHash !== null
           ? filingFeeFromRaceHash.filingRequirementsText
           : (filingRequirementsText ?? null),
+      filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+      filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+      paperworkInstructions:
+        filingFeeFromRaceHash?.paperworkInstructions ?? null,
       milestones,
     }
   }
@@ -892,6 +900,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       filingFee: filingFeeFromRaceHash?.filingFee ?? null,
       filingRequirementsText:
         filingFeeFromRaceHash?.filingRequirementsText ?? null,
+      filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+      filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+      paperworkInstructions:
+        filingFeeFromRaceHash?.paperworkInstructions ?? null,
       registeredVoters: context.registered_voters,
       uniqueCellphones: context.unique_cellphones,
       uniqueLandlines: context.unique_landlines,
@@ -971,6 +983,9 @@ const emptyContextFields = (): Omit<
   | 'voterContactGoal'
   | 'filingFee'
   | 'filingRequirementsText'
+  | 'filingOfficeAddress'
+  | 'filingPhoneNumber'
+  | 'paperworkInstructions'
 > => ({
   registeredVoters: null,
   uniqueCellphones: null,
