@@ -135,6 +135,12 @@ export class CampaignsController {
     return version.data
   }
 
+  // Intentionally @UseCampaign()-only, no isPro guard: the filing-instructions
+  // screen is a PRE-payment step of the pro-upgrade wizard, so its audience is
+  // by definition not-yet-Pro — an isPro gate would 403 the exact users it
+  // serves. The payload is public BallotReady data already shown free in
+  // onboarding (SuccessPage), and @UseCampaign() scopes the send to the
+  // caller's own campaign + their own email. Per ENG-10325 AC.
   @Post('mine/filing-instructions/email')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)

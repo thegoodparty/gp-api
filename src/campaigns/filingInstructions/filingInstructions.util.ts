@@ -25,10 +25,11 @@ const formatFilingWindow = (
 }
 
 /**
- * Renders the plain-text "email this to me" body for the Pro-upgrade
- * filing-instructions screen: filing window (from `campaign.details`), plus
- * fee / requirements / office contact (from the live race-target metrics).
- * Sections with no data are omitted so the candidate never sees empty labels.
+ * Renders the plain-text "email this to me" body for the pre-payment
+ * pro-upgrade wizard's filing-instructions screen (shown to candidates before
+ * they subscribe): filing window (from `campaign.details`), plus fee /
+ * requirements / office contact (from the live race-target metrics). Sections
+ * with no data are omitted so the candidate never sees empty labels.
  */
 export const renderFilingInstructionsEmail = (
   campaign: Campaign,
