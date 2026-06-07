@@ -11,6 +11,7 @@ import {
   CompleteCheckoutSessionDto,
   CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
+  CreateProCheckoutSessionDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
 import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
@@ -28,8 +29,25 @@ export class PurchaseController {
   }
 
   @Post('checkout-session')
-  async createProCheckoutSession(@ReqUser() user: User) {
+  async createProCheckoutSession(
+    @ReqUser() user: User,
+    @Body() dto: CreateProCheckoutSessionDto = {},
+  ) {
     const { email } = user
+
+    if (dto.embedded) {
+      const { clientSecret, checkoutSessionId } =
+        await this.stripeService.createEmbeddedProSubscriptionCheckoutSession(
+          user.id,
+          email,
+          dto.returnUrl,
+        )
+
+      await this.usersService.patchUserMetaData(user.id, { checkoutSessionId })
+
+      return { clientSecret }
+    }
+
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id, email)
 
