@@ -48,6 +48,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { FilingInstructionsService } from './filingInstructions/filingInstructions.service'
 import { CampaignWith } from './campaigns.types'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -66,6 +67,7 @@ export class CampaignsController {
     private readonly slack: SlackService,
     private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
+    private readonly filingInstructions: FilingInstructionsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CampaignsController.name)
@@ -131,6 +133,23 @@ export class CampaignsController {
     if (!version) throw new NotFoundException('No plan version found')
 
     return version.data
+  }
+
+  // Intentionally @UseCampaign()-only, no isPro guard: the filing-instructions
+  // screen is a PRE-payment step of the pro-upgrade wizard, so its audience is
+  // by definition not-yet-Pro — an isPro gate would 403 the exact users it
+  // serves. The payload is public BallotReady data already shown free in
+  // onboarding (SuccessPage), and @UseCampaign() scopes the send to the
+  // caller's own campaign + their own email. Per ENG-10325 AC.
+  @Post('mine/filing-instructions/email')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async emailFilingInstructions(
+    @ReqCampaign() campaign: Campaign,
+    @ReqUser() user: User,
+  ) {
+    await this.filingInstructions.emailToCandidate(campaign, user)
+    return { success: true }
   }
 
   @Get('slug/:slug')
