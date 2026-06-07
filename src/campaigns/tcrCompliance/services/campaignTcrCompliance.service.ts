@@ -104,6 +104,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         peerlyIdentityId: null,
         kickoffSentAt: null,
         createdAt: { lt: cutoff },
+        // Pre-payment (pro-upgrade3) submissions intentionally sit with
+        // kickoffSentAt null until payment; only sweep campaigns that are
+        // already Pro so the agent never runs before the candidate pays.
+        campaign: { isPro: true },
       },
       include: {
         campaign: { include: { user: true } },

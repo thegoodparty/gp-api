@@ -513,6 +513,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
             peerlyIdentityId: null,
             kickoffSentAt: null,
             createdAt: { lt: expect.any(Date) },
+            campaign: { isPro: true },
           },
         }),
       )
@@ -593,6 +594,18 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
       expect(mockQueue.sendMessage).not.toHaveBeenCalled()
       expect(mockModel.update).not.toHaveBeenCalled()
+    })
+
+    it('only sweeps Pro campaigns so pre-payment submissions are not dispatched', async () => {
+      mockModel.findMany.mockResolvedValueOnce([])
+
+      await sweep(service)
+
+      expect(mockModel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ campaign: { isPro: true } }),
+        }),
+      )
     })
   })
 })
