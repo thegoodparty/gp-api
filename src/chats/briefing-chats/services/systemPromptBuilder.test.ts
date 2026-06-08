@@ -43,6 +43,7 @@ const baseAnnotation: Annotation = {
   noteId: null,
   chatConversationId: 'conv-1',
   annotationBugReportId: null,
+  annotationReviewId: null,
 }
 
 const artifactContent =

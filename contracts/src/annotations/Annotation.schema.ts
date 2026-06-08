@@ -10,10 +10,17 @@ import { z } from 'zod'
  *     Both null when jsonPath is null.
  *
  * Only the `note` and `bug_report` kinds are wired in v1. `chat` is
- * reserved for Collin's eventual chat module.
+ * reserved for Collin's eventual chat module. `review` is admin-only:
+ * it can only be created inside an impersonation session and is never
+ * returned to non-impersonated callers (server-side default-deny).
  */
 
-export const ANNOTATION_KIND_VALUES = ['note', 'chat', 'bug_report'] as const
+export const ANNOTATION_KIND_VALUES = [
+  'note',
+  'chat',
+  'bug_report',
+  'review',
+] as const
 export const AnnotationKindSchema = z.enum(ANNOTATION_KIND_VALUES)
 export type AnnotationKind = z.infer<typeof AnnotationKindSchema>
 
@@ -45,8 +52,7 @@ export const AnnotationAnchorSchema = z
   })
   .refine(
     (a) => {
-      const passage =
-        a.json_path !== null && a.start !== null && a.end !== null
+      const passage = a.json_path !== null && a.start !== null && a.end !== null
       const cardLevel =
         a.json_path !== null && a.start === null && a.end === null
       const briefingWide =
@@ -118,6 +124,17 @@ export const AnnotationChatSchema = z.object({
 })
 export type AnnotationChat = z.infer<typeof AnnotationChatSchema>
 
+// reviewer_clerk_sub is intentionally omitted — the admin's Clerk subject
+// is internal reviewer attribution and never leaves the server.
+export const AnnotationReviewSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  reviewer_email: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+export type AnnotationReview = z.infer<typeof AnnotationReviewSchema>
+
 // ---------------------------------------------------------------------------
 // The annotation row as returned by the API
 // ---------------------------------------------------------------------------
@@ -136,6 +153,7 @@ export const AnnotationSchema = z.object({
   note: AnnotationNoteSchema.optional(),
   chat: AnnotationChatSchema.optional(),
   bug_report: AnnotationBugReportSchema.optional(),
+  review: AnnotationReviewSchema.optional(),
 })
 export type Annotation = z.infer<typeof AnnotationSchema>
 
@@ -145,6 +163,7 @@ export type Annotation = z.infer<typeof AnnotationSchema>
 
 const noteBodySchema = z.string().min(1).max(10_000)
 const bugReportDescriptionSchema = z.string().min(1).max(4_000)
+const reviewBodySchema = z.string().min(1).max(10_000)
 
 export const CreateAnnotationRequestSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -161,6 +180,13 @@ export const CreateAnnotationRequestSchema = z.discriminatedUnion('kind', [
     anchor: AnnotationAnchorSchema,
     payload: z.object({
       description: bugReportDescriptionSchema,
+    }),
+  }),
+  z.object({
+    kind: z.literal('review'),
+    anchor: AnnotationAnchorSchema,
+    payload: z.object({
+      body: reviewBodySchema,
     }),
   }),
 ])

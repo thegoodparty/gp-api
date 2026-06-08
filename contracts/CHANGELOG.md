@@ -1,5 +1,19 @@
 # @goodparty_org/contracts
 
+## 0.13.0
+
+### Minor Changes
+
+- `AnnotationKind` gains a `review` value for admin QA review comments.
+  `Annotation` gains an optional `review` block (`id`, `body`,
+  `reviewer_email`, timestamps); `reviewer_clerk_sub` is intentionally
+  not exposed. `CreateAnnotationRequest` gains a `review` variant
+  (`{ kind: 'review', anchor, payload: { body } }`). Review annotations
+  are admin-only: creatable only inside an impersonation session and
+  withheld from non-impersonated callers by a server-side default-deny.
+  Additive and non-breaking for existing `note` / `bug_report` / `chat`
+  consumers.
+
 ## 0.12.0
 
 ### Minor Changes

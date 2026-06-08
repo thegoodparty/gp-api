@@ -38,6 +38,7 @@ const annotation: Annotation = {
   noteId: null,
   chatConversationId: 'conv-hville-1',
   annotationBugReportId: null,
+  annotationReviewId: null,
 }
 
 const artifactContent = `# Briefing: Hendersonville, NC — Regular Council Meeting
