@@ -5,6 +5,7 @@ import { GeminiService } from 'src/vendors/google/services/gemini.service'
 import { CommunityEventsService } from './communityEvents.service'
 import { CommunityEventsPersister } from './communityEvents.persister'
 import { CommunityEventsPromptContext } from './communityEvents.prompts'
+import { AnalyticsService } from '@/analytics/analytics.service'
 
 const buildCtx = (
   overrides: Partial<CommunityEventsPromptContext> = {},
@@ -52,6 +53,9 @@ describe('CommunityEventsService', () => {
       gemini as unknown as GeminiService,
       braintrust as unknown as BraintrustService,
       persister as unknown as CommunityEventsPersister,
+      {
+        track: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AnalyticsService,
       createMockLogger(),
     )
   })
@@ -83,7 +87,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events).toHaveLength(3)
     expect(result.events.map((e) => e.title)).toEqual(['A', 'B', 'C'])
@@ -106,7 +110,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events.map((e) => e.title)).toEqual(['A', 'B', 'C'])
   })
@@ -120,7 +124,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events.map((e) => e.title)).toEqual(['Future'])
   })
@@ -139,7 +143,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events.map((e) => e.title)).toEqual(['OK'])
   })
@@ -152,7 +156,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events.map((e) => e.title)).toEqual(['OK'])
   })
@@ -160,7 +164,7 @@ describe('CommunityEventsService', () => {
   it('returns an empty events array when the model returns no qualifying events', async () => {
     gemini.generateStructured.mockResolvedValue({ events: [] })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events).toEqual([])
     // Persist still fires — the cache shape must distinguish "generated,
@@ -185,7 +189,7 @@ describe('CommunityEventsService', () => {
       ],
     })
 
-    const result = await service.generate(42, 99, buildCtx())
+    const result = await service.generate(42, 99, 7, buildCtx())
 
     expect(result.events.map((e) => e.url)).toEqual([null, null])
     expect(result.events.map((e) => e.address)).toEqual([null, null])
@@ -199,7 +203,7 @@ describe('CommunityEventsService', () => {
     })
     gemini.generateStructured.mockResolvedValue({ events: [] })
 
-    await service.generate(42, 99, buildCtx())
+    await service.generate(42, 99, 7, buildCtx())
 
     const [structuredPrompt] = gemini.generateStructured.mock.calls[0]
     expect(structuredPrompt).toContain('EVENTS_FROM_BR')

@@ -5,6 +5,8 @@ import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import { GEMINI_MODEL } from '@/vendors/google/gemini.types'
 import { GeminiService } from '@/vendors/google/services/gemini.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
+import { AnalyticsService } from '@/analytics/analytics.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 import {
   aiOutletsToolResultSchema,
   LocalNewsOutlet,
@@ -104,6 +106,7 @@ export class OnboardingLocalNewsService {
     private readonly gemini: GeminiService,
     private readonly braintrust: BraintrustService,
     private readonly campaigns: CampaignsService,
+    private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(OnboardingLocalNewsService.name)
@@ -155,28 +158,43 @@ export class OnboardingLocalNewsService {
       state,
     })
     if (claimed) {
-      void this.runFetch({ campaignId: campaign.id, city, state, office })
+      void this.runFetch({
+        campaignId: campaign.id,
+        userId: campaign.userId,
+        city,
+        state,
+        office,
+      })
     }
     return { status: 'pending' }
   }
 
   private async runFetch({
     campaignId,
+    userId,
     city,
     state,
     office,
   }: {
     campaignId: number
+    userId: number
     city?: string
     state: string
     office: string
   }): Promise<void> {
     const jurisdiction = city ? `${city}, ${state}` : state
     const startedAt = Date.now()
+    const startedAtPerf = performance.now()
     this.logger.info(
       { jurisdiction, office, campaignId },
       'getLocalNews background fetch started',
     )
+    void this.analytics
+      .track(userId, EVENTS.CampaignPlanV2.MediaGenerationStarted, {
+        campaignId,
+        generationEngine: 'gemini',
+      })
+      .catch(() => undefined)
 
     try {
       const result = await this.braintrust.tracedNested(
@@ -197,6 +215,14 @@ export class OnboardingLocalNewsService {
         { office, city: city ?? null, state },
         result.outlets,
       )
+      void this.analytics
+        .track(userId, EVENTS.CampaignPlanV2.MediaGenerationCompleted, {
+          campaignId,
+          generationEngine: 'gemini',
+          durationMs: Math.round(performance.now() - startedAtPerf),
+          outletCount: result.outlets.length,
+        })
+        .catch(() => undefined)
       this.logger.info(
         {
           jurisdiction,

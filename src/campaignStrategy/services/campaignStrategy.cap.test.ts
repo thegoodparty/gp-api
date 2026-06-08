@@ -52,7 +52,11 @@ describe('CampaignStrategyService', () => {
     persistOpportunitiesAndChallenges: ReturnType<typeof vi.fn>
   }
   let s3: { getFile: ReturnType<typeof vi.fn> }
-  let prisma: { campaignStrategy: Record<string, ReturnType<typeof vi.fn>> }
+  let analytics: { track: ReturnType<typeof vi.fn> }
+  let prisma: {
+    campaignStrategy: Record<string, ReturnType<typeof vi.fn>>
+    campaign: Record<string, ReturnType<typeof vi.fn>>
+  }
 
   const planRow = (overrides: Record<string, unknown> = {}) => ({
     id: 42,
@@ -76,6 +80,7 @@ describe('CampaignStrategyService', () => {
       persistOpportunitiesAndChallenges: vi.fn().mockResolvedValue(undefined),
     }
     s3 = { getFile: vi.fn() }
+    analytics = { track: vi.fn().mockResolvedValue(undefined) }
     prisma = {
       campaignStrategy: {
         upsert: vi.fn().mockResolvedValue(planRow()),
@@ -83,6 +88,9 @@ describe('CampaignStrategyService', () => {
         update: vi.fn().mockResolvedValue(undefined),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findFirst: vi.fn().mockResolvedValue(planRow()),
+      },
+      campaign: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 7 }),
       },
     }
     // The last three deps (communityEvents, electionApi, races) belong to the
@@ -97,6 +105,7 @@ describe('CampaignStrategyService', () => {
       { generate: vi.fn() } as never,
       { getRaceContext: vi.fn() } as never,
       { getZipCodesByRaceId: vi.fn() } as never,
+      analytics as never,
     )
     Object.defineProperty(service, '_prisma', { value: prisma })
     Object.assign(service, {
