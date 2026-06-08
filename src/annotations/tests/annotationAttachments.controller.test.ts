@@ -76,7 +76,9 @@ const mockS3 = () => {
     view: vi
       .spyOn(s3, 'getSignedUrlForViewing')
       .mockResolvedValue('https://s3.example/download-url'),
-    exists: vi.spyOn(s3, 'objectExists').mockResolvedValue(true),
+    head: vi
+      .spyOn(s3, 'headObject')
+      .mockResolvedValue({ contentLength: 1_500_000 }),
     get: vi.spyOn(s3, 'getFileBytes').mockResolvedValue(Buffer.from('binary')),
     del: vi.spyOn(s3, 'deleteObject').mockResolvedValue(undefined),
   }
@@ -212,14 +214,21 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
     )
 
     expect(result.status).toBe(204)
-    expect(s3.exists).toHaveBeenCalled()
+    expect(s3.head).toHaveBeenCalled()
     expect(queue).toHaveBeenCalledOnce()
+    // The OCR job must be enqueued with throwOnError so a producer failure
+    // surfaces to the caller instead of silently dropping the message.
+    expect(queue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ throwOnError: true }),
+    )
   })
 
   it('returns 400 when the file has not actually landed in S3', async () => {
     const { annotation } = await seedBriefingAndNote('eo-missing-upload')
     const s3 = mockS3()
-    s3.exists.mockResolvedValueOnce(false)
+    s3.head.mockResolvedValueOnce(null)
     mockQueue()
 
     const presign = await service.client.post(
@@ -235,6 +244,48 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
     )
 
     expect(result.status).toBe(400)
+  })
+
+  it('returns 400 when the actual S3 size exceeds the declared size', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-size-mismatch')
+    const s3 = mockS3()
+    s3.head.mockResolvedValueOnce({ contentLength: 5_000_000 })
+    mockQueue()
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-size-mismatch'),
+    )
+
+    const result = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/${presign.data.attachment_id}/complete`,
+      {},
+      orgHeader('eo-size-mismatch'),
+    )
+
+    expect(result.status).toBe(400)
+  })
+
+  it('does not silently ack when the OCR enqueue fails', async () => {
+    const { annotation } = await seedBriefingAndNote('eo-queue-fail')
+    mockS3()
+    const queue = mockQueue()
+    queue.mockRejectedValueOnce(new Error('sqs_unavailable'))
+
+    const presign = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/presign`,
+      validPresign,
+      orgHeader('eo-queue-fail'),
+    )
+
+    const result = await service.client.post(
+      `/v1/annotations/${annotation.id}/note/attachments/${presign.data.attachment_id}/complete`,
+      {},
+      orgHeader('eo-queue-fail'),
+    )
+
+    expect(result.status).toBeGreaterThanOrEqual(500)
   })
 })
 
