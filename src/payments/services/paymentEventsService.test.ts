@@ -30,6 +30,7 @@ describe('PaymentEventsService', () => {
     resolvePositionNameByOrganizationSlug: vi.fn(),
   }
   const crm = { getCrmCompanyOwnerName: vi.fn() }
+  const tcrComplianceService = { enqueueAgenticKickoffIfNeeded: vi.fn() }
 
   const mockUser = { id: 1, email: 'test@example.com' } as User
   const mockCampaign = {
@@ -65,6 +66,9 @@ describe('PaymentEventsService', () => {
     analytics.track.mockResolvedValue(undefined)
     slackService.message.mockResolvedValue(undefined)
     voterFileDownloadAccess.downloadAccessAlert.mockResolvedValue(undefined)
+    tcrComplianceService.enqueueAgenticKickoffIfNeeded.mockResolvedValue(
+      undefined,
+    )
 
     service = new PaymentEventsService(
       usersService as never,
@@ -77,6 +81,7 @@ describe('PaymentEventsService', () => {
       {} as never,
       analytics as never,
       {} as never,
+      tcrComplianceService as never,
       logger,
     )
   })
@@ -118,6 +123,38 @@ describe('PaymentEventsService', () => {
         EVENTS.Account.ProUpgradeComplete,
         { pro: true },
       )
+    })
+
+    it('enqueues the agentic kickoff after marking the campaign Pro', async () => {
+      await service.handleEvent(subscriptionEvent)
+
+      expect(campaignsService.setIsPro).toHaveBeenCalledWith(mockCampaign.id)
+      expect(
+        tcrComplianceService.enqueueAgenticKickoffIfNeeded,
+      ).toHaveBeenCalledExactlyOnceWith(mockCampaign.id)
+      expect(
+        campaignsService.setIsPro.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        tcrComplianceService.enqueueAgenticKickoffIfNeeded.mock
+          .invocationCallOrder[0],
+      )
+    })
+
+    it('does not fail the webhook when the kickoff enqueue throws', async () => {
+      const enqueueError = new Error('SQS down')
+      tcrComplianceService.enqueueAgenticKickoffIfNeeded.mockRejectedValueOnce(
+        enqueueError,
+      )
+
+      await expect(
+        service.handleEvent(subscriptionEvent),
+      ).resolves.not.toThrow()
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ error: enqueueError }),
+        expect.stringContaining('agentic compliance kickoff'),
+      )
+      expect(usersService.patchUserMetaData).toHaveBeenCalled()
     })
   })
 })

@@ -8,7 +8,12 @@ import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import { getUserFullName } from '@/users/util/users.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
-import { Injectable } from '@nestjs/common'
+import {
+  BadGatewayException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import {
   ElectedOffice,
@@ -18,7 +23,7 @@ import {
   Prisma,
 } from '../../generated/prisma'
 import { addDays } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { chunk } from 'es-toolkit'
 import ms from 'ms'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
@@ -133,8 +138,8 @@ const IMMINENCE_WINDOW_DAYS = 5
 
 type TargetMeeting = {
   meetingDate: string // YYYY-MM-DD
-  meetingTime: string // HH:MM
-  meetingTimezone: string // IANA
+  meetingTime?: string // HH:MM (optional — user-supplied agenda path leaves it to the agent)
+  meetingTimezone?: string // IANA (optional — same reason)
 }
 
 @Injectable()
@@ -279,12 +284,22 @@ export class MeetingBriefingsService extends createPrismaBase(
   private async dispatchBriefing(
     ctx: DispatchContext,
     meeting: TargetMeeting,
-  ): Promise<void> {
+    options: {
+      // URL-paste path: user gave us a URL to an agenda. Travels in params as
+      // an ordinary string the agent reads + cites.
+      agendaPacketUrl?: string
+      // UPLOAD path: user uploaded a file. Travels in params under the
+      // reserved `_input_files` envelope key; the dispatch handler strips it
+      // out of params before agent validation/PARAMS_JSON and uses it to
+      // tell the runner to pre-fetch via the broker into /workspace/input/.
+      inputFiles?: Array<{ bucket: string; key: string; dest: string }>
+    } = {},
+  ): Promise<{ runId: string } | undefined> {
     const hint = await this.loadLocationHint(
       ctx.electedOfficeId,
       MeetingResourceLocationType.AGENDA,
     )
-    await this.experimentRuns.dispatchRun({
+    const run = await this.experimentRuns.dispatchRun({
       type: BRIEFING_EXPERIMENT_TYPE,
       organizationSlug: ctx.organizationSlug,
       clerkUserId: ctx.clerkUserId,
@@ -293,13 +308,74 @@ export class MeetingBriefingsService extends createPrismaBase(
         state: ctx.state,
         positionName: ctx.positionName,
         meetingDate: meeting.meetingDate,
-        meetingTime: meeting.meetingTime,
-        meetingTimezone: meeting.meetingTimezone,
+        ...(meeting.meetingTime ? { meetingTime: meeting.meetingTime } : {}),
+        ...(meeting.meetingTimezone
+          ? { meetingTimezone: meeting.meetingTimezone }
+          : {}),
         ...(ctx.l2DistrictType ? { l2DistrictType: ctx.l2DistrictType } : {}),
         ...(ctx.l2DistrictName ? { l2DistrictName: ctx.l2DistrictName } : {}),
         ...(hint ? { knownAgendaLocation: hint } : {}),
+        ...(options.agendaPacketUrl
+          ? { agendaPacketUrl: options.agendaPacketUrl }
+          : {}),
+        ...(options.inputFiles && options.inputFiles.length > 0
+          ? { _input_files: options.inputFiles }
+          : {}),
       },
     })
+    return run ? { runId: run.runId } : undefined
+  }
+
+  /**
+   * Public entry point for user-supplied agenda runs. Bypasses the imminence
+   * gate and the schedule lookup — the user is telling us "brief THIS meeting
+   * with THIS agenda." We still resolve the dispatch context (officialName,
+   * state, etc.) the normal way; the only PARAMS differences are
+   * `agendaPacketUrl` or `_input_files` set and `meetingTime`/`meetingTimezone`
+   * left to the agent to discover from the platform (we don't reliably know
+   * them for arbitrary user-supplied dates).
+   *
+   * Caller supplies exactly one of `agendaPacketUrl` (URL-paste path; user's
+   * own URL — never a presigned one) or `inputFiles` (UPLOAD path; runner
+   * pre-fetches via the broker before the agent boots). Not validated here:
+   * the caller is the upload service, which always sets exactly one.
+   */
+  async dispatchBriefingWithUserAgenda(args: {
+    electedOfficeId: string
+    meetingDate: string
+    agendaPacketUrl?: string
+    inputFiles?: Array<{ bucket: string; key: string; dest: string }>
+  }): Promise<{ runId: string }> {
+    const electedOffice = await this.client.electedOffice.findUnique({
+      where: { id: args.electedOfficeId },
+    })
+    if (!electedOffice) {
+      throw new NotFoundException(
+        `electedOffice not found: ${args.electedOfficeId}`,
+      )
+    }
+    const ctx = await this.resolveDispatchContext(electedOffice)
+    if (!ctx) {
+      throw new NotFoundException(
+        `could not resolve dispatch context for electedOffice ${args.electedOfficeId}`,
+      )
+    }
+    const result = await this.dispatchBriefing(
+      ctx,
+      { meetingDate: args.meetingDate },
+      {
+        ...(args.agendaPacketUrl
+          ? { agendaPacketUrl: args.agendaPacketUrl }
+          : {}),
+        ...(args.inputFiles ? { inputFiles: args.inputFiles } : {}),
+      },
+    )
+    if (!result) {
+      throw new BadGatewayException(
+        'dispatch queue not configured; briefing run was not enqueued',
+      )
+    }
+    return result
   }
 
   /**
@@ -356,11 +432,24 @@ export class MeetingBriefingsService extends createPrismaBase(
   async dispatchManual(
     electedOfficeId: string,
     kind: ManualDispatchKind,
+    useImminenceGate = false,
+    requestingUserId?: number,
   ): Promise<{ dispatched: boolean }> {
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { id: electedOfficeId },
     })
     if (!electedOffice) return { dispatched: false }
+
+    // A user session may only dispatch for an office it owns; M2M callers pass
+    // no requestingUserId and are trusted to dispatch for any office.
+    if (
+      requestingUserId !== undefined &&
+      electedOffice.userId !== requestingUserId
+    ) {
+      throw new ForbiddenException(
+        'You do not have access to this elected office',
+      )
+    }
 
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return { dispatched: false }
@@ -370,19 +459,32 @@ export class MeetingBriefingsService extends createPrismaBase(
       return { dispatched: true }
     }
 
-    // Manual briefing dispatch bypasses the 5-day imminence gate but still
-    // needs a meetingDate from the schedule. Project up to 60 days out so
-    // an operator can pre-brief a meeting that's still a few weeks away.
+    // A briefing needs a meetingDate from the schedule. With the imminence
+    // gate on, match the daily cron exactly: skip if a future briefing already
+    // covers the official, and only dispatch when the next meeting falls inside
+    // the 5-day window. With the gate off (the UI "brief now" button) widen to
+    // 60 days so an operator can pre-brief a meeting that's still weeks away.
+    const now = new Date()
+    if (useImminenceGate) {
+      const futureBriefing = await this.model.findFirst({
+        where: { electedOfficeId, meetingDate: { gte: now } },
+        select: { id: true },
+      })
+      if (futureBriefing) return { dispatched: false }
+    }
+
     const target = await this.resolveTargetMeeting(
       ctx.organizationSlug,
       ctx.electedOfficeId,
-      new Date(),
-      60,
+      now,
+      useImminenceGate ? IMMINENCE_WINDOW_DAYS : 60,
     )
     if (!target) return { dispatched: false }
 
-    await this.dispatchBriefing(ctx, target)
-    return { dispatched: true }
+    // dispatchBriefing returns undefined when the run wasn't enqueued (queue
+    // not configured); don't report success in that case.
+    const result = await this.dispatchBriefing(ctx, target)
+    return { dispatched: !!result }
   }
 
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
@@ -704,6 +806,48 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
   }
 
+  // Resolve the (meetingTime, meetingTimezone) to persist. The platform path
+  // requires a valid HH:MM time and a timezone and returns null (skip the row)
+  // when either is malformed. The user-agenda path dispatches without those
+  // PARAMS — the meeting often isn't on any platform for the agent to read a
+  // time from (ad-hoc / small-jurisdiction meetings are the whole point of
+  // letting a user supply the packet) — so it persists with empty values
+  // rather than skipping. Blocking there would strand the user on a perpetual
+  // "processing" pill for exactly the meetings this feature targets.
+  private resolveMeetingTimeFields(
+    artifact: PrismaJson.MeetingBriefingArtifact,
+    userSuppliedAgenda: boolean,
+    runId: string,
+  ): { meetingTime: string; meetingTimezone: string } | null {
+    const rawTime =
+      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
+    const timeValid = /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(rawTime)
+    if (!timeValid && !userSuppliedAgenda) {
+      this.logger.error(
+        { runId, meetingTime: rawTime },
+        'meeting_briefing artifact has invalid meeting_time',
+      )
+      return null
+    }
+
+    const rawTimezone =
+      typeof artifact.meeting_timezone === 'string'
+        ? artifact.meeting_timezone
+        : ''
+    if (!rawTimezone && !userSuppliedAgenda) {
+      this.logger.error(
+        { runId },
+        'meeting_briefing artifact missing meeting_timezone',
+      )
+      return null
+    }
+
+    return {
+      meetingTime: timeValid ? rawTime : '',
+      meetingTimezone: rawTimezone,
+    }
+  }
+
   private async writeBriefingRowFromArtifact(
     run: ExperimentRun,
     electedOffice: { id: string; userId: number },
@@ -747,27 +891,13 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const meetingTime =
-      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
-    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(meetingTime)) {
-      this.logger.error(
-        { runId: run.runId, meetingTime },
-        'meeting_briefing artifact has invalid meeting_time',
-      )
-      return
-    }
-
-    const meetingTimezone =
-      typeof artifact.meeting_timezone === 'string'
-        ? artifact.meeting_timezone
-        : ''
-    if (!meetingTimezone) {
-      this.logger.error(
-        { runId: run.runId },
-        'meeting_briefing artifact missing meeting_timezone',
-      )
-      return
-    }
+    const resolved = this.resolveMeetingTimeFields(
+      artifact,
+      briefingStatus === 'agenda_provided_by_user',
+      run.runId,
+    )
+    if (!resolved) return
+    const { meetingTime, meetingTimezone } = resolved
 
     const electedOfficeId = electedOffice.id
     await this.model.upsert({
@@ -829,13 +959,25 @@ export class MeetingBriefingsService extends createPrismaBase(
       leadInFallback: readLeadIn(artifact),
     })
 
+    // The user-agenda path persists empty meetingTime/meetingTimezone, which
+    // would make fromZonedTime produce NaN. Only emit the exact-instant
+    // property when both are present so HubSpot's datetime field stays valid.
+    const meetingDateTime =
+      meetingTime && meetingTimezone
+        ? fromZonedTime(
+            `${dateString}T${meetingTime}:00`,
+            meetingTimezone,
+          ).getTime()
+        : null
+
     try {
       await this.analytics.track(
         userId,
         'Briefing Assistant - Agenda Created',
         {
           agendaId: dateString,
-          meetingDate: dateString,
+          meetingDate: parseIsoDateAsUTC(dateString).getTime(),
+          ...(meetingDateTime !== null ? { meetingDateTime } : {}),
           meetingTime,
           meetingTimezone,
           meetingPlace: artifact.location ?? '',

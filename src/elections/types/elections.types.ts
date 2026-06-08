@@ -158,14 +158,19 @@ export type PositionWithOptionalDistrict = {
 
 /**
  * Shape returned by election-api `GET /races/by-br-hash-id/:hashId/filing-fee`.
- * Mirrors `FilingFeeResult` on the election-api side so the shapes stay
- * aligned. `extractionSource` is informational (audit / debugging) and not
- * surfaced to clients today.
+ * Mirrors `FilingDetailsByBrHashResult` on the election-api side so the shapes
+ * stay aligned. `extractionSource` is informational (audit / debugging) and not
+ * surfaced to clients today. The three `filing*`/`paperwork*` office-contact
+ * fields are sourced straight off the matched BallotReady race row and feed the
+ * Pro-upgrade filing-instructions screen.
  */
 export type FilingFeeByBrHashResult = {
   filingFee: number | null
   filingRequirementsText: string | null
   extractionSource: string | null
+  filingOfficeAddress: string | null
+  filingPhoneNumber: string | null
+  paperworkInstructions: string | null
 }
 
 /**

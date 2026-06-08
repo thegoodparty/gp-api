@@ -19,6 +19,7 @@ import { StripeModule } from '../vendors/stripe/stripe.module'
 import { WebsitesModule } from '../websites/websites.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { CampaignsController } from './campaigns.controller'
+import { FilingInstructionsService } from './filingInstructions/filingInstructions.service'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -70,6 +71,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
   ],
   providers: [
     CampaignsService,
+    FilingInstructionsService,
     CampaignPlanVersionsService,
     CampaignPositionsService,
     CampaignUpdateHistoryService,

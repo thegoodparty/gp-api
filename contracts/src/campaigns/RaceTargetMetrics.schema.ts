@@ -67,6 +67,18 @@ export const RaceTargetMetricsSchema = z.object({
    * when `filingFee` is null. `null` when BallotReady has no data.
    */
   filingRequirementsText: z.string().nullable(),
+  /**
+   * Structured filing-office contact for the race, sourced from BallotReady
+   * via election-api's `/races/by-br-hash-id/:hash/filing-fee` lookup. Powers
+   * the "filing office" block on the Pro-upgrade filing-instructions screen.
+   * `filingOfficeAddress` is a single free-text block (address line 1/2, city,
+   * state, zip); `paperworkInstructions` is BallotReady's narrative on the
+   * local election authority a candidate contacts. All `null` when BallotReady
+   * has no office data for the race.
+   */
+  filingOfficeAddress: z.string().nullable(),
+  filingPhoneNumber: z.string().nullable(),
+  paperworkInstructions: z.string().nullable(),
   // The fields below come straight from election-api's
   // /campaign-strategy-context endpoint. All nullable — null when the race
   // hash didn't resolve to a Position+District or the upstream data is
