@@ -78,6 +78,5 @@ export class BriefingsPdfController {
  * fallback is cheap insurance.
  */
 function asciiFallback(filename: string): string {
-  // eslint-disable-next-line no-control-regex
   return filename.replace(/[^\x20-\x7e]/g, '_')
 }

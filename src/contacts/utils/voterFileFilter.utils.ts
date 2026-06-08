@@ -1,4 +1,4 @@
-import { VoterFileFilter } from '@prisma/client'
+import { VoterFileFilter } from '../../generated/prisma'
 
 type RangeCondition = {
   gte?: number

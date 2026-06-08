@@ -5,7 +5,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../generated/prisma'
 import { TranscribeSessionResponseSchema } from '@goodparty_org/contracts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'

@@ -7,7 +7,7 @@ import {
   ChatMessage,
   ChatMessageRole,
   MeetingBriefing,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ChatStoreService } from '@/chats/services/chatStore.prisma'

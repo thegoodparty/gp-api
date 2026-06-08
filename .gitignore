@@ -90,6 +90,18 @@ ztestfile
 # Script output
 scripts/*.csv
 
+# Performance tooling output (scripts/perf/*.sh + node --cpu-prof / --heap-prof / --prof)
+/profiles/
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+isolate-*.log
+isolate-*.json
+flamegraph.html
+
+# Generated Prisma client
+src/generated/
+
 # AI Tooling
 .ai
 repomix.config.json

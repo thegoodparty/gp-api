@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 
 export const ReqCampaign = createParamDecorator(
   (_: undefined, ctx: ExecutionContext): Campaign => {

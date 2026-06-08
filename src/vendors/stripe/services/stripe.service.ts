@@ -1,7 +1,8 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { User } from '../../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import {
+  CheckoutSessionMode,
   CustomCheckoutSessionPayload,
   PaymentIntentPayload,
   PaymentType,
@@ -89,37 +90,76 @@ export class StripeService {
     return await this.stripe.checkout.sessions.retrieve(sessionId)
   }
 
+  // Shared params for the Pro subscription Checkout Session, used by both the
+  //  redirect flow (createCheckoutSession) and the embedded flow
+  //  (createEmbeddedProSubscriptionCheckoutSession). The webhook
+  //  (checkout.session.completed) identifies the campaign and sets isPro from
+  //  metadata.userId, so both flows must carry it identically.
+  private getProSubscriptionSessionParams = async (
+    userId: number,
+    email: string | null,
+  ): Promise<Stripe.Checkout.SessionCreateParams> => ({
+    metadata: {
+      userId,
+    },
+    ...(email ? { customer_email: email } : {}),
+    billing_address_collection: 'auto',
+    line_items: [
+      {
+        // We should never have more than 1 price for Pro. But if we do, this
+        //  will need to be more intelligent.
+        // Stripe SDK uses broad union types — default_price is string | Price | null
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        price: (await this.getPrice()) as string,
+        quantity: 1,
+      },
+    ],
+    mode: CheckoutSessionMode.SUBSCRIPTION,
+    allow_promotion_codes: true,
+    // Expanding for Segment / analytics
+    expand: [
+      'subscription',
+      'subscription.items.data.price',
+      'payment_intent.payment_method',
+    ],
+  })
+
   async createCheckoutSession(userId: number, email: string | null = null) {
     const session = await this.stripe.checkout.sessions.create({
-      metadata: {
-        userId,
-      },
-      ...(email ? { customer_email: email } : {}),
-      billing_address_collection: 'auto',
-      line_items: [
-        {
-          // We should never have more than 1 price for Pro. But if we do, this
-          //  will need to be more intelligent.
-          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          price: (await this.getPrice()) as string,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      allow_promotion_codes: true,
-      // Expanding for Segment / analytics
-      expand: [
-        'subscription',
-        'subscription.items.data.price',
-        'payment_intent.payment_method',
-      ],
+      ...(await this.getProSubscriptionSessionParams(userId, email)),
       success_url: `${WEBAPP_ROOT_URL}/dashboard/pro-sign-up/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${WEBAPP_ROOT_URL}/dashboard`,
     })
 
     const { url: redirectUrl, id: checkoutSessionId } = session
     return { redirectUrl, checkoutSessionId }
+  }
+
+  // Embedded (in-wizard) variant of the Pro subscription checkout. Mirrors the
+  //  one-time embedded path (createCustomCheckoutSession): ui_mode 'custom' +
+  //  return_url, returns a client_secret instead of a redirect url. isPro is
+  //  still flipped only by the checkout.session.completed webhook.
+  async createEmbeddedProSubscriptionCheckoutSession(
+    userId: number,
+    email: string | null = null,
+    returnUrl: string = `${WEBAPP_ROOT_URL}/dashboard/pro-upgrade?session_id={CHECKOUT_SESSION_ID}`,
+  ) {
+    const session = await this.stripe.checkout.sessions.create({
+      ...(await this.getProSubscriptionSessionParams(userId, email)),
+      ui_mode: 'custom',
+      return_url: returnUrl,
+    })
+
+    if (!session.client_secret) {
+      throw new BadGatewayException(
+        'Failed to create checkout session: no client_secret returned',
+      )
+    }
+
+    return {
+      clientSecret: session.client_secret,
+      checkoutSessionId: session.id,
+    }
   }
 
   async createCustomCheckoutSession(

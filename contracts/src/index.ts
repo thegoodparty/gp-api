@@ -47,6 +47,9 @@ export {
   type WebsiteStatus,
   WEBSITE_STATUS_VALUES,
   WebsiteStatusSchema,
+  type ExperimentRunStatus,
+  EXPERIMENT_RUN_STATUS_VALUES,
+  ExperimentRunStatusSchema,
 } from './generated/enums'
 
 export { EmailSchema } from './shared/Email.schema'
@@ -163,9 +166,26 @@ export {
 } from './campaigns/SetDistrictOutput.schema'
 
 export {
+  MilestoneWindowSchema,
+  RaceCandidateSchema,
+  RaceMilestonesSchema,
   RaceTargetMetricsSchema,
+  type MilestoneWindow,
+  type RaceCandidate,
+  type RaceMilestones,
   type RaceTargetMetrics,
 } from './campaigns/RaceTargetMetrics.schema'
+
+export {
+  CommunityEventSchema,
+  CommunityEventsResultSchema,
+  CommunityEventsReadySchema,
+  CommunityEventsGeneratingSchema,
+  CommunityEventsResponseSchema,
+  type CommunityEvent,
+  type CommunityEventsResult,
+  type CommunityEventsResponse,
+} from './campaigns/CommunityEvents.schema'
 
 export {
   CampaignWithPositionNameSchema,
@@ -253,6 +273,8 @@ export {
 
 export { RaceFullSchema, type RaceFull } from './elections/raceFull'
 
+export { ZipCodesArraySchema } from './elections/zipCodes'
+
 export {
   SPEECH_SYNTHESIS_ENGINE_VALUES,
   type SpeechSynthesisEngine,
@@ -296,6 +318,8 @@ export {
   type AnnotationBugReport,
   AnnotationChatSchema,
   type AnnotationChat,
+  AnnotationReviewSchema,
+  type AnnotationReview,
   AnnotationSchema,
   type Annotation,
   CreateAnnotationRequestSchema,
@@ -330,3 +354,26 @@ export {
   BriefingFeedbackListResponseSchema,
   type BriefingFeedbackListResponse,
 } from './artifactFeedback/ArtifactFeedback.schema'
+
+export {
+  AgentRunCandidateSummarySchema,
+  type AgentRunCandidateSummary,
+  AgentRunListItemSchema,
+  type AgentRunListItem,
+  AgentRunsListQuerySchema,
+  type AgentRunsListQuery,
+  AgentRunSchema,
+  type AgentRun,
+  AgentRunDetailSchema,
+  type AgentRunDetail,
+} from './agentRuns/AgentRun.schema'
+
+export {
+  BRIEFING_DATE_RANGE_VALUES,
+  BriefingDateRangeFilterSchema,
+  type BriefingDateRangeFilter,
+  BriefingAdminListQuerySchema,
+  type BriefingAdminListQuery,
+  BriefingAdminRowSchema,
+  type BriefingAdminRow,
+} from './adminBriefings/AdminBriefing.schema'

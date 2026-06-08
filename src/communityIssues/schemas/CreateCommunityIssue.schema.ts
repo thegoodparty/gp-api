@@ -1,4 +1,4 @@
-import { IssueStatus } from '@prisma/client'
+import { IssueStatus } from '../../generated/prisma'
 import { createZodDto } from 'nestjs-zod'
 import { CommunityIssueSchema } from './CommunityIssue.schema'
 

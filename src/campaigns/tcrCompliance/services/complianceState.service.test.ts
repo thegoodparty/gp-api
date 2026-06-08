@@ -6,7 +6,7 @@ import {
   TcrComplianceStatus,
   Website,
   WebsiteStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { ComplianceStage } from '@goodparty_org/contracts'
 import { describe, expect, it } from 'vitest'
 import { deriveComplianceStage } from './complianceState.service'

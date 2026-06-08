@@ -1,5 +1,5 @@
 import { useTestService } from '@/test-service'
-import { CampaignTaskType } from '@prisma/client'
+import { CampaignTaskType } from '../../../generated/prisma'
 import { describe, expect, it, vi } from 'vitest'
 import { AnalyticsService } from '@/analytics/analytics.service'
 import { EVENTS } from '@/vendors/segment/segment.types'

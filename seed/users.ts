@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, User, UserRole } from '@prisma/client'
+import { Prisma, PrismaClient, User, UserRole } from '../src/generated/prisma'
 import { createClerkClient } from '@clerk/backend'
 import pmap from 'p-map'
 import { userFactory } from './factories/user.factory'

@@ -41,6 +41,8 @@ export interface LlmChatCompletionOptions {
 export interface LlmToolCompletionOptions extends LlmChatCompletionOptions {
   tools: ChatCompletionTool[]
   toolChoice?: ChatCompletionToolChoiceOption
+  enableReasoning?: boolean
+  reasoningEffort?: 'low' | 'medium' | 'high'
 }
 
 export interface LlmJsonCompletionOptions<T> extends LlmChatCompletionOptions {
@@ -177,6 +179,7 @@ export const defaultAnthropicProviderFactory: AnthropicProviderFactory = ({
 @Injectable()
 export class LlmService {
   private readonly defaultModels: string[]
+  private readonly chatFallbackModel?: string
   private readonly defaultRetries = 3
   private readonly defaultMaxSteps = 5
   private readonly defaultTimeout = 300000
@@ -203,7 +206,7 @@ export class LlmService {
     anthropicProviderFactory?: AnthropicProviderFactory,
   ) {
     this.logger.setContext(LlmService.name)
-    const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
+    const { TOGETHER_AI_KEY, AI_MODELS = '', AI_FALLBACK_MODEL } = process.env
 
     if (!TOGETHER_AI_KEY) {
       throw new Error('Please set TOGETHER_AI_KEY in your .env')
@@ -238,7 +241,34 @@ export class LlmService {
       anthropicProviderFactory ?? defaultAnthropicProviderFactory
     this.anthropicApiKey = process.env.ANTHROPIC_API_KEY
 
+    // Optional cross-provider fallback for streaming chat. A Claude model only
+    // counts when ANTHROPIC_API_KEY is set (otherwise resolveChatModel would
+    // throw); a non-Claude id (e.g. another Together model) is always usable.
+    const fallback = AI_FALLBACK_MODEL?.trim()
+    if (fallback && (!fallback.startsWith('claude') || this.anthropicApiKey)) {
+      this.chatFallbackModel = fallback
+    } else if (fallback) {
+      this.logger.warn(
+        `AI_FALLBACK_MODEL "${fallback}" ignored: requires ANTHROPIC_API_KEY`,
+      )
+    }
+
     this.streamTextFn = streamTextFn ?? realStreamText
+  }
+
+  /**
+   * Model chain for streaming chat: the default Together models plus an optional
+   * cross-provider fallback (AI_FALLBACK_MODEL). The fallback lets a streamed
+   * chat survive a full Together outage at connect-time, since streaming routes
+   * Claude models to Anthropic via resolveChatModel. (Non-streaming completions
+   * always use the Together client, so they intentionally don't get this.)
+   */
+  getChatModelChain(): string[] {
+    const chain = [...this.defaultModels]
+    if (this.chatFallbackModel && !chain.includes(this.chatFallbackModel)) {
+      chain.push(this.chatFallbackModel)
+    }
+    return chain
   }
 
   private resolveChatModel(model: string): LanguageModel {
@@ -362,6 +392,8 @@ export class LlmService {
       timeout = this.defaultTimeout,
       userId,
       retries = this.defaultRetries,
+      enableReasoning,
+      reasoningEffort,
     } = options
 
     if (!tools.length) {
@@ -385,6 +417,8 @@ export class LlmService {
           maxTokens,
           timeout,
           userId,
+          enableReasoning,
+          reasoningEffort,
         }),
     )
 
@@ -869,6 +903,8 @@ export class LlmService {
     maxTokens,
     timeout,
     userId,
+    enableReasoning,
+    reasoningEffort,
   }: {
     model: string
     messages: ChatCompletionMessageParam[]
@@ -879,10 +915,23 @@ export class LlmService {
     maxTokens?: number
     timeout: number
     userId?: string
+    enableReasoning?: boolean
+    reasoningEffort?: 'low' | 'medium' | 'high'
   }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
-    const requestParams: ChatCompletionCreateParamsNonStreaming = {
+    const reasoning = enableReasoning
+      ? {
+          enabled: true,
+          ...(reasoningEffort && { effort: reasoningEffort }),
+        }
+      : undefined
+
+    // Together AI accepts a non-OpenAI `reasoning` field for reasoning-
+    // capable models (e.g. DeepSeek). The OpenAI SDK params type does not
+    // model it, so we widen the literal here and the request is forwarded
+    // through as JSON.
+    const requestParams = {
       model,
       messages,
       tools,
@@ -890,9 +939,10 @@ export class LlmService {
       temperature,
       top_p: topP,
       ...(maxTokens && { max_tokens: maxTokens }),
+      ...(reasoning && { reasoning }),
       ...userIdentification,
-      stream: false,
-    }
+      stream: false as const,
+    } as ChatCompletionCreateParamsNonStreaming
 
     const completion = await this.createCompletionLogged(
       requestParams,

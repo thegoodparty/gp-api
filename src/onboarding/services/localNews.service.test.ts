@@ -23,8 +23,20 @@ const cacheKey = (
 })
 
 function makeService() {
-  const ai = {
-    getChatToolCompletion: vi.fn(),
+  const gemini = {
+    generateWithSearch: vi.fn().mockResolvedValue({
+      text: 'mock search results',
+      searchQueries: [],
+      sources: [],
+    }),
+    generateStructured: vi.fn(),
+  }
+  // Pass-through tracedNested: invoke the wrapped fn unchanged so the test
+  // observes the underlying gemini call without caring about the span shape.
+  const braintrust = {
+    tracedNested: vi.fn(
+      <T>(_name: string, fn: () => Promise<T>): Promise<T> => fn(),
+    ),
   }
   const model = {
     update: vi.fn().mockResolvedValue(undefined),
@@ -34,11 +46,12 @@ function makeService() {
     model,
   }
   const service = new OnboardingLocalNewsService(
-    ai as never,
+    gemini as never,
+    braintrust as never,
     campaigns as never,
     createMockLogger(),
   )
-  return { service, ai, campaigns, model }
+  return { service, gemini, braintrust, campaigns, model }
 }
 
 function readyOutlets(extra: { name: string }[] = []) {
@@ -69,7 +82,7 @@ describe('OnboardingLocalNewsService', () => {
 
   describe('getLocalNews', () => {
     it('returns the cached outlets when the (office, city, state) key matches', async () => {
-      const { service, ai } = makeService()
+      const { service, gemini } = makeService()
       const outlets = readyOutlets()
       const cached = { ...cacheKey(), status: 'ready', outlets }
 
@@ -83,13 +96,13 @@ describe('OnboardingLocalNewsService', () => {
       })
 
       expect(result).toEqual({ status: 'ready', outlets })
-      expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
+      expect(gemini.generateStructured).not.toHaveBeenCalled()
     })
 
     it('ignores a cached entry for a different city even when office matches', async () => {
       // The bug this guards against: Denver City Council cache hit served to
       // a Boulder City Council fetch because office matched.
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, gemini, model } = makeService()
       const denverCached = {
         office: OFFICE,
         city: 'Denver',
@@ -101,7 +114,7 @@ describe('OnboardingLocalNewsService', () => {
         id: 1,
         data: { onboarding: { localMediaOutlets: denverCached } },
       })
-      ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -127,7 +140,7 @@ describe('OnboardingLocalNewsService', () => {
     })
 
     it('returns pending without calling markPending when a fresh pending entry exists for the same key', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, gemini, model } = makeService()
       const result = await service.getLocalNews({
         state: STATE,
         office: OFFICE,
@@ -148,11 +161,11 @@ describe('OnboardingLocalNewsService', () => {
       expect(result).toEqual({ status: 'pending' })
       expect(campaigns.findFirst).not.toHaveBeenCalled()
       expect(model.update).not.toHaveBeenCalled()
-      expect(ai.getChatToolCompletion).not.toHaveBeenCalled()
+      expect(gemini.generateStructured).not.toHaveBeenCalled()
     })
 
     it('falls through TTL-expired pending into markPending', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, gemini, model } = makeService()
       const expiredCampaign = {
         id: 1,
         data: {
@@ -166,7 +179,7 @@ describe('OnboardingLocalNewsService', () => {
         },
       }
       campaigns.findFirst.mockResolvedValue(expiredCampaign)
-      ai.getChatToolCompletion.mockResolvedValue({ content: '', tokens: 0 })
+      gemini.generateStructured.mockResolvedValue({ outlets: readyOutlets() })
 
       const result = await service.getLocalNews({
         state: STATE,
@@ -216,7 +229,7 @@ describe('OnboardingLocalNewsService', () => {
     })
 
     it('expires the pending marker (startedAt: 0) when the background fetch fails', async () => {
-      const { service, campaigns, ai, model } = makeService()
+      const { service, campaigns, gemini, model } = makeService()
       let claimWritten = false
       campaigns.findFirst.mockImplementation(async () => ({
         id: 1,
@@ -236,7 +249,7 @@ describe('OnboardingLocalNewsService', () => {
         claimWritten = true
         return undefined
       })
-      ai.getChatToolCompletion.mockRejectedValue(new Error('AI exploded'))
+      gemini.generateStructured.mockRejectedValue(new Error('Gemini exploded'))
 
       await service.getLocalNews({
         state: STATE,
@@ -259,6 +272,53 @@ describe('OnboardingLocalNewsService', () => {
         status: 'pending',
         startedAt: 0,
       })
+    })
+
+    it('persists outlets from gemini.generateStructured on a successful fetch', async () => {
+      const { service, campaigns, gemini, model } = makeService()
+      const aiOutlets = readyOutlets([{ name: 'Denver Post' }])
+      campaigns.findFirst.mockResolvedValue({
+        id: 1,
+        data: { onboarding: {} },
+      })
+      gemini.generateStructured.mockResolvedValue({ outlets: aiOutlets })
+
+      await service.getLocalNews({
+        state: STATE,
+        office: OFFICE,
+        campaign: { id: 1, data: { onboarding: {} } } as never,
+      })
+
+      await new Promise((resolve) => setImmediate(resolve))
+      await new Promise((resolve) => setImmediate(resolve))
+
+      const readyWrite = model.update.mock.calls.find(
+        (call) =>
+          call[0]?.data.data.onboarding.localMediaOutlets.status === 'ready',
+      )?.[0]
+      expect(readyWrite?.data.data.onboarding.localMediaOutlets).toEqual({
+        office: OFFICE,
+        city: CITY,
+        state: STATE,
+        status: 'ready',
+        outlets: aiOutlets,
+      })
+
+      // The search stage must run with jurisdiction + office embedded in
+      // the prompt (the XML-wrapped prompt-injection defense lives in
+      // buildSearchPrompt), and its text must flow into the structured
+      // stage. A regression that calls generateWithSearch('') would
+      // silently strip the candidate context otherwise.
+      expect(gemini.generateWithSearch).toHaveBeenCalledTimes(1)
+      const searchPrompt = gemini.generateWithSearch.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(searchPrompt).toContain(STATE)
+      expect(searchPrompt).toContain(OFFICE)
+      const structuredPrompt = gemini.generateStructured.mock.calls[0]?.[0] as
+        | string
+        | undefined
+      expect(structuredPrompt).toContain('mock search results')
     })
   })
 })

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../generated/prisma'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 import { IS_PROD_DEPLOY } from 'src/shared/util/appEnvironment.util'
 

@@ -9,7 +9,7 @@ import {
   ExperimentRunStatus,
   MeetingBriefing,
   User,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ChatStreamChunk,

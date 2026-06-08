@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Organization } from '../../generated/prisma'
 
 export const ReqOrganization = createParamDecorator(
   (_: undefined, ctx: ExecutionContext): Organization | undefined => {

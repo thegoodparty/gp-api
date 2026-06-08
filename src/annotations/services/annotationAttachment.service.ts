@@ -10,7 +10,7 @@ import {
   ElectedOffice,
   OcrStatus,
   Prisma,
-} from '@prisma/client'
+} from '../../generated/prisma'
 import {
   AttachmentDownloadUrlResponse,
   AttachmentPresignRequest,
@@ -199,16 +199,13 @@ export class AnnotationAttachmentService extends createPrismaBase(
       throw new BadRequestException('attachment_already_processed')
     }
 
-    const actualSize = await this.s3.getObjectSize(
-      this.bucket,
-      attachment.storageKey,
-    )
-    if (actualSize === undefined) {
+    const head = await this.s3.headObject(this.bucket, attachment.storageKey)
+    if (!head || head.contentLength === null) {
       throw new BadRequestException('upload_not_received')
     }
     if (
-      actualSize > ATTACHMENT_MAX_BYTES ||
-      actualSize > attachment.sizeBytes
+      head.contentLength > ATTACHMENT_MAX_BYTES ||
+      head.contentLength > attachment.sizeBytes
     ) {
       throw new BadRequestException('upload_size_exceeded')
     }

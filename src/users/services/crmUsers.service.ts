@@ -4,7 +4,7 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User } from '../../generated/prisma'
 import { UsersService } from './users.service'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { getMidnightForDate } from '../../shared/util/date.util'

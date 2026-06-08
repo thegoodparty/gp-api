@@ -1,5 +1,60 @@
 # @goodparty_org/contracts
 
+## 0.13.0
+
+### Minor Changes
+
+- `AnnotationKind` gains a `review` value for admin QA review comments.
+  `Annotation` gains an optional `review` block (`id`, `body`,
+  `reviewer_email`, timestamps); `reviewer_clerk_sub` is intentionally
+  not exposed. `CreateAnnotationRequest` gains a `review` variant
+  (`{ kind: 'review', anchor, payload: { body } }`). Review annotations
+  are admin-only: creatable only inside an impersonation session and
+  withheld from non-impersonated callers by a server-side default-deny.
+  Additive and non-breaking for existing `note` / `bug_report` / `chat`
+  consumers.
+
+## 0.12.0
+
+### Minor Changes
+
+- `CommunityEventSchema` gains a required `address: string | null` field
+  for the venue's physical street address (renders in Section 7's
+  Address column on the campaign-plan template). `null` when the BR
+  search results don't surface an address. Previously this column was
+  populated from the optional `url` field — a misuse that's now
+  corrected. Non-breaking: existing `url` field is unchanged; consumers
+  that read `url` continue to work; new `address` is additive.
+
+## 0.11.0
+
+### Minor Changes
+
+- Add `CommunityEventSchema`, `CommunityEventsResultSchema`,
+  `CommunityEventsReadySchema`, `CommunityEventsGeneratingSchema`, and
+  `CommunityEventsResponseSchema` plus inferred types `CommunityEvent`,
+  `CommunityEventsResult`, `CommunityEventsResponse`. Backs the new
+  `POST /v1/campaignStrategy/mine/community-events` polling endpoint
+  that drives Section 7 of the campaign-plan template. Capped at 3
+  events per the ClickUp template spec; empty array means
+  "no qualifying events found" (UI shows the empty state without
+  re-polling).
+
+## 0.10.0
+
+### Minor Changes
+
+- Add `MilestoneWindowSchema`, `RaceMilestonesSchema`, and a new optional
+  `milestones` field on `RaceTargetMetricsSchema`. Carries per-category
+  campaign-timeline windows (voter registration, early voting, absentee
+  ballot request) sourced live from BallotReady via gp-api. Each
+  category window has nullable `start` (earliest OPEN milestone) and
+  `end` (latest CLOSE milestone). The whole `milestones` object is
+  nullable when the BR upstream call fails. Drives Section 6 of the
+  Campaign Plan template in gp-webapp.
+- Also re-export `RaceCandidateSchema` (already used by
+  `RaceTargetMetricsSchema`; export was previously omitted).
+
 ## 0.9.0
 
 ### Minor Changes
@@ -45,7 +100,7 @@
   `Salli`, `Ruth`, `Stephen`, `Amy`). Update default voice/engine from
   `Joanna`/`neural` to `Amy`/`generative`. Add a cross-field refine to
   `SynthesizeSpeechRequestSchema` that rejects any `voiceId` × `engine:
-  'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
+'generative'` pairing where the voice is not in `GENERATIVE_VOICE_VALUES`.
 
 ## 0.5.0
 

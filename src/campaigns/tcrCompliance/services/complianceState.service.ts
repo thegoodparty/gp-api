@@ -7,7 +7,7 @@ import {
   TcrComplianceStatus,
   Website,
   WebsiteStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import {
   ComplianceStage,
   type ComplianceStateOutput,

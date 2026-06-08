@@ -18,7 +18,7 @@ import {
   Poll,
   PollIssue,
   User,
-} from '@prisma/client'
+} from '../generated/prisma'
 import { orderBy } from 'lodash'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'

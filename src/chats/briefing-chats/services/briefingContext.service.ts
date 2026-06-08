@@ -8,7 +8,7 @@ import {
   AnnotationKind,
   AnnotationResourceType,
   MeetingBriefing,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { createPrismaBase, MODELS } from '@/prisma/util/prisma.util'
 import { BriefingArtifactCacheService } from './briefingArtifactCache.service'
 

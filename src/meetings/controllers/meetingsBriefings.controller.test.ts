@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { addDays, getDay, parseISO } from 'date-fns'
@@ -53,6 +53,61 @@ const mockS3 = (responses: Record<string, string | undefined>) => {
   vi.spyOn(s3, 'getFile').mockImplementation(
     async (_bucket, key) => responses[key],
   )
+}
+
+// Seed everything a briefing dispatch needs to resolve: org + position +
+// elected office + a COMPLETED meeting_schedule artifact in S3 whose RRULE
+// the caller controls (to land a meeting inside or outside the 5-day gate).
+const seedBriefingTarget = async (orgSlug: string, rrule: string) => {
+  await service.prisma.organization.create({
+    data: { slug: orgSlug, ownerId: service.user.id, positionId: 'br-pos-g' },
+  })
+  await service.prisma.campaign.create({
+    data: {
+      userId: service.user.id,
+      slug: `test-campaign-${orgSlug}`,
+      organizationSlug: orgSlug,
+      details: {},
+    },
+  })
+  const eo = await service.prisma.electedOffice.create({
+    data: { organizationSlug: orgSlug, userId: service.user.id },
+  })
+  vi.spyOn(
+    service.app.get(ElectionsService),
+    'getPositionById',
+  ).mockResolvedValue({
+    id: 'pos-real',
+    brPositionId: 'br-pos-g',
+    brDatabaseId: 'br-db-g',
+    state: 'MN',
+    name: 'City Council',
+  })
+  const artifactKey = `schedule-${orgSlug}.json`
+  await service.prisma.experimentRun.create({
+    data: {
+      organizationSlug: orgSlug,
+      experimentType: 'meeting_schedule',
+      status: ExperimentRunStatus.COMPLETED,
+      artifactBucket: 'schedule-bucket',
+      artifactKey,
+    },
+  })
+  mockS3({
+    [artifactKey]: JSON.stringify({
+      status: 'found',
+      rrule,
+      time: '23:59',
+      timezone: 'America/Chicago',
+      duration_minutes: 120,
+      meeting_name: 'City Council',
+      location: 'Council Chambers',
+      sources: [],
+      generated_at: new Date().toISOString(),
+      human: 'test schedule',
+    }),
+  })
+  return eo
 }
 
 describe('GET /v1/meetings', () => {
@@ -724,5 +779,154 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
         office: 'City Council',
       },
     })
+  })
+
+  it('with useImminenceGate, dispatches a briefing when a meeting is inside the 5-day window', async () => {
+    const orgSlug = `eo-gate-in-${Date.now()}`
+    const eo = await seedBriefingTarget(orgSlug, 'FREQ=DAILY')
+    const dispatchedRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.RUNNING,
+      },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(dispatchedRun)
+
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: eo.id, kind: 'briefing', useImminenceGate: true },
+    )
+
+    expect(result.status).toBe(201)
+    expect(result.data).toEqual({ dispatched: true, kind: 'briefing' })
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        organizationSlug: orgSlug,
+      }),
+    )
+  })
+
+  it('with useImminenceGate, returns 201 dispatched:false (no dispatch) when the next meeting is outside the 5-day window', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
+    try {
+      const orgSlug = `eo-gate-out-${Date.now()}`
+      // Next occurrence is the 20th — ~19 days out: outside 5, inside 60.
+      const eo = await seedBriefingTarget(orgSlug, 'FREQ=MONTHLY;BYMONTHDAY=20')
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(undefined)
+
+      const result = await service.client.post(
+        '/v1/meetings/briefings/dispatch',
+        { electedOfficeId: eo.id, kind: 'briefing', useImminenceGate: true },
+      )
+
+      expect(result.status).toBe(201)
+      expect(result.data).toEqual({ dispatched: false, kind: 'briefing' })
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('without the gate, still dispatches that same out-of-window meeting (60-day manual window)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
+    try {
+      const orgSlug = `eo-nogate-${Date.now()}`
+      const eo = await seedBriefingTarget(orgSlug, 'FREQ=MONTHLY;BYMONTHDAY=20')
+      const dispatchedRun = await service.prisma.experimentRun.create({
+        data: {
+          organizationSlug: orgSlug,
+          experimentType: 'meeting_briefing',
+          status: ExperimentRunStatus.RUNNING,
+        },
+      })
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(dispatchedRun)
+
+      const result = await service.client.post(
+        '/v1/meetings/briefings/dispatch',
+        { electedOfficeId: eo.id, kind: 'briefing' },
+      )
+
+      expect(result.status).toBe(201)
+      expect(result.data).toEqual({ dispatched: true, kind: 'briefing' })
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'meeting_briefing' }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('with useImminenceGate, skips when a future briefing already covers the official', async () => {
+    const orgSlug = `eo-gate-dedupe-${Date.now()}`
+    const eo = await seedBriefingTarget(orgSlug, 'FREQ=DAILY')
+    const existingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+      },
+    })
+    await service.prisma.meetingBriefing.create({
+      data: {
+        electedOfficeId: eo.id,
+        meetingDate: new Date('2099-12-31'),
+        meetingTime: '19:00',
+        meetingTimezone: 'America/Denver',
+        experimentRunId: existingRun.runId,
+        artifactBucket: 'b',
+        artifactKey: 'existing.json',
+      },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: eo.id, kind: 'briefing', useImminenceGate: true },
+    )
+
+    expect(result.status).toBe(201)
+    expect(result.data).toEqual({ dispatched: false, kind: 'briefing' })
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
+  it('403s a user session dispatching against an office it does not own', async () => {
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: `other-${Date.now()}`,
+        email: `other-${Date.now()}@test.example`,
+        firstName: 'Other',
+        lastName: 'User',
+      },
+    })
+    const orgSlug = `eo-idor-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: otherUser.id },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: otherUser.id },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: eo.id, kind: 'briefing', useImminenceGate: true },
+    )
+
+    expect(result.status).toBe(403)
+    expect(dispatchSpy).not.toHaveBeenCalled()
   })
 })

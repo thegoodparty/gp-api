@@ -1,7 +1,7 @@
 import { StatsResponse } from '@/contacts/contacts.types'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { useTestService } from '@/test-service'
-import { Poll } from '@prisma/client'
+import { Poll } from '../generated/prisma'
 import { v7 as uuidv7 } from 'uuid'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
@@ -287,18 +287,14 @@ describe('GET /polls/:pollId/download-responses', () => {
   })
 
   it('returns 403 when the poll belongs to a different elected office', async () => {
+    // A user owns at most one elected office, so the "other" office must
+    // belong to a different user. The caller still reaches the endpoint
+    // through their own office header and is rejected on poll ownership.
+    const otherUser = await service.prisma.user.create({
+      data: { email: `other-office-${uuidv7()}@example.com` },
+    })
     const otherEoId = uuidv7()
     const otherOrgSlug = `eo-${otherEoId}`
-    // electedOffice.user_id is unique, and service.user already owns one
-    // office (beforeEach), so the foreign office must belong to another user.
-    const otherUser = await service.prisma.user.create({
-      data: {
-        clerkId: `other_${otherEoId}`,
-        email: `other-${otherEoId}@goodparty.org`,
-        firstName: 'A',
-        lastName: 'B',
-      },
-    })
     await service.prisma.organization.create({
       data: { slug: otherOrgSlug, ownerId: otherUser.id },
     })

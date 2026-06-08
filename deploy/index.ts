@@ -130,6 +130,15 @@ export = async () => {
       ? 'annotation-attachments-dev'
       : createAnnotationAttachmentsBucket({ environment }).bucket.bucket
 
+  // Private bucket for user-supplied inputs to agent experiment runs (first
+  // use: agenda packets uploaded from /briefings). Browser PUTs via presigned
+  // URL; the broker reads on the runner's behalf via /inputs/read. Created
+  // and owned by gp-ai-projects Terraform (modules/agent-run-inputs); gp-api
+  // references by name only. Preview environments share the dev bucket.
+  const agentRunInputsBucketName = `gp-agent-run-inputs-${
+    environment === 'preview' ? 'dev' : environment
+  }`
+
   // Shared bucket between the external meeting_pipeline (writes briefings)
   // and gp-api TextToSpeechService (caches Polly audio under speech/synth/,
   // then hands the browser presigned GETs). Dev bucket exists out-of-band
@@ -414,6 +423,7 @@ export = async () => {
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ANNOTATION_ATTACHMENTS_BUCKET: annotationAttachmentsBucketName,
+      AGENT_RUN_INPUTS_BUCKET: agentRunInputsBucketName,
       DB_HOST: rdsCluster.endpoint,
       DB_USER: rdsCluster.masterUsername,
       DB_NAME: rdsCluster.databaseName,

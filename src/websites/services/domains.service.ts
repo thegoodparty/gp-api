@@ -9,7 +9,14 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
-import { Campaign, Domain, DomainStatus, User, Website } from '@prisma/client'
+import {
+  Campaign,
+  Domain,
+  DomainSource,
+  DomainStatus,
+  User,
+  Website,
+} from '../../generated/prisma'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
 import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
@@ -44,8 +51,10 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import {
   DomainPurchaseMetadata,
   DomainSearchResult,
+  hasSupportedTld,
   PatternedDomainCandidate,
   PatternedDomainSearchResult,
+  SUPPORTED_TLDS,
 } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import {
@@ -55,8 +64,6 @@ import {
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 
 const MAX_PATTERN_CANDIDATES = 50
-
-const SUPPORTED_TLDS = ['com', 'org', 'vote'] as const
 
 const DOMAIN_PURCHASE_ADVISORY_LOCK_KEY = 918_275
 
@@ -443,12 +450,16 @@ export class DomainsService
     // bare SLD patterns (no TLD) and the server fans them out across the
     // supported TLDs. Patterns that already include a TLD are passed through
     // unchanged so existing alternation syntax (e.g. `vote-x.(run|bio)`)
-    // keeps working.
+    // keeps working — but only when that TLD is on the allowlist, so an
+    // explicit `candidate.com` can't bypass the "never offered" promise.
     const candidates = Array.from(
       new Set(
-        expanded.flatMap((c) =>
-          c.includes('.') ? [c] : SUPPORTED_TLDS.map((tld) => `${c}.${tld}`),
-        ),
+        expanded.flatMap((c) => {
+          if (!c.includes('.')) {
+            return SUPPORTED_TLDS.map((tld) => `${c}.${tld}`)
+          }
+          return hasSupportedTld(c) ? [c] : []
+        }),
       ),
     )
 
@@ -517,6 +528,7 @@ export class DomainsService
     campaignId: number,
     domainName: string,
     price: number,
+    source: DomainSource,
   ): Promise<
     | {
         kind: typeof DOMAIN_RESERVATION_KIND.IDEMPOTENT
@@ -585,6 +597,7 @@ export class DomainsService
           price,
           paymentId: null,
           status: DomainStatus.pending,
+          source,
         },
       })
 
@@ -655,6 +668,7 @@ export class DomainsService
     campaign: Campaign & { user: User },
     domainName: string,
     maxPrice: number,
+    source: DomainSource,
   ): Promise<{
     website: Pick<Website, 'id' | 'vanityPath' | 'status' | 'campaignId'>
     domain: Pick<Domain, 'id' | 'name' | 'status'> & { price: number | null }
@@ -712,6 +726,7 @@ export class DomainsService
       campaign.id,
       domainName,
       price,
+      source,
     )
 
     if (locked.kind === DOMAIN_RESERVATION_KIND.IDEMPOTENT) {

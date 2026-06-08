@@ -5,7 +5,7 @@ import {
   ExperimentRunStatus,
   OfficeLevel,
   TcrComplianceStatus,
-} from '@prisma/client'
+} from '../../../generated/prisma'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,6 +49,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     delete: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
   }
   let mockPrisma: {
     tcrCompliance: typeof mockModel
@@ -56,9 +57,12 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
   }
 
   const user = createMockUser({ clerkId: 'user_clerk_abc' })
+  // isPro: true — these cases exercise the already-Pro path, where the kickoff
+  // is enqueued immediately on submit (pro-upgrade1, post-payment resubmit).
   const campaign = createMockCampaign({
     userId: user.id,
     formattedAddress: '123 Main St',
+    isPro: true,
   })
 
   const basePayload = {
@@ -98,6 +102,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       delete: vi.fn().mockResolvedValue(undefined),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       update: vi.fn().mockResolvedValue(undefined),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     }
     mockPrisma = {
       tcrCompliance: mockModel,
@@ -170,13 +175,21 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     })
   })
 
-  it('stamps kickoffSentAt after a successful kickoff send', async () => {
+  it('claims kickoffSentAt atomically before sending the kickoff', async () => {
     await service.createAgentic(user, campaign, basePayload)
 
-    expect(mockModel.update).toHaveBeenCalledWith({
-      where: { id: 'tcr-new' },
+    expect(mockModel.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tcr-new', kickoffSentAt: null },
       data: { kickoffSentAt: expect.any(Date) },
     })
+  })
+
+  it('does not enqueue a second kickoff when the claim is already taken', async () => {
+    mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+
+    await service.createAgentic(user, campaign, basePayload)
+
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
   })
 
   it('marks the record error and re-throws if SQS sendMessage fails', async () => {
@@ -187,6 +200,11 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
       service.createAgentic(user, campaign, basePayload),
     ).rejects.toBe(sqsErr)
 
+    // Claim is rolled back (kickoffSentAt back to null) so the sweep can retry
+    expect(mockModel.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tcr-new', kickoffSentAt: expect.any(Date) },
+      data: { kickoffSentAt: null },
+    })
     expect(mockModel.update).toHaveBeenCalledWith({
       where: { id: 'tcr-new' },
       data: { status: TcrComplianceStatus.error },
@@ -390,6 +408,85 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
     ).rejects.toThrow(BadRequestException)
   })
 
+  it('persists the record but defers the kickoff when the campaign is not Pro', async () => {
+    const nonProCampaign = createMockCampaign({
+      userId: user.id,
+      formattedAddress: '123 Main St',
+      isPro: false,
+    })
+
+    const result = await service.createAgentic(
+      user,
+      nonProCampaign,
+      basePayload,
+    )
+
+    expect(result.created).toBe(true)
+    expect(mockModel.create).toHaveBeenCalledTimes(1)
+    expect(mockModel.updateMany).not.toHaveBeenCalled()
+    expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+  })
+
+  describe('enqueueAgenticKickoffIfNeeded', () => {
+    const paidRecord = {
+      id: 'tcr-paid',
+      campaignId: campaign.id,
+      kickoffSentAt: null,
+    }
+    const campaignWithClerk = { ...campaign, user: { clerkId: 'clerk_paid' } }
+
+    it('enqueues exactly one kickoff after payment for a deferred record', async () => {
+      mockModel.findUnique.mockResolvedValueOnce(paidRecord)
+      mockCampaigns.findUnique.mockResolvedValueOnce(campaignWithClerk)
+
+      await service.enqueueAgenticKickoffIfNeeded(campaign.id)
+
+      expect(mockModel.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tcr-paid', kickoffSentAt: null },
+        data: { kickoffSentAt: expect.any(Date) },
+      })
+      expect(mockQueue.sendMessage).toHaveBeenCalledTimes(1)
+      const [message] = mockQueue.sendMessage.mock.calls[0]
+      expect(message.data).toEqual({
+        campaignId: campaign.id,
+        tcrComplianceId: 'tcr-paid',
+        clerkUserId: 'clerk_paid',
+      })
+    })
+
+    it('does not enqueue a second kickoff when the claim is already taken (replay)', async () => {
+      mockModel.findUnique.mockResolvedValueOnce(paidRecord)
+      mockCampaigns.findUnique.mockResolvedValueOnce(campaignWithClerk)
+      mockModel.updateMany.mockResolvedValueOnce({ count: 0 })
+
+      await service.enqueueAgenticKickoffIfNeeded(campaign.id)
+
+      expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when no TCR record exists yet (paid before filing)', async () => {
+      mockModel.findUnique.mockResolvedValueOnce(null)
+
+      await service.enqueueAgenticKickoffIfNeeded(campaign.id)
+
+      expect(mockModel.updateMany).not.toHaveBeenCalled()
+      expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when the campaign has no Clerk user', async () => {
+      mockModel.findUnique.mockResolvedValueOnce(paidRecord)
+      mockCampaigns.findUnique.mockResolvedValueOnce({
+        ...campaign,
+        user: { clerkId: null },
+      })
+
+      await service.enqueueAgenticKickoffIfNeeded(campaign.id)
+
+      expect(mockModel.updateMany).not.toHaveBeenCalled()
+      expect(mockQueue.sendMessage).not.toHaveBeenCalled()
+    })
+  })
+
   describe('sweepStrandedAgenticKickoffs', () => {
     const sweep = (svc: CampaignTcrComplianceService) =>
       (
@@ -416,6 +513,7 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
             peerlyIdentityId: null,
             kickoffSentAt: null,
             createdAt: { lt: expect.any(Date) },
+            campaign: { isPro: true },
           },
         }),
       )
@@ -496,6 +594,18 @@ describe('CampaignTcrComplianceService - createAgentic', () => {
 
       expect(mockQueue.sendMessage).not.toHaveBeenCalled()
       expect(mockModel.update).not.toHaveBeenCalled()
+    })
+
+    it('only sweeps Pro campaigns so pre-payment submissions are not dispatched', async () => {
+      mockModel.findMany.mockResolvedValueOnce([])
+
+      await sweep(service)
+
+      expect(mockModel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ campaign: { isPro: true } }),
+        }),
+      )
     })
   })
 })

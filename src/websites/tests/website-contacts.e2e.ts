@@ -9,7 +9,7 @@ import {
   campaignOrgSlug,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
-import { WebsiteContact } from '@prisma/client'
+import { WebsiteContact } from '../../generated/prisma'
 
 test.describe('Websites - Contacts', () => {
   let testUserId: number | undefined

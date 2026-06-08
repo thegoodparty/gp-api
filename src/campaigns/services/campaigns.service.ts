@@ -3,6 +3,7 @@ import {
   CampaignStatus,
   OnboardingStep,
   type ListCampaignsPagination,
+  type RaceMilestones,
 } from '@goodparty_org/contracts'
 import {
   BadRequestException,
@@ -11,12 +12,18 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '../../generated/prisma'
 import { differenceInMilliseconds, formatISO } from 'date-fns'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { RaceTargetMetrics } from 'src/elections/types/elections.types'
+import {
+  CampaignStrategyContextResponse,
+  FilingFeeByBrHashResult,
+  RaceTargetMetrics,
+} from 'src/elections/types/elections.types'
+import { formatL2DistrictName } from 'src/campaigns/ai/chat/util/formatDistrictName.util'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -61,6 +68,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly stripeService: StripeService,
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
+    private readonly ballotReady: BallotReadyService,
     private readonly organizations: OrganizationsService,
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CampaignTasksService))
@@ -772,19 +780,39 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         })
       : null
 
-    if (!org?.overrideDistrictId && !org?.positionId) return null
+    if (!org?.overrideDistrictId && !org?.positionId && !raceId) return null
 
-    // Prefer the race-hash-based filing fee when the campaign has a BR race
-    // hash on details.raceId — it resolves with a single Race lookup and
-    // doesn't depend on Position.placeId being populated (which it isn't
-    // in the election-api mart today). Falls back to the Position-side
-    // filing fee on the positionId branch when raceId is missing or the
-    // race-hash lookup fails.
-    const filingFeeFromRaceHash = raceId
-      ? await this.elections.fetchFilingFeeByRaceHash(raceId)
-      : null
+    // Three race-hash-keyed lookups in parallel: civics context (the new
+    // unified source for win number, projected turnout, voter counts,
+    // candidates, dates), filing fee, and BR campaign-timeline milestones.
+    // Milestones come straight from BR GraphQL — election-api doesn't
+    // store or expose them. All three return null on failure, letting us
+    // degrade gracefully to the position-based path below.
+    const [contextResult, filingFeeFromRaceHash, milestones] =
+      await Promise.all([
+        raceId
+          ? this.elections.fetchCampaignStrategyContext(raceId)
+          : Promise.resolve(null),
+        raceId
+          ? this.elections.fetchFilingFeeByRaceHash(raceId)
+          : Promise.resolve(null),
+        raceId
+          ? this.ballotReady.fetchMilestones(raceId)
+          : Promise.resolve(null),
+      ])
 
-    if (org.overrideDistrictId) {
+    if (contextResult) {
+      return this.mapContextToRaceTargetMetrics(
+        contextResult,
+        filingFeeFromRaceHash,
+        milestones,
+      )
+    }
+
+    // Fallback path: no raceId, or the context endpoint failed. Use the
+    // legacy position / district-based metrics. New fields default to null
+    // because the legacy path doesn't surface them.
+    if (org?.overrideDistrictId) {
       const result = await this.elections
         .buildRaceTargetDetails({
           districtId: org.overrideDistrictId,
@@ -796,18 +824,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       if (!projectedTurnout || projectedTurnout <= 0) return null
 
       return {
+        ...emptyContextFields(),
         projectedTurnout,
         winNumber: winNumber ?? 0,
         voterContactGoal: voterContactGoal ?? 0,
         filingFee: filingFeeFromRaceHash?.filingFee ?? null,
         filingRequirementsText:
           filingFeeFromRaceHash?.filingRequirementsText ?? null,
+        filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+        filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+        paperworkInstructions:
+          filingFeeFromRaceHash?.paperworkInstructions ?? null,
+        milestones,
       }
     }
 
+    if (!org?.positionId) return null
+
     const result = await this.elections
       .getPositionMatchedRaceTargetDetails({
-        positionId: org.positionId!,
+        positionId: org.positionId,
         electionDate,
         includeTurnout: true,
         campaignId,
@@ -825,14 +861,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       filingRequirementsText,
     } = result
     return {
+      ...emptyContextFields(),
       projectedTurnout,
       winNumber,
       voterContactGoal,
-      // Race-hash result wins when we successfully fetched it (even when its
-      // filingFee is null — that's a legitimate "BR has no fee data for
-      // this race" signal, not an absence of an answer). Falls back to the
-      // Position-side result only when no raceId was set or the race-hash
-      // call errored out.
       filingFee:
         filingFeeFromRaceHash !== null
           ? filingFeeFromRaceHash.filingFee
@@ -841,6 +873,131 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         filingFeeFromRaceHash !== null
           ? filingFeeFromRaceHash.filingRequirementsText
           : (filingRequirementsText ?? null),
+      filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+      filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+      paperworkInstructions:
+        filingFeeFromRaceHash?.paperworkInstructions ?? null,
+      milestones,
+    }
+  }
+
+  private mapContextToRaceTargetMetrics(
+    context: CampaignStrategyContextResponse,
+    filingFeeFromRaceHash: FilingFeeByBrHashResult | null,
+    milestones: RaceMilestones | null,
+  ): RaceTargetMetrics {
+    // win_number_effective prefers BR's calibrated civics number when
+    // available, falls back to floor(turnout / 2) + 1 — both computed on
+    // election-api. We just trust whatever it returns; null collapses to 0
+    // so the downstream type stays `number` for win number / contact goal.
+    const winNumber = context.win_number_effective ?? 0
+    const projectedTurnout = context.projected_turnout ?? 0
+    const voterContactGoal = context.contacts_needed_estimate ?? 0
+    return {
+      winNumber,
+      projectedTurnout,
+      voterContactGoal,
+      filingFee: filingFeeFromRaceHash?.filingFee ?? null,
+      filingRequirementsText:
+        filingFeeFromRaceHash?.filingRequirementsText ?? null,
+      filingOfficeAddress: filingFeeFromRaceHash?.filingOfficeAddress ?? null,
+      filingPhoneNumber: filingFeeFromRaceHash?.filingPhoneNumber ?? null,
+      paperworkInstructions:
+        filingFeeFromRaceHash?.paperworkInstructions ?? null,
+      registeredVoters: context.registered_voters,
+      uniqueCellphones: context.unique_cellphones,
+      uniqueLandlines: context.unique_landlines,
+      projectedVoterTurnout: context.projected_voter_turnout,
+      candidates: context.candidates.map((c) => ({
+        gpCandidateId: c.gp_candidate_id,
+        firstName: c.first_name,
+        lastName: c.last_name,
+        fullName: c.full_name,
+        email: c.email,
+        websiteUrl: c.website_url,
+        party: c.party,
+        isIncumbent: c.is_incumbent,
+      })),
+      generalElectionDate: context.general_election_date,
+      primaryElectionDate: context.primary_election_date,
+      relevantElectionDate: context.relevant_election_date,
+      officialOfficeName: context.official_office_name,
+      officeLevel: context.office_level,
+      officeType: context.office_type,
+      numberOfSeats: context.number_of_seats,
+      milestones,
+    }
+  }
+
+  /**
+   * Resolves the candidate's real voter-file (L2) district name for prompt
+   * personalization (e.g. "STATE HOUSE 005", "Clarkdale Town"). Prefers the
+   * org's overridden district, falling back to the matched position's district.
+   * Returns null when no district is resolvable so callers can fall back to the
+   * self-reported `details.district`.
+   */
+  async resolveL2DistrictName(campaign: Campaign): Promise<string | null> {
+    try {
+      const { organizationSlug } = campaign
+      const org = organizationSlug
+        ? await this.organizations.findUnique({
+            where: { slug: organizationSlug },
+          })
+        : null
+
+      if (org?.overrideDistrictId) {
+        const district = await this.elections.getDistrict(
+          org.overrideDistrictId,
+        )
+        return formatL2DistrictName(
+          district?.L2DistrictName,
+          district?.L2DistrictType,
+        )
+      }
+
+      if (org?.positionId) {
+        const position = await this.elections.getPositionById(org.positionId, {
+          includeDistrict: true,
+        })
+        return formatL2DistrictName(
+          position?.district?.L2DistrictName,
+          position?.district?.L2DistrictType,
+        )
+      }
+
+      return null
+    } catch (e) {
+      this.logger.error({ e }, 'failed to resolve L2 district name')
+      return null
     }
   }
 }
+
+// Null-filled values for every non-legacy field on RaceTargetMetrics — used
+// on the position-based and overrideDistrict fallback paths that don't have
+// access to the context endpoint's richer data.
+const emptyContextFields = (): Omit<
+  RaceTargetMetrics,
+  | 'winNumber'
+  | 'projectedTurnout'
+  | 'voterContactGoal'
+  | 'filingFee'
+  | 'filingRequirementsText'
+  | 'filingOfficeAddress'
+  | 'filingPhoneNumber'
+  | 'paperworkInstructions'
+> => ({
+  registeredVoters: null,
+  uniqueCellphones: null,
+  uniqueLandlines: null,
+  projectedVoterTurnout: null,
+  candidates: [],
+  generalElectionDate: null,
+  primaryElectionDate: null,
+  relevantElectionDate: null,
+  officialOfficeName: null,
+  officeLevel: null,
+  officeType: null,
+  numberOfSeats: null,
+  milestones: null,
+})

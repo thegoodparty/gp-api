@@ -17,7 +17,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { Prisma, UserRole } from '@prisma/client'
+import { Prisma, UserRole } from '../../generated/prisma'
 import { subDays, subMonths } from 'date-fns'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -29,6 +29,11 @@ import {
   AdminUserListSchema,
   DateRangeFilter,
 } from './schemas/AdminUserList.schema'
+
+const SENSITIVE_USER_FIELDS = {
+  password: true,
+  passwordResetToken: true,
+} as const
 
 @Controller('admin/users')
 @UsePipes(ZodValidationPipe)
@@ -44,8 +49,9 @@ export class AdminUsersController {
   @Get()
   @Roles(UserRole.admin)
   async list(@Query() { dateRange }: AdminUserListSchema) {
+    const omit = SENSITIVE_USER_FIELDS
     if (!dateRange || dateRange === DateRangeFilter.allTime) {
-      return this.usersService.findMany()
+      return this.usersService.findMany({ omit })
     }
     let date = new Date()
     if (dateRange === DateRangeFilter.last12Months) {
@@ -55,11 +61,13 @@ export class AdminUsersController {
     } else if (dateRange === DateRangeFilter.lastWeek) {
       date = subDays(date, 7)
     } else {
-      // input validation should prevent this case
       throw new BadRequestException('Invalid date range')
     }
 
-    return this.usersService.findMany({ where: { createdAt: { gt: date } } })
+    return this.usersService.findMany({
+      where: { createdAt: { gt: date } },
+      omit,
+    })
   }
 
   @Get('search')
@@ -75,13 +83,20 @@ export class AdminUsersController {
   @Get(':id')
   @Roles(UserRole.admin)
   async get(@Param('id', ParseIntPipe) id: number) {
-    return await this.usersService.findUniqueOrThrow({ where: { id } })
+    return this.usersService.findUniqueOrThrow({
+      where: { id },
+      omit: SENSITIVE_USER_FIELDS,
+    })
   }
 
   @Post()
   @Roles(UserRole.admin)
-  create(@Body() body: AdminCreateUserSchema) {
-    return this.usersService.createUser(body)
+  async create(@Body() body: AdminCreateUserSchema) {
+    const { id } = await this.usersService.createUser(body)
+    return this.usersService.findUniqueOrThrow({
+      where: { id },
+      omit: SENSITIVE_USER_FIELDS,
+    })
   }
 
   @Post('impersonate/:id')

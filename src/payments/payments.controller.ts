@@ -10,7 +10,7 @@ import {
   RawBodyRequest,
   Req,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../generated/prisma'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { Stripe } from 'stripe'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'

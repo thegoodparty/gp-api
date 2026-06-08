@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import type { Annotation, MeetingBriefing } from '@prisma/client'
-import { AnnotationKind, AnnotationResourceType } from '@prisma/client'
+import type { Annotation, MeetingBriefing } from '../../../generated/prisma'
+import {
+  AnnotationKind,
+  AnnotationResourceType,
+} from '../../../generated/prisma'
 import { BriefingSchema } from '@/chats/briefing-chats/types/briefing.schema'
 import type { HighlightSnippet } from './extractHighlight'
 import {
@@ -40,6 +43,7 @@ const baseAnnotation: Annotation = {
   noteId: null,
   chatConversationId: 'conv-1',
   annotationBugReportId: null,
+  annotationReviewId: null,
 }
 
 const artifactContent =

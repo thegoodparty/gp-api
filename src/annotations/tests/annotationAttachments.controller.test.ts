@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ExperimentRunStatus, OcrStatus } from '@prisma/client'
+import { ExperimentRunStatus, OcrStatus } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { QueueProducerService } from '@/queue/producer/queueProducer.service'
@@ -23,6 +23,7 @@ const seedElectedOffice = async (orgSlug: string, userId?: number) => {
 const seedBriefingAndNote = async (
   orgSlug: string,
   userId: number = service.user.id,
+  authorUserId: number = userId,
 ) => {
   const eo = await seedElectedOffice(orgSlug, userId)
   const briefingRun = await service.prisma.experimentRun.create({
@@ -45,7 +46,7 @@ const seedBriefingAndNote = async (
   })
   const annotation = await service.prisma.annotation.create({
     data: {
-      author: { connect: { id: userId } },
+      author: { connect: { id: authorUserId } },
       kind: 'note',
       resourceType: 'briefing',
       resourceId: briefing.id,
@@ -75,7 +76,9 @@ const mockS3 = () => {
     view: vi
       .spyOn(s3, 'getSignedUrlForViewing')
       .mockResolvedValue('https://s3.example/download-url'),
-    exists: vi.spyOn(s3, 'getObjectSize').mockResolvedValue(1_500_000),
+    head: vi
+      .spyOn(s3, 'headObject')
+      .mockResolvedValue({ contentLength: 1_500_000 }),
     get: vi.spyOn(s3, 'getFileBytes').mockResolvedValue(Buffer.from('binary')),
     del: vi.spyOn(s3, 'deleteObject').mockResolvedValue(undefined),
   }
@@ -211,7 +214,7 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
     )
 
     expect(result.status).toBe(204)
-    expect(s3.exists).toHaveBeenCalled()
+    expect(s3.head).toHaveBeenCalled()
     expect(queue).toHaveBeenCalledOnce()
     // The OCR job must be enqueued with throwOnError so a producer failure
     // surfaces to the caller instead of silently dropping the message.
@@ -225,7 +228,7 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
   it('returns 400 when the file has not actually landed in S3', async () => {
     const { annotation } = await seedBriefingAndNote('eo-missing-upload')
     const s3 = mockS3()
-    s3.exists.mockResolvedValueOnce(undefined)
+    s3.head.mockResolvedValueOnce(null)
     mockQueue()
 
     const presign = await service.client.post(
@@ -246,7 +249,7 @@ describe('POST /v1/annotations/:annotationId/note/attachments/:attachmentId/comp
   it('returns 400 when the actual S3 size exceeds the declared size', async () => {
     const { annotation } = await seedBriefingAndNote('eo-size-mismatch')
     const s3 = mockS3()
-    s3.exists.mockResolvedValueOnce(5_000_000)
+    s3.head.mockResolvedValueOnce({ contentLength: 5_000_000 })
     mockQueue()
 
     const presign = await service.client.post(
@@ -325,7 +328,11 @@ describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/downl
     expect(result.status).toBe(404)
   })
 
-  it('rejects callers who do not own the annotation', async () => {
+  it('rejects access through an elected office that does not own the briefing', async () => {
+    // The briefing lives under another user's elected office, but the
+    // calling (default) user authored the annotation. Since a user owns at
+    // most one elected office, the caller reaches the annotation through
+    // their own office header and the briefing-access check must 403.
     const otherUser = await service.prisma.user.create({
       data: {
         clerkId: 'other_download',
@@ -335,28 +342,64 @@ describe('GET /v1/annotations/:annotationId/note/attachments/:attachmentId/downl
       },
     })
     const { annotation, noteId } = await seedBriefingAndNote(
-      'eo-download-owner',
+      'eo-download-foreign',
       otherUser.id,
+      service.user.id,
     )
-    mockS3()
-
     const attachment = await service.prisma.annotationNoteAttachment.create({
       data: {
         noteId,
         fileName: 'photo.jpg',
         mimeType: 'image/jpeg',
         sizeBytes: 1_500_000,
-        storageKey: 'annotations/download/other',
+        storageKey: `annotations/${annotation.id}/seed`,
         ocrStatus: OcrStatus.pending,
       },
     })
+    mockS3()
 
-    // service.user owns a different elected office; the annotation belongs
-    // to otherUser, so the author check 403s before the row is read.
-    await seedElectedOffice('eo-mine-download')
+    await seedElectedOffice('eo-download-mine')
     const result = await service.client.get(
       `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
-      orgHeader('eo-mine-download'),
+      orgHeader('eo-download-mine'),
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('rejects callers who did not author the annotation', async () => {
+    // Annotation is authored by another user, but the briefing lives under
+    // the requesting user's own elected office. Only the author check should
+    // fire; if it were removed the briefing-access check would pass and the
+    // request would succeed, making this a true regression guard.
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: 'other_download_author',
+        email: 'other-download-author@goodparty.org',
+        firstName: 'A',
+        lastName: 'B',
+      },
+    })
+    const { annotation, noteId } = await seedBriefingAndNote(
+      'eo-download-mine-author',
+      service.user.id,
+      otherUser.id,
+    )
+    const attachment = await service.prisma.annotationNoteAttachment.create({
+      data: {
+        noteId,
+        fileName: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1_500_000,
+        storageKey: `annotations/${annotation.id}/seed`,
+        ocrStatus: OcrStatus.pending,
+      },
+    })
+    mockS3()
+
+    const result = await service.client.get(
+      `/v1/annotations/${annotation.id}/note/attachments/${attachment.id}/download-url`,
+      orgHeader('eo-download-mine-author'),
     )
 
     expect(result.status).toBe(403)

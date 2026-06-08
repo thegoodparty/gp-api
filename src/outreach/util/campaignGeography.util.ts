@@ -3,7 +3,7 @@
  * Used by outreach and 10DLC flows so Peerly jobs get correct didState and didNpaSubset.
  */
 import { P2P_JOB_DEFAULTS } from '@/vendors/peerly/constants/p2pJob.constants'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../generated/prisma'
 import type { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 import { extractAddressComponents } from 'src/vendors/google/util/GooglePlaces.util'
 import zipcodes from 'zipcodes'

@@ -1,4 +1,4 @@
-import { Content, ContentType, Prisma } from '@prisma/client'
+import { Content, ContentType, Prisma } from '../generated/prisma'
 import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
 import { PinoLogger } from 'nestjs-pino'
 

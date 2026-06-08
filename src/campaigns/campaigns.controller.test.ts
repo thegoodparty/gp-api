@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Organization, User, UserRole } from '@prisma/client'
+import { Campaign, Organization, User, UserRole } from '../generated/prisma'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,9 +14,32 @@ import { CampaignsController } from './campaigns.controller'
 import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { FilingInstructionsService } from './filingInstructions/filingInstructions.service'
 import { CampaignWith } from './campaigns.types'
 
 const CREATED_AT = '2025-01-01'
+
+// Shared null-filled defaults for the fields RaceTargetMetrics gained when
+// fetchLiveRaceTargetMetrics started consuming /campaign-strategy-context.
+// Tests that don't care about these can spread this into their fixture.
+const EMPTY_RACE_CONTEXT_FIELDS = {
+  filingOfficeAddress: null,
+  filingPhoneNumber: null,
+  paperworkInstructions: null,
+  registeredVoters: null,
+  uniqueCellphones: null,
+  uniqueLandlines: null,
+  projectedVoterTurnout: null,
+  candidates: [],
+  generalElectionDate: null,
+  primaryElectionDate: null,
+  relevantElectionDate: null,
+  officialOfficeName: null,
+  officeLevel: null,
+  officeType: null,
+  numberOfSeats: null,
+  milestones: null,
+}
 
 const userDefaults = {
   createdAt: new Date(CREATED_AT),
@@ -103,6 +126,7 @@ describe('CampaignsController', () => {
   let slackService: SlackService
   let organizationsService: OrganizationsService
   let analyticsService: AnalyticsService
+  let filingInstructionsService: FilingInstructionsService
 
   beforeEach(() => {
     const campaignsServiceMock: Partial<CampaignsService> = {
@@ -148,12 +172,19 @@ describe('CampaignsController', () => {
     }
     analyticsService = analyticsServiceMock as AnalyticsService
 
+    const filingInstructionsServiceMock: Partial<FilingInstructionsService> = {
+      emailToCandidate: vi.fn(),
+    }
+    filingInstructionsService =
+      filingInstructionsServiceMock as FilingInstructionsService
+
     controller = new CampaignsController(
       campaignsService,
       planVersionsService,
       slackService,
       organizationsService,
       analyticsService,
+      filingInstructionsService,
       createMockLogger(),
     )
   })
@@ -251,6 +282,7 @@ describe('CampaignsController', () => {
         voterContactGoal: 20005,
         filingFee: null,
         filingRequirementsText: null,
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       }
       vi.spyOn(
         campaignsService,
@@ -296,6 +328,21 @@ describe('CampaignsController', () => {
 
       expect(campaignsService.getStatus).toHaveBeenCalledWith(undefined)
       expect(result).toEqual({ status: false })
+    })
+  })
+
+  describe('emailFilingInstructions', () => {
+    it('emails the candidate their filing instructions and returns success', async () => {
+      const result = await controller.emailFilingInstructions(
+        mockCampaign,
+        mockUser,
+      )
+
+      expect(filingInstructionsService.emailToCandidate).toHaveBeenCalledWith(
+        mockCampaign,
+        mockUser,
+      )
+      expect(result).toEqual({ success: true })
     })
   })
 
@@ -403,6 +450,7 @@ describe('CampaignsController', () => {
         voterContactGoal: 12505,
         filingFee: null,
         filingRequirementsText: null,
+        ...EMPTY_RACE_CONTEXT_FIELDS,
       }
       vi.spyOn(
         campaignsService,

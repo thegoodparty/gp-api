@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Organization } from '../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'

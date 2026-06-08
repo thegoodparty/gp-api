@@ -1,7 +1,7 @@
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { Campaign, Organization, User } from '@prisma/client'
+import { Campaign, Organization, User } from '../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -11,6 +11,7 @@ import {
   CompleteCheckoutSessionDto,
   CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
+  CreateProCheckoutSessionDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
 import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
@@ -28,8 +29,25 @@ export class PurchaseController {
   }
 
   @Post('checkout-session')
-  async createProCheckoutSession(@ReqUser() user: User) {
+  async createProCheckoutSession(
+    @ReqUser() user: User,
+    @Body() dto: CreateProCheckoutSessionDto = {},
+  ) {
     const { email } = user
+
+    if (dto.embedded) {
+      const { clientSecret, checkoutSessionId } =
+        await this.stripeService.createEmbeddedProSubscriptionCheckoutSession(
+          user.id,
+          email,
+          dto.returnUrl,
+        )
+
+      await this.usersService.patchUserMetaData(user.id, { checkoutSessionId })
+
+      return { clientSecret }
+    }
+
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id, email)
 

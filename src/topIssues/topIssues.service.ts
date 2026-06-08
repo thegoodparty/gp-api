@@ -3,19 +3,19 @@ import {
   CreateTopIssueDto,
   TopIssueOutputDto,
 } from './schemas/topIssues.schema'
-import { TopIssue } from '@prisma/client'
+import { TopIssue } from '../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { AiService } from 'src/ai/ai.service'
-import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+import { LlmService } from '@/llm/services/llm.service'
 
 @Injectable()
 export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
-  constructor(private readonly ai: AiService) {
+  constructor(private readonly llm: LlmService) {
     super()
   }
 
   async getByLocation(zip: string): Promise<string[]> {
-    const messages: AiChatMessage[] = [
+    const messages: ChatCompletionMessageParam[] = [
       {
         role: 'system',
         content: 'You are a helpful political assistant.',
@@ -27,15 +27,14 @@ export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
     ]
 
     try {
-      const completion = await this.ai.llmChatCompletion(
+      const completion = await this.llm.chatCompletion({
         messages,
-        3000,
-        0.5,
-        0.1,
-      )
+        maxTokens: 3000,
+        temperature: 0.5,
+        topP: 0.1,
+      })
 
-      const chatResponse = completion.content
-      const issues = chatResponse.split(',')
+      const issues = completion.content.split(',')
       return issues.map((issue) => issue.trim())
     } catch (error) {
       this.logger.error(

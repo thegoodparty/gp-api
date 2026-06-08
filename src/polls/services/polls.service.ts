@@ -1,6 +1,6 @@
 import { addBusinessDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { PollConfidence, Prisma } from '@prisma/client'
+import { PollConfidence, Prisma } from '../../generated/prisma'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'

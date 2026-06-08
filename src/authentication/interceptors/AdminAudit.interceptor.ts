@@ -5,7 +5,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { User, UserRole } from '@prisma/client'
+import { User, UserRole } from '../../generated/prisma'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { FastifyRequest } from 'fastify'
 import { PinoLogger } from 'nestjs-pino'

@@ -7,7 +7,7 @@ import { OrganizationsService } from '@/organizations/services/organizations.ser
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { GooglePlacesApiResponse } from '@/shared/types/GooglePlaces.types'
 
 vi.mock('src/queue/queue.config', () => ({

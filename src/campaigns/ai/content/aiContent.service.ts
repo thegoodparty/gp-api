@@ -1,13 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { differenceInMilliseconds } from 'date-fns'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/services/content.service'
-import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import {
+  PromptReplaceCampaign,
+  PromptReplaceService,
+} from 'src/ai/services/promptReplace.service'
+import { LlmService } from '@/llm/services/llm.service'
+import { formatHtmlLlmResponse } from '@/ai/util/llmResponseFormat.util'
+import {
+  isChatCompletionMessage,
+  toChatCompletionMessage,
+} from '@/ai/util/chatMessage.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { GenerationStatus } from './aiContent.types'
 import {
@@ -23,7 +33,8 @@ export class AiContentService {
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly contentService: ContentService,
-    private readonly aiService: AiService,
+    private readonly promptReplaceService: PromptReplaceService,
+    private readonly llm: LlmService,
     private readonly slack: SlackService,
     private readonly queue: QueueProducerService,
     private readonly clerkEnricher: ClerkUserEnricherService,
@@ -116,7 +127,7 @@ export class AiContentService {
     const liveMetrics = await this.campaignsService.fetchLiveRaceTargetMetrics(
       campaignWithRelations,
     )
-    prompt = await this.aiService.promptReplace(
+    prompt = await this.promptReplaceService.promptReplace(
       prompt,
       campaignWithRelations,
       liveMetrics,
@@ -150,7 +161,7 @@ export class AiContentService {
       prompt,
       // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      existingChat: (chat as AiChatMessage[]) || [],
+      existingChat: (chat as unknown as AiChatMessage[]) || [],
       inputValues,
       createdAt: new Date().valueOf(),
     }
@@ -229,9 +240,9 @@ export class AiContentService {
     }
 
     const chat = existingChat || []
-    const messages = [
-      { role: 'user', content: prompt } as AiChatMessage,
-      ...chat,
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'user', content: prompt },
+      ...chat.map(toChatCompletionMessage).filter(isChatCompletionMessage),
     ]
     let chatResponse
     let generateError = false
@@ -247,14 +258,14 @@ export class AiContentService {
         maxTokens = 2500
       }
 
-      const completion = await this.aiService.llmChatCompletion(
+      const completion = await this.llm.chatCompletion({
         messages,
         maxTokens,
-        0.7,
-        0.9,
-      )
+        temperature: 0.7,
+        topP: 0.9,
+      })
 
-      chatResponse = completion.content as string
+      chatResponse = formatHtmlLlmResponse(completion.content)
       const totalTokens = completion.tokens
 
       await this.slack.aiMessage({

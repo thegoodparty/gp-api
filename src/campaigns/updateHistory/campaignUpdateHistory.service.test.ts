@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotFoundException } from '@nestjs/common'
-import { Campaign, CampaignUpdateHistoryType } from '@prisma/client'
+import { Campaign, CampaignUpdateHistoryType } from '../../generated/prisma'
 import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CampaignsService } from '../services/campaigns.service'
 

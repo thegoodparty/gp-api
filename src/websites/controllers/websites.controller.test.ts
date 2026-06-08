@@ -6,7 +6,7 @@ import {
   NotFoundException,
   RequestMethod,
 } from '@nestjs/common'
-import { DomainStatus, WebsiteStatus } from '@prisma/client'
+import { DomainStatus, WebsiteStatus } from '../../generated/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
@@ -560,6 +560,67 @@ describe('WebsitesController', () => {
 
       expect(mockS3Service.uploadFile).not.toHaveBeenCalled()
       expect(mockWebsitesService.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateWebsite - file upload scoping', () => {
+    it('scopes uploaded image keys to the campaign ID', async () => {
+      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
+        content: completeContent,
+        hasEverBeenPublished: false,
+        domain: null,
+      })
+      mockWebsitesService.update.mockResolvedValue({
+        id: 1,
+        content: completeContent,
+      })
+      mockS3Service.buildKey.mockImplementation(
+        (folder?: string, fileName?: string) =>
+          `${folder ?? ''}/${fileName ?? ''}`,
+      )
+      mockS3Service.uploadFile.mockResolvedValue('uploaded-file-url')
+
+      const logoFile: FileUpload = {
+        fieldname: 'logoFile',
+        filename: 'logo.png',
+        mimetype: 'image/png',
+        encoding: '7bit',
+        data: Buffer.from('logo'),
+      }
+      const heroFile: FileUpload = {
+        fieldname: 'heroFile',
+        filename: 'hero.png',
+        mimetype: 'image/png',
+        encoding: '7bit',
+        data: Buffer.from('hero'),
+      }
+
+      const body = new UpdateWebsiteSchema()
+      await controller.updateWebsite(mockUser, mockCampaign, body, [
+        logoFile,
+        heroFile,
+      ])
+
+      expect(mockS3Service.buildKey).toHaveBeenCalledWith(
+        `uploads/${mockCampaign.id}`,
+        logoFile.filename,
+      )
+      expect(mockS3Service.buildKey).toHaveBeenCalledWith(
+        `uploads/${mockCampaign.id}`,
+        heroFile.filename,
+      )
+      expect(mockS3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        logoFile.data,
+        `uploads/${mockCampaign.id}/${logoFile.filename}`,
+        expect.objectContaining({ contentType: logoFile.mimetype }),
+      )
+      expect(mockS3Service.uploadFile).toHaveBeenCalledWith(
+        expect.any(String),
+        heroFile.data,
+        `uploads/${mockCampaign.id}/${heroFile.filename}`,
+        expect.objectContaining({ contentType: heroFile.mimetype }),
+      )
     })
   })
 

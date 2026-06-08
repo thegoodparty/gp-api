@@ -22,8 +22,8 @@ import {
   ReadUserOutputSchema,
   UpdatePasswordSchema,
 } from '@goodparty_org/contracts'
-import { User } from '@prisma/client'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { User } from '../generated/prisma'
+import { isPrismaError } from '../prisma/util/prismaErrors.util'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
@@ -114,7 +114,7 @@ export class UsersController {
       throw new BadRequestException('No file found')
     }
 
-    const key = this.s3.buildKey('uploads', file.filename)
+    const key = this.s3.buildKey(`uploads/${user.id}`, file.filename)
     const avatar = await this.s3.uploadFile(ASSET_DOMAIN, file.data, key, {
       contentType: file.mimetype,
       cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
@@ -131,7 +131,8 @@ export class UsersController {
     if (!user) {
       throw new UnauthorizedException('User session required')
     }
-    const key = this.s3.buildKey(args.bucket, args.fileName)
+    const scopedFolder = `${args.bucket}/${user.id}`
+    const key = this.s3.buildKey(scopedFolder, args.fileName)
     return {
       signedUploadUrl: await this.s3.getSignedUrlForUpload(ASSET_DOMAIN, key, {
         contentType: args.fileType,
@@ -170,11 +171,8 @@ export class UsersController {
   async delete(@Param() { id }: UserIdParamSchema, @ReqUser() reqUser: User) {
     try {
       return await this.usersService.deleteUser(id, reqUser.id)
-    } catch (error: unknown | PrismaClientKnownRequestError) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+    } catch (error: unknown) {
+      if (isPrismaError(error, 'P2025')) {
         this.logger.warn(
           `request to delete user that does not exist, w/ id: ${id}`,
         )

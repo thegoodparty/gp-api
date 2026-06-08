@@ -18,7 +18,7 @@ import {
 import { AiContentService } from './aiContent.service'
 import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '../../../generated/prisma'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'
@@ -26,7 +26,10 @@ import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
 import { ContentService } from 'src/content/services/content.service'
-import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import {
+  PromptReplaceCampaign,
+  PromptReplaceService,
+} from 'src/ai/services/promptReplace.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -41,7 +44,7 @@ import { FORBIDDEN_KEYS } from '../schemas/forbiddenKeys'
 export class AiContentController {
   constructor(
     private readonly aiContent: AiContentService,
-    private readonly ai: AiService,
+    private readonly promptReplaceService: PromptReplaceService,
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
     private readonly analytics: AnalyticsService,
@@ -163,7 +166,7 @@ export class AiContentController {
 
     const liveMetrics =
       await this.campaigns.fetchLiveRaceTargetMetrics(campaign)
-    const candidateContext = await this.ai.promptReplace(
+    const candidateContext = await this.promptReplaceService.promptReplace(
       candidateJson,
       campaign,
       liveMetrics,

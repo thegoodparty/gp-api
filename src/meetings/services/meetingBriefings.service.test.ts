@@ -1,4 +1,8 @@
-import { ExperimentRunStatus } from '@prisma/client'
+import {
+  ExperimentRun,
+  ExperimentRunStatus,
+  MeetingResourceLocationType,
+} from '../../generated/prisma'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ExperimentRunsService } from '@/agentExperiments/services/experimentRuns.service'
@@ -52,7 +56,54 @@ const mockResolveServeContext = (
   return spy
 }
 
-describe('POST /v1/elected-office dispatches schedule + briefing in parallel', () => {
+/**
+ * Seed a meeting_schedule ExperimentRun and mock S3 to return its
+ * artifact when the briefing service calls loadLatestScheduleForOrg.
+ *
+ * Defaults: FREQ=DAILY with time 23:59 in America/Chicago — guarantees
+ * the schedule projects a meeting inside any reasonable test window so
+ * the imminence gate passes. Tests that need a meeting OUTSIDE the
+ * window can pass a long-interval RRULE explicitly.
+ */
+const seedScheduleForOrg = async (
+  orgSlug: string,
+  schedule: Partial<{
+    status: 'found' | 'not_found'
+    rrule: string
+    time: string
+    timezone: string
+    duration_minutes: number
+    meeting_name: string
+    location: string
+  }> = {},
+) => {
+  const artifactKey = `schedule-${orgSlug}.json`
+  const body = {
+    status: schedule.status ?? 'found',
+    rrule: schedule.rrule ?? 'FREQ=DAILY',
+    time: schedule.time ?? '23:59',
+    timezone: schedule.timezone ?? 'America/Chicago',
+    duration_minutes: schedule.duration_minutes ?? 120,
+    meeting_name: schedule.meeting_name ?? 'City Council',
+    location: schedule.location ?? 'Council Chambers',
+    sources: [],
+    generated_at: new Date().toISOString(),
+    human: 'Daily test schedule',
+  }
+  await service.prisma.experimentRun.create({
+    data: {
+      organizationSlug: orgSlug,
+      experimentType: 'meeting_schedule',
+      status: ExperimentRunStatus.COMPLETED,
+      artifactBucket: 'schedule-bucket',
+      artifactKey,
+    },
+  })
+  mockS3({ [artifactKey]: JSON.stringify(body) })
+  return artifactKey
+}
+
+describe('POST /v1/elected-office dispatches schedule only (briefing chains via onExperimentRunCompleted)', () => {
   beforeEach(() => {
     vi.stubEnv('MEETINGS_AUTOMATION_ENABLED', 'true')
     mockResolveServeContext(null)
@@ -76,11 +127,11 @@ describe('POST /v1/elected-office dispatches schedule + briefing in parallel', (
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(200)
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
 
-  it('dispatches both meeting_schedule and meeting_briefing when org has a position', async () => {
+  it('dispatches meeting_schedule only (briefing fires later after the schedule completes)', async () => {
     const orgSlug = `eo-create-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-123' })
 
@@ -98,14 +149,11 @@ describe('POST /v1/elected-office dispatches schedule + briefing in parallel', (
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
-    const dispatchedTypes = dispatchSpy.mock.calls.map(
-      ([arg]) => (arg as { type: string }).type,
-    )
-    expect(dispatchedTypes).toEqual(
-      expect.arrayContaining(['meeting_schedule', 'meeting_briefing']),
-    )
-    expect(dispatchSpy).toHaveBeenCalledTimes(2)
+    expect(res.status).toBe(200)
+    // Only the schedule fires on creation. The briefing is chained later
+    // in onExperimentRunCompleted once the schedule lands and the
+    // imminence gate confirms a meeting inside the 5-day window.
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
     expect(dispatchSpy).toHaveBeenCalledWith({
       type: 'meeting_schedule',
       organizationSlug: expect.stringMatching(/^eo-/) as string,
@@ -114,16 +162,6 @@ describe('POST /v1/elected-office dispatches schedule + briefing in parallel', (
         elected_office_id: res.data.id as string,
         state: 'MN',
         office: 'City Council',
-      },
-    })
-    expect(dispatchSpy).toHaveBeenCalledWith({
-      type: 'meeting_briefing',
-      organizationSlug: expect.stringMatching(/^eo-/) as string,
-      clerkUserId: service.user.clerkId!,
-      params: {
-        officialName: `${service.user.firstName} ${service.user.lastName}`,
-        state: 'MN',
-        positionName: 'City Council',
       },
     })
   })
@@ -142,8 +180,70 @@ describe('POST /v1/elected-office dispatches schedule + briefing in parallel', (
       { headers: { 'x-organization-slug': orgSlug } },
     )
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(200)
     expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
+  it('skips schedule dispatch when a schedule run already exists for the org', async () => {
+    const suffix = Date.now()
+    const owner = await service.prisma.user.create({
+      data: { email: `dedup-${suffix}@example.com` },
+    })
+    const orgSlug = `eo-dedup-${suffix}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: owner.id },
+    })
+    const electedOffice = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: owner.id },
+    })
+    await seedScheduleForOrg(orgSlug)
+
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onElectedOfficeCreated(electedOffice)
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
+  it('re-dispatches when the only existing schedule run failed', async () => {
+    const suffix = Date.now()
+    const owner = await service.prisma.user.create({
+      data: {
+        email: `failed-run-${suffix}@example.com`,
+        clerkId: `clerk-${suffix}`,
+        firstName: 'Test',
+        lastName: 'Official',
+      },
+    })
+    const orgSlug = `eo-failed-${suffix}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: owner.id, positionId: 'br-pos-failed' },
+    })
+    const electedOffice = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: owner.id },
+    })
+    await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.FAILED,
+      },
+    })
+
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onElectedOfficeCreated(electedOffice)
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -155,17 +255,104 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
     vi.unstubAllEnvs()
   })
 
-  it('does not dispatch anything on schedule completion (chaining removed)', async () => {
-    const orgSlug = `eo-chain-removed-${Date.now()}`
-    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-removed' })
-    await service.prisma.electedOffice.create({
+  it('chains a briefing dispatch when schedule completion shows a meeting inside the 5-day window', async () => {
+    const orgSlug = `eo-chain-imminent-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-imminent' })
+    const eo = await service.prisma.electedOffice.create({
       data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const artifactKey = await seedScheduleForOrg(orgSlug) // FREQ=DAILY → always inside window
+    const scheduleRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'schedule-bucket',
+        artifactKey,
+        params: { elected_office_id: eo.id },
+      },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(scheduleRun)
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        params: expect.objectContaining({
+          meetingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+          meetingTime: '23:59',
+          meetingTimezone: 'America/Chicago',
+        }),
+      }),
+    )
+  })
+
+  it('does not chain a briefing when schedule completion shows no meeting inside the 5-day window', async () => {
+    // Pin the clock to mid-year so Jan 1 (the next YEARLY occurrence) is
+    // far outside the 5-day window. Without this, runs between roughly
+    // Dec 27 and Jan 1 would see Jan 1 INSIDE the window and the test
+    // would flake.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
+    try {
+      const orgSlug = `eo-chain-far-${Date.now()}`
+      await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-far' })
+      const eo = await service.prisma.electedOffice.create({
+        data: { organizationSlug: orgSlug, userId: service.user.id },
+      })
+      mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+      const artifactKey = await seedScheduleForOrg(orgSlug, {
+        rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
+      })
+      const scheduleRun = await service.prisma.experimentRun.create({
+        data: {
+          organizationSlug: orgSlug,
+          experimentType: 'meeting_schedule',
+          status: ExperimentRunStatus.COMPLETED,
+          artifactBucket: 'schedule-bucket',
+          artifactKey,
+          params: { elected_office_id: eo.id },
+        },
+      })
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(undefined)
+
+      await service.app
+        .get(MeetingBriefingsService)
+        .onExperimentRunCompleted(scheduleRun)
+
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not chain a briefing when schedule completion has status not_found', async () => {
+    const orgSlug = `eo-chain-not-found-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-chain-not-found' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const artifactKey = await seedScheduleForOrg(orgSlug, {
+      status: 'not_found',
     })
     const scheduleRun = await service.prisma.experimentRun.create({
       data: {
         organizationSlug: orgSlug,
         experimentType: 'meeting_schedule',
         status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'schedule-bucket',
+        artifactKey,
+        params: { elected_office_id: eo.id },
       },
     })
     const dispatchSpy = vi
@@ -311,6 +498,53 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
       },
     })
     expect(row).toBeNull()
+  })
+
+  it('writes the row for agenda_provided_by_user even when meeting_time is empty', async () => {
+    const orgSlug = `eo-user-agenda-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: service.user.id },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing.json',
+        params: { elected_office_id: eo.id },
+      },
+    })
+    mockS3({
+      'briefing.json': JSON.stringify({
+        briefing_status: 'agenda_provided_by_user',
+        meeting_date: '2026-06-08',
+        meeting_time: '',
+        meeting_timezone: '',
+        meeting_name: 'Special Session',
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    const row = await service.prisma.meetingBriefing.findUnique({
+      where: {
+        electedOfficeId_meetingDate: {
+          electedOfficeId: eo.id,
+          meetingDate: new Date('2026-06-08'),
+        },
+      },
+    })
+    expect(row).not.toBeNull()
+    expect(row?.meetingTime).toBe('')
+    expect(row?.meetingTimezone).toBe('')
+    expect(row?.experimentRunId).toBe(briefingRun.runId)
+    expect(row?.artifact?.meeting_name).toBe('Special Session')
   })
 
   it('does not write a MeetingBriefing row for placeholder briefing_status (awaiting_agenda)', async () => {
@@ -529,7 +763,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
 
-  it('dispatches only for EOs without a future briefing', async () => {
+  it('dispatches only for EOs without a future briefing (and only when schedule shows imminent meeting)', async () => {
     const orgSlugA = `eo-cron-a-${Date.now()}`
     await seedOrgAndCampaign(orgSlugA, { positionId: 'br-pos-cron-a' })
     const campaignA = await service.prisma.campaign.findFirst({
@@ -577,6 +811,11 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
 
     mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
 
+    // Both orgs have schedules so the imminence gate passes. Org A also has
+    // an existing future briefing → coverage dedupe skips it. Only B fires.
+    await seedScheduleForOrg(orgSlugA)
+    await seedScheduleForOrg(orgSlugB)
+
     const existingBriefingRun = await service.prisma.experimentRun.create({
       data: {
         organizationSlug: orgSlugA,
@@ -609,9 +848,70 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
         organizationSlug: orgSlugB,
         params: expect.objectContaining({
           positionName: 'City Council',
+          meetingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+          meetingTime: '23:59',
+          meetingTimezone: 'America/Chicago',
         }),
       }),
     )
+  })
+
+  it('skips an EO entirely when no meeting_schedule exists yet', async () => {
+    const orgSlug = `eo-cron-no-schedule-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-no-sched' })
+    const campaign = await service.prisma.campaign.findFirst({
+      where: { organizationSlug: orgSlug },
+    })
+    await service.prisma.electedOffice.create({
+      data: {
+        organizationSlug: orgSlug,
+        userId: service.user.id,
+        campaignId: campaign?.id,
+      },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
+
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+
+  it('skips an EO when the next meeting is outside the 5-day window', async () => {
+    // Pin clock to mid-year so Jan 1 (the next YEARLY occurrence) is far
+    // outside any 5-day window. Without pinning, runs near new year would
+    // see Jan 1 inside the window and flake.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
+    try {
+      const orgSlug = `eo-cron-far-meeting-${Date.now()}`
+      await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-cron-far' })
+      const campaign = await service.prisma.campaign.findFirst({
+        where: { organizationSlug: orgSlug },
+      })
+      await service.prisma.electedOffice.create({
+        data: {
+          organizationSlug: orgSlug,
+          userId: service.user.id,
+          campaignId: campaign?.id,
+        },
+      })
+      mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+      await seedScheduleForOrg(orgSlug, {
+        rrule: 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1',
+      })
+      const dispatchSpy = vi
+        .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+        .mockResolvedValue(undefined)
+
+      await service.app.get(MeetingBriefingsService).dispatchDailyBriefings()
+
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('runs the dispatch loop once when invoked twice the same day (multi-replica guard)', async () => {
@@ -629,6 +929,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
     })
 
     mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    await seedScheduleForOrg(orgSlug)
 
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
@@ -659,6 +960,7 @@ describe('MeetingBriefingsService.dispatchDailyBriefings', () => {
     })
 
     mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    await seedScheduleForOrg(orgSlug)
 
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
@@ -703,9 +1005,38 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     vi.unstubAllEnvs()
   })
 
-  it('dispatches a briefing run when kind is briefing', async () => {
+  it('dispatches a briefing run when kind is briefing (with meetingDate from schedule)', async () => {
     const orgSlug = `eo-manual-briefing-${Date.now()}`
     await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-manual-b' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    await seedScheduleForOrg(orgSlug)
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
+
+    const result = await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
+    expect(result.dispatched).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        params: expect.objectContaining({
+          meetingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+          meetingTime: '23:59',
+          meetingTimezone: 'America/Chicago',
+        }),
+      }),
+    )
+  })
+
+  it('does not dispatch a briefing manually when no schedule exists', async () => {
+    const orgSlug = `eo-manual-no-sched-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-manual-no-sched' })
     const eo = await service.prisma.electedOffice.create({
       data: { organizationSlug: orgSlug, userId: service.user.id },
     })
@@ -718,10 +1049,8 @@ describe('MeetingBriefingsService.dispatchManual', () => {
       .get(MeetingBriefingsService)
       .dispatchManual(eo.id, 'briefing')
 
-    expect(result.dispatched).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'meeting_briefing' }),
-    )
+    expect(result.dispatched).toBe(false)
+    expect(dispatchSpy).not.toHaveBeenCalled()
   })
 
   it('returns dispatched:false for unknown electedOfficeId', async () => {
@@ -750,9 +1079,10 @@ describe('MeetingBriefingsService.dispatchManual', () => {
       l2DistrictType: 'City',
       l2DistrictName: 'Minneapolis',
     })
+    await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     const result = await service.app
       .get(MeetingBriefingsService)
@@ -767,6 +1097,9 @@ describe('MeetingBriefingsService.dispatchManual', () => {
         officialName: `${service.user.firstName} ${service.user.lastName}`,
         state: 'MN',
         positionName: 'City Council Member',
+        meetingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+        meetingTime: '23:59',
+        meetingTimezone: 'America/Chicago',
         l2DistrictType: 'City',
         l2DistrictName: 'Minneapolis',
       },
@@ -785,9 +1118,10 @@ describe('MeetingBriefingsService.dispatchManual', () => {
       l2DistrictType: 'SchoolDistrict',
       l2DistrictName: 'LAUSD',
     })
+    await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     const result = await service.app
       .get(MeetingBriefingsService)
@@ -802,6 +1136,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
           positionName: 'School Board',
           l2DistrictType: 'SchoolDistrict',
           l2DistrictName: 'LAUSD',
+          meetingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
         }),
       }),
     )
@@ -824,5 +1159,323 @@ describe('MeetingBriefingsService.dispatchManual', () => {
 
     expect(result.dispatched).toBe(false)
     expect(dispatchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('MeetingBriefingsService location hints', () => {
+  beforeEach(() => {
+    mockResolveServeContext(null)
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('passes known_schedule_location into the schedule dispatch when a row exists', async () => {
+    const orgSlug = `loc-sched-hint-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-sched-hint' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    await service.prisma.meetingResourceLocation.create({
+      data: {
+        electedOfficeId: eo.id,
+        type: MeetingResourceLocationType.SCHEDULE,
+        description: 'https://example.gov/city-council/meetings',
+      },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'schedule')
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_schedule',
+        params: expect.objectContaining({
+          known_schedule_location: 'https://example.gov/city-council/meetings',
+        }),
+      }),
+    )
+  })
+
+  it('omits known_schedule_location when no row exists', async () => {
+    const orgSlug = `loc-sched-no-hint-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-sched-no-hint' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'schedule')
+
+    const params = dispatchSpy.mock.calls[0]?.[0]?.params as
+      | Record<string, unknown>
+      | undefined
+    expect(params).toBeDefined()
+    expect(params).not.toHaveProperty('known_schedule_location')
+  })
+
+  it('passes knownAgendaLocation and electedOfficeId into the briefing dispatch when a row exists', async () => {
+    const orgSlug = `loc-agenda-hint-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-agenda-hint' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    await service.prisma.meetingResourceLocation.create({
+      data: {
+        electedOfficeId: eo.id,
+        type: MeetingResourceLocationType.AGENDA,
+        description: 'https://city.granicus.com/ViewPublisher.php?view_id=5',
+      },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    await seedScheduleForOrg(orgSlug)
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .dispatchManual(eo.id, 'briefing')
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'meeting_briefing',
+        params: expect.objectContaining({
+          knownAgendaLocation:
+            'https://city.granicus.com/ViewPublisher.php?view_id=5',
+        }),
+      }),
+    )
+  })
+
+  it('upserts a SCHEDULE location row when the schedule artifact carries discovered_schedule_location', async () => {
+    const orgSlug = `loc-sched-persist-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-sched-persist' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    mockResolveServeContext({ state: 'MN', positionName: 'City Council' })
+    const artifactKey = `schedule-loc-${orgSlug}.json`
+    await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_schedule',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'schedule-bucket',
+        artifactKey,
+        params: { elected_office_id: eo.id },
+      },
+    })
+    mockS3({
+      [artifactKey]: JSON.stringify({
+        status: 'found',
+        rrule: 'FREQ=DAILY',
+        time: '19:00',
+        timezone: 'America/Chicago',
+        duration_minutes: 120,
+        meeting_name: 'City Council',
+        location: 'Council Chambers',
+        sources: [],
+        generated_at: new Date().toISOString(),
+        human: 'Daily',
+        discovered_schedule_location:
+          'https://example.gov/government/city-council/',
+      }),
+    })
+    const scheduleRun = await service.prisma.experimentRun.findFirstOrThrow({
+      where: { artifactKey },
+    })
+    vi.spyOn(
+      service.app.get(ExperimentRunsService),
+      'dispatchRun',
+    ).mockResolvedValue(undefined)
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(scheduleRun)
+
+    const row = await service.prisma.meetingResourceLocation.findUnique({
+      where: {
+        electedOfficeId_type: {
+          electedOfficeId: eo.id,
+          type: MeetingResourceLocationType.SCHEDULE,
+        },
+      },
+    })
+    expect(row).not.toBeNull()
+    expect(row?.description).toBe(
+      'https://example.gov/government/city-council/',
+    )
+    expect(row?.experimentRunId).toBe(scheduleRun.runId)
+  })
+
+  it('upserts an AGENDA location row on a placeholder briefing when discovered_agenda_location is set', async () => {
+    const orgSlug = `loc-agenda-placeholder-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, {
+      positionId: 'br-pos-agenda-placeholder',
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-placeholder.json',
+        params: {},
+      },
+    })
+    mockS3({
+      'briefing-placeholder.json': JSON.stringify({
+        briefing_status: 'awaiting_agenda',
+        meeting_date: '2026-06-10',
+        run_metadata: {
+          agenda_packet_url: null,
+          discovered_agenda_location:
+            'https://city.granicus.com/ViewPublisher.php?view_id=5',
+        },
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    // No briefing row written for placeholder status (existing behavior),
+    // but the location hint persists so the next run can use it.
+    const briefingRow = await service.prisma.meetingBriefing.findUnique({
+      where: {
+        electedOfficeId_meetingDate: {
+          electedOfficeId: eo.id,
+          meetingDate: new Date('2026-06-10'),
+        },
+      },
+    })
+    expect(briefingRow).toBeNull()
+
+    const locationRow = await service.prisma.meetingResourceLocation.findUnique(
+      {
+        where: {
+          electedOfficeId_type: {
+            electedOfficeId: eo.id,
+            type: MeetingResourceLocationType.AGENDA,
+          },
+        },
+      },
+    )
+    expect(locationRow).not.toBeNull()
+    expect(locationRow?.description).toBe(
+      'https://city.granicus.com/ViewPublisher.php?view_id=5',
+    )
+    expect(locationRow?.experimentRunId).toBe(briefingRun.runId)
+  })
+
+  it('overwrites an existing location row on the next run', async () => {
+    const orgSlug = `loc-overwrite-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-overwrite' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    await service.prisma.meetingResourceLocation.create({
+      data: {
+        electedOfficeId: eo.id,
+        type: MeetingResourceLocationType.AGENDA,
+        description: 'https://old.example.gov/meetings',
+      },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-overwrite.json',
+        params: {},
+      },
+    })
+    mockS3({
+      'briefing-overwrite.json': JSON.stringify({
+        briefing_status: 'briefing_ready',
+        meeting_date: '2026-06-10',
+        meeting_time: '19:00',
+        meeting_timezone: 'America/Chicago',
+        meeting_name: 'City Council',
+        location: 'Council Chambers',
+        run_metadata: {
+          agenda_packet_url:
+            'https://new.example.gov/meetings/2026-06-10/packet.pdf',
+          discovered_agenda_location: 'https://new.example.gov/meetings',
+        },
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    const row = await service.prisma.meetingResourceLocation.findUnique({
+      where: {
+        electedOfficeId_type: {
+          electedOfficeId: eo.id,
+          type: MeetingResourceLocationType.AGENDA,
+        },
+      },
+    })
+    expect(row?.description).toBe('https://new.example.gov/meetings')
+    expect(row?.experimentRunId).toBe(briefingRun.runId)
+  })
+
+  it('does not write a location row when discovered_agenda_location is absent', async () => {
+    const orgSlug = `loc-absent-${Date.now()}`
+    await seedOrgAndCampaign(orgSlug, { positionId: 'br-pos-absent' })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing-no-loc.json',
+        params: {},
+      },
+    })
+    mockS3({
+      'briefing-no-loc.json': JSON.stringify({
+        briefing_status: 'briefing_ready',
+        meeting_date: '2026-06-10',
+        meeting_time: '19:00',
+        meeting_timezone: 'America/Chicago',
+        meeting_name: 'City Council',
+        location: 'Council Chambers',
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    const row = await service.prisma.meetingResourceLocation.findUnique({
+      where: {
+        electedOfficeId_type: {
+          electedOfficeId: eo.id,
+          type: MeetingResourceLocationType.AGENDA,
+        },
+      },
+    })
+    expect(row).toBeNull()
   })
 })

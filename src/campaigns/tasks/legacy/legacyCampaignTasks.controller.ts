@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common'
 import { LegacyCampaignTasksService } from './services/legacyCampaignTasks.service'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 
 @Controller('campaigns/legacy-tasks')

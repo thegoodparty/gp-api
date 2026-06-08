@@ -1,7 +1,7 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { Organization } from '@prisma/client'
+import { Organization } from '../../generated/prisma'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RequireOrganizationMetadata } from '../decorators/UseOrganization.decorator'
 import { OrganizationsService } from '../services/organizations.service'

@@ -603,21 +603,29 @@ describe('S3Service', () => {
     })
   })
 
-  describe('getObjectSize', () => {
+  describe('headObject', () => {
     const bucket = 'test-bucket'
     const key = 'folder/file.txt'
 
-    it('returns ContentLength on success', async () => {
+    it('returns contentLength on success', async () => {
       s3Mock
         .on(HeadObjectCommand)
         .resolves({ ContentLength: 12345, $metadata: {} })
 
-      const result = await service.getObjectSize(bucket, key)
+      const result = await service.headObject(bucket, key)
 
-      expect(result).toBe(12345)
+      expect(result).toEqual({ contentLength: 12345 })
     })
 
-    it('returns undefined on NoSuchKey', async () => {
+    it('returns null contentLength when S3 omits it', async () => {
+      s3Mock.on(HeadObjectCommand).resolves({ $metadata: {} })
+
+      const result = await service.headObject(bucket, key)
+
+      expect(result).toEqual({ contentLength: null })
+    })
+
+    it('returns null on NoSuchKey', async () => {
       s3Mock.on(HeadObjectCommand).rejects(
         new NoSuchKey({
           message: 'The specified key does not exist',
@@ -625,26 +633,26 @@ describe('S3Service', () => {
         }),
       )
 
-      const result = await service.getObjectSize(bucket, key)
+      const result = await service.headObject(bucket, key)
 
-      expect(result).toBeUndefined()
+      expect(result).toBeNull()
     })
 
-    it('returns undefined on HTTP 404', async () => {
+    it('returns null on HTTP 404', async () => {
       const error = Object.assign(new Error('NotFound'), {
         $metadata: { httpStatusCode: 404 },
       })
       s3Mock.on(HeadObjectCommand).rejects(error)
 
-      const result = await service.getObjectSize(bucket, key)
+      const result = await service.headObject(bucket, key)
 
-      expect(result).toBeUndefined()
+      expect(result).toBeNull()
     })
 
     it('rethrows unexpected errors', async () => {
       s3Mock.on(HeadObjectCommand).rejects(new Error('Network error'))
 
-      await expect(service.getObjectSize(bucket, key)).rejects.toThrow(
+      await expect(service.headObject(bucket, key)).rejects.toThrow(
         'Network error',
       )
     })

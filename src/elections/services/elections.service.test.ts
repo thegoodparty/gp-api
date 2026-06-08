@@ -311,6 +311,32 @@ describe('ElectionsService', () => {
     })
   })
 
+  describe('getZipCodesByBrPositionId', () => {
+    it('calls /v1/positions/by-ballotready-id/:brPositionId/zip-codes and returns the parsed zip array', async () => {
+      mockHttpGet.mockReturnValue(
+        of({ data: ['90210', '90211', '90212'], status: 200 }),
+      )
+
+      const result = await service.getZipCodesByBrPositionId('br-pos-1')
+
+      expect(result).toEqual(['90210', '90211', '90212'])
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/v1/positions/by-ballotready-id/br-pos-1/zip-codes',
+        ),
+        expect.any(Object),
+      )
+    })
+
+    it('returns an empty array when the API returns null/empty', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      const result = await service.getZipCodesByBrPositionId('br-pos-1')
+
+      expect(result).toEqual([])
+    })
+  })
+
   describe('getDistrictId', () => {
     it('returns district id when API returns results', async () => {
       mockHttpGet.mockReturnValue(
@@ -577,6 +603,78 @@ describe('ElectionsService', () => {
       })
 
       const result = await service.fetchFilingFeeByRaceHash('br-hash-1')
+
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('fetchCampaignStrategyContext', () => {
+    it('returns null without calling the API when brHashId is empty', async () => {
+      const mockHttpPost = vi.fn()
+      Object.defineProperty(service, 'httpService', {
+        get: () => ({ get: mockHttpGet, post: mockHttpPost }),
+        configurable: true,
+      })
+
+      const result = await service.fetchCampaignStrategyContext('')
+
+      expect(result).toBeNull()
+      expect(mockHttpPost).not.toHaveBeenCalled()
+    })
+
+    it('POSTs to /campaign-strategy-context with brHashId in the body', async () => {
+      const mockHttpPost = vi.fn().mockReturnValue(
+        of({
+          data: {
+            candidate_count: 0,
+            candidate_office: null,
+            candidates: [],
+            civics_win_number: null,
+            contacts_needed_estimate: 100,
+            general_election_date: '2026-11-03',
+            number_of_seats: 1,
+            office_level: null,
+            office_type: null,
+            official_office_name: null,
+            primary_election_date: null,
+            projected_turnout: 200,
+            projected_voter_turnout: 200,
+            registered_voters: 900,
+            unique_cellphones: 500,
+            unique_landlines: 300,
+            relevant_election_date: '2026-11-03',
+            state: 'CA',
+            win_number_effective: 100,
+            win_number_estimate: 101,
+          },
+          status: 200,
+        }),
+      )
+      Object.defineProperty(service, 'httpService', {
+        get: () => ({ get: mockHttpGet, post: mockHttpPost }),
+        configurable: true,
+      })
+
+      const result = await service.fetchCampaignStrategyContext('Z2lk-hash')
+
+      expect(result?.registered_voters).toBe(900)
+      expect(result?.win_number_effective).toBe(100)
+      expect(mockHttpPost).toHaveBeenCalledWith(
+        expect.stringContaining('campaign-strategy-context'),
+        { brHashId: 'Z2lk-hash' },
+      )
+    })
+
+    it('returns null and swallows errors when election-api throws', async () => {
+      const mockHttpPost = vi.fn().mockImplementation(() => {
+        throw new Error('boom')
+      })
+      Object.defineProperty(service, 'httpService', {
+        get: () => ({ get: mockHttpGet, post: mockHttpPost }),
+        configurable: true,
+      })
+
+      const result = await service.fetchCampaignStrategyContext('Z2lk-hash')
 
       expect(result).toBeNull()
     })

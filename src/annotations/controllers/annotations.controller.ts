@@ -7,9 +7,11 @@ import {
   Param,
   Post,
   Put,
+  Req,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice, User } from '@prisma/client'
+import { ElectedOffice, User } from '../../generated/prisma'
+import { IncomingRequest } from '@/authentication/authentication.types'
 import {
   AnnotationResponseSchema,
   AttachmentDownloadUrlResponseSchema,
@@ -55,14 +57,40 @@ export class AnnotationsController {
   }
 
   @UseElectedOffice()
+  @Put(':annotationId/review')
+  @ResponseSchema(AnnotationResponseSchema)
+  async updateReview(
+    @Param('annotationId') annotationId: string,
+    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Body(new ZodValidationPipe(UpdateNoteRequestSchema))
+    body: UpdateNoteRequest,
+    @Req() req: IncomingRequest,
+  ) {
+    return this.annotations.updateReviewBody(
+      annotationId,
+      user.id,
+      electedOffice,
+      req.actorSub ?? null,
+      body.body,
+    )
+  }
+
+  @UseElectedOffice()
   @Delete(':annotationId')
   @HttpCode(204)
   async remove(
     @Param('annotationId') annotationId: string,
     @ReqUser() user: User,
     @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Req() req: IncomingRequest,
   ): Promise<void> {
-    await this.annotations.deleteOne(annotationId, user.id, electedOffice)
+    await this.annotations.deleteOne(
+      annotationId,
+      user.id,
+      electedOffice,
+      req.actorSub ?? null,
+    )
   }
 
   @UseElectedOffice()

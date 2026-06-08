@@ -1,5 +1,11 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
+import {
+  compareAsc,
+  endOfMonth,
+  format,
+  parseISO,
+  startOfMonth,
+} from 'date-fns'
 import { gql, GraphQLClient } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
@@ -7,6 +13,8 @@ import { truncateZip } from 'src/shared/util/zipcodes.util'
 import zipcodes from 'zipcodes'
 import { ElectionLevels } from '../../shared/constants/governmentLevels'
 import {
+  BallotReadyMilestone,
+  RaceMilestonesGraphResponse,
   RaceNode,
   RacesByIdNode,
   RacesByZipcode,
@@ -14,6 +22,7 @@ import {
   RaceWithOfficeHolders,
   RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
+import type { MilestoneWindow, RaceMilestones } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
@@ -114,6 +123,80 @@ export class BallotReadyService {
       return await this.graphQLClient.request(query)
     } catch (error) {
       this.logger.error({ error }, 'Error at fetchRaceById:')
+      return null
+    }
+  }
+
+  // Hop from a general-election race to its sibling primary race, returning
+  // the primary's brHashId (the id election-api keys campaign-strategy-context
+  // on). Returns null when the position has no primary or none can be found.
+  async fetchPrimaryRaceId(generalRaceId: string): Promise<string | null> {
+    const race = await this.fetchRaceById(generalRaceId)
+    const positionId = race?.node?.position?.id
+    // electionDay is an ISO8601Date GraphQL scalar (typed `any`); coerce.
+    const generalDay = String(race?.node?.election?.electionDay ?? '')
+    if (!positionId || !race?.node?.position?.hasPrimary || !generalDay) {
+      return null
+    }
+    const year = generalDay.slice(0, 4)
+    const query = gql`
+      query PrimaryRaceForPosition(
+        $positionId: ID!
+        $rangeStart: ISO8601Date!
+        $rangeEnd: ISO8601Date!
+      ) {
+        node(id: $positionId) {
+          ... on Position {
+            races(
+              filterBy: { electionDay: { gte: $rangeStart, lte: $rangeEnd } }
+              first: 50
+            ) {
+              edges {
+                node {
+                  id
+                  isPrimary
+                  election {
+                    electionDay
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<
+        {
+          node: {
+            races?: {
+              edges: {
+                node: {
+                  id: string
+                  isPrimary: boolean
+                  election: { electionDay: string }
+                }
+              }[]
+            }
+          } | null
+        },
+        { positionId: string; rangeStart: string; rangeEnd: string }
+      >(query, {
+        positionId,
+        rangeStart: `${year}-01-01`,
+        rangeEnd: `${year}-12-31`,
+      })
+      const primary = (result?.node?.races?.edges ?? [])
+        .map((e) => e.node)
+        .filter((n) => n.isPrimary && n.election.electionDay !== generalDay)
+        .sort((a, b) =>
+          String(a.election.electionDay).localeCompare(
+            String(b.election.electionDay),
+          ),
+        )[0]
+      return primary?.id ?? null
+    } catch (error) {
+      this.logger.error({ error }, 'Error at fetchPrimaryRaceId:')
       return null
     }
   }
@@ -476,9 +559,125 @@ export class BallotReadyService {
     }
   }
 
+  // Fetch the per-category milestone windows for a BR race. Source:
+  // Race.election.milestones() — BR returns one row per (category, type,
+  // feature), so we collapse via earliest OPEN / latest CLOSE per
+  // category. Returns null on any failure so callers can null-fill the
+  // field without failing the parent request — milestones are enrichment,
+  // not core.
+  //
+  // Field name `date` (not `at`) confirmed via GraphQL introspection
+  // 2026-06-01. BR's Milestone.date is ISO8601Date (yyyy-MM-dd), so the
+  // datetime/offset gymnastics we needed for the original `at` guess are
+  // unnecessary — string sort matches chronological order for
+  // ISO8601Date and the value never needs reformatting.
+  async fetchMilestones(brHashId: string): Promise<RaceMilestones | null> {
+    if (!brHashId) return null
+    const query = gql`
+      query MilestonesForRace($raceId: ID!) {
+        node(id: $raceId) {
+          ... on Race {
+            election {
+              milestones {
+                category
+                type
+                date
+              }
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<
+        RaceMilestonesGraphResponse,
+        { raceId: string }
+      >(query, { raceId: brHashId })
+      // No race (unknown raceId) or no linked Election → no data to
+      // collapse. Return top-level null so callers can null-fill cleanly
+      // and don't conflate "race not found" with "election exists but
+      // returned zero milestones" (which yields an all-null-windows
+      // object via collapseMilestones below).
+      if (!result?.node?.election) return null
+      const milestones = result.node.election.milestones ?? []
+      return collapseMilestones(milestones)
+    } catch (error) {
+      this.logger.warn(
+        { error, brHashId },
+        'BR Race.election.milestones lookup failed',
+      )
+      return null
+    }
+  }
+
   constructor(private readonly logger: PinoLogger) {
     this.logger.setContext(BallotReadyService.name)
   }
+}
+
+// Group BR milestones by category, picking the earliest OPEN and latest
+// CLOSE per category. BR returns one row per (category, type, feature)
+// combo — e.g. REGISTRATION CLOSE has separate rows for IN_PERSON, MAIL,
+// ONLINE deadlines. Earliest OPEN captures the first opportunity to
+// register/vote; latest CLOSE captures the final deadline a voter can
+// still hit (matters because some states close ONLINE earlier than
+// IN_PERSON). UI consumers can render the window without reasoning about
+// features. Exported for direct unit testing.
+export const collapseMilestones = (
+  milestones: BallotReadyMilestone[],
+): RaceMilestones => {
+  const grouped: Record<string, { opens: string[]; closes: string[] }> = {
+    REGISTRATION: { opens: [], closes: [] },
+    EARLY_VOTING: { opens: [], closes: [] },
+    REQUEST_BALLOT: { opens: [], closes: [] },
+  }
+
+  for (const m of milestones) {
+    if (!m.date) continue
+    const bucket = grouped[m.category]
+    if (!bucket) continue
+    if (m.type === 'OPEN') bucket.opens.push(m.date)
+    else if (m.type === 'CLOSE') bucket.closes.push(m.date)
+  }
+
+  return {
+    voter_registration: toWindow(grouped.REGISTRATION),
+    early_voting: toWindow(grouped.EARLY_VOTING),
+    request_ballot: toWindow(grouped.REQUEST_BALLOT),
+  }
+}
+
+const toWindow = (bucket: {
+  opens: string[]
+  closes: string[]
+}): MilestoneWindow | null => {
+  const start = earliestDate(bucket.opens)
+  const end = latestDate(bucket.closes)
+  if (start === null && end === null) return null
+  return { start, end }
+}
+
+// BR's Milestone.date is ISO8601Date (yyyy-MM-dd, no time component) per
+// schema introspection 2026-06-01. For that format string sort matches
+// chronological order, so compareAsc and lex compare give the same
+// result here. We keep compareAsc anyway for CLAUDE.md Rule 28 and so
+// the helper stays correct if BR ever swaps to the nullable
+// `datetime: ISO8601DateTime` field (which can carry a non-UTC offset
+// where lex order would diverge from chronological order). The returned
+// value is the input string verbatim — no reformatting needed because
+// the source is already yyyy-MM-dd.
+const earliestDate = (values: string[]): string | null => {
+  if (values.length === 0) return null
+  return values.reduce((a, b) =>
+    compareAsc(parseISO(a), parseISO(b)) <= 0 ? a : b,
+  )
+}
+
+const latestDate = (values: string[]): string | null => {
+  if (values.length === 0) return null
+  return values.reduce((a, b) =>
+    compareAsc(parseISO(a), parseISO(b)) >= 0 ? a : b,
+  )
 }
 
 function getMonthBounds(dateString: string): { gt: string; lt: string } {

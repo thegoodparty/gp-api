@@ -1,5 +1,8 @@
-import type { Annotation, MeetingBriefing } from '@prisma/client'
-import { AnnotationKind, AnnotationResourceType } from '@prisma/client'
+import type { Annotation, MeetingBriefing } from '../../../../generated/prisma'
+import {
+  AnnotationKind,
+  AnnotationResourceType,
+} from '../../../../generated/prisma'
 import { buildSystemPrompt } from '../../services/systemPromptBuilder'
 
 // systemPromptBuilder.ts does not export its argument interface, so we
@@ -35,6 +38,7 @@ const annotation: Annotation = {
   noteId: null,
   chatConversationId: 'conv-hville-1',
   annotationBugReportId: null,
+  annotationReviewId: null,
 }
 
 const artifactContent = `# Briefing: Hendersonville, NC — Regular Council Meeting

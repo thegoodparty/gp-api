@@ -10,11 +10,11 @@ import {
   PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
-} from '@prisma/client'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+} from '../../generated/prisma'
+import { isPrismaError } from 'src/prisma/util/prismaErrors.util'
 import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
-import { format, isBefore } from 'date-fns'
+import { addMinutes, format, isBefore, isValid, parseISO } from 'date-fns'
 import { groupBy } from 'es-toolkit'
 import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
@@ -29,6 +29,7 @@ import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { MeetingBriefingsService } from 'src/meetings/services/meetingBriefings.service'
+import { CampaignStrategyService } from 'src/campaignStrategy/services/campaignStrategy.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import {
@@ -76,7 +77,8 @@ import { OrgDistrict } from '@/organizations/organizations.types'
 
 import type { AgentExperimentResultData } from '../queue.types'
 
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
+import { isJsonObject } from '@/shared/util/objects.util'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -124,6 +126,7 @@ export class QueueConsumerService {
     private readonly weeklyTasksDigestHandler: WeeklyTasksDigestHandlerService,
     private readonly experimentRunsService: ExperimentRunsService,
     private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly campaignStrategy: CampaignStrategyService,
     private readonly annotationAttachments: AnnotationAttachmentService,
     private readonly logger: PinoLogger,
   ) {
@@ -201,15 +204,9 @@ export class QueueConsumerService {
 
   private legacyShouldRequeueError(error: Error): boolean {
     // Don't retry Prisma errors for missing records - these are permanent failures
-    if (error instanceof PrismaClientKnownRequestError) {
-      // P2025: Record not found
-      if (error.code === 'P2025') {
-        return false
-      }
-      // P2002: Unique constraint violation
-      if (error.code === 'P2002') {
-        return false
-      }
+    // P2025: Record not found; P2002: Unique constraint violation
+    if (isPrismaError(error, 'P2025') || isPrismaError(error, 'P2002')) {
+      return false
     }
 
     // Don't retry validation errors or other client errors
@@ -873,6 +870,78 @@ export class QueueConsumerService {
     })
   }
 
+  // Reads the agent artifact to decide terminal vs resumable status. The result
+  // message only says success/failed; data_quality/next_action live in the S3
+  // artifact. Falls back to COMPLETED on any read/parse failure so a transient
+  // S3 miss never strands a run.
+  private async resolveSuccessPatch(data: AgentExperimentResultData): Promise<{
+    status: ExperimentRunStatus
+    stage: string | null
+    dataQuality: string | null
+    resumeScheduledFor: Date | null
+  }> {
+    const base = {
+      status: ExperimentRunStatus.COMPLETED,
+      stage: null as string | null,
+      dataQuality: null as string | null,
+      resumeScheduledFor: null as Date | null,
+    }
+    if (!data.artifactBucket || !data.artifactKey) return base
+    let artifact: Record<string, unknown>
+    try {
+      const raw = await this.s3Service.getFile(
+        data.artifactBucket,
+        data.artifactKey,
+      )
+      if (!raw) return base
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      artifact = JSON.parse(raw) as Record<string, unknown>
+    } catch (error) {
+      this.logger.warn(
+        { error, runId: data.runId },
+        'could not read artifact; defaulting to COMPLETED',
+      )
+      return base
+    }
+
+    const stage = typeof artifact.stage === 'string' ? artifact.stage : null
+    const dq = artifact.data_quality
+    const overall =
+      isJsonObject(dq) && typeof dq.overall === 'string' ? dq.overall : null
+    const nextAction = artifact.next_action
+    const scheduledForRaw =
+      isJsonObject(nextAction) &&
+      typeof nextAction.scheduled_for === 'string' &&
+      nextAction.scheduled_for !== ''
+        ? nextAction.scheduled_for
+        : null
+    const parsedScheduledFor = scheduledForRaw
+      ? parseISO(scheduledForRaw)
+      : null
+    const scheduledFor =
+      parsedScheduledFor && isValid(parsedScheduledFor)
+        ? parsedScheduledFor
+        : null
+
+    if (overall === 'partial') {
+      return {
+        status: ExperimentRunStatus.AWAITING_RESUME,
+        stage,
+        dataQuality: overall,
+        resumeScheduledFor: scheduledFor ?? addMinutes(new Date(), 5),
+      }
+    }
+    if (overall === 'failed' || stage === 'failed') {
+      return {
+        ...base,
+        status: ExperimentRunStatus.FAILED,
+        stage,
+        dataQuality: overall,
+      }
+    }
+    return { ...base, stage, dataQuality: overall }
+  }
+
   private async handleAgentExperimentResult(data: AgentExperimentResultData) {
     const run = await this.experimentRunsService.findUnique({
       where: { runId: data.runId },
@@ -891,10 +960,13 @@ export class QueueConsumerService {
       return true
     }
 
+    const successPatch =
+      data.status === 'success' ? await this.resolveSuccessPatch(data) : null
+
     const updatedRun = await this.experimentRunsService.optimisticLockingUpdate(
       { where: { runId: data.runId } },
-      async (run) => {
-        if (run.status !== ExperimentRunStatus.RUNNING) {
+      async (currentRun) => {
+        if (currentRun.status !== ExperimentRunStatus.RUNNING) {
           this.logger.info(
             { runId: data.runId },
             'Experiment run already completed, skipping',
@@ -902,11 +974,12 @@ export class QueueConsumerService {
           throw new Error('Experiment run already completed')
         }
         return {
-          status: {
-            success: ExperimentRunStatus.COMPLETED,
-            failed: ExperimentRunStatus.FAILED,
-            contract_violation: ExperimentRunStatus.FAILED,
-          }[data.status],
+          status: successPatch
+            ? successPatch.status
+            : ExperimentRunStatus.FAILED,
+          stage: successPatch?.stage ?? null,
+          dataQuality: successPatch?.dataQuality ?? null,
+          resumeScheduledFor: successPatch?.resumeScheduledFor ?? null,
           artifactKey: data.artifactKey ?? null,
           artifactBucket: data.artifactBucket ?? null,
           durationSeconds: data.durationSeconds ?? null,
@@ -921,14 +994,28 @@ export class QueueConsumerService {
       'Updated experiment run from queue event',
     )
 
-    await this.meetingBriefings
-      .onExperimentRunCompleted(updatedRun)
-      .catch((err: unknown) =>
-        this.logger.error(
-          { err, runId: updatedRun.runId },
-          'onExperimentRunCompleted failed after run update',
-        ),
-      )
+    if (updatedRun.status === ExperimentRunStatus.COMPLETED) {
+      await this.meetingBriefings
+        .onExperimentRunCompleted(updatedRun)
+        .catch((err: unknown) =>
+          this.logger.error(
+            { err, runId: updatedRun.runId },
+            'onExperimentRunCompleted failed after run update',
+          ),
+        )
+    }
+
+    // Let a persistence failure propagate instead of swallowing it, so the
+    // failure surfaces (requeue + DLQ visibility) rather than silently acking
+    // a COMPLETED run that never got its section persisted. This is for
+    // visibility, not retry: onExperimentRunCompleted already calls markFailed
+    // before it rethrows, so on redelivery the status guard above (!= RUNNING)
+    // drops the message. That same guard bounds the requeue, so the raw throw
+    // can't infinite-redrive. The user-facing 'failed' state comes from
+    // markFailed (or, if markFailed itself faults, the isStuck grace-window
+    // backstop), not from the requeue. onExperimentRunCompleted is a no-op for
+    // non-campaign-strategy runs, so this only throws on a real persist failure.
+    await this.campaignStrategy.onExperimentRunCompleted(updatedRun)
 
     return true
   }

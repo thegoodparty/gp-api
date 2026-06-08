@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Readable } from 'stream'
-import { Campaign } from '@prisma/client'
+import { Campaign } from '../../../generated/prisma'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { OrgDistrict } from '../../../organizations/organizations.types'
 import {

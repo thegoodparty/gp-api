@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '@aws-sdk/client-sqs'
-import { ExperimentRunStatus } from '@prisma/client'
+import { ExperimentRunStatus } from '../../generated/prisma'
 import { PinoLogger } from 'nestjs-pino'
 import { QueueType } from '@/queue/queue.types'
 import { QueueConsumerService } from '@/queue/consumer/queueConsumer.service'
@@ -66,6 +66,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
   let meetingBriefings: {
     onExperimentRunCompleted: ReturnType<typeof vi.fn>
   }
+  let s3Service: { getFile: ReturnType<typeof vi.fn> }
   let logger: PinoLogger
 
   beforeEach(() => {
@@ -92,6 +93,7 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
     meetingBriefings = {
       onExperimentRunCompleted: vi.fn().mockResolvedValue(undefined),
     }
+    s3Service = { getFile: vi.fn().mockResolvedValue(undefined) }
 
     service = new QueueConsumerService(
       {} as never,
@@ -107,12 +109,15 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      s3Service as never,
       {} as never,
       {} as never,
       {} as never,
       experimentRunsService as never,
       meetingBriefings as never,
+      {
+        onExperimentRunCompleted: vi.fn().mockResolvedValue(undefined),
+      } as never,
       {} as never,
       logger,
     )
@@ -304,5 +309,133 @@ describe('QueueConsumerService - handleAgentExperimentResult', () => {
       expect.objectContaining({ err: expect.any(Error) }),
       'onExperimentRunCompleted failed after run update',
     )
+  })
+
+  it('maps success + partial data_quality to AWAITING_RESUME with scheduled_for and stage', async () => {
+    const scheduledFor = '2026-06-10T12:00:00.000Z'
+    s3Service.getFile.mockResolvedValue(
+      JSON.stringify({
+        stage: 'pending_website_live',
+        data_quality: { overall: 'partial' },
+        next_action: {
+          kind: 'wait_dns_propagation',
+          scheduled_for: scheduledFor,
+        },
+      }),
+    )
+
+    await service.processMessage(
+      makeMessage({
+        status: 'success',
+        artifactKey: 'compliance_setup/run-abc/result.json',
+        artifactBucket: 'gp-agent-artifacts-dev',
+      }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.AWAITING_RESUME)
+    expect(patched.stage).toBe('pending_website_live')
+    expect(patched.dataQuality).toBe('partial')
+    expect(patched.resumeScheduledFor).toEqual(new Date(scheduledFor))
+  })
+
+  it('maps success + ok data_quality to COMPLETED and persists stage', async () => {
+    s3Service.getFile.mockResolvedValue(
+      JSON.stringify({
+        stage: 'tcr_submitted',
+        data_quality: { overall: 'ok' },
+      }),
+    )
+
+    await service.processMessage(
+      makeMessage({
+        status: 'success',
+        artifactKey: 'compliance_setup/run-abc/result.json',
+        artifactBucket: 'gp-agent-artifacts-dev',
+      }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.COMPLETED)
+    expect(patched.stage).toBe('tcr_submitted')
+    expect(patched.dataQuality).toBe('ok')
+  })
+
+  it('maps success + failed stage to FAILED', async () => {
+    s3Service.getFile.mockResolvedValue(
+      JSON.stringify({
+        stage: 'failed',
+        data_quality: { overall: 'failed' },
+      }),
+    )
+
+    await service.processMessage(
+      makeMessage({
+        status: 'success',
+        artifactKey: 'compliance_setup/run-abc/result.json',
+        artifactBucket: 'gp-agent-artifacts-dev',
+      }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.FAILED)
+  })
+
+  it('falls back to COMPLETED when s3.getFile rejects — never strands a run', async () => {
+    s3Service.getFile.mockRejectedValue(new Error('S3 read error'))
+
+    await service.processMessage(
+      makeMessage({
+        status: 'success',
+        artifactKey: 'compliance_setup/run-abc/result.json',
+        artifactBucket: 'gp-agent-artifacts-dev',
+      }),
+    )
+
+    const [, modifier] = experimentRunsService.optimisticLockingUpdate.mock
+      .calls[0] as [
+      unknown,
+      (run: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    ]
+    const patched = await callModifier(modifier)
+    expect(patched.status).toBe(ExperimentRunStatus.COMPLETED)
+  })
+
+  it('does not call onExperimentRunCompleted when result is AWAITING_RESUME', async () => {
+    s3Service.getFile.mockResolvedValue(
+      JSON.stringify({
+        stage: 'pending_website_live',
+        data_quality: { overall: 'partial' },
+        next_action: {
+          kind: 'wait_dns_propagation',
+          scheduled_for: '2026-06-10T12:00:00.000Z',
+        },
+      }),
+    )
+
+    await service.processMessage(
+      makeMessage({
+        status: 'success',
+        artifactKey: 'compliance_setup/run-abc/result.json',
+        artifactBucket: 'gp-agent-artifacts-dev',
+      }),
+    )
+
+    expect(meetingBriefings.onExperimentRunCompleted).not.toHaveBeenCalled()
   })
 })
