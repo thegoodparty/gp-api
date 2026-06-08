@@ -5,6 +5,8 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ElectedOffice, User } from '../../generated/prisma'
@@ -14,6 +16,9 @@ import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.de
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { UserOrM2MGuard } from '@/electedOffice/guards/UserOrM2M.guard'
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { effectiveUser } from '@/authentication/util/effectiveUser.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import {
@@ -225,21 +230,34 @@ export class MeetingsBriefingsController {
     return { ...artifact, briefing_id: row.id }
   }
 
+  @UseGuards(UserOrM2MGuard)
   @Post('briefings/dispatch')
   async dispatchAgent(
     @Body(new ZodValidationPipe(DispatchMeetingAgentSchema))
     body: DispatchMeetingAgentDto,
+    @Req() req: IncomingRequest,
   ) {
+    // M2M callers (the bulk dispatch script, gp-admin) are trusted to dispatch
+    // for any office. A user session may only dispatch for an office it owns —
+    // passing the user id down enforces that and 403s an attempt against
+    // someone else's office. Undefined (M2M) skips the ownership check.
+    const requestingUserId = req.m2mToken ? undefined : effectiveUser(req)?.id
     const result = await this.meetingBriefings.dispatchManual(
       body.electedOfficeId,
       body.kind,
+      body.useImminenceGate,
+      requestingUserId,
     )
-    if (!result.dispatched) {
+    // With the imminence gate on, a non-dispatch is an expected skip (no meeting
+    // inside the window, or one already briefed), so return it as a 200 and let
+    // the bulk caller tell "skipped" from a hard failure. Without the gate (the
+    // UI button), a non-dispatch means context resolution failed → 404.
+    if (!result.dispatched && !body.useImminenceGate) {
       throw new NotFoundException(
         'Could not resolve dispatch context for that elected office',
       )
     }
-    return { dispatched: true, kind: body.kind }
+    return { dispatched: result.dispatched, kind: body.kind }
   }
 
   /**

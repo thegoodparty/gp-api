@@ -10,6 +10,7 @@ import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import {
   BadGatewayException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -431,11 +432,24 @@ export class MeetingBriefingsService extends createPrismaBase(
   async dispatchManual(
     electedOfficeId: string,
     kind: ManualDispatchKind,
+    useImminenceGate = false,
+    requestingUserId?: number,
   ): Promise<{ dispatched: boolean }> {
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { id: electedOfficeId },
     })
     if (!electedOffice) return { dispatched: false }
+
+    // A user session may only dispatch for an office it owns; M2M callers pass
+    // no requestingUserId and are trusted to dispatch for any office.
+    if (
+      requestingUserId !== undefined &&
+      electedOffice.userId !== requestingUserId
+    ) {
+      throw new ForbiddenException(
+        'You do not have access to this elected office',
+      )
+    }
 
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return { dispatched: false }
@@ -445,14 +459,25 @@ export class MeetingBriefingsService extends createPrismaBase(
       return { dispatched: true }
     }
 
-    // Manual briefing dispatch bypasses the 5-day imminence gate but still
-    // needs a meetingDate from the schedule. Project up to 60 days out so
-    // an operator can pre-brief a meeting that's still a few weeks away.
+    // A briefing needs a meetingDate from the schedule. With the imminence
+    // gate on, match the daily cron exactly: skip if a future briefing already
+    // covers the official, and only dispatch when the next meeting falls inside
+    // the 5-day window. With the gate off (the UI "brief now" button) widen to
+    // 60 days so an operator can pre-brief a meeting that's still weeks away.
+    const now = new Date()
+    if (useImminenceGate) {
+      const futureBriefing = await this.model.findFirst({
+        where: { electedOfficeId, meetingDate: { gte: now } },
+        select: { id: true },
+      })
+      if (futureBriefing) return { dispatched: false }
+    }
+
     const target = await this.resolveTargetMeeting(
       ctx.organizationSlug,
       ctx.electedOfficeId,
-      new Date(),
-      60,
+      now,
+      useImminenceGate ? IMMINENCE_WINDOW_DAYS : 60,
     )
     if (!target) return { dispatched: false }
 
