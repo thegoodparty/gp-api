@@ -28,6 +28,7 @@ import {
   RaceTargetDetailsResult,
   RaceTargetMetrics,
   VoterIssue,
+  VoterIssueLevel,
 } from '../types/elections.types'
 
 @Injectable()
@@ -249,11 +250,12 @@ export class ElectionsService {
 
   async getVoterIssues(params: {
     districtId: string
+    level?: VoterIssueLevel
   }): Promise<VoterIssue[] | null> {
-    return this.electionApiGet<VoterIssue[], { districtId: string }>(
-      'voter-issues',
-      params,
-    )
+    return this.electionApiGet<
+      VoterIssue[],
+      { districtId: string; level?: VoterIssueLevel }
+    >('voter-issues', params)
   }
 
   async getDistrictId(
