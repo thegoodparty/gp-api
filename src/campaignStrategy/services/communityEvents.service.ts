@@ -5,6 +5,8 @@ import { BraintrustService } from 'src/vendors/braintrust/braintrust.service'
 import { GEMINI_MODEL } from 'src/vendors/google/gemini.types'
 import { GeminiService } from 'src/vendors/google/services/gemini.service'
 import { CommunityEvent, CommunityEventsResult } from '@goodparty_org/contracts'
+import { AnalyticsService } from '@/analytics/analytics.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 import {
   CommunityEventsRaw,
   CommunityEventsRawSchema,
@@ -38,6 +40,7 @@ export class CommunityEventsService {
     private readonly gemini: GeminiService,
     private readonly braintrust: BraintrustService,
     private readonly persister: CommunityEventsPersister,
+    private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CommunityEventsService.name)
@@ -46,9 +49,18 @@ export class CommunityEventsService {
   async generate(
     campaignStrategyId: number,
     campaignId: number,
+    userId: number,
     ctx: CommunityEventsPromptContext,
   ): Promise<CommunityEventsResult> {
     const variables = buildEventsPromptVariables(ctx)
+    const startedAtPerf = performance.now()
+    void this.analytics
+      .track(userId, EVENTS.CampaignPlanV2.CommunityEventsGenerationStarted, {
+        campaignId,
+        planId: campaignStrategyId,
+        generationEngine: 'gemini',
+      })
+      .catch(() => undefined)
 
     const result = await this.braintrust.tracedNested(
       'community-events:generate',
@@ -69,6 +81,15 @@ export class CommunityEventsService {
     )
 
     await this.persister.persist(campaignStrategyId, result)
+    void this.analytics
+      .track(userId, EVENTS.CampaignPlanV2.CommunityEventsGenerationCompleted, {
+        campaignId,
+        planId: campaignStrategyId,
+        generationEngine: 'gemini',
+        durationMs: Math.round(performance.now() - startedAtPerf),
+        eventCount: result.events.length,
+      })
+      .catch(() => undefined)
     return result
   }
 

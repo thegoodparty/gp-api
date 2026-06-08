@@ -547,6 +547,19 @@ describe('ElectionsService', () => {
 
       expect(result).toBeNull()
     })
+
+    it('forwards the level query param when provided', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      await service.getVoterIssues({ districtId: 'd-1', level: 'local' })
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('voter-issues'),
+        expect.objectContaining({
+          params: { districtId: 'd-1', level: 'local' },
+        }),
+      )
+    })
   })
 
   describe('fetchFilingFeeByRaceHash', () => {

@@ -1,4 +1,6 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { VoterIssueLevel } from '@/elections/types/elections.types'
+import { getVoterIssueLevelFromPositionLevel } from '@/elections/util/getVoterIssueLevelFromPositionLevel.util'
 import {
   BadRequestException,
   Injectable,
@@ -419,6 +421,43 @@ export class OrganizationsService extends createPrismaBase(
     if (!org) return null
 
     return this.resolveDistrict(org)
+  }
+
+  // Resolves both the district and the office's voter-issue level in a single
+  // position fetch, so the onboarding voter-issues endpoint can scope issues to
+  // the candidate's jurisdiction without a second election-api round-trip.
+  async getDistrictAndLevelForOrgSlug(slug: string): Promise<{
+    district: OrgDistrict | null
+    level: VoterIssueLevel | null
+  }> {
+    const org = await this.findUnique({ where: { slug } })
+    if (!org) return { district: null, level: null }
+
+    const [position, overrideDistrict] = await Promise.all([
+      org.positionId
+        ? this.electionsService.getPositionById(org.positionId, {
+            includeDistrict: true,
+          })
+        : Promise.resolve(null),
+      org.overrideDistrictId
+        ? this.electionsService.getDistrict(org.overrideDistrictId)
+        : Promise.resolve(null),
+    ])
+
+    const rawDistrict = overrideDistrict ?? position?.district
+    const district: OrgDistrict | null = rawDistrict
+      ? {
+          id: rawDistrict.id,
+          state: rawDistrict.state,
+          l2Type: rawDistrict.L2DistrictType,
+          l2Name: rawDistrict.L2DistrictName,
+        }
+      : null
+
+    return {
+      district,
+      level: getVoterIssueLevelFromPositionLevel(position?.level),
+    }
   }
 
   async resolveServeContext(org: Organization): Promise<{
