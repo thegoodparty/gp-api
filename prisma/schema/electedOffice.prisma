@@ -18,6 +18,7 @@ model ElectedOffice {
   pollIndividualMessages   PollIndividualMessage[]
   meetingBriefings         MeetingBriefing[]
   meetingResourceLocations MeetingResourceLocation[]
+  userAgendaUploads        UserAgendaUpload[]
 
   @@unique([userId])
   @@index([campaignId])
