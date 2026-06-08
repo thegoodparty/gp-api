@@ -10,6 +10,7 @@ import { S3Service } from '@/vendors/aws/services/s3.service'
 import { BraintrustService } from '@/vendors/braintrust/braintrust.service'
 import {
   BadGatewayException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -432,11 +433,23 @@ export class MeetingBriefingsService extends createPrismaBase(
     electedOfficeId: string,
     kind: ManualDispatchKind,
     useImminenceGate = false,
+    requestingUserId?: number,
   ): Promise<{ dispatched: boolean }> {
     const electedOffice = await this.client.electedOffice.findUnique({
       where: { id: electedOfficeId },
     })
     if (!electedOffice) return { dispatched: false }
+
+    // A user session may only dispatch for an office it owns; M2M callers pass
+    // no requestingUserId and are trusted to dispatch for any office.
+    if (
+      requestingUserId !== undefined &&
+      electedOffice.userId !== requestingUserId
+    ) {
+      throw new ForbiddenException(
+        'You do not have access to this elected office',
+      )
+    }
 
     const ctx = await this.resolveDispatchContext(electedOffice)
     if (!ctx) return { dispatched: false }

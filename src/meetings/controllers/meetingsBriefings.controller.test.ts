@@ -886,4 +886,33 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
     expect(result.data).toEqual({ dispatched: false, kind: 'briefing' })
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
+
+  it('403s a user session dispatching against an office it does not own', async () => {
+    const otherUser = await service.prisma.user.create({
+      data: {
+        clerkId: `other-${Date.now()}`,
+        email: `other-${Date.now()}@test.example`,
+        firstName: 'Other',
+        lastName: 'User',
+      },
+    })
+    const orgSlug = `eo-idor-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: otherUser.id },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: otherUser.id },
+    })
+    const dispatchSpy = vi
+      .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
+      .mockResolvedValue(undefined)
+
+    const result = await service.client.post(
+      '/v1/meetings/briefings/dispatch',
+      { electedOfficeId: eo.id, kind: 'briefing', useImminenceGate: true },
+    )
+
+    expect(result.status).toBe(403)
+    expect(dispatchSpy).not.toHaveBeenCalled()
+  })
 })
