@@ -17,6 +17,7 @@ import { S3Service } from '@/vendors/aws/services/s3.service'
 import { RacesService } from '@/elections/services/races.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { RaceContextFromApi } from '../types/electionApi.types'
+import { AnalyticsService } from '@/analytics/analytics.service'
 
 // Strategic-landscape (CAP dispatch) behavior is covered in
 // campaignStrategy.cap.test.ts. This file covers the community-events pipeline
@@ -156,6 +157,10 @@ describe('CampaignStrategyService — community events', () => {
         { provide: ElectionApiService, useValue: mockElectionApi },
         { provide: RacesService, useValue: mockRaces },
         { provide: PinoLogger, useValue: createMockLogger() },
+        {
+          provide: AnalyticsService,
+          useValue: { track: vi.fn().mockResolvedValue(undefined) },
+        },
         CampaignStrategyService,
       ],
     }).compile()
@@ -306,7 +311,7 @@ describe('CampaignStrategyService — community events', () => {
       await service.drainInFlight()
 
       expect(mockRaces.getZipCodesByRaceId).toHaveBeenCalledWith('hash-abc')
-      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      const ctx = mockEvents.generate.mock.calls[0]?.[3]
       // All resolver zips join into a single comma-separated value so the
       // LLM has full geographic coverage of the district.
       expect(ctx?.zip).toBe('10025, 10026')
@@ -325,7 +330,7 @@ describe('CampaignStrategyService — community events', () => {
       )
       await service.drainInFlight()
 
-      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      const ctx = mockEvents.generate.mock.calls[0]?.[3]
       expect(ctx?.zip).toBe('94110')
     })
 
@@ -349,7 +354,7 @@ describe('CampaignStrategyService — community events', () => {
       )
       await service.drainInFlight()
 
-      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      const ctx = mockEvents.generate.mock.calls[0]?.[3]
       expect(ctx?.zip).toBe('')
     })
 
@@ -366,7 +371,7 @@ describe('CampaignStrategyService — community events', () => {
       )
       await service.drainInFlight()
 
-      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      const ctx = mockEvents.generate.mock.calls[0]?.[3]
       expect(ctx?.zip).toBe('94110')
     })
 
@@ -386,7 +391,7 @@ describe('CampaignStrategyService — community events', () => {
       )
       await service.drainInFlight()
 
-      const ctx = mockEvents.generate.mock.calls[0]?.[2]
+      const ctx = mockEvents.generate.mock.calls[0]?.[3]
       expect(ctx?.zip).toBe(districtZips.join(', '))
     })
   })

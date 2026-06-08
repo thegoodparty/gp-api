@@ -45,13 +45,15 @@ function makeService() {
     findFirst: vi.fn(),
     model,
   }
+  const analytics = { track: vi.fn().mockResolvedValue(undefined) }
   const service = new OnboardingLocalNewsService(
     gemini as never,
     braintrust as never,
     campaigns as never,
+    analytics as never,
     createMockLogger(),
   )
-  return { service, gemini, braintrust, campaigns, model }
+  return { service, gemini, braintrust, campaigns, model, analytics }
 }
 
 function readyOutlets(extra: { name: string }[] = []) {
