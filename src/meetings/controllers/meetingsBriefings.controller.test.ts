@@ -784,9 +784,16 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
   it('with useImminenceGate, dispatches a briefing when a meeting is inside the 5-day window', async () => {
     const orgSlug = `eo-gate-in-${Date.now()}`
     const eo = await seedBriefingTarget(orgSlug, 'FREQ=DAILY')
+    const dispatchedRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.RUNNING,
+      },
+    })
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue(dispatchedRun)
 
     const result = await service.client.post(
       '/v1/meetings/briefings/dispatch',
@@ -833,9 +840,16 @@ describe('POST /v1/meetings/briefings/dispatch', () => {
     try {
       const orgSlug = `eo-nogate-${Date.now()}`
       const eo = await seedBriefingTarget(orgSlug, 'FREQ=MONTHLY;BYMONTHDAY=20')
+      const dispatchedRun = await service.prisma.experimentRun.create({
+        data: {
+          organizationSlug: orgSlug,
+          experimentType: 'meeting_briefing',
+          status: ExperimentRunStatus.RUNNING,
+        },
+      })
       const dispatchSpy = vi
         .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-        .mockResolvedValue(undefined)
+        .mockResolvedValue(dispatchedRun)
 
       const result = await service.client.post(
         '/v1/meetings/briefings/dispatch',
