@@ -1,5 +1,61 @@
 # @goodparty_org/contracts
 
+## 0.14.0
+
+### Minor Changes
+
+- Add top-level `primaryResult` (`'won' | 'lost'`, nullable) to `CampaignSchema`
+  / `ReadCampaignOutput`. Persists a candidate's primary-election outcome as a
+  proper campaign column instead of the `details` JSON blob, so the dashboard's
+  Election Results selection survives reloads. Readers can access
+  `campaign.primaryResult` directly.
+
+- Add agent-runs admin read shapes backing the gp-admin agent-runs dashboard:
+  `AgentRunListItemSchema` / `AgentRunListItem` (a list row with a candidate
+  summary derived from `compliance_setup` params), `AgentRunsListQuerySchema` /
+  `AgentRunsListQuery` (list filters: experimentType, status, organizationSlug,
+  createdAfter, createdBefore, plus pagination), `AgentRunSchema` / `AgentRun`
+  (the full `experiment_run` row), and `AgentRunDetailSchema` / `AgentRunDetail`
+  (`{ run, artifact, conversationLog }`, where `artifact` is an opaque
+  `Record<string, unknown>` read from S3 and `conversationLog` is plain text).
+  Also export the `ExperimentRunStatus` enum (`ExperimentRunStatusSchema` /
+  `EXPERIMENT_RUN_STATUS_VALUES`).
+
+- `RaceTargetMetricsSchema` / `RaceTargetMetrics` gain three nullable
+  filing-office-contact fields, sourced from BallotReady via election-api's
+  `/races/by-br-hash-id/:hash/filing-fee` lookup:
+  - `filingOfficeAddress` — free-text address block (line 1/2, city, state, zip)
+    where candidacy paperwork is submitted.
+  - `filingPhoneNumber` — phone for the local election authority.
+  - `paperworkInstructions` — BallotReady's narrative on the local election
+    authority a candidate contacts for filing procedures.
+
+  All `null` when BallotReady has no office data for the race. Powers the
+  "filing office" block on the Pro-upgrade filing-instructions screen
+  (ENG-10325). Additive and non-breaking — existing consumers are unaffected.
+
+- Add `AWAITING_RESUME` to the `ExperimentRunStatus` enum
+  (`ExperimentRunStatusSchema` / `EXPERIMENT_RUN_STATUS_VALUES`) and four fields to
+  the agent-run read shapes (`AgentRunListItemSchema` / `AgentRunSchema`):
+  `stage`, `dataQuality`, `resumeScheduledFor`, and `resumeAttempts`. These back
+  the compliance recovery loop (ENG-7554) — a parked run is now reported as
+  `AWAITING_RESUME` rather than `COMPLETED`, with its resume schedule and attempt
+  count surfaced for the gp-admin dashboard.
+
+- Add speech (Text-to-Speech and Speech-to-Text) module schemas.
+
+  The speech module is a domain-agnostic "pure pipe": TTS in/out is plain text and audio URLs; STT in/out is audio frames and transcripts. Domain rendering and persistence are the caller's responsibility.
+  - `SynthesizeSpeechRequestSchema` / `SynthesizeSpeechResponseSchema` — TTS request/response for `POST /v1/speech/synthesize`. Request is `{ text, options? }`.
+  - `SYNTHESIZE_SPEECH_MAX_TEXT_LENGTH` — server-enforced cap on a single synthesis request.
+  - `SpeechSynthesisVoiceSchema` — allowlist of supported Polly neural voices.
+  - `SpeechSynthesisEngineSchema` — Polly engine enum.
+  - `TranscribeSessionRequestSchema` / `TranscribeSessionResponseSchema` — STT WebSocket session request/response for `POST /v1/speech/transcribe/session`. Request body is reserved as `{}` for forward-compatible options.
+
+- Widen `CampaignDetails.isProUpdatedAt` from `number` to `string | number`.
+  New writes from `gp-api` store an ISO datetime string; legacy unix-ms
+  numbers persist in existing rows until backfilled. Readers must handle
+  both shapes. The previously-valid `number` shape is unchanged.
+
 ## 0.13.0
 
 ### Minor Changes
