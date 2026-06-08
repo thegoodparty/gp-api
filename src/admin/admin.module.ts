@@ -10,6 +10,8 @@ import { AdminCampaignsService } from './campaigns/adminCampaigns.service'
 import { AdminUsersController } from './users/adminUsers.controller'
 import { AdminAgentRunsController } from './agentRuns/adminAgentRuns.controller'
 import { AdminAgentRunsService } from './agentRuns/services/adminAgentRuns.service'
+import { AdminBriefingsController } from './briefings/adminBriefings.controller'
+import { AdminBriefingsService } from './briefings/services/adminBriefings.service'
 
 @Module({
   imports: [
@@ -24,7 +26,12 @@ import { AdminAgentRunsService } from './agentRuns/services/adminAgentRuns.servi
     AdminCampaignsController,
     AdminUsersController,
     AdminAgentRunsController,
+    AdminBriefingsController,
   ],
-  providers: [AdminCampaignsService, AdminAgentRunsService],
+  providers: [
+    AdminCampaignsService,
+    AdminAgentRunsService,
+    AdminBriefingsService,
+  ],
 })
 export class AdminModule {}

@@ -2,6 +2,7 @@ enum AnnotationKind {
   note
   chat
   bug_report
+  review
 }
 
 // The type of resource about which
@@ -33,6 +34,8 @@ model Annotation {
   chatConversationId    String?              @unique @map("chat_conversation_id")
   bugReport             AnnotationBugReport? @relation(fields: [annotationBugReportId], references: [id])
   annotationBugReportId String?              @unique @map("annotation_bug_report_id")
+  annotationReview      AnnotationReview?    @relation(fields: [annotationReviewId], references: [id])
+  annotationReviewId    String?              @unique @map("annotation_review_id")
 
   @@index([authorUserId])
   @@index([authorUserId, resourceType, resourceId, kind])

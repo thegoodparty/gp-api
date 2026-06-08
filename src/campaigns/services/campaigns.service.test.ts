@@ -36,6 +36,9 @@ const BR_POSITION_ID = 'br-position-456'
 // (overrideDistrictId, position-based) emit these as null; tests for those
 // paths spread this into their expected result.
 const EMPTY_RACE_CONTEXT_FIELDS = {
+  filingOfficeAddress: null,
+  filingPhoneNumber: null,
+  paperworkInstructions: null,
   registeredVoters: null,
   uniqueCellphones: null,
   uniqueLandlines: null,
@@ -1138,11 +1141,14 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
       })
     })
 
-    it('prefers race-hash result over position-side filingFee', async () => {
+    it('prefers race-hash result over position-side filingFee and surfaces office contact', async () => {
       vi.mocked(mockElections.fetchFilingFeeByRaceHash!).mockResolvedValue({
         filingFee: 75,
         filingRequirementsText: 'BR-hash text.',
         extractionSource: 'direct_dollar',
+        filingOfficeAddress: '123 Main St, Springfield, IL 62701',
+        filingPhoneNumber: '(217) 555-0100',
+        paperworkInstructions: 'File with the county clerk in person.',
       })
 
       const result =
@@ -1158,6 +1164,9 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         filingFee: 75,
         filingRequirementsText: 'BR-hash text.',
         ...EMPTY_RACE_CONTEXT_FIELDS,
+        filingOfficeAddress: '123 Main St, Springfield, IL 62701',
+        filingPhoneNumber: '(217) 555-0100',
+        paperworkInstructions: 'File with the county clerk in person.',
       })
     })
 
@@ -1170,6 +1179,9 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         filingFee: null,
         filingRequirementsText: 'Fee varies; see BR.',
         extractionSource: 'multi_value',
+        filingOfficeAddress: null,
+        filingPhoneNumber: null,
+        paperworkInstructions: null,
       })
 
       const result =
@@ -1219,6 +1231,9 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         filingFee: 50,
         filingRequirementsText: 'BR-hash text.',
         extractionSource: 'direct_dollar',
+        filingOfficeAddress: null,
+        filingPhoneNumber: null,
+        paperworkInstructions: null,
       })
 
       const result =
@@ -1298,6 +1313,9 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         filingFee: 100,
         filingRequirementsText: 'Filing fee: $100.',
         extractionSource: 'direct_dollar',
+        filingOfficeAddress: '500 Election Way, Sacramento, CA 95814',
+        filingPhoneNumber: '(916) 555-0199',
+        paperworkInstructions: 'Submit candidacy paperwork to the city clerk.',
       })
       vi.mocked(mockBallotReady.fetchMilestones!).mockResolvedValue({
         voter_registration: { start: '2026-06-01', end: '2026-10-19' },
@@ -1314,6 +1332,9 @@ describe('CampaignsService - fetchLiveRaceTargetMetrics', () => {
         projectedTurnout: 1200,
         filingFee: 100,
         filingRequirementsText: 'Filing fee: $100.',
+        filingOfficeAddress: '500 Election Way, Sacramento, CA 95814',
+        filingPhoneNumber: '(916) 555-0199',
+        paperworkInstructions: 'Submit candidacy paperwork to the city clerk.',
         registeredVoters: 5500,
         uniqueCellphones: 3300,
         uniqueLandlines: 1800,

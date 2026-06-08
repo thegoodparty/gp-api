@@ -5,13 +5,20 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ElectedOffice } from '../../generated/prisma'
+import { ElectedOffice, User } from '../../generated/prisma'
 import { addMonths, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { UserOrM2MGuard } from '@/electedOffice/guards/UserOrM2M.guard'
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { effectiveUser } from '@/authentication/util/effectiveUser.util'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { parseIsoDateAsUTC } from '@/shared/util/date.util'
 import {
@@ -22,7 +29,18 @@ import {
   DispatchMeetingAgentDto,
   DispatchMeetingAgentSchema,
 } from '../schemas/dispatchMeetingAgent.schema'
+import {
+  UserAgendaFinalizeRequest,
+  UserAgendaFinalizeRequestSchema,
+  UserAgendaFinalizeResponseSchema,
+  UserAgendaPresignRequest,
+  UserAgendaPresignRequestSchema,
+  UserAgendaPresignResponseSchema,
+} from '../schemas/userAgendaUpload.schema'
 import { MeetingBriefingsService } from '../services/meetingBriefings.service'
+import { UserAgendaUploadService } from '../services/userAgendaUpload.service'
+
+type UserAgendaStatus = 'processing' | 'failed' | 'completed' | 'unknown'
 
 type MeetingListItem = {
   meetingDate: string
@@ -32,12 +50,14 @@ type MeetingListItem = {
   meetingName: string
   location: string
   hasBriefing: boolean
+  userAgendaStatus: UserAgendaStatus | null
 }
 
 @Controller('meetings')
 export class MeetingsBriefingsController {
   constructor(
     private readonly meetingBriefings: MeetingBriefingsService,
+    private readonly userAgendaUploads: UserAgendaUploadService,
     private readonly s3: S3Service,
   ) {}
 
@@ -90,6 +110,7 @@ export class MeetingsBriefingsController {
           meetingName: knownSchedule.meeting_name,
           location: knownSchedule.location,
           hasBriefing: false,
+          userAgendaStatus: null,
         })
       }
     }
@@ -116,6 +137,43 @@ export class MeetingsBriefingsController {
           knownSchedule?.location ||
           '',
         hasBriefing: true,
+        userAgendaStatus: existing?.userAgendaStatus ?? null,
+      })
+    }
+
+    // Layer in user-agenda statuses last so the GET row reflects the latest
+    // user-upload state regardless of whether a briefing row exists yet
+    // (the briefing row appears only AFTER the dispatched run completes).
+    // The query is scoped to the same window as the meeting projection so
+    // upload rows for off-list dates (no projected schedule entry, no
+    // briefing row yet) still appear as their own list rows. Past-date
+    // uploads within the window are also surfaced — the presign/finalize
+    // endpoints accept any meetingDate, so a user who uploaded for a
+    // recent meeting must still see its status (otherwise their submission
+    // silently disappears from the list).
+    const userAgendaStatuses =
+      await this.userAgendaUploads.getStatusForMeetings(electedOffice.id, {
+        from: windowFrom,
+        to: windowTo,
+      })
+    for (const [date, status] of userAgendaStatuses) {
+      const existing = byDate.get(date)
+      if (existing) {
+        byDate.set(date, { ...existing, userAgendaStatus: status })
+        continue
+      }
+      // Off-list date: user uploaded an agenda for a meeting we don't have a
+      // schedule entry or briefing row for. Surface as a row so the agenda is
+      // visible — fill the schedule-only fields with placeholders.
+      byDate.set(date, {
+        meetingDate: date,
+        meetingTime: '',
+        meetingTimezone: '',
+        durationMinutes: 0,
+        meetingName: '',
+        location: '',
+        hasBriefing: false,
+        userAgendaStatus: status,
       })
     }
 
@@ -172,20 +230,78 @@ export class MeetingsBriefingsController {
     return { ...artifact, briefing_id: row.id }
   }
 
+  @UseGuards(UserOrM2MGuard)
   @Post('briefings/dispatch')
   async dispatchAgent(
     @Body(new ZodValidationPipe(DispatchMeetingAgentSchema))
     body: DispatchMeetingAgentDto,
+    @Req() req: IncomingRequest,
   ) {
+    // M2M callers (the bulk dispatch script, gp-admin) are trusted to dispatch
+    // for any office. A user session may only dispatch for an office it owns —
+    // passing the user id down enforces that and 403s an attempt against
+    // someone else's office. Undefined (M2M) skips the ownership check.
+    const requestingUserId = req.m2mToken ? undefined : effectiveUser(req)?.id
     const result = await this.meetingBriefings.dispatchManual(
       body.electedOfficeId,
       body.kind,
+      body.useImminenceGate,
+      requestingUserId,
     )
-    if (!result.dispatched) {
+    // With the imminence gate on, a non-dispatch is an expected skip (no meeting
+    // inside the window, or one already briefed), so return it as a 200 and let
+    // the bulk caller tell "skipped" from a hard failure. Without the gate (the
+    // UI button), a non-dispatch means context resolution failed → 404.
+    if (!result.dispatched && !body.useImminenceGate) {
       throw new NotFoundException(
         'Could not resolve dispatch context for that elected office',
       )
     }
-    return { dispatched: true, kind: body.kind }
+    return { dispatched: result.dispatched, kind: body.kind }
+  }
+
+  /**
+   * Step 1 of user-supplied agenda upload: returns a presigned S3 PUT URL
+   * the browser uses to upload the PDF directly to the agent-run-inputs
+   * bucket. No DB row is created here — finalizeUserAgenda creates the row
+   * after the upload completes.
+   */
+  @UseElectedOffice()
+  @Post(':date/briefing/agenda/presign')
+  @ResponseSchema(UserAgendaPresignResponseSchema)
+  async presignUserAgenda(
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
+    @Body(new ZodValidationPipe(UserAgendaPresignRequestSchema))
+    body: UserAgendaPresignRequest,
+  ) {
+    return this.userAgendaUploads.createUploadPresign(electedOffice, date, body)
+  }
+
+  /**
+   * Step 2 of user-supplied agenda upload (or sole step for URL paste):
+   * persists the upload metadata and dispatches a fresh briefing run with
+   * `agendaPacketUrl` set.
+   */
+  @UseElectedOffice()
+  @Post(':date/briefing/agenda')
+  @ResponseSchema(UserAgendaFinalizeResponseSchema)
+  async finalizeUserAgenda(
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqUser() user: User,
+    @Param(new ZodValidationPipe(MeetingDateParamSchema))
+    { date }: MeetingDateParam,
+    @Body(new ZodValidationPipe(UserAgendaFinalizeRequestSchema))
+    body: UserAgendaFinalizeRequest,
+  ) {
+    const { experimentRunId } =
+      await this.userAgendaUploads.finalizeAndDispatch(
+        electedOffice,
+        user.id,
+        date,
+        body,
+      )
+    return { experimentRunId, status: 'processing' as const }
   }
 }

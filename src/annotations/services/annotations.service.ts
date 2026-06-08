@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { AnnotationKind, ElectedOffice, Prisma } from '../../generated/prisma'
+import {
+  AnnotationKind,
+  ElectedOffice,
+  Prisma,
+  User,
+} from '../../generated/prisma'
 import {
   Annotation as AnnotationDTO,
   CreateAnnotationRequest,
@@ -24,7 +29,17 @@ const ANNOTATION_INCLUDE = {
   },
   bugReport: true,
   chat: true,
+  annotationReview: true,
 } satisfies Prisma.AnnotationInclude
+
+// Everything a normal (non-impersonated) caller may see. `review` is excluded
+// by default; it is only returned when a caller explicitly requests it AND
+// carries an impersonation actor (server-side default-deny — see listForBriefing).
+const NON_REVIEW_KINDS = [
+  AnnotationKind.note,
+  AnnotationKind.chat,
+  AnnotationKind.bug_report,
+] as const
 
 type AnnotationWithRelations = Prisma.AnnotationGetPayload<{
   include: typeof ANNOTATION_INCLUDE
@@ -77,6 +92,15 @@ function toDTO(row: AnnotationWithRelations): AnnotationDTO {
       created_at: row.chat.createdAt.toISOString(),
     }
   }
+  if (row.annotationReview) {
+    base.review = {
+      id: row.annotationReview.id,
+      body: row.annotationReview.body,
+      reviewer_email: row.annotationReview.reviewerEmail,
+      created_at: row.annotationReview.createdAt.toISOString(),
+      updated_at: row.annotationReview.updatedAt.toISOString(),
+    }
+  }
   return base
 }
 
@@ -112,7 +136,17 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     meetingDate: string,
     userId: number,
     electedOffice: ElectedOffice,
+    actorSub: string | null,
+    kinds?: AnnotationKind[],
   ): Promise<AnnotationDTO[]> {
+    // Default-deny: omitting `kinds` returns everything except `review`. Asking
+    // for `review` requires an impersonation actor — without one we 403 rather
+    // than silently returning an empty list, so the boundary is unambiguous.
+    const effectiveKinds: AnnotationKind[] = kinds ?? [...NON_REVIEW_KINDS]
+    if (effectiveKinds.includes(AnnotationKind.review) && actorSub === null) {
+      throw new ForbiddenException('review_requires_impersonation')
+    }
+
     const briefingId = await resolveBriefingId(
       this.client,
       meetingDate,
@@ -123,6 +157,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
         resourceType: 'briefing',
         resourceId: briefingId,
         authorUserId: userId,
+        kind: { in: effectiveKinds },
       },
       orderBy: { createdAt: 'asc' },
       include: ANNOTATION_INCLUDE,
@@ -135,7 +170,14 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     userId: number,
     electedOffice: ElectedOffice,
     input: CreateAnnotationRequest,
+    actorSub: string | null,
+    actorUser: User | null,
   ): Promise<AnnotationDTO> {
+    // Review annotations can only be authored inside an impersonation session.
+    if (input.kind === 'review' && actorSub === null) {
+      throw new ForbiddenException('review_requires_impersonation')
+    }
+
     const briefingId = await resolveBriefingId(
       this.client,
       meetingDate,
@@ -177,6 +219,34 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
             include: ANNOTATION_INCLUDE,
           })
         }
+
+        if (input.kind === 'review') {
+          // Guaranteed non-null by the pre-transaction guard; re-checked here
+          // to narrow for the type checker.
+          if (actorSub === null) {
+            throw new ForbiddenException('review_requires_impersonation')
+          }
+          // author stays the impersonated (reviewed) user; the admin's
+          // identity lives on the AnnotationReview child via reviewerClerkSub.
+          return tx.annotation.create({
+            data: {
+              author: { connect: { id: userId } },
+              kind: AnnotationKind.review,
+              resourceType: 'briefing',
+              resourceId: briefingId,
+              ...anchorFields,
+              annotationReview: {
+                create: {
+                  body: input.payload.body,
+                  reviewerClerkSub: actorSub,
+                  reviewerEmail: actorUser?.email ?? null,
+                },
+              },
+            },
+            include: ANNOTATION_INCLUDE,
+          })
+        }
+
         return tx.annotation.create({
           data: {
             author: { connect: { id: userId } },
@@ -223,10 +293,44 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     return toDTO(updated)
   }
 
+  async updateReviewBody(
+    annotationId: string,
+    userId: number,
+    electedOffice: ElectedOffice,
+    actorSub: string | null,
+    body: string,
+  ): Promise<AnnotationDTO> {
+    if (actorSub === null) {
+      throw new ForbiddenException('review_requires_impersonation')
+    }
+    const row = await this.client.annotation.findUnique({
+      where: { id: annotationId },
+      include: ANNOTATION_INCLUDE,
+    })
+    if (!row) throw new NotFoundException('annotation_not_found')
+    if (row.authorUserId !== userId) {
+      throw new ForbiddenException('annotation_not_yours')
+    }
+    if (row.kind !== AnnotationKind.review || !row.annotationReview) {
+      throw new ForbiddenException('not_a_review')
+    }
+    await this.assertAnnotationBriefingAccess(row.resourceId, electedOffice)
+
+    const updated = await this.client.annotation.update({
+      where: { id: annotationId },
+      data: {
+        annotationReview: { update: { body } },
+      },
+      include: ANNOTATION_INCLUDE,
+    })
+    return toDTO(updated)
+  }
+
   async deleteOne(
     annotationId: string,
     userId: number,
     electedOffice: ElectedOffice,
+    actorSub: string | null,
   ): Promise<void> {
     const row = await this.client.annotation.findUnique({
       where: { id: annotationId },
@@ -238,6 +342,7 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
         noteId: true,
         annotationBugReportId: true,
         chatConversationId: true,
+        annotationReviewId: true,
         note: {
           select: {
             attachments: { select: { storageKey: true } },
@@ -248,6 +353,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
     if (!row) throw new NotFoundException('annotation_not_found')
     if (row.authorUserId !== userId) {
       throw new ForbiddenException('annotation_not_yours')
+    }
+    // Review rows are authored as the impersonated user, so the author check
+    // alone would let that user delete an admin's review. Gate on the actor.
+    if (row.kind === AnnotationKind.review && actorSub === null) {
+      throw new ForbiddenException('review_requires_impersonation')
     }
     await this.assertAnnotationBriefingAccess(row.resourceId, electedOffice)
 
@@ -261,6 +371,11 @@ export class AnnotationsService extends createPrismaBase(MODELS.Annotation) {
       if (row.annotationBugReportId) {
         await tx.annotationBugReport.delete({
           where: { id: row.annotationBugReportId },
+        })
+      }
+      if (row.annotationReviewId) {
+        await tx.annotationReview.delete({
+          where: { id: row.annotationReviewId },
         })
       }
       // Chat soft-delete is the responsibility of Collin's chat service.

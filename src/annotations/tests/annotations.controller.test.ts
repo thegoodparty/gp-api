@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ExperimentRunStatus } from '../../generated/prisma'
 import { useTestService } from '@/test-service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
+import { AnnotationsService } from '../services/annotations.service'
 
 const service = useTestService()
 
@@ -79,6 +80,16 @@ const bugReport = {
     end: 15,
   },
   payload: { description: 'This figure looks wrong.' },
+}
+
+const reviewComment = {
+  kind: 'review' as const,
+  anchor: {
+    json_path: '/items/0/display/summary',
+    start: 0,
+    end: 10,
+  },
+  payload: { body: 'Reviewer note: fix this.' },
 }
 
 describe('POST /v1/meetings/:date/briefing/annotations', () => {
@@ -570,5 +581,158 @@ describe('DELETE /v1/annotations/:annotationId', () => {
     )
 
     expect(result.status).toBe(403)
+  })
+})
+
+// The HTTP client authenticates as a normal user with no impersonation actor,
+// so these exercise the default-deny boundary exactly as a real user would hit
+// it. Review rows must never leak to or be mutated by a non-impersonated user.
+describe('review annotations — default-deny over HTTP (no actor)', () => {
+  it('rejects creating a review without an impersonation actor', async () => {
+    const orgSlug = 'eo-review-noactor'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    const result = await service.client.post(
+      '/v1/meetings/2026-06-08/briefing/annotations',
+      reviewComment,
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('rejects listing kinds=review without an impersonation actor', async () => {
+    const orgSlug = 'eo-review-list-noactor'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing/annotations?kinds=review',
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(403)
+  })
+
+  it('omits review rows from a normal list', async () => {
+    const orgSlug = 'eo-review-leak'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefing = await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    await service.prisma.annotation.create({
+      data: {
+        author: { connect: { id: service.user.id } },
+        kind: 'note',
+        resourceType: 'briefing',
+        resourceId: briefing.id,
+        note: { create: { body: 'visible note' } },
+      },
+    })
+    await service.prisma.annotation.create({
+      data: {
+        author: { connect: { id: service.user.id } },
+        kind: 'review',
+        resourceType: 'briefing',
+        resourceId: briefing.id,
+        annotationReview: {
+          create: { body: 'secret review', reviewerClerkSub: 'user_admin' },
+        },
+      },
+    })
+
+    const result = await service.client.get(
+      '/v1/meetings/2026-06-08/briefing/annotations',
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.annotations).toHaveLength(1)
+    expect(result.data.annotations[0].kind).toBe('note')
+  })
+
+  it('rejects deleting a review row without an impersonation actor', async () => {
+    const orgSlug = 'eo-review-del-noactor'
+    const eo = await seedElectedOffice(orgSlug)
+    const briefing = await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    const review = await service.prisma.annotation.create({
+      data: {
+        author: { connect: { id: service.user.id } },
+        kind: 'review',
+        resourceType: 'briefing',
+        resourceId: briefing.id,
+        annotationReview: {
+          create: { body: 'x', reviewerClerkSub: 'user_admin' },
+        },
+      },
+    })
+
+    const result = await service.client.delete(
+      `/v1/annotations/${review.id}`,
+      orgHeader(orgSlug),
+    )
+
+    expect(result.status).toBe(403)
+  })
+})
+
+// The service takes actorSub/actorUser as explicit args (the guard populates
+// them in production). Driving the real service against the real DB is the
+// closest we can get to the impersonation path without minting an actor JWT.
+describe('AnnotationsService — review behavior with an actor', () => {
+  const ACTOR_SUB = 'user_admin_123'
+
+  it('persists reviewer attribution and lists reviews back', async () => {
+    const annotations = service.app.get(AnnotationsService)
+    const orgSlug = 'eo-review-svc'
+    const eo = await seedElectedOffice(orgSlug)
+    await seedBriefing(eo.id, orgSlug, '2026-06-08')
+
+    const admin = await service.prisma.user.create({
+      data: {
+        clerkId: ACTOR_SUB,
+        email: 'admin-reviewer@goodparty.org',
+        firstName: 'Admin',
+        lastName: 'Reviewer',
+      },
+    })
+
+    const created = await annotations.createForBriefing(
+      '2026-06-08',
+      service.user.id,
+      eo,
+      reviewComment,
+      ACTOR_SUB,
+      admin,
+    )
+
+    expect(created.kind).toBe('review')
+    expect(created.author_user_id).toBe(service.user.id)
+    expect(created.review?.body).toBe('Reviewer note: fix this.')
+    expect(created.review?.reviewer_email).toBe('admin-reviewer@goodparty.org')
+
+    const dbReview = await service.prisma.annotationReview.findFirst({
+      where: { id: created.review?.id },
+    })
+    expect(dbReview?.reviewerClerkSub).toBe(ACTOR_SUB)
+
+    const listedWithActor = await annotations.listForBriefing(
+      '2026-06-08',
+      service.user.id,
+      eo,
+      ACTOR_SUB,
+      ['review'],
+    )
+    expect(listedWithActor).toHaveLength(1)
+    expect(listedWithActor[0].kind).toBe('review')
+
+    const listedNormally = await annotations.listForBriefing(
+      '2026-06-08',
+      service.user.id,
+      eo,
+      null,
+    )
+    expect(listedNormally).toHaveLength(0)
   })
 })

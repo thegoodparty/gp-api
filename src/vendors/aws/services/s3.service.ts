@@ -216,6 +216,31 @@ export class S3Service extends AwsService {
     }, 'objectExists')
   }
 
+  /**
+   * HEAD an object. Returns the object's metadata when present, null when
+   * absent. Useful for validating both existence AND properties (like size)
+   * in a single round-trip — callers that only need a boolean should use
+   * `objectExists` instead.
+   */
+  async headObject(
+    bucket: string,
+    key: string,
+  ): Promise<{ contentLength: number | null } | null> {
+    return this.executeAwsOperation(async () => {
+      try {
+        const { HeadObjectCommand } = await import('@aws-sdk/client-s3')
+        const response = await this.s3Client.send(
+          new HeadObjectCommand({ Bucket: bucket, Key: key }),
+        )
+        return { contentLength: response.ContentLength ?? null }
+      } catch (error: unknown) {
+        if (error instanceof NoSuchKey) return null
+        if (isHttpStatusError(error, 404)) return null
+        throw error
+      }
+    }, 'headObject')
+  }
+
   getFileUrl(
     bucket: string,
     key: string,
