@@ -200,7 +200,7 @@ export class AnnotationAttachmentService extends createPrismaBase(
     }
 
     const head = await this.s3.headObject(this.bucket, attachment.storageKey)
-    if (!head || head.contentLength === null) {
+    if (!head || !head.contentLength) {
       throw new BadRequestException('upload_not_received')
     }
     if (

@@ -106,6 +106,49 @@ const buildOverflowFieldLenBuffer = (): Buffer => {
   return Buffer.concat([lfh, cd, eocd])
 }
 
+// A valid archive whose EOCD comment happens to contain the EOCD signature.
+// The backward scan must skip the in-comment match and find the real record.
+const buildCommentWithSignatureBuffer = (): Buffer => {
+  const base = buildZipBuffer(1024)
+  const comment = Buffer.alloc(34)
+  comment.writeUInt32LE(0x06054b50, 0)
+  const withComment = Buffer.concat([base, comment])
+  withComment.writeUInt16LE(comment.length, base.length - 22 + 20)
+  return withComment
+}
+
+// Two central-directory entries where the second has a corrupted signature.
+// The size walk must reject it rather than stop early on the bad entry.
+const buildCorruptSecondEntryBuffer = (): Buffer => {
+  const fileName = Buffer.from('a.xml')
+  const nameLen = fileName.length
+
+  const lfh = Buffer.alloc(30 + nameLen)
+  lfh.writeUInt32LE(0x04034b50, 0)
+  lfh.writeUInt16LE(20, 4)
+  fileName.copy(lfh, 30)
+
+  const cd1 = Buffer.alloc(46 + nameLen)
+  cd1.writeUInt32LE(0x02014b50, 0)
+  cd1.writeUInt32LE(1024, 24)
+  cd1.writeUInt16LE(nameLen, 28)
+  fileName.copy(cd1, 46)
+
+  const cd2 = Buffer.alloc(46)
+
+  const cdSize = cd1.length + cd2.length
+  const cdOffset = lfh.length
+
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(2, 8)
+  eocd.writeUInt16LE(2, 10)
+  eocd.writeUInt32LE(cdSize, 12)
+  eocd.writeUInt32LE(cdOffset, 16)
+
+  return Buffer.concat([lfh, cd1, cd2, eocd])
+}
+
 const buildZip64EocdBuffer = (): Buffer => {
   const fileName = Buffer.from('a.xml')
   const nameLen = fileName.length
@@ -187,13 +230,40 @@ describe('DocxOcrExtractor', () => {
     )
   })
 
-  it('rejects ZIP64 archives as unsupported', async () => {
+  it('rejects a corrupted central-directory entry mid-walk', async () => {
+    const corrupt = buildCorruptSecondEntryBuffer()
+    const { extractor } = buildExtractor(corrupt)
+
+    await expect(extractor.extract(input())).rejects.toThrow(
+      'attachment_invalid_archive',
+    )
+  })
+
+  it('rejects ZIP64 EOCD archives as unsupported', async () => {
     const zip64 = buildZip64EocdBuffer()
     const { extractor } = buildExtractor(zip64)
 
     await expect(extractor.extract(input())).rejects.toThrow(
       'attachment_unsupported_format',
     )
+  })
+
+  it('rejects entries flagged with ZIP64 size sentinels', async () => {
+    const sentinel = buildZipBuffer(0xffffffff)
+    const { extractor } = buildExtractor(sentinel)
+
+    await expect(extractor.extract(input())).rejects.toThrow(
+      'attachment_unsupported_format',
+    )
+  })
+
+  it('finds the real EOCD when the comment contains its signature', async () => {
+    const tricky = buildCommentWithSignatureBuffer()
+    const { extractor } = buildExtractor(tricky)
+
+    const result = await extractor.extract(input())
+
+    expect(result.text).toBe('hello')
   })
 
   it('passes through to mammoth for a valid small archive', async () => {

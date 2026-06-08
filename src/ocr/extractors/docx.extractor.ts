@@ -21,7 +21,12 @@ const findEocdOffset = (buf: Buffer): number => {
     i >= Math.max(0, buf.length - 65557);
     i--
   ) {
-    if (buf.readUInt32LE(i) === EOCD_SIGNATURE) return i
+    if (buf.readUInt32LE(i) !== EOCD_SIGNATURE) continue
+    // Disambiguate the real EOCD from the signature appearing inside an
+    // archive comment: only the true record's comment-length field accounts
+    // for exactly the bytes remaining after it.
+    const commentLen = buf.readUInt16LE(i + 20)
+    if (i + EOCD_MIN_SIZE + commentLen === buf.length) return i
   }
   return -1
 }
@@ -45,7 +50,9 @@ const totalUncompressedSize = (buf: Buffer): number => {
   let pos = cdOffset
   const cdEnd = cdOffset + cdSize
   while (pos + 46 <= cdEnd) {
-    if (buf.readUInt32LE(pos) !== CD_ENTRY_SIGNATURE) break
+    if (buf.readUInt32LE(pos) !== CD_ENTRY_SIGNATURE) {
+      throw new BadRequestException('attachment_invalid_archive')
+    }
     const uncompressed = buf.readUInt32LE(pos + 24)
     if (uncompressed === ZIP64_SENTINEL) {
       throw new BadRequestException('attachment_unsupported_format')
