@@ -23,7 +23,7 @@ import {
   Prisma,
 } from '../../generated/prisma'
 import { addDays } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { chunk } from 'es-toolkit'
 import ms from 'ms'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
@@ -959,13 +959,25 @@ export class MeetingBriefingsService extends createPrismaBase(
       leadInFallback: readLeadIn(artifact),
     })
 
+    // The user-agenda path persists empty meetingTime/meetingTimezone, which
+    // would make fromZonedTime produce NaN. Only emit the exact-instant
+    // property when both are present so HubSpot's datetime field stays valid.
+    const meetingDateTime =
+      meetingTime && meetingTimezone
+        ? fromZonedTime(
+            `${dateString}T${meetingTime}:00`,
+            meetingTimezone,
+          ).getTime()
+        : null
+
     try {
       await this.analytics.track(
         userId,
         'Briefing Assistant - Agenda Created',
         {
           agendaId: dateString,
-          meetingDate: dateString,
+          meetingDate: parseIsoDateAsUTC(dateString).getTime(),
+          ...(meetingDateTime !== null ? { meetingDateTime } : {}),
           meetingTime,
           meetingTimezone,
           meetingPlace: artifact.location ?? '',
