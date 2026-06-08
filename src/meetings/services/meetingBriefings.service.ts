@@ -456,8 +456,10 @@ export class MeetingBriefingsService extends createPrismaBase(
     )
     if (!target) return { dispatched: false }
 
-    await this.dispatchBriefing(ctx, target)
-    return { dispatched: true }
+    // dispatchBriefing returns undefined when the run wasn't enqueued (queue
+    // not configured); don't report success in that case.
+    const result = await this.dispatchBriefing(ctx, target)
+    return { dispatched: !!result }
   }
 
   async onExperimentRunCompleted(run: ExperimentRun): Promise<void> {
@@ -779,6 +781,48 @@ export class MeetingBriefingsService extends createPrismaBase(
     })
   }
 
+  // Resolve the (meetingTime, meetingTimezone) to persist. The platform path
+  // requires a valid HH:MM time and a timezone and returns null (skip the row)
+  // when either is malformed. The user-agenda path dispatches without those
+  // PARAMS — the meeting often isn't on any platform for the agent to read a
+  // time from (ad-hoc / small-jurisdiction meetings are the whole point of
+  // letting a user supply the packet) — so it persists with empty values
+  // rather than skipping. Blocking there would strand the user on a perpetual
+  // "processing" pill for exactly the meetings this feature targets.
+  private resolveMeetingTimeFields(
+    artifact: PrismaJson.MeetingBriefingArtifact,
+    userSuppliedAgenda: boolean,
+    runId: string,
+  ): { meetingTime: string; meetingTimezone: string } | null {
+    const rawTime =
+      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
+    const timeValid = /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(rawTime)
+    if (!timeValid && !userSuppliedAgenda) {
+      this.logger.error(
+        { runId, meetingTime: rawTime },
+        'meeting_briefing artifact has invalid meeting_time',
+      )
+      return null
+    }
+
+    const rawTimezone =
+      typeof artifact.meeting_timezone === 'string'
+        ? artifact.meeting_timezone
+        : ''
+    if (!rawTimezone && !userSuppliedAgenda) {
+      this.logger.error(
+        { runId },
+        'meeting_briefing artifact missing meeting_timezone',
+      )
+      return null
+    }
+
+    return {
+      meetingTime: timeValid ? rawTime : '',
+      meetingTimezone: rawTimezone,
+    }
+  }
+
   private async writeBriefingRowFromArtifact(
     run: ExperimentRun,
     electedOffice: { id: string; userId: number },
@@ -822,27 +866,13 @@ export class MeetingBriefingsService extends createPrismaBase(
       return
     }
 
-    const meetingTime =
-      typeof artifact.meeting_time === 'string' ? artifact.meeting_time : ''
-    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(meetingTime)) {
-      this.logger.error(
-        { runId: run.runId, meetingTime },
-        'meeting_briefing artifact has invalid meeting_time',
-      )
-      return
-    }
-
-    const meetingTimezone =
-      typeof artifact.meeting_timezone === 'string'
-        ? artifact.meeting_timezone
-        : ''
-    if (!meetingTimezone) {
-      this.logger.error(
-        { runId: run.runId },
-        'meeting_briefing artifact missing meeting_timezone',
-      )
-      return
-    }
+    const resolved = this.resolveMeetingTimeFields(
+      artifact,
+      briefingStatus === 'agenda_provided_by_user',
+      run.runId,
+    )
+    if (!resolved) return
+    const { meetingTime, meetingTimezone } = resolved
 
     const electedOfficeId = electedOffice.id
     await this.model.upsert({

@@ -1,4 +1,5 @@
 import {
+  ExperimentRun,
   ExperimentRunStatus,
   MeetingResourceLocationType,
 } from '../../generated/prisma'
@@ -499,6 +500,53 @@ describe('MeetingBriefingsService.onExperimentRunCompleted', () => {
     expect(row).toBeNull()
   })
 
+  it('writes the row for agenda_provided_by_user even when meeting_time is empty', async () => {
+    const orgSlug = `eo-user-agenda-${Date.now()}`
+    await service.prisma.organization.create({
+      data: { slug: orgSlug, ownerId: service.user.id },
+    })
+    const eo = await service.prisma.electedOffice.create({
+      data: { organizationSlug: orgSlug, userId: service.user.id },
+    })
+    const briefingRun = await service.prisma.experimentRun.create({
+      data: {
+        organizationSlug: orgSlug,
+        experimentType: 'meeting_briefing',
+        status: ExperimentRunStatus.COMPLETED,
+        artifactBucket: 'briefing-bucket',
+        artifactKey: 'briefing.json',
+        params: { elected_office_id: eo.id },
+      },
+    })
+    mockS3({
+      'briefing.json': JSON.stringify({
+        briefing_status: 'agenda_provided_by_user',
+        meeting_date: '2026-06-08',
+        meeting_time: '',
+        meeting_timezone: '',
+        meeting_name: 'Special Session',
+      }),
+    })
+
+    await service.app
+      .get(MeetingBriefingsService)
+      .onExperimentRunCompleted(briefingRun)
+
+    const row = await service.prisma.meetingBriefing.findUnique({
+      where: {
+        electedOfficeId_meetingDate: {
+          electedOfficeId: eo.id,
+          meetingDate: new Date('2026-06-08'),
+        },
+      },
+    })
+    expect(row).not.toBeNull()
+    expect(row?.meetingTime).toBe('')
+    expect(row?.meetingTimezone).toBe('')
+    expect(row?.experimentRunId).toBe(briefingRun.runId)
+    expect(row?.artifact?.meeting_name).toBe('Special Session')
+  })
+
   it('does not write a MeetingBriefing row for placeholder briefing_status (awaiting_agenda)', async () => {
     const orgSlug = `eo-awaiting-${Date.now()}`
     await service.prisma.organization.create({
@@ -967,7 +1015,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     const result = await service.app
       .get(MeetingBriefingsService)
@@ -1034,7 +1082,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     const result = await service.app
       .get(MeetingBriefingsService)
@@ -1073,7 +1121,7 @@ describe('MeetingBriefingsService.dispatchManual', () => {
     await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     const result = await service.app
       .get(MeetingBriefingsService)
@@ -1193,7 +1241,7 @@ describe('MeetingBriefingsService location hints', () => {
     await seedScheduleForOrg(orgSlug)
     const dispatchSpy = vi
       .spyOn(service.app.get(ExperimentRunsService), 'dispatchRun')
-      .mockResolvedValue(undefined)
+      .mockResolvedValue({ runId: 'manual-dispatch-run' } as ExperimentRun)
 
     await service.app
       .get(MeetingBriefingsService)
