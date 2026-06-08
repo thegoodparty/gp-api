@@ -8,42 +8,43 @@ import { OnboardingVoterIssuesController } from './onboardingVoterIssues.control
 describe('OnboardingVoterIssuesController', () => {
   let controller: OnboardingVoterIssuesController
   let getVoterIssues: ReturnType<typeof vi.fn>
-  let getDistrictForOrgSlug: ReturnType<typeof vi.fn>
+  let getDistrictAndLevelForOrgSlug: ReturnType<typeof vi.fn>
 
   const organization = { slug: 'org-slug' } as Organization
 
   beforeEach(() => {
     getVoterIssues = vi.fn()
-    getDistrictForOrgSlug = vi.fn()
+    getDistrictAndLevelForOrgSlug = vi.fn()
     controller = new OnboardingVoterIssuesController(
       { getVoterIssues } as unknown as ElectionsService,
-      { getDistrictForOrgSlug } as unknown as OrganizationsService,
+      { getDistrictAndLevelForOrgSlug } as unknown as OrganizationsService,
     )
   })
 
-  it('resolves the district from the organization and forwards to elections service', async () => {
-    getDistrictForOrgSlug.mockResolvedValue({
-      id: 'd-1',
-      l2Type: 'City',
-      l2Name: 'Los Angeles',
+  it('forwards the district and office level to the elections service', async () => {
+    getDistrictAndLevelForOrgSlug.mockResolvedValue({
+      district: { id: 'd-1', l2Type: 'City', l2Name: 'Poway city' },
+      level: 'local',
     })
     const issues = [
-      { label: 'Education', score: 88, priority: 'high' as const },
+      { label: 'Development', score: 78, priority: 'high' as const },
     ]
     getVoterIssues.mockResolvedValue(issues)
 
     const result = await controller.getVoterIssues(organization)
 
-    expect(getDistrictForOrgSlug).toHaveBeenCalledWith('org-slug')
-    expect(getVoterIssues).toHaveBeenCalledWith({ districtId: 'd-1' })
+    expect(getDistrictAndLevelForOrgSlug).toHaveBeenCalledWith('org-slug')
+    expect(getVoterIssues).toHaveBeenCalledWith({
+      districtId: 'd-1',
+      level: 'local',
+    })
     expect(result).toEqual({ issues })
   })
 
   it('coerces a null upstream response to an empty issues array', async () => {
-    getDistrictForOrgSlug.mockResolvedValue({
-      id: 'd-1',
-      l2Type: 'City',
-      l2Name: 'Los Angeles',
+    getDistrictAndLevelForOrgSlug.mockResolvedValue({
+      district: { id: 'd-1', l2Type: 'City', l2Name: 'Poway city' },
+      level: 'local',
     })
     getVoterIssues.mockResolvedValue(null)
 
@@ -52,8 +53,23 @@ describe('OnboardingVoterIssuesController', () => {
     expect(result).toEqual({ issues: [] })
   })
 
+  it('returns no issues when the office level cannot be resolved', async () => {
+    getDistrictAndLevelForOrgSlug.mockResolvedValue({
+      district: { id: 'd-1', l2Type: 'City', l2Name: 'Poway city' },
+      level: null,
+    })
+
+    const result = await controller.getVoterIssues(organization)
+
+    expect(result).toEqual({ issues: [] })
+    expect(getVoterIssues).not.toHaveBeenCalled()
+  })
+
   it('throws NotFoundException when the organization has no district', async () => {
-    getDistrictForOrgSlug.mockResolvedValue(null)
+    getDistrictAndLevelForOrgSlug.mockResolvedValue({
+      district: null,
+      level: null,
+    })
 
     await expect(controller.getVoterIssues(organization)).rejects.toThrow(
       new NotFoundException(
