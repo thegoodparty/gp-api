@@ -50,6 +50,26 @@ export const EVENTS = {
     //  ⚠️  DO NOT MODIFY - Used by HubSpot workflows for weekly task digest emails
     WeeklyTasksDigest: 'Campaign Plan - Weekly Tasks Digest',
   },
+  // Server-side generation for the V2 onboarding campaign plan. The strategic
+  // landscape (CAP/PMF engine) fans out into two independent agent jobs, so it
+  // gets four events. The webapp's view of these is tracked separately under
+  // `Onboarding V2 -` in gp-webapp.
+  CampaignPlanV2: {
+    MediaGenerationStarted: 'Campaign Plan V2 - Media Generation Started',
+    MediaGenerationCompleted: 'Campaign Plan V2 - Media Generation Completed',
+    CommunityEventsGenerationStarted:
+      'Campaign Plan V2 - Community Events Generation Started',
+    CommunityEventsGenerationCompleted:
+      'Campaign Plan V2 - Community Events Generation Completed',
+    OppositionResearchGenerationStarted:
+      'Campaign Plan V2 - Opposition Research Generation Started',
+    OppositionResearchGenerationCompleted:
+      'Campaign Plan V2 - Opposition Research Generation Completed',
+    OpportunitiesChallengesGenerationStarted:
+      'Campaign Plan V2 - Opportunities & Challenges Generation Started',
+    OpportunitiesChallengesGenerationCompleted:
+      'Campaign Plan V2 - Opportunities & Challenges Generation Completed',
+  },
 }
 
 export type UserContext = {

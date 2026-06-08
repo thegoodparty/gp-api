@@ -8,12 +8,14 @@ describe('OrganizationsService', () => {
   let mockGetPositionByBallotReadyId: ReturnType<typeof vi.fn>
   let mockGetPositionById: ReturnType<typeof vi.fn>
   let mockGetDistrictId: ReturnType<typeof vi.fn>
+  let mockGetDistrict: ReturnType<typeof vi.fn>
   let mockCleanDistrictName: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     mockGetPositionByBallotReadyId = vi.fn().mockResolvedValue(null)
     mockGetPositionById = vi.fn().mockResolvedValue(null)
     mockGetDistrictId = vi.fn().mockResolvedValue(null)
+    mockGetDistrict = vi.fn().mockResolvedValue(null)
     mockCleanDistrictName = vi.fn((name: string) => name)
 
     service = new OrganizationsService(
@@ -21,6 +23,7 @@ describe('OrganizationsService', () => {
         getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
         getPositionById: mockGetPositionById,
         getDistrictId: mockGetDistrictId,
+        getDistrict: mockGetDistrict,
         cleanDistrictName: mockCleanDistrictName,
       } as unknown as ElectionsService,
       createMockClerkEnricher(),
@@ -423,6 +426,135 @@ describe('OrganizationsService', () => {
         positionName: null,
       })
       expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getDistrictAndLevelForOrgSlug', () => {
+    let mockFindUnique: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      mockFindUnique = vi.fn().mockResolvedValue(null)
+      service.findUnique = mockFindUnique as typeof service.findUnique
+    })
+
+    const district = {
+      id: 'district-1',
+      state: 'CA',
+      L2DistrictType: 'City',
+      L2DistrictName: 'Poway city',
+    }
+
+    it('resolves the district and maps the position level', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'poway',
+        positionId: 'gp-pos-id',
+        overrideDistrictId: null,
+      })
+      mockGetPositionById.mockResolvedValue({
+        id: 'gp-pos-id',
+        name: 'Poway City Council',
+        level: 'CITY',
+        district,
+      })
+
+      const result = await service.getDistrictAndLevelForOrgSlug('poway')
+
+      expect(result).toEqual({
+        district: {
+          id: 'district-1',
+          state: 'CA',
+          l2Type: 'City',
+          l2Name: 'Poway city',
+        },
+        level: 'local',
+      })
+      expect(mockGetPositionById).toHaveBeenCalledWith('gp-pos-id', {
+        includeDistrict: true,
+      })
+    })
+
+    it('returns a null level when the position has no level', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'poway',
+        positionId: 'gp-pos-id',
+        overrideDistrictId: null,
+      })
+      mockGetPositionById.mockResolvedValue({
+        id: 'gp-pos-id',
+        name: 'Poway City Council',
+        level: null,
+        district,
+      })
+
+      const result = await service.getDistrictAndLevelForOrgSlug('poway')
+
+      expect(result.district).not.toBeNull()
+      expect(result.level).toBeNull()
+    })
+
+    it('resolves the override district with a null level when there is no position', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'poway',
+        positionId: null,
+        overrideDistrictId: 'district-1',
+      })
+      mockGetDistrict.mockResolvedValue(district)
+
+      const result = await service.getDistrictAndLevelForOrgSlug('poway')
+
+      expect(result).toEqual({
+        district: {
+          id: 'district-1',
+          state: 'CA',
+          l2Type: 'City',
+          l2Name: 'Poway city',
+        },
+        level: null,
+      })
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+
+    it('returns null district and level when the org is not found', async () => {
+      const result = await service.getDistrictAndLevelForOrgSlug('missing')
+
+      expect(result).toEqual({ district: null, level: null })
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+
+    it('takes the district from the override but the level from the position when both are set', async () => {
+      mockFindUnique.mockResolvedValue({
+        slug: 'poway',
+        positionId: 'gp-pos-id',
+        overrideDistrictId: 'override-district-1',
+      })
+      mockGetPositionById.mockResolvedValue({
+        id: 'gp-pos-id',
+        name: 'Poway City Council',
+        level: 'CITY',
+        district,
+      })
+      mockGetDistrict.mockResolvedValue({
+        id: 'override-district-1',
+        state: 'CA',
+        L2DistrictType: 'County',
+        L2DistrictName: 'San Diego county',
+      })
+
+      const result = await service.getDistrictAndLevelForOrgSlug('poway')
+
+      expect(result).toEqual({
+        district: {
+          id: 'override-district-1',
+          state: 'CA',
+          l2Type: 'County',
+          l2Name: 'San Diego county',
+        },
+        level: 'local',
+      })
+      expect(mockGetPositionById).toHaveBeenCalledWith('gp-pos-id', {
+        includeDistrict: true,
+      })
+      expect(mockGetDistrict).toHaveBeenCalledWith('override-district-1')
     })
   })
 

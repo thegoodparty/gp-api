@@ -39,6 +39,8 @@ import {
 } from './electionApi.service'
 import { StrategicLandscapeParamsService } from './strategicLandscapeParams.service'
 import { StrategicLandscapePersister } from './strategicLandscape.persister'
+import { AnalyticsService } from '@/analytics/analytics.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
 
 const OPPOSITION = 'opposition_research'
 const OPPORTUNITIES = 'opportunities_and_challenges'
@@ -169,8 +171,19 @@ export class CampaignStrategyService
     private readonly communityEvents: CommunityEventsService,
     private readonly electionApi: ElectionApiService,
     private readonly races: RacesService,
+    private readonly analytics: AnalyticsService,
   ) {
     super()
+  }
+
+  private async resolveCampaignUserId(
+    campaignId: number,
+  ): Promise<number | null> {
+    const campaign = await this.client.campaign.findUnique({
+      where: { id: campaignId },
+      select: { userId: true },
+    })
+    return campaign?.userId ?? null
   }
 
   async getOrGenerateStrategicLandscape(
@@ -244,6 +257,8 @@ export class CampaignStrategyService
     })
     if (!plan) return
 
+    const userId = await this.resolveCampaignUserId(plan.campaignId)
+
     // If loading, parsing, or persisting the artifact fails, the run was
     // marked COMPLETED upstream but its section never landed. Flip it to
     // FAILED so the endpoint reports 'failed' rather than a permanent
@@ -254,6 +269,23 @@ export class CampaignStrategyService
 
       if (run.experimentType === OPPOSITION) {
         await this.persister.persistOpponents(plan.id, parseOpponents(raw))
+        if (userId !== null) {
+          void this.analytics
+            .track(
+              userId,
+              EVENTS.CampaignPlanV2.OppositionResearchGenerationCompleted,
+              {
+                campaignId: plan.campaignId,
+                planId: plan.id,
+                generationEngine: 'cap',
+                runId: run.runId,
+                durationSeconds: run.durationSeconds,
+                costUsd: run.costUsd,
+                outcome: run.status,
+              },
+            )
+            .catch(() => undefined)
+        }
       } else {
         const { opportunities, challenges } =
           parseOpportunitiesAndChallenges(raw)
@@ -262,6 +294,23 @@ export class CampaignStrategyService
           opportunities,
           challenges,
         )
+        if (userId !== null) {
+          void this.analytics
+            .track(
+              userId,
+              EVENTS.CampaignPlanV2.OpportunitiesChallengesGenerationCompleted,
+              {
+                campaignId: plan.campaignId,
+                planId: plan.id,
+                generationEngine: 'cap',
+                runId: run.runId,
+                durationSeconds: run.durationSeconds,
+                costUsd: run.costUsd,
+                outcome: run.status,
+              },
+            )
+            .catch(() => undefined)
+        }
       }
     } catch (error) {
       await this.experimentRuns.markFailed(
@@ -373,7 +422,12 @@ export class CampaignStrategyService
     electionDate: string,
   ): Promise<void> {
     const ctx = await this.buildEventsContext(campaign, brHashId, electionDate)
-    await this.communityEvents.generate(planId, campaign.id, ctx)
+    await this.communityEvents.generate(
+      planId,
+      campaign.id,
+      campaign.userId,
+      ctx,
+    )
   }
 
   // Build the community-events prompt context by combining election-api's
@@ -554,10 +608,10 @@ export class CampaignStrategyService
       states.opposition !== 'inflight' && states.opportunities !== 'inflight'
 
     const opposition = dispatchOpposition
-      ? await this.attemptOpposition(plan, base, freshStart)
+      ? await this.attemptOpposition(campaign.userId, plan, base, freshStart)
       : states.opposition
     const opportunities = dispatchOpportunities
-      ? await this.attemptOpportunities(plan, base, freshStart)
+      ? await this.attemptOpportunities(campaign.userId, plan, base, freshStart)
       : states.opportunities
 
     return this.statusFrom(opposition, opportunities)
@@ -568,6 +622,7 @@ export class CampaignStrategyService
   // most MAX_SECTION_ATTEMPTS slots in total — bounding the Fargate runs a
   // failing-and-retried (or maliciously hammered) section can spawn.
   private async attemptOpposition(
+    userId: number,
     plan: CampaignStrategy,
     base: DispatchBase,
     freshStart: boolean,
@@ -580,6 +635,22 @@ export class CampaignStrategyService
 
     const runId = await this.tryDispatch(OPPOSITION, base)
     if (!runId) return 'stalled'
+
+    if (freshStart) {
+      void this.analytics
+        .track(
+          userId,
+          EVENTS.CampaignPlanV2.OppositionResearchGenerationStarted,
+          {
+            campaignId: plan.campaignId,
+            planId: plan.id,
+            generationEngine: 'cap',
+            runId,
+            attempt: plan.oppositionAttempts + 1,
+          },
+        )
+        .catch(() => undefined)
+    }
 
     try {
       await this.client.campaignStrategy.update({
@@ -602,6 +673,7 @@ export class CampaignStrategyService
   }
 
   private async attemptOpportunities(
+    userId: number,
     plan: CampaignStrategy,
     base: DispatchBase,
     freshStart: boolean,
@@ -617,6 +689,22 @@ export class CampaignStrategyService
 
     const runId = await this.tryDispatch(OPPORTUNITIES, base)
     if (!runId) return 'stalled'
+
+    if (freshStart) {
+      void this.analytics
+        .track(
+          userId,
+          EVENTS.CampaignPlanV2.OpportunitiesChallengesGenerationStarted,
+          {
+            campaignId: plan.campaignId,
+            planId: plan.id,
+            generationEngine: 'cap',
+            runId,
+            attempt: plan.opportunitiesAttempts + 1,
+          },
+        )
+        .catch(() => undefined)
+    }
 
     try {
       await this.client.campaignStrategy.update({

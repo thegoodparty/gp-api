@@ -33,16 +33,20 @@ export class OnboardingVoterIssuesController {
   async getVoterIssues(
     @ReqOrganization() organization: Organization,
   ): Promise<VoterIssuesResponse> {
-    const district = await this.organizations.getDistrictForOrgSlug(
-      organization.slug,
-    )
+    const { district, level } =
+      await this.organizations.getDistrictAndLevelForOrgSlug(organization.slug)
     if (!district) {
       throw new NotFoundException(
         `No district associated with organization "${organization.slug}"`,
       )
     }
+    // Scope issues to the office's jurisdiction. Without a resolvable level we
+    // return nothing rather than the unfiltered national list, which would
+    // surface federal topics irrelevant to a local race.
+    if (!level) return { issues: [] }
     const issues = await this.elections.getVoterIssues({
       districtId: district.id,
+      level,
     })
     return { issues: issues ?? [] }
   }

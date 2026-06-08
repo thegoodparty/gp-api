@@ -1,4 +1,7 @@
-import type { RaceTargetMetrics } from '@goodparty_org/contracts'
+import type {
+  BallotReadyPositionLevel,
+  RaceTargetMetrics,
+} from '@goodparty_org/contracts'
 export type { RaceTargetMetrics } from '@goodparty_org/contracts'
 
 export type BDElection = {
@@ -80,6 +83,8 @@ export type VoterIssue = {
   priority: 'high' | 'medium' | 'low'
 }
 
+export type VoterIssueLevel = 'local' | 'regional' | 'state' | 'federal'
+
 export enum ProjectedTurnoutSourceColumns {
   id = 'id',
   createdAt = 'createdAt',
@@ -150,6 +155,7 @@ export type PositionWithOptionalDistrict = {
   brDatabaseId: string
   state: string
   name: string
+  level?: BallotReadyPositionLevel | null
   district?: District
   filingFee?: number | null
   filingRequirementsText?: string | null
